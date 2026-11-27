@@ -121,7 +121,7 @@ run on a lamp.
   needs `--stand` and `--home`, widens only once the lamp stands at its full height and never narrows, and keeps every other bound. The look
   is held inside the pitch servo's own stored range less 20 counts, and a lamp about to sit down from a look past today's reach waits, with
   today's reach in force so the head's goal is pulled in at the pose's speed cap, and folds only once the head is back inside it (no timeout;
-  a safety sit-down or a run that is ending is never held, but today's reach is in force at once for it), so the arm never folds under a head the map has not cleared. First try: the look is capped at 45 degrees (512 counts) down from home until `LAMP_BODY_DEV_REACH_MEASURED=on` is set by hand after a measured run (a test cap on a dev lamp, never a user limit; the journal line says the cap).
+  a safety sit-down or a run that is ending is never held, but today's reach is in force at once for it), so the arm never folds under a head the map has not cleared. First try: the look is capped at 45 degrees (512 counts) down from home until `LAMP_BODY_DEV_REACH_MEASURED=on` is set by hand after a measured run; `LAMP_BODY_DEV_REACH_PAST_MAP=N` (a whole number of counts, 1..1,024) sets the look to exactly N counts instead, past the map's end, for a measured run of a pose the map only models (ignored without `LAMP_BODY_DEV_REACH=on`) (a test cap on a dev lamp, never a user limit; the journal line says the cap).
   The margin is 48 counts, taken from the stand pose's pitch (what the reach is added to), stricter than the body's own 20. A look is held to
   these bounds; `body/limits` and `get body` stay a folded lamp's ("The body's limits", `docs/control.md`), so the page's band reads the
   folded numbers while the lamp stands.

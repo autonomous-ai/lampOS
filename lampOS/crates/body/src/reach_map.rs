@@ -496,6 +496,33 @@ pub fn dev_reach_capped(counts: f32, measured: Option<&str>) -> f32 {
     }
 }
 
+/// `LAMP_BODY_DEV_REACH_PAST_MAP=N` (a dev lamp only, never a product unit; #7513): with the dev reach on, the standing head may look down N
+/// counts from home, past the map's end and the first-try cap, for a measured run of a pose the map only models. Never more than
+/// [`DEV_PAST_MAP_MAX`]; a value that is not a whole number of counts in 1..=that is ignored (the map reach as before).
+pub const DEV_REACH_PAST_MAP: &str = "LAMP_BODY_DEV_REACH_PAST_MAP";
+pub const DEV_PAST_MAP_MAX: f32 = 1_024.0;
+
+/// The dev reach's look down (counts) once the map's own is read (`map_counts`): `None` unless the dev reach is on; the first-try cap
+/// ([`dev_reach_capped`]) unless `measured` is `on`; and N counts, no more than [`DEV_PAST_MAP_MAX`], when `past` is a whole number N
+/// (replacing both the map's end and the cap).
+pub fn dev_reach_final(
+    reach_on: bool,
+    map_counts: f32,
+    measured: Option<&str>,
+    past: Option<&str>,
+) -> Option<f32> {
+    if !reach_on {
+        return None;
+    }
+    let past = past
+        .and_then(|text| text.trim().parse::<u32>().ok())
+        .filter(|n| (1..=DEV_PAST_MAP_MAX as u32).contains(n));
+    Some(match past {
+        Some(n) => n as f32,
+        None => dev_reach_capped(map_counts, measured),
+    })
+}
+
 /// Whether a value of [`DEV_REACH`] turns the map reach on.
 pub fn dev_reach_from(value: Option<&str>) -> bool {
     value == Some("on")
@@ -811,6 +838,31 @@ mod tests {
             Ok(2648.0_f32 + 19.0 - 1822.0 - 48.0)
         );
         assert_eq!(dev_pitch_down(Ok(map_75c9()), &LAMP_75C9), Ok(825.0));
+    }
+
+    #[test]
+    fn the_past_map_override_never_passes_n_and_is_ignored_without_the_dev_reach() {
+        let past = |on, map, measured, past: Option<&str>| dev_reach_final(on, map, measured, past);
+        // Without the dev reach nothing is asked, whatever else is set.
+        assert_eq!(past(false, 825.0, Some("on"), Some("1024")), None);
+        assert_eq!(past(false, 825.0, None, None), None);
+        // On, no override: the cap and the map as before.
+        assert_eq!(past(true, 825.0, None, None), Some(512.0));
+        assert_eq!(past(true, 825.0, Some("on"), None), Some(825.0));
+        // An override is N counts, past the map's end and the cap, and never more than 1,024.
+        assert_eq!(past(true, 825.0, None, Some("1024")), Some(1_024.0));
+        assert_eq!(past(true, 825.0, None, Some("900")), Some(900.0));
+        assert_eq!(past(true, 825.0, None, Some("1025")), Some(512.0));
+        assert_eq!(past(true, 825.0, Some("on"), Some("99999")), Some(825.0));
+        // Not a whole number of counts, or zero: ignored.
+        for bad in ["", "0", "-5", "12.5", "off", "1e3"] {
+            assert_eq!(past(true, 825.0, None, Some(bad)), Some(512.0), "{bad}");
+        }
+        for n in 1..=1_024u32 {
+            let said = n.to_string();
+            let got = past(true, 825.0, Some("on"), Some(&said)).unwrap();
+            assert!(got <= 1_024.0 && got == n as f32);
+        }
     }
 
     #[test]

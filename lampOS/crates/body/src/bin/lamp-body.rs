@@ -185,14 +185,19 @@ fn dev_pitch_down_of(arguments: &Arguments) -> Option<f32> {
     };
     match map::dev_pitch_down(text, &lamp) {
         Ok(counts) => {
-            let counts = map::dev_reach_capped(
-                counts,
+            let map_counts = counts;
+            let counts = map::dev_reach_final(
+                true,
+                map_counts,
                 std::env::var(map::DEV_REACH_MEASURED).ok().as_deref(),
-            );
+                std::env::var(map::DEV_REACH_PAST_MAP).ok().as_deref(),
+            )
+            .unwrap_or(map_counts);
             eprintln!(
-                "lamp-body: LAMP_BODY_DEV_REACH: the standing head may look down {counts} counts from home (the map {path}, {} counts kept off its end; first-try cap {} counts until LAMP_BODY_DEV_REACH_MEASURED=on)",
+                "lamp-body: LAMP_BODY_DEV_REACH: the standing head may look down {counts} counts from home (the map {path}, {} counts kept off its end, {map_counts} counts; first-try cap {} counts until LAMP_BODY_DEV_REACH_MEASURED=on; LAMP_BODY_DEV_REACH_PAST_MAP=N sets it to N counts, at most {})",
                 map::DEV_MARGIN,
-                map::DEV_FIRST_TRY_CAP_COUNTS
+                map::DEV_FIRST_TRY_CAP_COUNTS,
+                map::DEV_PAST_MAP_MAX
             );
             Some(counts)
         }

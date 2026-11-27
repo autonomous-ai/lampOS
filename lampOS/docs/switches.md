@@ -1149,6 +1149,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_BODY_APP_REACH` | A program can move the lamp's joints up to 90% of the way to their hardware limits (a dev lamp only). |
 | `LAMP_BODY_DEV_REACH` | A dev lamp's standing head may look down as far as its own reach map allows; the product never sets it. |
 | `LAMP_BODY_DEV_REACH_MEASURED` | Lifts the dev reach's first-try cap of 45 degrees once the lamp has had a measured run; a dev lamp only, the product never sets it. |
+| `LAMP_BODY_DEV_REACH_PAST_MAP` | On a dev lamp with the dev reach on, N counts (1 to 1,024) is how far the standing head may look down, past the map's end, for a measured run; the product never sets it. |
 | `LAMP_BODY_STRAIN_GUARD` | If the lamp's arm strains or overheats twice in an hour, it stays folded until you hold its head for a second. |
 | `LAMP_BODY_SEAT_COOLS` | A lamp that sat down because its arm got hot says so, and gets back up by itself once it has cooled. |
 | `LAMP_BODY_STRAIN_REST_COOLS` | A lamp that sat down for a strain stays down until you ask it up; if it got hot, until it cools. |
