@@ -3578,6 +3578,8 @@ fn second_route_worker_environment(
         // Only after the lamp's answer: a line over it has no print.
         crate::said_to_me::FOLLOW_UPS_AFTER_THE_ANSWER,
         crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
+        // New work asked right after the lamp's news is handed over (#8701).
+        crate::agent_tasks::AFTER_NEWS_ENVIRONMENT,
         // A line asking to remember the person's face, with their name,
         // calls remember_my_face (the owner's try on lamp-4ace, 23 Oct).
         crate::known_faces::ASKED_ENVIRONMENT,
@@ -3988,6 +3990,7 @@ mod tests {
             crate::said_to_me::FOLLOW_UPS,
             crate::said_to_me::FOLLOW_UPS_AFTER_THE_ANSWER,
             crate::agent_tasks::NAMED_ASK_ENVIRONMENT,
+            crate::agent_tasks::AFTER_NEWS_ENVIRONMENT,
             crate::known_faces::ASKED_ENVIRONMENT,
             crate::known_faces::RECORD_TOLD_ENVIRONMENT,
             crate::known_faces::RENAME_ASKED_ENVIRONMENT,
@@ -5312,6 +5315,7 @@ mod tests {
                     || name == crate::said_to_me::FOLLOW_UPS
                     || name == crate::said_to_me::FOLLOW_UPS_AFTER_THE_ANSWER
                     || name == crate::agent_tasks::NAMED_ASK_ENVIRONMENT
+                    || name == crate::agent_tasks::AFTER_NEWS_ENVIRONMENT
                     || name == crate::known_faces::ASKED_ENVIRONMENT
                     || name == crate::known_faces::RECORD_TOLD_ENVIRONMENT
                     || name == crate::known_faces::RENAME_ASKED_ENVIRONMENT
@@ -5658,6 +5662,7 @@ mod tests {
                     "LAMP_SKILL_YES_CARRY=on",
                     "LAMP_SPEAKING_READ_LOOKS=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
+                    "LAMP_TASKS_AFTER_NEWS=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                     "LAMP_TIMER_ASKS_HOW_LONG=on",
