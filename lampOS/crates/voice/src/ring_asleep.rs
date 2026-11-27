@@ -590,6 +590,34 @@ pub fn persons_light(bus: &lamp_bus::Bus) -> Option<crate::ring_face::Lit> {
         .flatten()
 }
 
+/// Whether the person turned their light off (#8634: the app's "Keep a
+/// light on while resting" switch is their light being on): the ring's
+/// last `light/state`, else the light last asked for on the bus, else the
+/// one kept on disk at `kept` ([`crate::ring_light::KEEP_PATH`], with
+/// `LAMP_LIGHT_KEEP=on`), so a restart, which empties the bus, keeps the
+/// choice. Never said anywhere: not off, and the asleep face shows as
+/// before.
+pub fn persons_light_off(bus: Option<&lamp_bus::Bus>, kept: &std::path::Path) -> bool {
+    let said = |topic: &str, ring_only: bool| {
+        let message = bus?.latest(topic).ok().flatten()?;
+        if ring_only && message.header.source != crate::ring_light::SOURCE {
+            return None;
+        }
+        message.parse::<lamp_msgs::Light>().ok()
+    };
+    let [asked, state] = lamp_msgs::Light::TOPICS;
+    said(state, true)
+        .or_else(|| said(asked, false))
+        .or_else(|| crate::ring_light::kept_on_disk(kept))
+        .is_some_and(|light| !light.on)
+}
+
+/// The muted wait's asleep face under `ceiling`, unless the person's light
+/// is off (#8634): then every light stays off while the lamp sleeps.
+pub fn face_ceiling(ceiling: Option<u16>, persons_light_off: bool) -> Option<u16> {
+    ceiling.filter(|_| !persons_light_off)
+}
+
 /// The person's light drawn at once ([`light_pixels`]) until stopped, then
 /// black, or left on the ring when told to `leave` (a wake).
 fn paint_light<S: FrameSink>(
@@ -1343,6 +1371,66 @@ mod tests {
         actions.publish_json(1, &said(true, "red", 5)).unwrap();
         assert_eq!(persons_light(&bus), None, "another part's");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #8634: the app's "Keep a light on while resting" switch is the
+    /// person's light being on. Off is read from the ring's last
+    /// `light/state`, else the light last asked for on the bus, else the
+    /// one kept on disk, so a restart, which empties the bus, keeps the
+    /// choice. Never said anywhere: not off, the asleep face as before.
+    #[test]
+    fn the_persons_light_is_off_from_the_ring_the_bus_or_the_disk() {
+        let root = std::env::temp_dir().join(format!("lamp-voice-off-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let kept = root.join("person.json");
+        let said = |on| lamp_msgs::Light {
+            on,
+            colour: "warm".into(),
+            level: 1,
+        };
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        assert!(!persons_light_off(Some(&bus), &kept), "never said");
+        assert!(!persons_light_off(None, &kept), "no bus, nothing kept");
+        // A restart: the bus is empty, the disk keeps the choice.
+        std::fs::write(&kept, serde_json::to_vec(&said(false)).unwrap()).unwrap();
+        assert!(persons_light_off(Some(&bus), &kept), "kept off");
+        assert!(persons_light_off(None, &kept), "kept off, no bus");
+        std::fs::write(&kept, serde_json::to_vec(&said(true)).unwrap()).unwrap();
+        assert!(!persons_light_off(Some(&bus), &kept), "kept on");
+        // The light asked for on the bus comes before the disk.
+        let mut asked = bus
+            .publisher_declared(
+                lamp_msgs::Light::TOPICS[0],
+                &lamp_msgs::Light::declaration(),
+                "cloud",
+            )
+            .unwrap();
+        asked.publish_json(1, &said(false)).unwrap();
+        assert!(persons_light_off(Some(&bus), &kept), "asked off");
+        // And the ring's own state before both.
+        let mut ring = bus
+            .publisher_declared(
+                lamp_msgs::Light::TOPICS[1],
+                &lamp_msgs::Light::declaration(),
+                crate::ring_light::SOURCE,
+            )
+            .unwrap();
+        ring.publish_json(1, &said(true)).unwrap();
+        assert!(!persons_light_off(Some(&bus), &kept), "the ring says on");
+        ring.publish_json(2, &said(false)).unwrap();
+        assert!(persons_light_off(Some(&bus), &kept), "the ring says off");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #8634: with the person's light off, no asleep face is started, so
+    /// the ring stays as the conversation's ring left it, black; on, or
+    /// never said, the face as today.
+    #[test]
+    fn a_light_turned_off_keeps_the_ring_dark_asleep() {
+        assert_eq!(face_ceiling(Some(48), true), None);
+        assert_eq!(face_ceiling(Some(48), false), Some(48));
+        assert_eq!(face_ceiling(None, false), None);
     }
 
     /// #1362: with the person's light, the sleep draws it at once, from the

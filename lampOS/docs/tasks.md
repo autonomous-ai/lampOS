@@ -2674,9 +2674,15 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     order puts it first, the `targets` answer says it as the `lamp`
     target's engine (so the voice names it), and the lamp's target is
     written again at the next look. `{"op":"app_engine_default_state"}`
-    reads it. Both answer `{"ok":true,"default":"claude","chosen_in_app":true}`
+    reads it. Both answer `{"ok":true,"default":"claude","chosen_in_app":true,"gateway":"ready"}`
     (`default` null when the lamp has no engine; `chosen_in_app` true only
-    while the app's choice is the default). The file is read at start;
+    while the app's choice is the default; `gateway` the agent switch's
+    state, `direct::gateway_said`: `switching` from the moment the default
+    changed until the new default's direct session finds its gateway ready,
+    then `ready`; `ready` too when the default has no direct session).
+    lamp-update's read (`app_engine_default_state` on its route) carries
+    the same field. `update.status` is not built here: lamp-cloud answers it
+    from lamp-update's `update/status` (`crates/update/src/status.rs`). The file is read at start;
     missing, not valid, or naming an engine Harness starts with no task is
     no choice. A choice no longer among the lamp's engines (Harness no
     longer reports it, or its switch is off) is passed over, not wiped.
@@ -6456,8 +6462,13 @@ With the switch on and a session built:
 - **At the start.** A pump thread (`openclaw-direct`; Hermes's
   `hermes-direct`) connects at once and
   opens or adopts the kept session, with no ask needed. A failed look is tried
-  again after 0.5 s, doubled each time, at most 30 s (2 s while something
-  waits). While ready and idle, it looks again every 30 s. The one session's
+  again after 0.5 s, doubled each time, at most 30 s; at most 2 s
+  (`direct::retry_most`) while something waits (a queued turn, a launch
+  waiting for readiness, a run in flight) or while its engine is the lamp's
+  default, so the lamp's own agent is ready within about 2 s of its gateway
+  coming up. A launch that starts waiting wakes a pump resting through its
+  back-off, which then looks at once. While ready and idle, it looks again
+  every 30 s. The one session's
   pane (`LAMP_TASKS_ONE_SESSION`) is not opened: it only ever took OpenClaw's
   turns.
 - **A spoken task.** An OpenClaw task for the lamp's own machine with no session
@@ -6635,15 +6646,75 @@ Harness and `hermes chat -q`: one connection to Hermes's own API server and one
 kept session. OpenClaw's switch and its path are unchanged; each engine has its
 own session, and both may be on (`direct::lamps`).
 
-Hermes's direct session takes a task only while Hermes is the lamp's default
-engine (`direct::serves_now`, the first of `lamp_order`, read live so the app's
-choice counts at once), because lamp-update runs Hermes's gateway only then.
-On a lamp whose default is OpenClaw, a task named for Hermes ("Ask Hermes
-to ...", `LAMP_TASKS_NAMED_ONLY`) keeps Harness's path and its progress, as
-before this switch, with no wait for a gateway that never starts. A task keeps
-the path it started on: a direct Hermes turn still running when the app's
-default moves to OpenClaw stays on its run (`Direct::path` counts its own turns
-whatever the default), never asked of Harness, which never had it.
+Each direct session, Hermes's and OpenClaw's, takes a task only while its
+engine is the lamp's default (`direct::serves_now`, the first of `lamp_order`,
+read live so the app's choice counts at once), because lamp-update runs one
+agent's gateway at a time, the default's. On a lamp whose default is OpenClaw,
+a task named for Hermes ("Ask Hermes to ...", `LAMP_TASKS_NAMED_ONLY`) keeps
+Harness's path and its progress, as before this switch, with no wait for a
+gateway that never starts. On a lamp whose default is Hermes, a spoken task
+for OpenClaw is refused at once with `agent_not_lamp_default`
+(`direct::not_default_for`; the voice's Task news tells it in one short line,
+`failed_not_default`: "OpenClaw isn't the lamp's agent right now."),
+and a skill run or make for it fails at once with words naming that code,
+in place of the 60 s (spoken) or 240 s (skill run) wait for OpenClaw's
+gateway. The queue's hold for OpenClaw's cold gateway (`runtime::gateway_wait`,
+at most 480 s, #8105) never holds such a task, nor marks the gateway wanted:
+it reaches the worker's refusal at once.
+
+**The agent switch** (the owner's rule). When the lamp's default agent
+changes (the app's `app_engine_default` at once, or any other change of
+`lamp_order` within `direct::SWITCH_LOOK_EVERY`, 1 s, from lamp-tasks' main
+loop; `direct::switch_check`), every turn of the old agent's direct session
+that has not ended, queued or running, ends at once with `direct::SWITCHED`
+("This task ended because the lamp switched to another agent. Please ask
+again."), carried as its observation's answer (state `failed`) as a gateway
+drop's words are, so the voice's news of a stopped task says it; a skill run
+fails with it. A running one is also aborted on its gateway, best effort, on a
+thread of its own. The new default's session stops trusting its last "ready",
+is woken and looks at its gateway at once, then at most every 2 s; the
+engines' default read says `"gateway":"switching"` until it answers, then
+`"ready"`. The journal says `tasks: direct: agent switch started: <old> to
+<new>; ...` and `tasks: direct: agent switch: <new> is ready, <ms> ms after
+the switch`. A turn no longer keeps the path it started on (#8431 kept a
+running Hermes turn on its run when the default moved; the switch now ends
+it): `Direct::path` counts its own turns only once they have ended, so their
+last look is still read from here, never asked of Harness, which never had
+them.
+
+**The agent switch, said aloud** (lamp-voice, `agent_switch_told`). The lamp
+says one fixed line when a switch starts, "Switching to OpenClaw." or
+"Switching to Hermes.", and one when the new agent's gateway answers,
+"OpenClaw is ready." or "Hermes is ready.", only in a conversation: a turn
+open (a reply in hand, or a stream the person owns), or the thread's
+conversation going on (the lamp's words within `thread::GOING_ON_FOR`, 45 s,
+not closed since) with someone at the lamp (`reminders::someone_here`: a face
+in view, or a person heard within the last two minutes), so the lamp's own
+unasked words, such as task news, to an empty room open none. A switch asked
+by voice is in one by its nature. A switch made in the app while the room is
+quiet or empty is never spoken: it shows in the app and on the light alone. How it is read: while a conversation is open, and
+only then, a thread of lamp-voice's own reads lamp-tasks' `targets` on its
+request socket every `agent_switch_told::READ_EVERY` (1 s); the lamp target's
+`engine` changing within one conversation is a switch (a conversation that
+opens after a switch never says it), and the answer's top-level `gateway`
+(`switching` or `ready`) is its readiness. A `ready` read within
+`SETTLE_US` (2.5 s) of the change counts only once `switching` was seen, so
+the old gateway's last word is never taken for the new one. Each line is said
+once a switch; the ready line only after its switching line was said, and
+never once the conversation ended (`ENDS_AFTER_US`, 2 s with no sign of it).
+A switch to an engine other than OpenClaw or Hermes is not said. The line
+waits for nothing of the lamp's own being said and 1 s of quiet from the
+person (`task_news::PAUSE_US`), and is said through the model's route as
+written (`onboarding::said_as_is`), in the owner's language (English,
+Vietnamese, Japanese, Chinese, Korean, French); the trace records
+`agent_switch_said` with its `moment`. lamp-tasks gives `gateway` on the
+engines' default read only, which lamp-voice's route may not ask: until
+`targets` carries it too, the ready line is never said and the switching line
+is. Work the switch ended is told by Task news in one short line: "That
+stopped because I switched to another agent. Please ask me again." It is the
+lamp's exact line in the owner's language (`agent_switch_told::ended_note`,
+said as written like the switch's own lines), never worded by the chat model
+or the news agent; the skill has no prompt for it.
 
 Hermes direct behaves the same as OpenClaw direct (the owner's acceptance, 23
 Nov): lamp tasks run, and "how far along?" and the status rows are answered
@@ -6709,8 +6780,11 @@ same as OpenClaw's skills. What is Hermes's own:
   it was listed idle while its close was refused for about 27 min, and its
   reads kept OpenClaw's Gateway running beside Hermes's. Any other pane on
   OpenClaw (a person's, opened in Harness) keeps the rule unchanged: listed
-  and not ended, it keeps the Gateway up, and marks it wanted for
-  `gateway::IN_USE_HOLD` (4 h).
+  and not ended, lamp-tasks marks it in use for `gateway::IN_USE_HOLD` (4 h)
+  and says `openclaw_in_use` on its answer, but lamp-update no longer reads
+  that field: OpenClaw's Gateway follows the default agent alone, so it never
+  runs beside Hermes's (one agent gateway at a time, lamp-update's
+  `gateway_keeper`).
 - **A skill's `do.task` and a make.** With the lamp's Hermes the default and its
   switch on, `HarnessRunner::run` takes the run on the one run path as a
   gateway agent's (`by_start`), whatever the Harness default-agent switch says,

@@ -2470,13 +2470,29 @@ fn sleep_light(bus: Option<&lamp_bus::Bus>) -> Option<crate::ring_face::Lit> {
     bus.and_then(crate::ring_asleep::persons_light)
 }
 
+/// Whether the person's light is off now (#8634), from the bus and the
+/// light kept on disk (Linux, where the ring is).
+#[cfg(target_os = "linux")]
+fn lights_off() -> bool {
+    let bus = lamp_bus::Bus::from_environment().ok();
+    crate::ring_asleep::persons_light_off(
+        bus.as_ref(),
+        std::path::Path::new(crate::ring_light::KEEP_PATH),
+    )
+}
+
 /// What a hand's sleep shows on the lamp's own ring (Linux): the person's
-/// own light, if their ring said one was on, and the asleep face otherwise
-/// (#1362, the first builder on #1362, 21 Oct 15:1x).
+/// own light, if their ring said one was on, the asleep face otherwise
+/// (#1362, the first builder on #1362, 21 Oct 15:1x), and nothing when
+/// their light is off (#8634).
 fn sleeping_face(ceiling: u16) -> Option<crate::ring_asleep::Asleep> {
     #[cfg(target_os = "linux")]
     {
         let bus = lamp_bus::Bus::from_environment().ok();
+        let kept = std::path::Path::new(crate::ring_light::KEEP_PATH);
+        if crate::ring_asleep::persons_light_off(bus.as_ref(), kept) {
+            return None;
+        }
         crate::ring_asleep::Asleep::sleeping(ceiling, sleep_light(bus.as_ref()))
     }
     #[cfg(not(target_os = "linux"))]
@@ -3686,7 +3702,8 @@ fn run_source(
                 termination,
                 |trace, cues| {
                     #[cfg(target_os = "linux")]
-                    let asleep = asleep_ceiling.and_then(crate::ring_asleep::Asleep::start);
+                    let asleep = crate::ring_asleep::face_ceiling(asleep_ceiling, lights_off())
+                        .and_then(crate::ring_asleep::Asleep::start);
                     #[cfg(not(target_os = "linux"))]
                     let _ = asleep_ceiling;
                     let tap_face = tap_face_ceiling.map(|ceiling| {
@@ -4481,6 +4498,13 @@ fn observe_provider_output(
         | ProviderOutput::RequestedAudio { .. } => {}
         // Tied to no turn: taken by the loop (#7418).
         ProviderOutput::MakesUnderWay { .. } => {}
+        // The failed calls of a request, from the second worker, a process of
+        // its own, for the turn's record (#8726).
+        ProviderOutput::Cases {
+            request,
+            failed,
+            proofs,
+        } => crate::turn_ledger::told_cases(*request, failed.clone(), proofs.clone()),
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
         // (#1390), as with news told unasked.
@@ -7006,6 +7030,10 @@ fn conversation_with_gate_inner(
     let mut signed_out = signed_out::SignedOut::from_environment();
     // The owner's Update now (#7517): lamp-update's moment for the voice.
     let mut give_way = give_way::GiveWay::from_environment();
+    // The lamp's agent switch (OpenClaw or Hermes), said only in a
+    // conversation: "Switching to Hermes.", then "Hermes is ready."
+    // (`agent_switch_told`). On whenever the tasks part is.
+    let mut agent_switch = crate::agent_switch_told::AgentSwitchTold::from_environment();
     // When the lamp was last speaking, and the turn that took the place of
     // another: neither a word after its own nor one that cut in is a sound.
     let mut last_spoke_us: Option<u64> = None;
@@ -9468,6 +9496,7 @@ fn conversation_with_gate_inner(
                 // Put on its turn by `observe_provider_output`.
                 ProviderOutput::NewsAnswered { .. }
                 | ProviderOutput::OwnWordsSaid { .. }
+                | ProviderOutput::Cases { .. }
                 | ProviderOutput::MakeWaiting { .. } => {}
                 // Put on its turn by `observe_provider_output` too. A call's
                 // line the slow chat answered with its down line (#5563):
@@ -13648,6 +13677,69 @@ fn conversation_with_gate_inner(
             did_voice_line = lamp_began.map(|turn| (turn, crate::did_voice::Moment::UpdateLine));
             give_way.said();
             record(trace, json!({"kind":"update_give_way_said","at_us":clock}))?;
+        }
+        // The lamp's agent switch (`agent_switch_told`): read only while a
+        // conversation is open (a turn, or the thread's conversation going
+        // on with someone at the lamp), and its two lines said only then,
+        // once each, when nothing holds the lamp and the person has paused.
+        // A switch made in the app to a quiet or empty room is never spoken.
+        if let Some(switch) = agent_switch.as_mut() {
+            let talking = crate::agent_switch_told::in_conversation(
+                reply.is_some() || admission.owns_stream(),
+                crate::reminders::someone_here(
+                    presence
+                        .as_ref()
+                        .is_some_and(|presence| presence.present(clock)),
+                    said_at_us,
+                    clock,
+                ),
+                || {
+                    crate::thread::THREAD
+                        .lock()
+                        .is_ok_and(|thread| thread.going_on(std::time::Instant::now()))
+                },
+            );
+            switch.conversation(talking, clock);
+            if talking
+                && reply.is_none()
+                && provider_queue.is_empty()
+                && speaker_pending.is_none()
+                && !admission.owns_stream()
+                && !submission_draining
+                && !paused
+                && clock.saturating_sub(last_speech_us) >= crate::task_news::PAUSE_US
+                && playback_mask.available(clock)
+                && snapshot.listening_ready(now())
+                && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
+                && let Some((moment, note)) = switch.owed()
+                && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+            {
+                snapshot = commit_written_turn(
+                    owner,
+                    reply,
+                    &mut provider_queue,
+                    &note,
+                    false,
+                    "agent_switch",
+                    provider_session,
+                    rig.playout_start_now(),
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                last_publish = monotonic_us();
+                lamp_began = reply.as_ref().map(|current| current.owner.turn());
+                did_voice_line =
+                    lamp_began.map(|turn| (turn, crate::did_voice::Moment::AgentSwitch));
+                switch.said(moment);
+                let moment = match moment {
+                    crate::agent_switch_told::Moment::Switching => "switching",
+                    crate::agent_switch_told::Moment::Ready => "ready",
+                };
+                record(
+                    trace,
+                    json!({"kind":"agent_switch_said","moment":moment,"at_us":clock}),
+                )?;
+            }
         }
         // "I've been signed out." (`LAMP_SIGNED_OUT`): once a spell, unasked,
         // to someone at the lamp, when nothing holds it and the room is quiet.

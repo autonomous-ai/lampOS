@@ -31,7 +31,7 @@ pub const MOST_DEPTH: usize = 8;
 /// (`lamp_control::protocol`'s), then [`REMEMBER_GRANT`], an app's own. `net`
 /// and `logs` are manifest booleans, never grants, and a service's grant is
 /// never an app's own.
-pub const GRANTS: [&str; 16] = [
+pub const GRANTS: [&str; 18] = [
     "body",
     "light",
     "speak",
@@ -48,11 +48,82 @@ pub const GRANTS: [&str; 16] = [
     "speech",
     "volume",
     REMEMBER_GRANT,
+    TURNS_GRANT,
+    REPORT_GRANT,
 ];
 /// An app's own grant, no computer's: `apps.remember` on the app socket, a
 /// fact kept for the lamp's known person marked with the app (#7415, C166;
 /// granted at install with nothing more asked, the owner's 18 Nov rule).
 pub const REMEMBER_GRANT: &str = "remember";
+/// Lamp Doctor's grants (#8726), an app's own as `remember` is, no
+/// computer's: each finished turn's record without its words; a fixed-schema
+/// report to the one fixed endpoint. (`conversation` and `model` come after
+/// the first version, with `conversation` refused beside `net`.)
+pub const TURNS_GRANT: &str = "turns";
+pub const REPORT_GRANT: &str = "report";
+/// The two of them.
+pub const DOCTOR_GRANTS: [&str; 2] = [TURNS_GRANT, REPORT_GRANT];
+/// The switch each of Lamp Doctor's grants is taken behind: `on` only, off
+/// unless set, in no product unit (#8765's read). Off, the grant is not one of
+/// the lamp's (as on a lamp built before it): no owner's yes is taken for a
+/// grant that does nothing yet. `turns` is behind the voice's
+/// `LAMP_DOCTOR_TURNS`, `report` behind `LAMP_DOCTOR_REPORT`; each process
+/// that vets a manifest reads them (lamp-apps-manage, lamp-control).
+pub const TURNS_ENVIRONMENT: &str = "LAMP_DOCTOR_TURNS";
+pub const REPORT_ENVIRONMENT: &str = "LAMP_DOCTOR_REPORT";
+
+thread_local! {
+    static SEAM: std::cell::Cell<Option<(bool, bool)>> = const { std::cell::Cell::new(None) };
+}
+
+/// A test's seam, no product flag: runs `f` with the two switches as given on
+/// this thread, `turns` and `report`, whatever the environment says.
+#[doc(hidden)]
+pub fn with_doctor_switches<R>(turns: bool, report: bool, f: impl FnOnce() -> R) -> R {
+    let before = SEAM.with(|seam| seam.replace(Some((turns, report))));
+    let out = f();
+    SEAM.with(|seam| seam.set(before));
+    out
+}
+
+/// Whether `grant` may be asked, held and said yes to now: any grant but
+/// Lamp Doctor's always; those, behind their switch.
+pub fn doctor_on(grant: &str) -> bool {
+    let env = |name: &str| std::env::var(name).ok().as_deref() == Some("on");
+    let (turns, report) = SEAM
+        .with(std::cell::Cell::get)
+        .unwrap_or_else(|| (env(TURNS_ENVIRONMENT), env(REPORT_ENVIRONMENT)));
+    match grant {
+        TURNS_GRANT => turns,
+        REPORT_GRANT => report,
+        _ => true,
+    }
+}
+
+/// The grants `report` is refused beside: the ones that read what a person
+/// says or does, or keep what an app learned (#8765's read, the Reviewer-lead).
+/// An app that can send must not be able to read what leaves with it.
+pub const REPORT_NOT_BESIDE: [&str; 6] = [
+    "hear",
+    "speech",
+    "microphone",
+    "camera",
+    "notes",
+    REMEMBER_GRANT,
+];
+
+/// Why `grants` are refused, if `report` is among them with a grant that
+/// reads what a person says or does (`log.send`'s one way out must not carry
+/// it), at install and at each call.
+pub fn report_refused(grants: &[String]) -> Option<&'static str> {
+    (grants.iter().any(|grant| grant == REPORT_GRANT)
+        && grants
+            .iter()
+            .any(|grant| REPORT_NOT_BESIDE.contains(&grant.as_str())))
+    .then_some(
+        "report can't be held beside hear, speech, microphone, camera, notes or remember: an app that can send must not read what a person says or does",
+    )
+}
 /// The lamp's NPU ops an app may name in `npu` (#7415): the lamp fetches
 /// each op's model when such an app is installed (`lamp-npu`), not at its
 /// first ask. An op rides an existing grant: `pose` the camera's.
@@ -453,7 +524,7 @@ pub fn check_manifest_switched(manifest: &AppManifest, tools: bool) -> Result<()
     }
     let mut grants = BTreeSet::new();
     for grant in &manifest.grants {
-        if !GRANTS.contains(&grant.as_str()) {
+        if !GRANTS.contains(&grant.as_str()) || !doctor_on(grant) {
             return Err(format!(
                 "{MANIFEST}: grant {grant:?} is not one of the door's: {}",
                 GRANTS.join(", ")
@@ -462,6 +533,9 @@ pub fn check_manifest_switched(manifest: &AppManifest, tools: bool) -> Result<()
         if !grants.insert(grant.as_str()) {
             return Err(format!("{MANIFEST}: grant {grant:?} twice"));
         }
+    }
+    if let Some(why) = report_refused(&manifest.grants) {
+        return Err(format!("{MANIFEST}: {why}"));
     }
     let mut ops = BTreeSet::new();
     for op in &manifest.npu {

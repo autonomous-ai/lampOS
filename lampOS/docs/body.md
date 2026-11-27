@@ -40,18 +40,18 @@ run on a lamp.
   the head's pitch is found between 1,760 and 2,020. A head pressed on the
   base (found at 2,095 on lamp-4ace on 2026-10-12) is refused, with nothing
   written, unless it was given `--wake on` (see "Waking"). A joint found at
-  62 or warmer, or over its start load, is refused with torque off on all
+  69 or warmer, or over its start load, is refused with torque off on all
   five and nothing else written: such a joint is pushing at something, and
   left held it would push on and be refused at every start until a power cut
   (base yaw on lamp-52e6, 2026-10-16: load 212, 65 °C, refused at every
-  restart). A joint found at 62 or warmer is first read again, up to three
+  restart). A joint found at 69 or warmer is first read again, up to three
   times and before anything is written, until two reads in a row agree
   within 3 degrees (`TEMPERATURE_JUMP`): one glitch on the first read would
   otherwise let go of a lamp found standing, and it falls. Only the joints
   judged here are read for it: the three it commands, and the shoulder and
   the elbow of a lamp given `--stand` (a folded lamp's warm arm is not read
-  again). Two reads that agree start as usual unless both are hot (62 then
-  61 starts; 70 then 70 is refused). Reads that never agree are acted on
+  again). Two reads that agree start as usual unless both are hot (69 then
+  68 starts; 70 then 70 is refused). Reads that never agree are acted on
   with the last hot one, so one low glitch on a read again does not let a
   real heat in (70, then 5, 70 and 70 is refused with nothing moved). A read
   again that fails after a hot one is acted on with that hot one. A read
@@ -135,7 +135,7 @@ let go, and nothing is written after that, when:
 | A commanded joint away from its goal for ten steps | 30 counts |
 | Any joint's status byte different from the one found at start | any change |
 | The shoulder or the elbow away from where it was found, in a body that does not stand | 6 counts |
-| A commanded joint's temperature register, on every step for a second | 62 |
+| A commanded joint's temperature register, on every step for a second | 69 (62 until 27 Nov, #8828) |
 | A read, or a write, that fails on every step for half a second (25 steps) | missing, late, malformed or unexpected bytes |
 | An arm goal outside its joint's window, or too far in one step (below) | refused before it is written, at once |
 
@@ -454,12 +454,12 @@ reviewer's case on #1347). So lamp-52e6's glitches, one read in 27 at random, ne
 into heat: a cool head at 56 whose glitches read 57 to 66 runs ten
 minutes (`a_cool_joint_glitching_within_the_flap_window_runs_ten_minutes`,
 the eighth's probe on #1347, which judging on the highest flap ever seen
-stopped on `Temperature` 65). A real flap over the limit, 60 and 64 by
-turns, is judged 64 and stops on `Temperature`, but its streak runs at
+stopped on `Temperature` 65). A real flap over the limit, 67 and 71 by
+turns, is judged 71 and stops on `Temperature`, but its streak runs at
 half rate (the flap reads hold), so the stop comes at about 100 reads
 rather than 50
 (`a_shoulder_flapping_between_55_and_61_runs_20_minutes_judged_at_61`,
-`a_joint_flapping_between_60_and_64_stops_on_heat`). A read over 100 or
+`a_joint_flapping_between_67_and_71_stops_on_heat`). A read over 100 or
 more than 10 from the good one is judged as before. With no good one yet (the first read) a reading is
 taken as it is: one over 100 is counted, and a hot one is read again before
 it is acted on (above). A glitch, or glitches between good reads however
@@ -986,7 +986,7 @@ rest by itself and then stands as ever:
    again once the arm is folded and still. The head is watched meanwhile: a
    head joint pushed over its load bound stops pushing, held where it is; a
    hot one is let go (it falls at most onto the arm); the arm is kept. A held
-   arm that reaches 62 degrees, or that nobody has folded by `WAIT_ASKING`
+   arm that reaches 69 degrees, or that nobody has folded by `WAIT_ASKING`
    (10 min), is let down slowly: its force drops to `GIVE_WAY_FORCE` (12%)
    and stays there, so it sinks under its own weight. With the arm already
    resting the run ends held, as before, and systemd's start limit bounds
@@ -1103,7 +1103,7 @@ the shoulder (servo 2) and the elbow (servo 3):
 - It also does not stand, and says why in its report (`standing_refused`)
   and in one journal line ("lamp-body: it will not stand this run: ..."),
   when it was given no home, when
-  either joint has torque off, another flag, or is at 62 or warmer, or when
+  either joint has torque off, another flag, or is at 69 or warmer, or when
   the two are not found within 80 counts of one point on the way between
   folded and stood up. Each of these also asks its owner, once, in words
   the voice can say (#6834; before, the only why was in the exit report,
@@ -1115,21 +1115,21 @@ the shoulder (servo 2) and the elbow (servo 3):
   an arm off that way, "My arm isn't folded all the way down, so I won't
   stand up. Please fold it down gently, then unplug me and plug me back
   in."; torque off or a flag, "Something in my arm isn't right, so I won't
-  stand up. Please unplug me and plug me back in."; 62 or warmer, "My arm
+  stand up. Please unplug me and plug me back in."; 69 or warmer, "My arm
   is too warm to stand up. Once it has cooled, please unplug me and plug me
   back in."; no home, "I don't know where my resting place is, so I won't
   stand up. I need someone to set me up again."
   (`a_run_that_will_not_stand_asks_the_owner_once_why`). The report's
   `stand_ask` holds it. Found part of the way up, on that way, it takes the
   lamp as it is and stays up as if it had just been spoken to; but found
-  up with only an arm at 62 or warmer (or over 100 on every first read),
+  up with only an arm at 69 or warmer (or over 100 on every first read),
   it folds down first, as when asked to stop, and is let go folded, on
   `Stop::Temperature`
   (`a_lamp_found_standing_with_a_warm_or_unreadable_elbow_folds_then_lets_go`).
 
 A shoulder or an elbow that reads over its load bound (`--arm-load`, 950
 and 950 without it) for six steps, is more than 160 counts from its goal for
-half a second, or reads 62 or warmer for a second sends the lamp back down
+half a second, or reads 69 or warmer for a second sends the lamp back down
 the way it came. It rests there for a minute whatever it is told, and after
 the third time inside half an hour (`Standing::RETREAT_WINDOW`) for half an
 hour (`Standing::LONG_REST`), and then it may rise again (on a window still
@@ -1181,7 +1181,8 @@ stand goal eased to where it
 holds plus 5 counts toward the goal (`STAND_EASE_MARGIN`), for the rest of
 the run. The servo stops pushing at a goal it can't reach. On lamp-74ff
 (13373) the elbow held 41 to 47 short of its measured 2,562 at loads of
-176 to 200, reached 62 °C in about 40 min and sat down hot; lamp-52e6's
+176 to 200, reached 62 °C in about 40 min and sat down hot (the stop was
+62 then; it is 69 since #8828); lamp-52e6's
 elbow holds 3 short at 24 and is left as it is.
 
 - The count is leaky (#7281). At its stand goal, a step short and loaded
@@ -1277,7 +1278,7 @@ after lamp-52e6's runs on #4501); off unless the unit sets
 - **A hot seat stands again once cool** (`LAMP_BODY_SEAT_COOLS=on`, #7281,
   on in the product unit; `StrainGuard::cools`). A seat for heat ends by
   itself once the joint that seated it has read under 50 °C
-  (`StrainGuard::COOL`, `bus_out::WARM` less 5: 12 under the 62 it sat
+  (`StrainGuard::COOL`, `bus_out::WARM` less 5: 19 under the 69 it sits
   down at, over a healthy standing elbow's 46 to 49 on lamp-4ace and
   lamp-52e6) for 5 min back to back (`StrainGuard::COOL_FOR`, the
   `CLIMB_WINDOW`); a held or missing read starts the count again. The
@@ -1300,7 +1301,7 @@ after lamp-52e6's runs on #4501); off unless the unit sets
   paused. Asked on a thread of its own, so the body's step never waits;
   the outcome goes to the journal. Nothing more is said until it stands.
 - **Each sit-down says why** (#7281). The journal says `sat down: {why}`
-  (e.g. `elbow_pitch at 62 degrees`) as it happens, not only in the exit
+  (e.g. `elbow_pitch at 69 degrees`) as it happens, not only in the exit
   report, and the fold line says `it sat down hot` when one was for heat.
 - **A rest ends folded (`LAMP_BODY_STRAIN_REST_COOLS=on`, #7344).** Off
   unless exactly `on`, on in the product unit; read only
@@ -1376,7 +1377,7 @@ second (`presence_in.rs`):
     call or arrival. Then it folds calmly at the window's end with the
     person still there, and stands again when spoken to or called;
   - by heat: not once the shoulder or the elbow reads 55 (`bus_out::WARM`),
-    so it folds before the strain guard's hot sit-down at 62;
+    so it folds before the strain guard's hot sit-down at 69;
   - never in its night rest (`Asked::night`);
   - never through a fold of its own: a lamp resting after a load, heat or
     tracking retreat, unplugged, unable to lift or seated (#4501) is not
@@ -3383,7 +3384,7 @@ body built before `bad_reads`/`bad_temperatures` (2026-10-17 08:25),
 `temperature_settles` (10:34) or `temperature_flaps` (#1364) still reads
 (`a_body_older_than_the_temperature_fields_still_reads`, a real lamp-52e6
 exit of 2026-10-14). A field renamed in `BodyReport` fails
-`a_joint_flapping_between_60_and_64_stops_on_heat`, which reads a real report
+`a_joint_flapping_between_67_and_71_stops_on_heat`, which reads a real report
 back and requires every line by name.
 
 ## On the bus
@@ -3425,7 +3426,7 @@ The report is `ok` with no message, or a warning:
 | `warn` | `seated: the elbow retreated twice in an hour (strained); hold its head a second, or run a health check, to let it stand again` | With the strain guard, until a person or a self-test lets it stand (above, "The strain guard"). Said before a warm joint (#7281) |
 | `warn` | `seated: the elbow sat down hot twice in an hour; it stands again by itself once it reads under 50 for 5 min, or when its head is held a second` | With `LAMP_BODY_SEAT_COOLS=on`, a hot seat that will end by itself (#7281) |
 | `warn` | `resting: the elbow sat down hot; it stays folded until it reads under 50 for 5 min, and then someone speaks to it, holds its head a second or runs a health check` (or `… sat down for a strain; it stays folded until someone speaks to it, …`) | With `LAMP_BODY_STRAIN_REST_COOLS=on`, from a sit-down until a person asks it up (above, "The strain guard"); said before a warm joint |
-| `warn` | `shoulder is warm: it reads 55, and the body stops at 62` | Any of the five joints reads 55 or more. The body ends its run, or sends the arm down, at 62 |
+| `warn` | `shoulder is warm: it reads 55, and the body stops at 69` | Any of the five joints reads 55 or more. The body ends its run, or sends the arm down, at its heat stop, 69; the number said is the body's own (`Limits::temperature`), not a fixed one |
 | `warn` | `its elbow pushed as hard as it may and did not move, in two long rests' tries: …` | Without the strain guard, after two long rests begun by a stand that never lifted (#4390) |
 | `warn` | `the elbow strained: it read a load of 500 too long while standing, and the lamp sat down to rest` | With the strain guard, while it rests from a long strain |
 | `warn` | `the elbow pushed as hard as it may and didn't move` | With the strain guard, from a stand that never lifted until it is let stand again |
@@ -3896,7 +3897,7 @@ the one `--overload release` makes ("Letting go under overload"):
   little over V1's contact pause (`pause_s`, 3 s). The servos do not
   need longer: through run 8 on lamp-52e6 (2026-10-15 14:14 to 14:21,
   the slump included) the shoulder and the elbow read 44 to 48 °C, far
-  under the 62 at which the body stops, and a hand on the base for a
+  under the 69 at which the body stops, and a hand on the base for a
   second or two warms nothing. A slump from overload (`--overload
   release`) still rests 120 s. The
   report counts it in `released` and, per joint, in `released_by_hand`

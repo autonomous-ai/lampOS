@@ -89,6 +89,8 @@ pub(crate) struct SessionState {
     /// Checked once before audio opens, retained across mute/reopen cycles.
     pub(crate) onboarding_definition: Option<std::sync::Arc<crate::onboarding::skill::Definition>>,
     events: Vec<Value>,
+    /// One record for each finished turn, told on `voice/turn` (serve mode).
+    ledger: Option<crate::turn_ledger::Ledger>,
     pub(crate) receipts: ReceiptHistory,
     pub(crate) yield_interval: Option<YieldInterval>,
     hearing: HearingTrail,
@@ -139,6 +141,22 @@ impl SessionState {
             ..Self::default()
         }
     }
+    /// A finished turn's record, from this event, told on `voice/turn`.
+    fn tell_turn(&mut self, event: &Value) {
+        if !crate::turn_ledger::on() {
+            return;
+        }
+        let ledger = self.ledger.get_or_insert_with(|| {
+            crate::turn_ledger::Ledger::new(crate::turn_ledger::build_number())
+        });
+        let finished = match crate::turn_ledger::cases() {
+            Some(mut cases) => ledger.observe(event, &mut cases, crate::turn_ledger::now_min()),
+            None => None,
+        };
+        if let Some(record) = finished {
+            crate::turn_ledger::told(record);
+        }
+    }
     pub(crate) fn continuous(&self) -> bool {
         self.continuous
     }
@@ -150,6 +168,7 @@ impl SessionState {
             self.events.push(event);
             return Ok(());
         }
+        self.tell_turn(&event);
         let sequence = self.sequence.checked_add(1);
         if let Some(sequence) = sequence {
             self.sequence = sequence;

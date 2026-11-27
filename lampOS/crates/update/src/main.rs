@@ -1208,18 +1208,18 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         acts.then_some((on, shown))
     };
-    // OpenClaw's gateway only while OpenClaw is the lamp's default agent
-    // (#8105, LAMP_OPENCLAW_GATEWAY_BY_DEFAULT): lamp-tasks is asked every
-    // KEEP_EVERY between rounds, on a thread of its own, so a choice in the
-    // app starts the gateway within seconds and another default stops it.
-    // A round asks once more for its own OpenClaw step. One lock is held by
-    // the round for its whole run and by the thread for each look, so the
-    // two never touch the gateway at once (Twelve's P3 on #8116).
-    // Hermes's API gateway (Hermes direct, LAMP_HERMES_GATEWAY): with Hermes
-    // on, it runs only while Hermes is the lamp's default agent; with it on,
-    // OpenClaw's gateway follows the default as well, so one agent gateway
-    // runs at a time (crate::hermes_gateway).
-    // Read with the others, so a round that turns it on in the carried
+    // One agent gateway at a time (crate::gateway_keeper): OpenClaw's only
+    // while OpenClaw is the lamp's default agent (#8105,
+    // LAMP_OPENCLAW_GATEWAY_BY_DEFAULT), Hermes's API gateway (Hermes direct,
+    // LAMP_HERMES_GATEWAY) only while Hermes is; with Hermes's on, OpenClaw's
+    // follows the default as well. One thread keeps both: every KEEP_EVERY
+    // it asks lamp-tasks once, stops the unwanted gateway, then starts the
+    // wanted one once the other is down, so a choice in the app moves the
+    // gateway within seconds. A round asks once more for its own gateway
+    // step. One lock is held by the round for its whole run and by the
+    // thread for each look, so the two never touch a gateway at once
+    // (Twelve's P3 on #8116); a look never waits for a gateway to be ready.
+    // Read with the others, so a round that turns a switch on in the carried
     // file restarts lamp-update (switches::restart_for).
     let hermes_gateway_switch = switches.hermes_gateway;
     let hermes_gateway = matches!(hermes, Some((true, _))) && hermes_gateway_switch;
@@ -1229,68 +1229,51 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         .root
         .join(lamp_update::openclaw_install::TASKS_APP_SOCKET.trim_start_matches('/'));
     let gateway_lock = std::sync::Arc::new(std::sync::Mutex::new(()));
-    if gateway_by_default {
-        use lamp_update::openclaw_install as openclaw;
-        say(
-            "OpenClaw's gateway runs only while OpenClaw is the lamp's agent (LAMP_OPENCLAW_GATEWAY_BY_DEFAULT)",
-        );
-        let root = config.root.clone();
-        let socket = tasks_app_socket.clone();
-        let shown = openclaw.map(|(_, shown)| shown).unwrap_or_default();
-        let gateway_lock = gateway_lock.clone();
-        let started = std::thread::Builder::new()
-            .name("gateway-by-default".into())
-            .spawn(move || {
-                let mut systemd = Systemctl::default();
-                let mut said = |line: &str| eprintln!("lamp-update: {line}");
-                loop {
-                    // A round holds the lock: this look is skipped.
-                    if let Ok(_look) = gateway_lock.try_lock() {
-                        let gateway =
-                            openclaw::gateway_wanted(true, openclaw::said_default(&socket));
-                        {
-                            openclaw::keep_between_rounds(
-                                &root,
-                                &mut systemd,
-                                gateway,
-                                shown.one_path,
-                                &mut lamp_update::install::output_of,
-                                &mut said,
-                            );
-                        }
-                    }
-                    std::thread::sleep(openclaw::KEEP_EVERY);
-                }
-            });
-        if let Err(error) = started {
-            say(&format!(
-                "OpenClaw's gateway is not kept to the lamp's agent: no thread: {error}"
-            ));
+    if gateway_by_default || hermes_gateway {
+        use lamp_update::{gateway_keeper, openclaw_install as openclaw};
+        if gateway_by_default {
+            say(
+                "OpenClaw's gateway runs only while OpenClaw is the lamp's agent (LAMP_OPENCLAW_GATEWAY_BY_DEFAULT)",
+            );
         }
-    }
-    if hermes_gateway {
-        use lamp_update::{hermes_gateway as gateway, openclaw_install as openclaw};
-        say("Hermes's gateway runs only while Hermes is the lamp's agent (LAMP_HERMES_GATEWAY)");
+        if hermes_gateway {
+            say(
+                "Hermes's gateway runs only while Hermes is the lamp's agent (LAMP_HERMES_GATEWAY)",
+            );
+        }
         let root = config.root.clone();
         let socket = tasks_app_socket.clone();
+        let one_path = openclaw
+            .map(|(_, shown)| shown)
+            .unwrap_or_default()
+            .one_path;
+        let mut keeper = gateway_keeper::Keeper::new(gateway_keeper::Kept {
+            openclaw: gateway_by_default.then_some(one_path),
+            hermes: hermes_gateway,
+        });
         let gateway_lock = gateway_lock.clone();
         let started = std::thread::Builder::new()
-            .name("hermes-gateway".into())
+            .name("gateway-keeper".into())
             .spawn(move || {
                 let mut systemd = Systemctl::default();
                 let mut said = |line: &str| eprintln!("lamp-update: {line}");
                 loop {
                     // A round holds the lock: this look is skipped.
                     if let Ok(_look) = gateway_lock.try_lock() {
-                        let wanted = gateway::gateway_wanted(openclaw::said_default(&socket));
-                        gateway::keep_between_rounds(&root, &mut systemd, wanted, &mut said);
+                        keeper.look(
+                            &root,
+                            &mut systemd,
+                            openclaw::said_default(&socket),
+                            &mut lamp_update::install::output_of,
+                            &mut said,
+                        );
                     }
                     std::thread::sleep(openclaw::KEEP_EVERY);
                 }
             });
         if let Err(error) = started {
             say(&format!(
-                "Hermes's gateway is not kept to the lamp's agent: no thread: {error}"
+                "the agent gateways are not kept to the lamp's agent: no thread: {error}"
             ));
         }
     }
@@ -1427,6 +1410,18 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 round(&config, &mut world)
             }
         };
+        // Hermes's gateway switched off: taken out before OpenClaw's step may
+        // start OpenClaw's, so the two never run together (one agent gateway
+        // at a time, crate::gateway_keeper).
+        if hermes.is_some()
+            && !hermes_gateway
+            && !matches!(
+                outcome,
+                Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
+            )
+        {
+            lamp_update::hermes_gateway::after_round_off(&config.root, &mut systemd, &mut say);
+        }
         // Once the channel was reached, so the lamp has its network; never
         // before a switch of its own, whose new build does its own round.
         if let Some(pin) = &harness
@@ -1451,6 +1446,29 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 },
                 &mut say,
             );
+            // The gateways stop before start (crate::gateway_keeper): the
+            // default read once for both, the unwanted gateway stopped here
+            // first, and a wanted one passed on as unknown (left as it is)
+            // while the other still runs, so neither step below starts its
+            // gateway beside the other's.
+            let (openclaw_gateway, hermes_gateway_wanted) = {
+                use lamp_update::{gateway_keeper, openclaw_install};
+                let said = (gateway_by_default || hermes_gateway)
+                    .then(|| openclaw_install::said_default(&tasks_app_socket))
+                    .flatten();
+                let openclaw_on = hermes_watch.is_some() && matches!(openclaw, Some((true, _)));
+                let hermes_on = hermes_watch.is_some() && matches!(hermes, Some((true, _)));
+                gateway_keeper::round_gateways(
+                    &config.root,
+                    &mut systemd,
+                    openclaw_on.then(|| {
+                        openclaw_install::gateway_wanted(gateway_by_default, said.clone())
+                    }),
+                    (hermes_on && hermes_gateway)
+                        .then(|| lamp_update::hermes_gateway::gateway_wanted(said)),
+                    &mut say,
+                )
+            };
             if let (Some(_), Some((true, shown))) = (&hermes_watch, hermes) {
                 use lamp_update::{hermes_install, hermes_schedule};
                 let now_unix_ms = lamp_update::records::unix_ms();
@@ -1485,13 +1503,12 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     engines.settle(&records);
                 }
                 // Hermes's gateway after Hermes's own step (LAMP_HERMES_GATEWAY).
-                if hermes_gateway {
-                    use lamp_update::{hermes_gateway as gateway, openclaw_install as openclaw};
-                    gateway::after_round(
+                if let (true, Some(wanted)) = (hermes_gateway, hermes_gateway_wanted) {
+                    lamp_update::hermes_gateway::after_round(
                         &config.root,
                         &records,
                         shown,
-                        gateway::gateway_wanted(openclaw::said_default(&tasks_app_socket)),
+                        wanted,
                         &mut systemd,
                         lamp_update::records::unix_ms(),
                         &mut say,
@@ -1517,19 +1534,12 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                         window
                     }
                 });
-                let gateway = if gateway_by_default {
-                    openclaw_install::gateway_wanted(
-                        true,
-                        openclaw_install::said_default(&tasks_app_socket),
-                    )
-                } else {
-                    openclaw_install::Gateway::Wanted
-                };
                 openclaw_install::after_round_with(
                     &config.root,
                     &records,
                     shown,
-                    gateway,
+                    openclaw_gateway.unwrap_or(openclaw_install::Gateway::Wanted),
+                    gateway_by_default,
                     &mut systemd,
                     &mut lamp_update::install::output_of,
                     now_unix_ms,
@@ -1556,15 +1566,6 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     &mut say,
                 );
             }
-        }
-        if hermes.is_some()
-            && !hermes_gateway
-            && !matches!(
-                outcome,
-                Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
-            )
-        {
-            lamp_update::hermes_gateway::after_round_off(&config.root, &mut systemd, &mut say);
         }
         if matches!(hermes, Some((false, _)))
             && !matches!(

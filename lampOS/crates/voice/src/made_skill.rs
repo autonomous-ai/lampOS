@@ -11905,9 +11905,9 @@ pub const VALUE_LEFT_OUT_HELD: &str =
 /// are days left in the year.", the count dropped, with the maker's
 /// [`LEFT_OUT`] note): whether `answer` is a skill a time, an event or a
 /// repeat starts (any trigger but a hand's alone, [`started_by_a_hand_alone`])
-/// whose only speaking is a fixed `say` (its words a line, a list or
-/// `{ text }`; no `say = { note }`, which the model answers at run time, and
-/// no `run` or `task` step) and that carries a `left out:` note, the card's "The maker notes what it couldn't
+/// whose speaking is a fixed `say` (its words a line, a list or
+/// `{ text }`; a `say = { note }` beside it, which the model answers at run
+/// time, passed over, El's P3 on #8732; no `run` or `task` step) and that carries a `left out:` note, the card's "The maker notes what it couldn't
 /// do". Such a make goes to the lamp's agent to write as a task step whose
 /// script prints the line, its answer told, as a make that needs the
 /// internet does. Kept simple on purpose: the note is not read for whether
@@ -11927,13 +11927,17 @@ pub fn says_fixed_with_left_out(answer: &str) -> bool {
 /// note when it holds, else `None`.
 fn fixed_say_left_out(files: &Files) -> Option<&str> {
     let note = files.left_out.as_deref()?;
-    timed_fixed_says(&files.toml).map(|_| note)
+    timed_fixed_says(&files.toml, false).map(|_| note)
 }
 
 /// The fixed words of a skill a time, an event or a repeat starts whose
-/// only speaking is a fixed `say` ([`says_fixed_with_left_out`]'s shape),
-/// each say's lines joined; `None` for any other skill.
-fn timed_fixed_says(toml_text: &str) -> Option<Vec<String>> {
+/// speaking is a fixed `say` ([`says_fixed_with_left_out`]'s shape), each
+/// say's lines joined; `None` for any other skill. With `note_says_too`, a
+/// `say = { note }` beside the fixed says makes it `None`, as the model
+/// may say the value then; without, it is passed over (El's P3 on #8732:
+/// a fixed say beside a note say, with the maker's `left out:` note, is
+/// still the say's value dropped).
+fn timed_fixed_says(toml_text: &str, note_says_too: bool) -> Option<Vec<String>> {
     let table = toml::from_str::<toml::Table>(toml_text).ok()?;
     if started_by_a_hand_alone(table.get("trigger")?) {
         return None;
@@ -11966,7 +11970,7 @@ fn timed_fixed_says(toml_text: &str) -> Option<Vec<String>> {
         .collect();
     let at_run_time = says().any(|say| say.get("note").is_some());
     (!fixed.is_empty()
-        && !at_run_time
+        && (!note_says_too || !at_run_time)
         && !steps
             .iter()
             .any(|step| step.get("run").is_some() || step.get("task").is_some()))
@@ -11981,7 +11985,17 @@ fn timed_fixed_says(toml_text: &str) -> Option<Vec<String>> {
 /// "dù" ("dù mấy giờ", whatever time) asks for no value (El's and the
 /// Reviewer-lead's P2 on #8732).
 fn value_asked(words: &str) -> Option<String> {
-    let lower = words.to_lowercase();
+    // Lowered char by char, each lowered byte mapped to its byte in
+    // `words`, so the note keeps the ask's own case (El's P3 on #8732).
+    let mut lower = String::new();
+    let mut from = Vec::new();
+    for (at, letter) in words.char_indices() {
+        for low in letter.to_lowercase() {
+            from.extend(std::iter::repeat_n(at, low.len_utf8()));
+            lower.push(low);
+        }
+    }
+    from.push(words.len());
     let at = VALUE_ASKS
         .iter()
         .filter_map(|ask| {
@@ -11995,20 +12009,69 @@ fn value_asked(words: &str) -> Option<String> {
                         .is_some_and(char::is_alphanumeric)
                         && !before.trim_end().ends_with("dù")
                         && !lower[at + ask.len()..].trim_start().starts_with("cũng")
+                        && !value_ask_not_meant(ask, before)
                 })
                 .map(|(at, _)| at)
         })
         .min()?;
     let rest = &lower[at..];
-    let end = rest.find(['.', '?', '!', '\n']).unwrap_or(rest.len());
-    Some(cut_chars(rest[..end].trim(), MOST_CANNOT_CHARS))
+    let end = at + rest.find(['.', '?', '!', '\n']).unwrap_or(rest.len());
+    Some(cut_chars(
+        words[from[at]..from[end]].trim(),
+        MOST_CANNOT_CHARS,
+    ))
+}
+
+/// Whether the [`VALUE_ASKS`] phrase `ask` after the lowered `before` asks
+/// for no value (El's P3s on #8732): one a negation governs in its own
+/// sentence ("don't tell me how many emails, just say good morning", "no
+/// need to say what time it is", "đừng nói mấy giờ"), within its four
+/// words before, but never one of forgetting ("don't forget", "without
+/// fail", "đừng quên", El's P2 on #8822); or "the time" or "the date" after a word that makes it a
+/// when, not a value ("all the time", "by the time", "at the time").
+fn value_ask_not_meant(ask: &str, before: &str) -> bool {
+    let sentence = before
+        .rsplit(['.', '?', '!', '\n', ','])
+        .next()
+        .unwrap_or_default();
+    let near: Vec<&str> = sentence
+        .split(|letter: char| !(letter.is_alphanumeric() || letter == '\'' || letter == '’'))
+        .filter(|word| !word.is_empty())
+        .collect();
+    let near = &near[near.len().saturating_sub(4)..];
+    let negated = near.iter().enumerate().any(|(at, word)| {
+        let next = near.get(at + 1).copied().unwrap_or_default();
+        // "Don't forget", "never miss", "without fail", "đừng quên": a
+        // negation of forgetting asks all the more (El's P2 on #8822).
+        let forgets = |next: &str| matches!(next, "forget" | "fail" | "miss" | "quên");
+        (matches!(
+            *word,
+            "don't" | "don’t" | "dont" | "never" | "without" | "đừng"
+        ) && !forgets(next))
+            || (*word == "do"
+                && next == "not"
+                && !forgets(near.get(at + 2).copied().unwrap_or_default()))
+            || (*word == "no" && next == "need")
+            || (*word == "không" && next == "cần")
+    });
+    let a_when = matches!(ask, "the time" | "the date")
+        && near.last().is_some_and(|word| {
+            matches!(
+                *word,
+                "all" | "by" | "at" | "on" | "from" | "since" | "until" | "till" | "same"
+            )
+        });
+    negated || a_when
 }
 
 /// The phrases of an ask for a value only a run can know: a count, an
 /// amount, a time or a day, in English and Vietnamese ([`value_asked`]).
 /// No "ngày nào": "ngày nào cũng …" is the plain Vietnamese "every day
 /// …", and the counts of days are `mấy ngày`, `còn mấy` and `bao nhiêu`.
-const VALUE_ASKS: [&str; 16] = [
+/// "the date" and "the time" take "what's the date", "say the time every
+/// hour" (El's P3 on #8732); "all the time" and its like are no ask
+/// ([`value_ask_not_meant`]).
+const VALUE_ASKS: [&str; 19] = [
     "how many",
     "how much",
     "how long",
@@ -12018,6 +12081,9 @@ const VALUE_ASKS: [&str; 16] = [
     "what day",
     "what date",
     "which day",
+    "the date",
+    "today's date",
+    "the time",
     "days left",
     "days until",
     "bao nhiêu",
@@ -12036,10 +12102,10 @@ const VALUE_ASKS: [&str; 16] = [
 /// reminder, and one with a digit is [`told_only`]'s.
 fn value_left_unsaid(files: &Files, asked: &str) -> Option<String> {
     let value = value_asked(asked)?;
-    let says = timed_fixed_says(&files.toml)?;
+    let says = timed_fixed_says(&files.toml, true)?;
     let ask = VALUE_ASKS
         .iter()
-        .find(|ask| value.starts_with(**ask))
+        .find(|ask| value.to_lowercase().starts_with(**ask))
         .copied()
         .unwrap_or_default();
     says.iter()

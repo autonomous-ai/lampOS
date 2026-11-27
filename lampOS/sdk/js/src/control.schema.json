@@ -3998,6 +3998,232 @@
       ],
       "additionalProperties": false
     },
+    "log.send": {
+      "description": "The one report an installed app holding report may send out (#8726, LAMP_DOCTOR_REPORT=on; behind LAMP_STORE_APPS): a flat body in a fixed schema, read whole or refused whole, with no free-text field. lamp-control sets the day (the lamp's own date) and the build itself, over anything the app sends; the app does not send them. report can't be held beside hear, speech, microphone, camera, notes or remember. At most one an hour an app. Accepted: {ok, kept: true, sent: false} (kept on the lamp; sent nowhere until the endpoint answers). Refused: no_grant (not granted, or held beside a reader), off, bad_request (never repeats what was in the report), rate (retry_ms), refused (the lamp's date is not known, or the kept reports are full).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "log.send"
+        },
+        "report": {
+          "type": "object",
+          "properties": {
+            "turns": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "answered_within_5s_pct": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "heard_to_first_sound_ms_median": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 600000
+            },
+            "heard_to_first_sound_ms_p90": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 600000
+            },
+            "asked_again": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "held": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "cut_ins": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "tool_timeouts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "stuck": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "tier": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "multipleOf": 0.1
+            },
+            "band": {
+              "enum": [
+                "green",
+                "amber",
+                "red"
+              ]
+            },
+            "failures": {
+              "type": "array",
+              "maxItems": 12,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "category": {
+                    "enum": [
+                      "stuck",
+                      "lost_answer",
+                      "task_never_run",
+                      "error",
+                      "skill_make_failed",
+                      "skill_refused",
+                      "memory_not_saved",
+                      "no_answer",
+                      "tts_refusal",
+                      "issue",
+                      "misheard",
+                      "very_slow"
+                    ]
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000
+                  }
+                },
+                "required": [
+                  "category",
+                  "count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "cases": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "string",
+                    "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                  },
+                  "kind": {
+                    "enum": [
+                      "stt",
+                      "llm",
+                      "tts",
+                      "tool",
+                      "app",
+                      "memory",
+                      "task"
+                    ]
+                  },
+                  "outcome": {
+                    "enum": [
+                      "error",
+                      "timeout",
+                      "refused"
+                    ]
+                  },
+                  "http": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599
+                  },
+                  "fault": {
+                    "enum": [
+                      "local",
+                      "transport",
+                      "connect_timeout",
+                      "response_timeout",
+                      "authentication",
+                      "quota_exceeded",
+                      "rate_limited",
+                      "server_unavailable",
+                      "server_rejected",
+                      "protocol"
+                    ]
+                  },
+                  "waited_ms": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 120000
+                  },
+                  "request": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  }
+                },
+                "required": [
+                  "at",
+                  "kind",
+                  "outcome",
+                  "waited_ms",
+                  "request"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "cases_dropped": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "route": {
+              "enum": [
+                "first",
+                "second",
+                "unknown"
+              ]
+            },
+            "diagnosis_version": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "turns",
+            "answered_within_5s_pct",
+            "heard_to_first_sound_ms_median",
+            "heard_to_first_sound_ms_p90",
+            "asked_again",
+            "held",
+            "cut_ins",
+            "tool_timeouts",
+            "stuck",
+            "tier",
+            "score",
+            "band",
+            "failures",
+            "cases",
+            "cases_dropped",
+            "route",
+            "diagnosis_version"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "report"
+      ],
+      "additionalProperties": false
+    },
     "app_request": {
       "description": "The ops only an installed app's socket (LAMP_APP_SOCKET) takes, besides the door's own that its manifest's grants allow. Apart from `request` until lamp-control's app socket takes them as ops (#7415).",
       "oneOf": [
@@ -4021,6 +4247,9 @@
         },
         {
           "$ref": "#/$defs/app.answer"
+        },
+        {
+          "$ref": "#/$defs/log.send"
         }
       ]
     },
@@ -4033,7 +4262,8 @@
             "app.trigger",
             "app.settings",
             "app.call",
-            "app.call.stopped"
+            "app.call.stopped",
+            "turns.finished"
           ]
         },
         "at": {
@@ -4162,6 +4392,209 @@
             "required": [
               "call",
               "why"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "turns.finished"
+              }
+            }
+          },
+          "then": {
+            "description": "A finished turn's record without its words, to a running app that holds turns (voice/turn_record, #8726): the voice's number, the minute it ended, heard to first sound (none when nothing was said), the outcome, the counts (a count the voice does not make yet is null), yes/no signals, each failed call as a case, a yes/no proof for a call that has one, the route and the build. Every string is a name from a fixed list.",
+            "properties": {
+              "turn": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "at_min": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "heard_to_first_sound_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "cut_ins": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "tool_calls": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tool_timeouts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "tool_errors": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "outcome": {
+                "enum": [
+                  "answered",
+                  "stuck",
+                  "refused",
+                  "held",
+                  "asked_again",
+                  "error",
+                  "no_answer",
+                  "lost_answer",
+                  "cancelled"
+                ]
+              },
+              "words_heard": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "words_said": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "heard_wrongly": {
+                "type": "boolean"
+              },
+              "name_missed": {
+                "type": "boolean"
+              },
+              "held_then_repeated": {
+                "type": "boolean"
+              },
+              "failed": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "stt",
+                        "llm",
+                        "tts",
+                        "tool",
+                        "app",
+                        "memory",
+                        "task"
+                      ]
+                    },
+                    "outcome": {
+                      "enum": [
+                        "error",
+                        "timeout",
+                        "refused"
+                      ]
+                    },
+                    "http": {
+                      "type": "integer",
+                      "minimum": 100,
+                      "maximum": 599
+                    },
+                    "fault": {
+                      "enum": [
+                        "local",
+                        "transport",
+                        "connect_timeout",
+                        "response_timeout",
+                        "authentication",
+                        "quota_exceeded",
+                        "rate_limited",
+                        "server_unavailable",
+                        "server_rejected",
+                        "protocol"
+                      ]
+                    },
+                    "waited_ms": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "request": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "outcome",
+                    "waited_ms",
+                    "request"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "proofs": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "stt",
+                        "llm",
+                        "tts",
+                        "tool",
+                        "app",
+                        "memory",
+                        "task"
+                      ]
+                    },
+                    "proved": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "proved"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "route": {
+                "enum": [
+                  "first",
+                  "second",
+                  "unknown"
+                ]
+              },
+              "build": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "turn",
+              "at_min",
+              "heard_to_first_sound_ms",
+              "cut_ins",
+              "tool_calls",
+              "tool_timeouts",
+              "tool_errors",
+              "outcome",
+              "words_heard",
+              "words_said",
+              "heard_wrongly",
+              "name_missed",
+              "held_then_repeated",
+              "failed",
+              "proofs",
+              "route",
+              "build"
             ]
           }
         }

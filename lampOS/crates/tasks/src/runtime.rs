@@ -658,7 +658,12 @@ pub const ENGINE_NOT_INSTALLED: &str = "engine_not_installed";
 /// The app's engine-default operations (#6492), on the app's route only:
 /// `app_engine_default` keeps the choice in `file` and uses it at once;
 /// `app_engine_default_state` says the default now. Either answers
-/// `{"default":<engine or null>,"chosen_in_app":<bool>}`.
+/// `{"default":<engine or null>,"chosen_in_app":<bool>,"gateway":
+/// "switching"|"ready"}`: `gateway` is the agent switch's state
+/// (`direct::gateway_said`), `switching` from the moment the default
+/// changed until the new default's gateway answers ready. A choice that
+/// changes the default runs the switch at once (`direct::switch_check`):
+/// the old agent's running tasks end, told as stopped.
 pub fn app_engine_default_operation(
     request: &Request,
     side: Option<&LampSide>,
@@ -694,6 +699,9 @@ pub fn app_engine_default_operation(
             "tasks: the lamp's default engine is {} (chosen in the app)",
             engine.argument()
         );
+        // The owner's switch rule, at once rather than at the main loop's
+        // next look, so this answer already says `switching`.
+        crate::direct::switch_check();
     }
     let default = side.and_then(|side| lamp_order(side).first().copied());
     let chosen_in_app = side
@@ -702,6 +710,7 @@ pub fn app_engine_default_operation(
     Ok(json!({
         "default": default.map(EngineKind::argument),
         "chosen_in_app": chosen_in_app,
+        "gateway": crate::direct::gateway_said(),
     }))
 }
 
@@ -800,7 +809,7 @@ fn pane_turn(
 
 /// [`place_wait`]'s answer for the next launch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PlaceWait {
+pub(crate) enum PlaceWait {
     /// Not one for the lamp's pane whose place is unknown: on as usual.
     Go,
     /// Held in the queue until the lamp's place is known.
@@ -816,8 +825,11 @@ enum PlaceWait {
 /// lamp-update starts it, at most `cap`, then given up; the store's loop
 /// and the Harness thread go on meanwhile. Off, or another engine: on as
 /// usual, the launch's own 60 s wait as before. `answers` is the port's
-/// last look; `held` the task held and since when.
-fn gateway_wait(
+/// last look; `held` the task held and since when. A launch for OpenClaw
+/// on the lamp while it is not the lamp's default is never held (nor marked
+/// wanted): lamp-update runs only the default's gateway, so it goes on to
+/// the worker, which refuses it at once ([`crate::direct::not_default_for`]).
+pub(crate) fn gateway_wait(
     next: Option<&Launch>,
     asking: crate::gateway::Asking,
     answers: impl FnOnce() -> bool,
@@ -826,9 +838,11 @@ fn gateway_wait(
     cap: Duration,
 ) -> PlaceWait {
     use crate::gateway::Asking;
-    let Some(next) =
-        next.filter(|next| asking != Asking::No && next.target.engine == EngineKind::Openclaw)
-    else {
+    let Some(next) = next.filter(|next| {
+        asking != Asking::No
+            && next.target.engine == EngineKind::Openclaw
+            && crate::direct::not_default_for(next).is_none()
+    }) else {
         if let Some((name, _)) = held.take() {
             eprintln!("tasks: {name}: held for OpenClaw's gateway no longer");
         }
@@ -2395,6 +2409,12 @@ fn owner<C: Clock>(
     let mut status_began = Instant::now();
     // A store kept aside is looked for again once a minute (#1505).
     let mut looked_aside = Instant::now();
+    // The lamp's default agent as first seen (a start is no switch), then
+    // looked at every `direct::SWITCH_LOOK_EVERY` for a change that did not
+    // come through the app's `app_engine_default` (the order Harness
+    // reports, a switch turned off): the agent switch runs on it too.
+    crate::direct::switch_check();
+    let mut switch_looked = Instant::now();
     // `serve --set-up-later`: the targets file as last read, and when the
     // file and the sign-in are next looked at. The first look is at once.
     let mut set_up = set_up_later.as_ref().map(|_| SetUp::default());
@@ -3558,6 +3578,10 @@ fn owner<C: Clock>(
         if let Some(tracker) = tracker.as_mut() {
             let found = engine.settled_within(&clock.sample()?, crate::progress::SETTLED_FOR_MS);
             tracker.settled(&found, unix_ms());
+        }
+        if switch_looked.elapsed() >= crate::direct::SWITCH_LOOK_EVERY {
+            switch_looked = Instant::now();
+            crate::direct::switch_check();
         }
         // A direct task's row, as it changes, on the bus at once: its run
         // has no `ps` to wait for.
@@ -6020,17 +6044,23 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                                 // A direct Hermes task waits on its own
                                 // session's readiness; OpenClaw's on the
                                 // Gateway wait, as Harness's.
-                                crate::direct::not_ready_for(
-                                    &job.launch,
-                                    crate::gateway::READY_WITHIN,
-                                )
-                                .unwrap_or_else(|| {
-                                    crate::gateway::launch_with(
-                                        gateway.as_mut(),
-                                        &job.launch,
-                                        || adapter.launch(&job.launch),
-                                    )
-                                }),
+                                // OpenClaw not the lamp's default:
+                                // refused at once, never its Gateway's
+                                // 60 s wait for a gateway not run.
+                                crate::direct::not_default_for(&job.launch)
+                                    .or_else(|| {
+                                        crate::direct::not_ready_for(
+                                            &job.launch,
+                                            crate::gateway::READY_WITHIN,
+                                        )
+                                    })
+                                    .unwrap_or_else(|| {
+                                        crate::gateway::launch_with(
+                                            gateway.as_mut(),
+                                            &job.launch,
+                                            || adapter.launch(&job.launch),
+                                        )
+                                    }),
                             ),
                             Job::Observe(job) => {
                                 // A direct task: its gateway run's look,
@@ -7661,7 +7691,7 @@ mod tests {
         let state = Request::AppEngineDefaultState {};
         assert_eq!(
             app_engine_default_operation(&state, Some(&side), &file).unwrap(),
-            serde_json::json!({"default":"openclaw","chosen_in_app":false})
+            serde_json::json!({"default":"openclaw","chosen_in_app":false,"gateway":"ready"})
         );
         let blank = Request::AppEngineDefault { engine: " ".into() };
         assert_eq!(
@@ -7704,14 +7734,14 @@ mod tests {
         // Chosen: kept, and first at once.
         assert_eq!(
             app_engine_default_operation(&hermes, Some(&side), &file).unwrap(),
-            serde_json::json!({"default":"hermes","chosen_in_app":true})
+            serde_json::json!({"default":"hermes","chosen_in_app":true,"gateway":"ready"})
         );
         assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
         let kept: serde_json::Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
         assert_eq!(kept, serde_json::json!({"version":1,"engine":"hermes"}));
         assert_eq!(
             app_engine_default_operation(&state, Some(&side), &file).unwrap(),
-            serde_json::json!({"default":"hermes","chosen_in_app":true})
+            serde_json::json!({"default":"hermes","chosen_in_app":true,"gateway":"ready"})
         );
         // Read again, as at start; a file not valid is no choice.
         assert_eq!(read_engine_default(&file), Some(Hermes));
@@ -7727,12 +7757,12 @@ mod tests {
         assert_eq!(lamp_order(&only), [Openclaw]);
         assert_eq!(
             app_engine_default_operation(&state, Some(&only), &file).unwrap(),
-            serde_json::json!({"default":"openclaw","chosen_in_app":false})
+            serde_json::json!({"default":"openclaw","chosen_in_app":false,"gateway":"ready"})
         );
         let none = LampSide::with_order(PathBuf::new(), Vec::new());
         assert_eq!(
             app_engine_default_operation(&state, Some(&none), &file).unwrap(),
-            serde_json::json!({"default":null,"chosen_in_app":false})
+            serde_json::json!({"default":null,"chosen_in_app":false,"gateway":"ready"})
         );
     }
 
@@ -7779,7 +7809,7 @@ mod tests {
         };
         assert_eq!(
             app_engine_default_operation(&claude, Some(&side), &file).unwrap(),
-            serde_json::json!({"default":"claude","chosen_in_app":true})
+            serde_json::json!({"default":"claude","chosen_in_app":true,"gateway":"ready"})
         );
         assert_eq!(lamp_order(&side), [Claude, Codex, Hermes, Openclaw]);
         assert_eq!(read_engine_default(&file), Some(Claude));

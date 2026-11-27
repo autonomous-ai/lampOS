@@ -394,12 +394,12 @@ fn the_apps_grant_list_is_the_doors_plain_grants() {
         .iter()
         .map(|grant| json!(grant).as_str().unwrap().to_owned())
         .collect();
-    assert_eq!(
-        GRANTS.last(),
-        Some(&lamp_skills::app_package::REMEMBER_GRANT)
-    );
-    assert!(crate::protocol::Grant::from_wire(lamp_skills::app_package::REMEMBER_GRANT).is_none());
-    let mut apps: Vec<String> = GRANTS[..GRANTS.len() - 1]
+    assert_eq!(GRANTS[15], lamp_skills::app_package::REMEMBER_GRANT);
+    // `remember` and Lamp Doctor's two are apps' own, no computer's.
+    for own in &GRANTS[15..] {
+        assert!(crate::protocol::Grant::from_wire(own).is_none(), "{own}");
+    }
+    let mut apps: Vec<String> = GRANTS[..15]
         .iter()
         .map(|grant| (*grant).to_owned())
         .collect();
@@ -449,4 +449,36 @@ fn a_removed_apps_kept_settings_are_gone_and_the_others_stay() {
     assert_eq!(settings_of(&place, "other").unwrap()["loud"], json!(8));
     let _ = std::fs::remove_dir_all(&apps);
     let _ = std::fs::remove_dir_all(&state);
+}
+
+#[test]
+fn a_yes_to_report_beside_a_reader_is_refused_and_beside_device_is_taken() {
+    let ask = |grants: Value| key_of(&five("install", "doctor", grants));
+    // Behind their switches: off, no yes is taken for either.
+    for grant in ["turns", "report"] {
+        let why = ask(json!([grant])).unwrap_err();
+        assert!(why.contains("not one of the door's"), "{grant}: {why}");
+    }
+    lamp_skills::app_package::with_doctor_switches(true, true, || {
+        for reader in [
+            "hear",
+            "speech",
+            "microphone",
+            "camera",
+            "notes",
+            "remember",
+        ] {
+            let why = ask(json!(["report", reader])).unwrap_err();
+            assert!(
+                why.contains("report can't be held beside"),
+                "{reader}: {why}"
+            );
+        }
+        assert!(ask(json!(["turns", "report", "device"])).is_ok());
+        assert!(ask(json!(["turns", "hear"])).is_ok());
+    });
+    lamp_skills::app_package::with_doctor_switches(true, false, || {
+        assert!(ask(json!(["turns"])).is_ok());
+        assert!(ask(json!(["report"])).is_err());
+    });
 }

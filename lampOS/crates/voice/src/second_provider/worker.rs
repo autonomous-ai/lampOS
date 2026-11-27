@@ -18105,6 +18105,113 @@ mod tests {
         assert!(super::going_on_from(true, Some(s(44)), None));
     }
 
+    /// #8839: a no-look arithmetic follow-up 15 s after the answer, with
+    /// product voice prints and optionally an earlier line recorded as another voice.
+    #[test]
+    fn ordinary_follow_ups_renew_with_a_low_missing_or_carried_print() {
+        use crate::room_told::Room;
+        use crate::second_provider::{Did, Heard};
+
+        #[derive(Default)]
+        struct Voice(Option<(u64, Result<Vec<f32>, String>)>);
+        impl crate::same_voice::Printer for Voice {
+            fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+                let score = f32::from(samples[0]) / 100.0;
+                self.0 = Some((request, Ok(vec![score, (1.0 - score * score).sqrt()])));
+                true
+            }
+            fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+                self.0.take()
+            }
+        }
+        let _one = crate::provider_worker::tests::one_thread();
+        let say = |heeding: &mut super::Heeding, request, score: Option<i16>| {
+            heeding.hear(
+                request,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            let samples = match score {
+                Some(percent) => vec![percent; crate::same_voice::ASKED_AT],
+                None => vec![1; 8_000],
+            };
+            heeding.hear(request, Heard::Samples(&samples));
+            heeding.hear(request, Heard::Ended);
+        };
+        let run = |follow_ups: bool, score: Option<i16>, carried: bool| {
+            let _clock = clock_with_history();
+            let mut heeding = product_heeding(Arc::default());
+            heeding.attention.tie_the_second_sign(true);
+            if follow_ups {
+                heeding.taking_follow_ups();
+            }
+            heeding.keeping_line_rooms();
+            heeding.checking_the_voice_for_the_join(Box::new(Voice::default()));
+            // Age the stored words past the fallback window so only the lamp's
+            // playback-end timestamps can establish and renew this window.
+            let first_words = Instant::now() - Duration::from_secs(90);
+            let mut thread = crate::thread::Thread::new();
+            thread.person("Hey Lamp, what is nine times eight?", true, first_words);
+            thread.lamp(8, "Seventy-two.", first_words);
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            say(&mut heeding, 8, Some(100));
+            heeding
+                .for_services
+                .as_mut()
+                .unwrap()
+                .decided(8, true, false);
+            heeding.lamp_did(Did::Said(8, monotonic_us()));
+            if carried {
+                heeding.keep_spoken(9, &Vec::new(), (Room::Quiet, true), false, Some(0.26));
+                assert_eq!(heeding.another_person, Some(9));
+            }
+
+            crate::scenario_clock::elapse_in_pass(Duration::from_secs(15)).unwrap();
+            say(&mut heeding, 10, score);
+            let measured = heeding.for_services.as_mut().unwrap().likeness_so_far(10);
+            assert_eq!(measured, score.map(|s| f32::from(s) / 100.0));
+            let start = monotonic_us();
+            let admitted = heeding
+                .heed(10, (start, start + 500_000), "And times two?", None)
+                .is_none();
+            if admitted {
+                let next_words = first_words + Duration::from_secs(15);
+                {
+                    let mut thread = crate::thread::THREAD.lock().unwrap();
+                    thread.person("And times two?", true, next_words);
+                    thread.lamp(10, "One hundred forty-four.", next_words);
+                }
+                heeding.lamp_did(Did::Said(10, start + 1_000_000));
+            }
+            // 31 s after the first answer and 15 s after the second. Only
+            // an answer eligible to renew the window can carry this line.
+            crate::scenario_clock::elapse_in_pass(Duration::from_secs(16)).unwrap();
+            let start = monotonic_us();
+            let renewed = heeding.signs(11, (start, start)).going_on;
+            assert_eq!(
+                heeding.said_until_free_us == Some(start - 15_000_000),
+                renewed
+            );
+            crate::scenario_clock::elapse_in_pass(Duration::from_secs(6)).unwrap();
+            let expired = monotonic_us();
+            assert!(!heeding.signs(12, (expired, expired)).going_on);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            (admitted, renewed)
+        };
+        for score in [Some(26), Some(29), Some(30), None, Some(100)] {
+            for carried in [false, true] {
+                assert_eq!(
+                    run(true, score, carried),
+                    (true, true),
+                    "{score:?}, carried={carried}"
+                );
+            }
+        }
+        assert_eq!(run(false, Some(26), false), (false, false), "switch off");
+    }
+
     /// `LAMP_FOLLOW_UPS` in a room not busy (the product owner's "about 20 s
     /// after the lamp answers", 25 Nov 2026): on lamp-74ff "And of
     /// Argentina?" 35 s after a short answer was answered by the thread's
@@ -31641,11 +31748,12 @@ mod tests {
     /// services' alone (`LAMP_SAME_VOICE_FOR=services`), and `LAMP_FOLLOW_UPS`
     /// read none, so TV and a third voice right after an answer were answered
     /// as follow-ups. With the join's prints read in the window
-    /// ([`super::Heeding::window_voices`]): a line in another voice than the
-    /// conversation's is judged by its signs as before (no look: held), one
-    /// in the conversation's own voice is a follow-up, looking or not, and so
-    /// is one too short for a print. Without `LAMP_FOLLOW_UPS` the window
-    /// reads no such print, and no look holds the line, as before.
+    /// ([`super::Heeding::window_voices`]): since #8839 (the product owner's
+    /// rule of 26 Nov: no unmeasured sensor holds a person) a line in another
+    /// voice than the conversation's is a follow-up too, as is one in the
+    /// conversation's own voice, looking or not, and one too short for a
+    /// print; the print may only help. Without `LAMP_FOLLOW_UPS` the window
+    /// takes no follow-up pass, and no look holds the line, as before.
     #[test]
     fn with_follow_ups_the_joins_prints_tell_another_voice_in_the_window() {
         let _one = crate::provider_worker::tests::one_thread();
@@ -31712,7 +31820,10 @@ mod tests {
             answered(true, 1, 48_000),
             "the conversation's own voice, no look"
         );
-        assert!(!answered(true, -1, 48_000), "another voice, no look");
+        assert!(
+            answered(true, -1, 48_000),
+            "another voice, no look: the print only helps (#8839)"
+        );
         assert!(
             answered(true, -1, 8_000),
             "too short for a print: no other voice"

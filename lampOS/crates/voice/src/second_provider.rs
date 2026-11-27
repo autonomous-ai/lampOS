@@ -10036,6 +10036,7 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::GenerationComplete { request }
         | ProviderOutput::Interrupted { request }
         | ProviderOutput::TurnComplete { request, .. }
+        | ProviderOutput::Cases { request, .. }
         | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::RequestedAudio { request, .. }
         | ProviderOutput::Unclear { request, .. }
@@ -10365,6 +10366,25 @@ pub fn fault(error: &net::Error) -> Fault {
 impl Shared {
     /// False once the engine is gone; the task then just ends.
     async fn emit(&self, event: ProviderOutput) -> bool {
+        // The calls of the request that failed in this process go to the
+        // coordinator, which makes the turn's record, just before the
+        // request's end (#8726).
+        if let ProviderOutput::TurnComplete { request, .. } = &event {
+            let (failed, proofs) = crate::turn_ledger::take(*request);
+            if (!failed.is_empty() || !proofs.is_empty())
+                && self
+                    .out
+                    .send(ProviderOutput::Cases {
+                        request: *request,
+                        failed,
+                        proofs,
+                    })
+                    .await
+                    .is_err()
+            {
+                return false;
+            }
+        }
         self.out.send(event).await.is_ok()
     }
 
@@ -10828,6 +10848,12 @@ async fn spoken(
         }
         Err(error) => {
             eprintln!("lamp-voice second: request {request} speech to text failed: {error}");
+            crate::turn_ledger::failed_by(
+                request,
+                lamp_msgs::doctor::CallKind::Stt,
+                &error,
+                finishing.elapsed(),
+            );
             shared.stages(request, &times).await;
             return shared
                 .fail(request, FailedStage::AwaitingResponse, &error)
@@ -21307,6 +21333,11 @@ async fn answer(
                                 "lamp-voice second: request {request} look round had not begun in {} ms; the lamp says it could not look",
                                 began.elapsed().as_millis()
                             );
+                            crate::turn_ledger::timed_out(
+                                request,
+                                lamp_msgs::doctor::CallKind::Llm,
+                                began.elapsed(),
+                            );
                             queue.push(shared.fixed(COULD_NOT_LOOK).to_owned()).await?;
                             return Ok(());
                         }
@@ -21314,6 +21345,11 @@ async fn answer(
                             eprintln!(
                                 "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the onboarding line's own words are said",
                                 began.elapsed().as_millis()
+                            );
+                            crate::turn_ledger::timed_out(
+                                request,
+                                lamp_msgs::doctor::CallKind::Llm,
+                                began.elapsed(),
                             );
                             if let Some(tries) = &tries {
                                 tries.neither();
@@ -21326,6 +21362,11 @@ async fn answer(
                             eprintln!(
                                 "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the turn ends unanswered",
                                 began.elapsed().as_millis()
+                            );
+                            crate::turn_ledger::timed_out(
+                                request,
+                                lamp_msgs::doctor::CallKind::Llm,
+                                began.elapsed(),
                             );
                             if let Some(tries) = &tries {
                                 tries.neither();
@@ -21386,6 +21427,12 @@ async fn answer(
                         eprintln!(
                             "lamp-voice second: request {request} chat round {round} failed after {} ms: {error}",
                             began.elapsed().as_millis()
+                        );
+                        crate::turn_ledger::failed_by(
+                            request,
+                            lamp_msgs::doctor::CallKind::Llm,
+                            &error,
+                            began.elapsed(),
                         );
                         // Refused with the history's kept calls in it: asked
                         // once more without them, in words only.

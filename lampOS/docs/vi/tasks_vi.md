@@ -3314,8 +3314,12 @@ Khi công tắc bật và đã có phiên:
 - **Lúc khởi động.** Một luồng bơm (`openclaw-direct`; của Hermes là
   `hermes-direct`) kết nối ngay và mở hoặc
   nhận lại phiên được giữ, không cần ai hỏi. Một lần nhìn thất bại được thử lại
-  sau 0,5 s, mỗi lần gấp đôi, tối đa 30 s (2 s khi có việc đang chờ). Khi đã
-  sẵn sàng và rảnh, nó nhìn lại mỗi 30 s. Pane của một phiên
+  sau 0,5 s, mỗi lần gấp đôi, tối đa 30 s; tối đa 2 s (`direct::retry_most`)
+  khi có việc đang chờ (một lượt trong hàng, một lần khởi chạy chờ sẵn sàng,
+  một lượt đang chạy) hoặc khi engine của nó là mặc định của đèn, nên agent
+  của chính đèn sẵn sàng trong khoảng 2 s sau khi gateway của nó lên. Một lần
+  khởi chạy bắt đầu chờ sẽ đánh thức luồng bơm đang nghỉ giữa các lần thử, và
+  nó nhìn ngay. Khi đã sẵn sàng và rảnh, nó nhìn lại mỗi 30 s. Pane của một phiên
   (`LAMP_TASKS_ONE_SESSION`) không được mở, vì nó chỉ nhận lượt của OpenClaw.
 - **Việc nói ra.** Một việc OpenClaw cho chính máy của đèn, không nêu tên phiên,
   được xếp hàng trong phiên trực tiếp và trả lời `joined` với agent id riêng:
@@ -3500,15 +3504,78 @@ thay cho Harness và `hermes chat -q`: một kết nối tới API server của 
 Hermes và một phiên được giữ. Công tắc và đường của OpenClaw không đổi; mỗi
 engine có phiên riêng, và cả hai có thể cùng bật (`direct::lamps`).
 
-Phiên nói thẳng của Hermes chỉ nhận việc khi Hermes là engine mặc định của đèn
-(`direct::serves_now`, engine đầu tiên của `lamp_order`, đọc trực tiếp nên lựa
-chọn trong app có hiệu lực ngay), vì lamp-update chỉ chạy gateway của Hermes
-khi đó. Trên đèn có mặc định là OpenClaw, việc gọi tên Hermes ("Hỏi Hermes
-...", `LAMP_TASKS_NAMED_ONLY`) vẫn đi đường Harness và tiến độ của Harness như
-trước công tắc này, không chờ một gateway không bao giờ khởi động. Một việc giữ
-đường nó đã bắt đầu: lượt Hermes nói thẳng còn đang chạy khi mặc định trong app
-đổi sang OpenClaw vẫn đọc từ lượt chạy của nó (`Direct::path` tính các lượt của
-chính nó bất kể mặc định), không hỏi Harness, nơi chưa từng có nó.
+Mỗi phiên nói thẳng, của Hermes và của OpenClaw, chỉ nhận việc khi engine của
+nó là engine mặc định của đèn (`direct::serves_now`, engine đầu tiên của
+`lamp_order`, đọc trực tiếp nên lựa chọn trong app có hiệu lực ngay), vì
+lamp-update mỗi lúc chỉ chạy gateway của một agent, agent mặc định. Trên đèn có
+mặc định là OpenClaw, việc gọi tên Hermes ("Hỏi Hermes ...",
+`LAMP_TASKS_NAMED_ONLY`) vẫn đi đường Harness và tiến độ của Harness như trước
+công tắc này, không chờ một gateway không bao giờ khởi động. Trên đèn có mặc
+định là Hermes, một việc nói ra cho OpenClaw bị từ chối ngay với
+`agent_not_lamp_default` (`direct::not_default_for`; Task news của voice nói nó
+bằng một câu ngắn, `failed_not_default`: "OpenClaw isn't the lamp's agent right
+now."), và một lượt chạy kỹ năng hay make cho nó thất bại ngay
+với lời có mã đó, thay cho việc chờ gateway của OpenClaw 60 s (việc nói ra)
+hay 240 s (lượt chạy kỹ năng). Hàng đợi giữ việc chờ gateway nguội của OpenClaw
+(`runtime::gateway_wait`, tối đa 480 s, #8105) không bao giờ giữ một việc như
+vậy, cũng không đánh dấu cần gateway: việc đó tới ngay chỗ worker từ chối.
+
+**Chuyển agent** (quy tắc của chủ sở hữu). Khi agent mặc định của đèn đổi
+(`app_engine_default` của app thì ngay lập tức, hoặc mọi thay đổi khác của
+`lamp_order` trong vòng `direct::SWITCH_LOOK_EVERY`, 1 s, từ vòng lặp chính
+của lamp-tasks; `direct::switch_check`), mọi lượt chưa kết thúc của phiên nói
+thẳng của agent cũ, đang chờ hay đang chạy, kết thúc ngay với
+`direct::SWITCHED` ("This task ended because the lamp switched to another
+agent. Please ask again."), mang trong câu trả lời của lần quan sát (trạng thái
+`failed`) như lời của một lần gateway rớt, nên tin việc bị dừng của voice nói
+nó; một lượt chạy kỹ năng thất bại với lời đó. Lượt đang chạy cũng được huỷ
+trên gateway của nó, cố gắng hết mức, trên một luồng riêng. Phiên của mặc định
+mới thôi tin lần "sẵn sàng" cuối, được đánh thức và nhìn gateway của nó ngay,
+rồi tối đa mỗi 2 s; lần đọc mặc định của các engine nói
+`"gateway":"switching"` cho tới khi nó trả lời, rồi `"ready"`. Nhật ký ghi
+`tasks: direct: agent switch started: <cũ> to <mới>; ...` và `tasks: direct:
+agent switch: <mới> is ready, <ms> ms after the switch`. Một việc không còn giữ
+đường nó đã bắt đầu (#8431 giữ lượt Hermes đang chạy trên lượt chạy của nó khi
+mặc định đổi; giờ việc chuyển agent kết thúc nó): `Direct::path` chỉ tính các
+lượt của chính nó khi chúng đã kết thúc, nên lần nhìn cuối của chúng vẫn đọc từ
+đây, không hỏi Harness, nơi chưa từng có chúng.
+
+**Việc chuyển agent, nói thành lời** (lamp-voice, `agent_switch_told`). Đèn nói
+một câu cố định khi việc chuyển bắt đầu, "Switching to OpenClaw." hay
+"Switching to Hermes.", và một câu khi gateway của agent mới trả lời,
+"OpenClaw is ready." hay "Hermes is ready.", chỉ khi đang trong một cuộc trò
+chuyện: một lượt đang mở (một câu trả lời trong tay, hay một luồng người dùng
+đang giữ), hoặc cuộc trò chuyện của thread còn đang diễn ra (lời của đèn trong
+`thread::GOING_ON_FOR`, 45 s, chưa đóng từ đó) khi có người ở bên đèn
+(`reminders::someone_here`: một khuôn mặt trong tầm nhìn, hoặc một người được
+nghe thấy trong hai phút vừa qua), nên lời không ai hỏi của chính đèn, như tin
+việc (task news), nói với phòng trống không mở cuộc trò chuyện nào. Việc chuyển
+được yêu cầu bằng giọng nói thì tự nó đã ở trong một cuộc trò chuyện. Việc
+chuyển làm trong app khi phòng im lặng hoặc trống thì không bao giờ được nói: nó
+chỉ hiện trong app và trên đèn. Cách đọc: khi có cuộc trò chuyện đang mở, và chỉ khi đó, một luồng riêng
+của lamp-voice đọc `targets` của lamp-tasks trên socket request của nó mỗi
+`agent_switch_told::READ_EVERY` (1 s); `engine` của target của đèn đổi trong
+cùng một cuộc trò chuyện là một lần chuyển (cuộc trò chuyện mở sau một lần
+chuyển không bao giờ nói nó), và `gateway` ở cấp trên cùng của câu trả lời
+(`switching` hay `ready`) là trạng thái sẵn sàng. Một lần đọc `ready` trong
+vòng `SETTLE_US` (2,5 s) sau lúc đổi chỉ được tính khi đã thấy `switching`,
+nên lời cuối của gateway cũ không bao giờ bị coi là của gateway mới. Mỗi câu
+được nói một lần cho mỗi lần chuyển; câu "ready" chỉ sau khi câu "switching"
+của nó đã được nói, và không bao giờ sau khi cuộc trò chuyện đã kết thúc
+(`ENDS_AFTER_US`, 2 s không có dấu hiệu nào của nó). Chuyển sang engine khác
+OpenClaw hay Hermes thì không nói. Câu chờ tới khi đèn không nói gì của riêng
+nó và người dùng im 1 s (`task_news::PAUSE_US`), và được nói qua đường của
+model đúng như đã viết (`onboarding::said_as_is`), bằng ngôn ngữ của chủ sở
+hữu (tiếng Anh, Việt, Nhật, Trung, Hàn, Pháp); trace ghi `agent_switch_said`
+với `moment` của nó. lamp-tasks chỉ đưa `gateway` trên lần đọc mặc định của
+các engine, thứ mà đường của lamp-voice không được hỏi: cho tới khi `targets`
+cũng mang nó, câu "ready" không bao giờ được nói, còn câu "switching" thì có.
+Việc bị việc chuyển kết thúc được Task news nói bằng một câu ngắn: "That
+stopped because I switched to another agent. Please ask me again." Đó là câu
+cố định của chính đèn, bằng ngôn ngữ của chủ sở hữu
+(`agent_switch_told::ended_note`, nói đúng như đã viết giống các câu chuyển
+agent), không bao giờ do model chat hay news agent diễn đạt lại; skill không có
+prompt nào cho câu này.
 
 Hermes nói thẳng hoạt động giống hệt OpenClaw nói thẳng (tiêu chí nghiệm thu
 của chủ sở hữu, 23/11): việc của đèn chạy, và "tới đâu rồi?" cùng các dòng
@@ -3576,8 +3643,11 @@ grant skill-start của nó, giống hệt kỹ năng của OpenClaw. Phần ri�
   lamp-ee17 nó được liệt kê là rảnh trong khi lần đóng bị từ chối khoảng 27
   phút, và các lần đọc đó giữ Gateway của OpenClaw chạy bên cạnh của Hermes.
   Mọi pane khác trên OpenClaw (của một người, mở trong Harness) giữ nguyên quy
-  tắc: được liệt kê và chưa kết thúc thì giữ Gateway chạy, và đánh dấu nó là
-  cần trong `gateway::IN_USE_HOLD` (4 giờ).
+  tắc: được liệt kê và chưa kết thúc thì lamp-tasks đánh dấu OpenClaw đang được
+  dùng trong `gateway::IN_USE_HOLD` (4 giờ) và nói `openclaw_in_use` trong câu
+  trả lời, nhưng lamp-update không còn đọc trường đó: Gateway của OpenClaw chỉ
+  theo agent mặc định, nên không bao giờ chạy bên cạnh của Hermes (mỗi lúc chỉ
+  một gateway agent, `gateway_keeper` của lamp-update).
 - **`do.task` của kỹ năng và make.** Khi Hermes của đèn là mặc định và công tắc
   bật, `HarnessRunner::run` nhận lượt chạy trên đường chạy duy nhất như của một
   gateway agent (`by_start`), bất kể công tắc default-agent của Harness, và giao
@@ -4075,9 +4145,15 @@ lamp-c0a4) thì không đổi gì: OpenClaw vẫn là engine của đèn, và ph
   đặt nó lên đầu, câu trả lời `targets` báo nó là engine của target `lamp`
   (để voice gọi đúng tên), và target của đèn được ghi lại ở lần xem kế
   tiếp. `{"op":"app_engine_default_state"}` đọc nó. Cả hai trả
-  `{"ok":true,"default":"claude","chosen_in_app":true}` (`default` là null
-  khi đèn không có engine; `chosen_in_app` chỉ true khi lựa chọn của app
-  đang là mặc định). File được đọc khi khởi động; thiếu, không hợp lệ, hoặc
+  `{"ok":true,"default":"claude","chosen_in_app":true,"gateway":"ready"}`
+  (`default` là null khi đèn không có engine; `chosen_in_app` chỉ true khi
+  lựa chọn của app đang là mặc định; `gateway` là trạng thái chuyển agent,
+  `direct::gateway_said`: `switching` từ lúc mặc định đổi cho tới khi phiên
+  nói thẳng của mặc định mới thấy gateway của nó sẵn sàng, rồi `ready`; cũng
+  là `ready` khi mặc định không có phiên nói thẳng). Lần đọc của lamp-update
+  (`app_engine_default_state` trên route của nó) có cùng trường này.
+  `update.status` không được dựng ở đây: lamp-cloud trả lời nó từ
+  `update/status` của lamp-update (`crates/update/src/status.rs`). File được đọc khi khởi động; thiếu, không hợp lệ, hoặc
   nêu một engine Harness khởi động không kèm việc thì là chưa chọn. Một lựa
   chọn không còn nằm trong các engine của đèn (Harness không còn báo nó,
   hoặc công tắc của nó tắt) bị bỏ qua, không bị xoá. Reset của đèn xoá nó

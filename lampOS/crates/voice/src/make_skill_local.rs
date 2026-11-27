@@ -8552,6 +8552,87 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         );
     }
 
+    /// El's P3s on #8732: "what's the date" and "the time every hour" ask
+    /// for a value; a negation or "all the time" asks for none; the note
+    /// keeps the ask's own case; and a fixed say beside a `say = { note }`
+    /// with the maker's `left out:` note is still held, while with no
+    /// note the model's say may give the value, so it is kept.
+    #[test]
+    fn the_date_the_time_a_negation_and_a_note_say_beside_a_fixed_one() {
+        let dropped = year_count("Good morning!", true, false);
+        for (asked, value) in [
+            ("every morning, tell me what's the date", "the date"),
+            ("at 7 AM, tell me today's date.", "today's date"),
+            ("say the time every hour", "the time every hour"),
+            (
+                "Every day at 6, tell me How Many days are left. Thanks",
+                "How Many days are left",
+            ),
+            (
+                "Mỗi sáng nói Bao Nhiêu ngày nữa hết năm",
+                "Bao Nhiêu ngày nữa hết năm",
+            ),
+            // El's P2 on #8822: a negation of forgetting asks all the more.
+            (
+                "every morning don't forget tell me how many emails",
+                "how many emails",
+            ),
+            ("mỗi sáng đừng quên báo bao nhiêu email", "bao nhiêu email"),
+            (
+                "every day without fail tell me how many days are left",
+                "how many days are left",
+            ),
+            (
+                "never forget to say how many days are left",
+                "how many days are left",
+            ),
+            ("at 6 do not forget to tell me the time", "the time"),
+        ] {
+            assert_eq!(
+                made_skill::value_left_out(&dropped, asked).as_deref(),
+                Some(value),
+                "{asked}"
+            );
+        }
+        for asked in [
+            "every morning, don't tell me how many emails, just say good morning",
+            "at 7, no need to say what time it is, just say hi",
+            "every day at 9 do not say how much I spent, just wish me luck",
+            "mỗi sáng đừng nói mấy giờ, chỉ chào tôi",
+            "every hour remind me to drink water, all the time",
+            "at 6 remind me to leave by the time the bus comes",
+        ] {
+            assert_eq!(made_skill::value_left_out(&dropped, asked), None, "{asked}");
+        }
+        // A negation in an earlier sentence governs nothing after it.
+        assert_eq!(
+            made_skill::value_left_out(
+                &dropped,
+                "Don't be loud. Every morning tell me how many days are left"
+            )
+            .as_deref(),
+            Some("how many days are left")
+        );
+        let days = "There are days left in the year.";
+        let beside = |note: bool| {
+            year_count(days, true, note).replace(
+                &format!("say = {{ text = \"{days}\" }}"),
+                &format!(
+                    "say = {{ text = \"{days}\" }}\n\n[[do]]\nsay = {{ note = \"Wish me a good day.\" }}"
+                ),
+            )
+        };
+        assert!(beside(true).contains("say = { note ="));
+        assert!(made_skill::says_fixed_with_left_out(&beside(true)));
+        assert_eq!(
+            made_skill::value_left_out(
+                &beside(false),
+                "every day at 6 tell me how many days are left"
+            ),
+            None
+        );
+    }
+
     /// #8732's row on lamp-ee17 (26 Nov, 17:03): DeepSeek kept "There are
     /// days left in the year." for "how many days are left in the year"
     /// with no `left out:` note. An ask for a value (English or

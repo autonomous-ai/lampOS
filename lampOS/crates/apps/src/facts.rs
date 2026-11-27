@@ -26,8 +26,10 @@ pub const DOOR_GRANTS: &[&str] = &[
 ];
 
 /// An app's own grants beyond the door's, which no computer is paired with:
-/// `remember` (`apps.remember`, `lamp_skills::app_package::REMEMBER_GRANT`).
-pub const APP_GRANTS: &[&str] = &["remember"];
+/// `remember` (`apps.remember`, `lamp_skills::app_package::REMEMBER_GRANT`),
+/// and Lamp Doctor's `turns` and `report` (#8726, `DOCTOR_GRANTS`). The
+/// manifest reader's list (`lamp_skills::app_package::GRANTS`) has the same.
+pub const APP_GRANTS: &[&str] = &["remember", "turns", "report"];
 
 /// The most characters of an app's title (it is spoken: "stop the <title> app").
 pub const MOST_TITLE: usize = 40;
@@ -73,13 +75,18 @@ pub fn check(app: &dyn AppFacts, build: Option<u64>) -> Result<(), String> {
     }
     let mut seen: Vec<&str> = Vec::new();
     for grant in app.grants() {
-        if !DOOR_GRANTS.contains(&grant.as_str()) && !APP_GRANTS.contains(&grant.as_str()) {
+        if (!DOOR_GRANTS.contains(&grant.as_str()) && !APP_GRANTS.contains(&grant.as_str()))
+            || !lamp_skills::app_package::doctor_on(grant)
+        {
             return Err(format!("not a grant an app may ask: {grant:?}"));
         }
         if seen.contains(&grant.as_str()) {
             return Err(format!("grant {grant:?} twice"));
         }
         seen.push(grant);
+    }
+    if let Some(why) = lamp_skills::app_package::report_refused(app.grants()) {
+        return Err(why.to_owned());
     }
     match build {
         None => Err("this lamp's build is not known: no app is installed".into()),

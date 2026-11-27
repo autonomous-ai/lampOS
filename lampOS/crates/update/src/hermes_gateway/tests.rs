@@ -367,7 +367,6 @@ fn the_gateway_is_wanted_only_while_hermes_is_the_default() {
     let said = |default: Option<&str>| {
         Some(Said {
             default: default.map(str::to_owned),
-            openclaw_in_use: Some(false),
         })
     };
     assert_eq!(gateway_wanted(said(Some("hermes"))), Gateway::Wanted);
@@ -680,5 +679,547 @@ fn the_work_folder_is_shown_read_write_for_makes() {
         );
         assert!(!text.contains("ro \"$W\""), "{shown:?}");
         assert!(!text.contains("$W/lamp not hidden"), "{shown:?}");
+    }
+}
+
+/// The two agent gateways side by side, driven as lamp-update drives them
+/// (looks of its one keeper, crate::gateway_keeper, and a round), on one
+/// fake systemd that keeps both units' states and says whether both ever
+/// ran at once.
+mod one_gateway {
+    use super::*;
+    use crate::gateway_keeper::{Keeper, Kept, round_gateways};
+    use crate::openclaw_install as oc;
+    use std::collections::BTreeMap;
+
+    #[derive(Default)]
+    struct Two {
+        active: BTreeMap<String, &'static str>,
+        log: Vec<String>,
+        /// A unit whose stop fails, left running.
+        stop_fails: Option<&'static str>,
+        /// Both gateways running at once, after any call.
+        ever_both: bool,
+    }
+
+    impl Two {
+        fn is(&self, unit: &str) -> &'static str {
+            self.active.get(unit).copied().unwrap_or("inactive")
+        }
+        fn both_running(&self) -> bool {
+            let up = |u: &str| matches!(self.is(u), "active" | "activating" | "deactivating");
+            up(UNIT) && up(oc::UNIT)
+        }
+        fn up(&mut self, unit: &str) {
+            self.active.insert(unit.to_owned(), "active");
+            self.ever_both |= self.both_running();
+        }
+        fn at(&self, line: &str) -> usize {
+            self.log
+                .iter()
+                .position(|l| l == line)
+                .unwrap_or_else(|| panic!("no `{line}` in {:?}", self.log))
+        }
+    }
+
+    impl Systemd for Two {
+        fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
+            Ok(units
+                .iter()
+                .map(|u| UnitState {
+                    unit: u.clone(),
+                    active: self.is(u).to_owned(),
+                    ..UnitState::default()
+                })
+                .collect())
+        }
+        fn self_recovery_ready(&mut self) -> Result<(), String> {
+            unreachable!()
+        }
+        fn reload(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+        fn restart(&mut self, u: &str) -> Result<(), String> {
+            unreachable!("{u}")
+        }
+        fn reset_failed(&mut self, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+        fn stop(&mut self, u: &str) -> Result<(), String> {
+            self.log.push(format!("stop {u}"));
+            if self.stop_fails == Some(u) {
+                return Err(format!("{u}: Job for {u} canceled"));
+            }
+            self.active.insert(u.to_owned(), "inactive");
+            Ok(())
+        }
+        fn start_unit(&mut self, u: &str) -> Result<(), String> {
+            self.log.push(format!("start {u}"));
+            self.up(u);
+            Ok(())
+        }
+        fn start_added(&mut self, u: &str) -> Result<(), String> {
+            self.start_unit(u)
+        }
+        fn last_line(&mut self, _: &str) -> Option<String> {
+            None
+        }
+        fn hermes_gateway_unit_properties(&mut self) -> Result<String, String> {
+            Ok(LOADED_AS_WRITTEN.to_owned())
+        }
+        fn try_restart_hermes_gateway(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+        fn harness_unit_properties(&mut self) -> Result<String, String> {
+            Ok("Id=lamp-update-harness.service\nLoadState=loaded\n\
+                FragmentPath=/etc/systemd/system/lamp-update-harness.service\n\
+                DropInPaths=\nUnitFileState=static\n"
+                .to_owned())
+        }
+        fn start_harness_unit(&mut self) -> Result<(), String> {
+            self.log.push("start-harness".into());
+            Ok(())
+        }
+    }
+
+    fn said(default: Option<&str>) -> Option<Said> {
+        Some(Said {
+            default: default.map(str::to_owned),
+        })
+    }
+
+    /// OpenClaw there as a stable lamp has it: wrapper, unit, enabled.
+    fn openclaw_there(lamp: &Lamp) {
+        fs::write(lamp.at(oc::WRAPPER), "").unwrap();
+        fs::write(
+            lamp.root().join(crate::writer_unit::FOLDER).join(oc::UNIT),
+            oc::unit_text_for(PRODUCT),
+        )
+        .unwrap();
+        let wants = lamp.at(oc::WANTS);
+        fs::create_dir_all(wants.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(format!("/etc/systemd/system/{}", oc::UNIT), wants).unwrap();
+    }
+
+    /// Both switches on, as the product has them; `one_path` OpenClaw's.
+    fn keeper(one_path: bool) -> Keeper {
+        Keeper::new(Kept {
+            openclaw: Some(one_path),
+            hermes: true,
+        })
+    }
+
+    /// One keeper look, every command answered, nothing said.
+    fn look(keeper: &mut Keeper, lamp: &Lamp, systemd: &mut Two, s: Option<Said>) {
+        let mut run = |_: &[String]| Ok::<String, String>(String::new());
+        keeper.look(lamp.root(), systemd, s, &mut run, &mut |_| {});
+    }
+
+    fn lamp_with_both(openclaw_up: bool, hermes_up: bool) -> (Lamp, Two) {
+        let lamp = Lamp::new();
+        lamp.hermes_there(PRODUCT);
+        write_ns(lamp.root(), PRODUCT).unwrap();
+        crate::writer_unit::write_unit(lamp.root(), UNIT, &unit_text(PRODUCT)).unwrap();
+        openclaw_there(&lamp);
+        let mut systemd = Two::default();
+        if openclaw_up {
+            systemd.active.insert(oc::UNIT.into(), "active");
+        }
+        if hermes_up {
+            systemd.active.insert(UNIT.into(), "active");
+            let wants = lamp.at(WANTS);
+            std::os::unix::fs::symlink(format!("/etc/systemd/system/{UNIT}"), wants).unwrap();
+        }
+        if !openclaw_up {
+            fs::remove_file(lamp.at(oc::WANTS)).unwrap();
+        }
+        (lamp, systemd)
+    }
+
+    /// The rule itself: whatever lamp-tasks says, the two never both want.
+    #[test]
+    fn one_answer_never_wants_both_gateways() {
+        let mut both = Vec::new();
+        for default in [Some("hermes"), Some("openclaw"), Some("claude"), None] {
+            let s = said(default);
+            if gateway_wanted(s.clone()) == Gateway::Wanted
+                && oc::gateway_wanted(true, s) == Gateway::Wanted
+            {
+                both.push(format!("{default:?}"));
+            }
+        }
+        assert!(both.is_empty(), "both gateways wanted for {both:?}");
+    }
+
+    /// (a) OpenClaw -> Hermes right after an OpenClaw turn (#8105's 4 h hold
+    /// is gone): one look leaves Hermes's gateway alone, never both.
+    #[test]
+    fn a_switch_to_hermes_after_an_openclaw_turn_leaves_one_gateway() {
+        let (lamp, mut systemd) = lamp_with_both(true, false);
+        look(
+            &mut keeper(false),
+            &lamp,
+            &mut systemd,
+            said(Some("hermes")),
+        );
+        assert!(!systemd.ever_both, "{:?}", systemd.log);
+        assert_eq!(systemd.is(UNIT), "active");
+        assert_eq!(systemd.is(oc::UNIT), "inactive");
+    }
+
+    /// (a) both ways: one look each, one gateway at every step (the two
+    /// threads before had both up between their looks).
+    #[test]
+    fn a_switch_either_way_leaves_one_gateway_after_one_look_each() {
+        let (lamp, mut systemd) = lamp_with_both(true, false);
+        let mut keeper = keeper(false);
+        look(&mut keeper, &lamp, &mut systemd, said(Some("hermes")));
+        assert_eq!(systemd.is(UNIT), "active");
+        assert_eq!(systemd.is(oc::UNIT), "inactive");
+        assert!(lamp.enabled() && fs::symlink_metadata(lamp.at(oc::WANTS)).is_err());
+        look(&mut keeper, &lamp, &mut systemd, said(Some("openclaw")));
+        assert_eq!(systemd.is(oc::UNIT), "active");
+        assert_eq!(systemd.is(UNIT), "inactive");
+        assert!(!lamp.enabled() && fs::symlink_metadata(lamp.at(oc::WANTS)).is_ok());
+        assert!(!systemd.ever_both, "{:?}", systemd.log);
+    }
+
+    /// (b) lamp-tasks restarting (no answer) changes nothing either way.
+    #[test]
+    fn lamp_tasks_down_touches_neither_gateway() {
+        let (lamp, mut systemd) = lamp_with_both(false, true);
+        let mut keeper = keeper(false);
+        look(&mut keeper, &lamp, &mut systemd, None);
+        look(&mut keeper, &lamp, &mut systemd, said(None));
+        assert!(systemd.log.is_empty(), "{:?}", systemd.log);
+    }
+
+    /// (c) stable -> this build, Hermes the default: the stable lamp's
+    /// always-on OpenClaw gateway is stopped and disabled by the first
+    /// look, Hermes's started only once the round wrote its unit and the
+    /// one-shot its script; never both at any step.
+    #[test]
+    fn an_update_on_a_hermes_lamp_never_runs_both() {
+        let lamp = Lamp::new();
+        lamp.hermes_there(PRODUCT);
+        lamp.harness_there();
+        openclaw_there(&lamp);
+        let mut systemd = Two::default();
+        systemd.active.insert(oc::UNIT.into(), "active");
+        let s = said(Some("hermes"));
+        let mut keeper = keeper(false);
+        // New lamp-update's keeper, before its first round.
+        look(&mut keeper, &lamp, &mut systemd, s.clone());
+        assert_eq!(systemd.is(oc::UNIT), "inactive");
+        // Its round: the unit written, the one-shot asked for the script.
+        let asked = after_round(
+            lamp.root(),
+            &lamp.records(),
+            PRODUCT,
+            gateway_wanted(s.clone()),
+            &mut systemd,
+            1,
+            &mut |_| {},
+        );
+        assert!(asked);
+        // The one-shot wrote the script; the next look starts Hermes's.
+        write_ns(lamp.root(), PRODUCT).unwrap();
+        look(&mut keeper, &lamp, &mut systemd, s);
+        assert_eq!(systemd.is(UNIT), "active");
+        assert!(!systemd.ever_both, "{:?}", systemd.log);
+    }
+
+    /// (c) stable -> this build, OpenClaw the default: Hermes's unit is
+    /// written but never enabled or started; OpenClaw's left running.
+    #[test]
+    fn an_update_on_an_openclaw_lamp_never_starts_hermes() {
+        let lamp = Lamp::new();
+        lamp.hermes_there(PRODUCT);
+        lamp.harness_there();
+        openclaw_there(&lamp);
+        let mut systemd = Two::default();
+        systemd.active.insert(oc::UNIT.into(), "active");
+        let s = said(Some("openclaw"));
+        let mut keeper = keeper(false);
+        look(&mut keeper, &lamp, &mut systemd, s.clone());
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            PRODUCT,
+            gateway_wanted(s.clone()),
+            &mut systemd,
+            1,
+            &mut |_| {},
+        );
+        write_ns(lamp.root(), PRODUCT).unwrap();
+        look(&mut keeper, &lamp, &mut systemd, s.clone());
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            PRODUCT,
+            gateway_wanted(s),
+            &mut systemd,
+            2,
+            &mut |_| {},
+        );
+        assert_eq!(systemd.is(UNIT), "inactive");
+        assert!(!lamp.enabled());
+        assert_eq!(systemd.is(oc::UNIT), "active");
+        assert!(
+            systemd.log.iter().all(|l| !l.contains(oc::UNIT)),
+            "{:?}",
+            systemd.log
+        );
+    }
+
+    /// One look, Hermes now the default with OpenClaw's gateway up:
+    /// OpenClaw's is stopped before Hermes's is started. A stop that fails
+    /// (OpenClaw's still running) holds Hermes's start, look after look,
+    /// until OpenClaw's is down.
+    #[test]
+    fn a_look_stops_openclaw_before_it_starts_hermes() {
+        let (lamp, mut systemd) = lamp_with_both(true, false);
+        look(
+            &mut keeper(false),
+            &lamp,
+            &mut systemd,
+            said(Some("hermes")),
+        );
+        assert!(
+            systemd.at(&format!("stop {}", oc::UNIT)) < systemd.at(&format!("start {UNIT}")),
+            "{:?}",
+            systemd.log
+        );
+        assert!(!systemd.ever_both);
+
+        let (lamp, mut systemd) = lamp_with_both(true, false);
+        systemd.stop_fails = Some(oc::UNIT);
+        let mut keeper = keeper(false);
+        for _ in 0..2 {
+            look(&mut keeper, &lamp, &mut systemd, said(Some("hermes")));
+            assert_eq!(systemd.is(UNIT), "inactive", "{:?}", systemd.log);
+            assert!(!lamp.enabled());
+        }
+        systemd.stop_fails = None;
+        look(&mut keeper, &lamp, &mut systemd, said(Some("hermes")));
+        assert_eq!(systemd.is(UNIT), "active");
+        assert_eq!(systemd.is(oc::UNIT), "inactive");
+        assert!(!systemd.ever_both, "{:?}", systemd.log);
+    }
+
+    /// The reverse: OpenClaw now the default with Hermes's gateway up:
+    /// Hermes's is stopped first, then OpenClaw's started; a failed stop
+    /// holds OpenClaw's.
+    #[test]
+    fn a_look_stops_hermes_before_it_starts_openclaw() {
+        let (lamp, mut systemd) = lamp_with_both(false, true);
+        look(
+            &mut keeper(false),
+            &lamp,
+            &mut systemd,
+            said(Some("openclaw")),
+        );
+        assert!(
+            systemd.at(&format!("stop {UNIT}")) < systemd.at(&format!("start {}", oc::UNIT)),
+            "{:?}",
+            systemd.log
+        );
+        assert!(!systemd.ever_both);
+
+        let (lamp, mut systemd) = lamp_with_both(false, true);
+        systemd.stop_fails = Some(UNIT);
+        look(
+            &mut keeper(false),
+            &lamp,
+            &mut systemd,
+            said(Some("openclaw")),
+        );
+        assert_eq!(systemd.is(oc::UNIT), "inactive", "{:?}", systemd.log);
+        assert!(!systemd.ever_both);
+    }
+
+    /// A cold OpenClaw gateway started by a look, the one run path on: its
+    /// allow-list add answers "not ready". The look runs the add once and
+    /// returns (no 40 × 3 s wait under the lock); the entry stays owed and
+    /// is tried once at each next look until taken. A switch to Hermes
+    /// meanwhile drops it and never leaves both up.
+    #[test]
+    fn a_cold_openclaw_gateway_never_holds_a_look() {
+        use std::cell::Cell;
+        let (lamp, mut systemd) = lamp_with_both(false, false);
+        let adds = Cell::new(0);
+        let ready = Cell::new(false);
+        let mut run = |argv: &[String]| {
+            let line = argv.join(" ");
+            if line.contains(" approvals allowlist add ") {
+                adds.set(adds.get() + 1);
+                if !ready.get() {
+                    return Err(format!("openclaw: {}", oc::CONFIG_NOT_READY));
+                }
+            }
+            Ok(String::new())
+        };
+        let mut keeper = keeper(true);
+        let mut lines = Vec::new();
+        for n in 1..=2 {
+            let began = std::time::Instant::now();
+            keeper.look(
+                lamp.root(),
+                &mut systemd,
+                said(Some("openclaw")),
+                &mut run,
+                &mut |line: &str| lines.push(line.to_owned()),
+            );
+            assert!(began.elapsed() < std::time::Duration::from_secs(1));
+            assert_eq!(adds.get(), n, "one add per look");
+            assert!(keeper.entry_owed());
+        }
+        assert_eq!(systemd.is(oc::UNIT), "active");
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|l| l.contains("waits for OpenClaw's gateway"))
+                .count(),
+            1,
+            "{lines:?}"
+        );
+        // Still cold, the default moves to Hermes: no add, one gateway.
+        keeper.look(
+            lamp.root(),
+            &mut systemd,
+            said(Some("hermes")),
+            &mut run,
+            &mut |_| {},
+        );
+        assert_eq!(adds.get(), 2);
+        assert!(!keeper.entry_owed());
+        assert_eq!(systemd.is(oc::UNIT), "inactive");
+        assert_eq!(systemd.is(UNIT), "active");
+        // Back to OpenClaw, ready at once: the add is taken in that look.
+        ready.set(true);
+        keeper.look(
+            lamp.root(),
+            &mut systemd,
+            said(Some("openclaw")),
+            &mut run,
+            &mut |_| {},
+        );
+        assert_eq!(adds.get(), 3);
+        assert!(!keeper.entry_owed());
+        // Owed again and ready at the next look: taken there, once.
+        ready.set(false);
+        keeper.look(
+            lamp.root(),
+            &mut systemd,
+            said(Some("hermes")),
+            &mut run,
+            &mut |_| {},
+        );
+        keeper.look(
+            lamp.root(),
+            &mut systemd,
+            said(Some("openclaw")),
+            &mut run,
+            &mut |_| {},
+        );
+        assert!(keeper.entry_owed());
+        ready.set(true);
+        keeper.look(
+            lamp.root(),
+            &mut systemd,
+            said(Some("openclaw")),
+            &mut run,
+            &mut |_| {},
+        );
+        assert!(!keeper.entry_owed());
+        keeper.look(
+            lamp.root(),
+            &mut systemd,
+            said(Some("openclaw")),
+            &mut run,
+            &mut |_| {},
+        );
+        assert_eq!(adds.get(), 5, "settled: nothing more run");
+        assert!(!systemd.ever_both, "{:?}", systemd.log);
+    }
+
+    /// Harness's one-shot at work, OpenClaw not wanted: the keeper still
+    /// stops and disables OpenClaw's gateway (it used to leave it to the
+    /// one-shot for as long as it ran), then starts Hermes's.
+    #[test]
+    fn the_one_shot_at_work_never_keeps_an_unwanted_openclaw_up() {
+        let (lamp, mut systemd) = lamp_with_both(true, false);
+        systemd
+            .active
+            .insert(crate::harness_install::UNIT.into(), "active");
+        look(
+            &mut keeper(false),
+            &lamp,
+            &mut systemd,
+            said(Some("hermes")),
+        );
+        assert_eq!(systemd.is(oc::UNIT), "inactive", "{:?}", systemd.log);
+        assert!(fs::symlink_metadata(lamp.at(oc::WANTS)).is_err());
+        assert_eq!(systemd.is(UNIT), "active");
+        assert!(!systemd.ever_both);
+    }
+
+    /// A round as main runs it, Hermes the default with OpenClaw's gateway
+    /// up: `round_gateways` first, then Hermes's step, then OpenClaw's.
+    /// OpenClaw's is stopped before Hermes's is started; with that stop
+    /// failing, the round never starts Hermes's.
+    #[test]
+    fn a_round_stops_openclaw_before_it_starts_hermes() {
+        for stop_fails in [false, true] {
+            let (lamp, mut systemd) = lamp_with_both(true, false);
+            lamp.harness_there();
+            if stop_fails {
+                systemd.stop_fails = Some(oc::UNIT);
+            }
+            let s = said(Some("hermes"));
+            let (openclaw, hermes) = round_gateways(
+                lamp.root(),
+                &mut systemd,
+                Some(oc::gateway_wanted(true, s.clone())),
+                Some(gateway_wanted(s)),
+                &mut |_| {},
+            );
+            after_round(
+                lamp.root(),
+                &lamp.records(),
+                PRODUCT,
+                hermes.unwrap(),
+                &mut systemd,
+                1,
+                &mut |_| {},
+            );
+            oc::after_round_with(
+                lamp.root(),
+                &lamp.records(),
+                PRODUCT,
+                openclaw.unwrap(),
+                true,
+                &mut systemd,
+                &mut |_: &[String]| Ok(String::new()),
+                1,
+                Ok(crate::hermes_schedule::Window::Reached),
+                &mut |_| {},
+            );
+            assert!(
+                !systemd.ever_both,
+                "stop_fails={stop_fails}: {:?}",
+                systemd.log
+            );
+            if stop_fails {
+                assert_eq!(systemd.is(UNIT), "inactive", "{:?}", systemd.log);
+            } else {
+                assert!(
+                    systemd.at(&format!("stop {}", oc::UNIT))
+                        < systemd.at(&format!("start {UNIT}")),
+                    "{:?}",
+                    systemd.log
+                );
+            }
+        }
     }
 }

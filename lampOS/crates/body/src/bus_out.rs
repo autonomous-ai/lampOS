@@ -83,9 +83,12 @@ const COUNTS_A_TURN: f64 = 4096.0;
 const MIDDLE: f64 = 2048.0;
 /// What a servo reports as its load is in thousandths of all it can exert.
 const FULL_LOAD: f64 = 1000.0;
-/// A joint this warm is said to be warm. The body ends its run at 62 on a
-/// joint it commands and sends the arm down at the same reading; this is
-/// far enough under to be told before that.
+/// A joint this warm is said to be warm. The body ends its run at its heat
+/// stop (`Limits::temperature`, 69) on a joint it commands and sends the arm
+/// down at the same reading (`Standing::TEMPERATURE`); this is far enough
+/// under to be told before that. Kept at 55 when the stop went from 62 to 69
+/// (#8828): a warm arm is still told early and still keeps a lamp from
+/// staying up for someone at it.
 pub const WARM: u8 = 55;
 /// Resistance met is said for this long after it happened.
 const RESISTANCE_SAID_FOR: Duration = Duration::from_secs(60);
@@ -242,12 +245,13 @@ fn said_as(joint: &str) -> &str {
 }
 
 /// How the body is at this step, as its report. `resisted` is how many
-/// times a joint has met resistance within the last minute.
+/// times a joint has met resistance within the last minute; `heat_stop` is
+/// the body's own heat stop, said with a warm joint (#8828).
 ///
 /// It is well unless a joint is warm, or one lately met something and
 /// stopped pushing. Neither stops the body: both are what a person would
 /// want to know before it does.
-pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
+pub fn health(glimpse: &Glimpse, resisted: u32, heat_stop: u8) -> Diagnostic {
     // Pitch, roll, yaw, and then shoulder, elbow, as a glimpse has them.
     let warmth = [
         ("head_pitch", glimpse.temperatures[0]),
@@ -318,7 +322,7 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
     } else if reading >= WARM {
         (
             Level::Warn,
-            format!("{warmest} is warm: it reads {reading}, and the body stops at 62"),
+            format!("{warmest} is warm: it reads {reading}, and the body stops at {heat_stop}"),
         )
     } else if let Some(joint) = glimpse.cannot_lift {
         (
@@ -939,6 +943,12 @@ impl Publishing {
             let mut report = health(
                 glimpse,
                 u32::try_from(publishing.resisted.len()).unwrap_or(u32::MAX),
+                publishing
+                    .bounds
+                    .as_ref()
+                    .map_or(crate::body::Standing::TEMPERATURE, |(limits, _)| {
+                        limits.temperature
+                    }),
             );
             if paused {
                 said_paused(&mut report);
@@ -1130,7 +1140,14 @@ mod tests {
             (0, 4_095, None)
         );
         assert!(!said.stands);
-        assert_eq!((said.speed, said.heat_stop, said.force), (50.0, 62, None));
+        assert_eq!((said.speed, said.heat_stop, said.force), (50.0, 69, None));
+        // The heat stop is 69, for a commanded joint and a held arm alike
+        // (#8828, the lead's ruling with the product owner: at 62 lamp-74ff's
+        // elbow sat the lamp down while it only stood).
+        assert_eq!(
+            (limits.temperature, crate::body::Standing::TEMPERATURE),
+            (69, 69)
+        );
         // A pitch home near the window's edge is cut to the window.
         let edge = body_limits(&limits, None, [1_750, 2_044, 2_015]);
         assert_eq!((edge.joints[4].min, edge.joints[4].max), (1_740, 1_765));
@@ -1229,6 +1246,7 @@ mod tests {
                 ..glimpse(0)
             },
             0,
+            69,
         );
         assert_eq!((report.level, report.message.as_str()), (Level::Error, say));
         assert!(
@@ -1253,6 +1271,7 @@ mod tests {
                     ..glimpse(1)
                 },
                 0,
+                69,
             )
         };
         let mut last: Option<(Diagnostic, Instant)> = None;
@@ -1294,6 +1313,7 @@ mod tests {
                 ..glimpse(1)
             },
             0,
+            69,
         );
         assert_eq!(asks(&let_go), Some(say));
         said_paused(&mut let_go);
@@ -1301,7 +1321,7 @@ mod tests {
         let mut other = let_go.clone();
         other.name = "eyes".into();
         assert_eq!(asks(&other), None);
-        assert_eq!(asks(&health(&glimpse(1), 0)), None);
+        assert_eq!(asks(&health(&glimpse(1), 0, 69)), None);
         let refused = stopped(&Stop::Refused {
             why: "out of range".into(),
         });
@@ -1468,7 +1488,7 @@ mod tests {
 
     #[test]
     fn a_paused_body_says_paused_and_nothing_else_changes() {
-        let well = health(&glimpse(50), 0);
+        let well = health(&glimpse(50), 0, 69);
         let mut paused = well.clone();
         said_paused(&mut paused);
         let state = |report: &Diagnostic| {
@@ -1485,7 +1505,7 @@ mod tests {
 
     #[test]
     fn the_body_is_well_unless_a_joint_is_warm_or_one_lately_met_resistance() {
-        let well = health(&glimpse(50), 0);
+        let well = health(&glimpse(50), 0, 69);
         assert_eq!((well.level, well.message.as_str()), (Level::Ok, ""));
         assert_eq!(well.name, "body");
         let facts: Vec<(&str, &str)> = well
@@ -1513,47 +1533,64 @@ mod tests {
         // One under warm is well, warm is not.
         let mut warm = glimpse(50);
         warm.arm_temperatures = [WARM - 1, 40];
-        assert_eq!(health(&warm, 0).level, Level::Ok);
+        assert_eq!(health(&warm, 0, 69).level, Level::Ok);
         warm.arm_temperatures = [WARM, 40];
-        let report = health(&warm, 0);
+        let report = health(&warm, 0, 69);
         assert_eq!(report.level, Level::Warn);
         assert_eq!(
             report.message,
-            "shoulder is warm: it reads 55, and the body stops at 62"
+            "shoulder is warm: it reads 55, and the body stops at 69"
+        );
+        // The stop said is the body's own, never a fixed number (#8828).
+        assert_eq!(
+            health(&warm, 0, 70).message,
+            "shoulder is warm: it reads 55, and the body stops at 70"
         );
         // Resting folded after three strains in half an hour is said, as
         // a warning, until it may rise again (lamp-4ace folded unseen from
         // 20 to 24 Oct). Warmth is said first.
         let mut resting = glimpse(50);
         resting.resting_s = 1_741;
-        let report = health(&resting, 0);
+        let report = health(&resting, 0, 69);
         assert_eq!(report.level, Level::Warn);
         assert_eq!(
             report.message,
             "its arm sat down for a strain three times in half an hour: it rests folded and may rise again in 30 min"
         );
         resting.arm_temperatures = [WARM, 40];
-        assert!(health(&resting, 0).message.starts_with("shoulder is warm"));
+        assert!(
+            health(&resting, 0, 69)
+                .message
+                .starts_with("shoulder is warm")
+        );
         // A joint the body commands, too.
         let mut head = glimpse(50);
         head.temperatures = [58, 36, 41];
-        assert!(health(&head, 0).message.starts_with("head_pitch is warm"));
+        assert!(
+            health(&head, 0, 69)
+                .message
+                .starts_with("head_pitch is warm")
+        );
         // Resistance, once and more than once. Warmth is said first.
         let mut pushed = glimpse(50);
         pushed.eased = [2, 0, 1];
-        let report = health(&pushed, 1);
+        let report = health(&pushed, 1, 69);
         assert_eq!(report.level, Level::Warn);
         assert_eq!(
             report.message,
             "a joint met resistance and stopped pushing, 1 time in the last minute"
         );
         assert!(
-            health(&pushed, 3)
+            health(&pushed, 3, 69)
                 .message
                 .ends_with("3 times in the last minute")
         );
         assert_eq!(report.values[5].value, "3");
-        assert!(health(&head, 3).message.starts_with("head_pitch is warm"));
+        assert!(
+            health(&head, 3, 69)
+                .message
+                .starts_with("head_pitch is warm")
+        );
     }
 
     /// The strain guard's warnings (#4390, #4501): seated first, then a
@@ -1562,7 +1599,7 @@ mod tests {
     #[test]
     fn the_strain_guards_warnings_name_the_joint_and_what_it_did() {
         let said = |glimpse: &Glimpse| {
-            let report = health(glimpse, 0);
+            let report = health(glimpse, 0, 69);
             assert_eq!(report.level, Level::Warn);
             report.message
         };
@@ -1772,7 +1809,7 @@ mod tests {
         assert_eq!(out.let_go, 0);
         out.stopped(&Stop::Temperature {
             joint: 2,
-            temperature: 62,
+            temperature: 69,
         });
         let last: Diagnostic = reports
             .recv(wait)
@@ -1781,7 +1818,7 @@ mod tests {
             .parse()
             .unwrap();
         assert_eq!(last.level, Level::Error);
-        assert_eq!(last.message, "stopped: shoulder is too warm (it reads 62)");
+        assert_eq!(last.message, "stopped: shoulder is too warm (it reads 69)");
         assert_eq!(last.values[0].value, "stopping");
         std::fs::remove_dir_all(root).unwrap();
     }

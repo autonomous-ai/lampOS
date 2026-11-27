@@ -2051,6 +2051,10 @@ impl<P: Persistence> Engine<P> {
                 if self.starting {
                     told["lamp"] = "starting".into();
                 }
+                // The agent switch's state (`direct::gateway_said`), for the
+                // voice's "<Agent> is ready." line in a conversation: the
+                // voice's route reads this op, not the app's default read.
+                told["gateway"] = crate::direct::gateway_said().into();
                 Some(told)
             }
             Request::List { after_id, limit } => {
@@ -6588,6 +6592,8 @@ mod tests {
         // A read: nothing is written.
         assert_eq!(engine.revision(), before);
         assert!(reply.get("lamp").is_none(), "switch off: no lamp field");
+        // The agent switch's state, for the voice's ready line: no switch.
+        assert_eq!(reply["gateway"], "ready");
     }
 
     /// #6492: the lamp's own target with both engines in its order and the

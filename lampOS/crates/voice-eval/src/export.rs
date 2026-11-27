@@ -801,6 +801,7 @@ const BUS_TOPICS: &[&str] = &[
     "voice/timing",
     "voice/tone",
     "voice/turn",
+    "voice/turn_record",
     "voice/turn_time",
 ];
 

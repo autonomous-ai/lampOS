@@ -893,6 +893,12 @@ impl Tts {
                 eprintln!(
                     "lamp-voice second: request {request}: the speech socket didn't open ({error}); its pieces go over HTTP"
                 );
+                crate::turn_ledger::failed_by(
+                    request,
+                    lamp_msgs::doctor::CallKind::Tts,
+                    &error,
+                    from.elapsed(),
+                );
                 *ahead = None;
             }
         }
@@ -1172,6 +1178,12 @@ impl Tts {
                     eprintln!(
                         "lamp-voice second: request {}: the speech socket failed before its first audio ({error}); the piece goes over HTTP",
                         turn.request
+                    );
+                    crate::turn_ledger::failed_by(
+                        turn.request,
+                        lamp_msgs::doctor::CallKind::Tts,
+                        &error,
+                        std::time::Duration::ZERO,
                     );
                     // The model or the request refused, not a timeout, which
                     // passes (the review of #2629); or the dialogue sessions

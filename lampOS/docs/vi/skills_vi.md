@@ -4306,7 +4306,7 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   `say` hay không: một ghi chú về điều khác trên kỹ năng như vậy chỉ tốn
   một lần tạo của agent, không bao giờ giữ một kỹ năng sai. Cùng câu `say`
   đó mà không có ghi chú ("Time to stretch!"), hay được hỏi bằng lời, vẫn
-  được giữ như trước, và một `say = { note }` cũng vậy. Ghi chú được trích
+  được giữ như trước, và một `say = { note }` đứng một mình cũng vậy. Ghi chú được trích
   cho agent bị cắt ở 120 ký tự. Giới hạn: lời của một bước `remind` là lời
   nhắc của người dùng (như told-only giữ chúng), nên một lời nhắc cạnh ghi
   chú `left out:` không bao giờ bị giữ lại. Khi không có ghi chú, một yêu
@@ -4315,12 +4315,24 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   DeepSeek giữ "There are days left in the year." cho "how many days are
   left in the year" mà không có ghi chú): yêu cầu chứa một cụm trong
   `VALUE_ASKS` ("how many", "how much", "how long", "how far", "how old",
-  "what time", "what day", "what date", "which day", "days left", "days
-  until", và tiếng Việt "bao nhiêu", "bao lâu", "mấy giờ", "mấy ngày",
-  "còn mấy", tính như một từ trọn vẹn, không có "cũng" đứng sau hay "dù"
-  đứng trước: "ngày nào cũng …" không phải là hỏi giá trị), và mọi câu `say` cố
-  định của kỹ năng hẹn giờ đều không có chữ số và không lặp lại cụm đó.
-  Agent được báo phần lời yêu cầu từ cụm đó tới hết câu, làm ghi chú. Một
+  "what time", "what day", "what date", "which day", "the date", "today's
+  date", "the time", "days left", "days until", và tiếng Việt "bao nhiêu",
+  "bao lâu", "mấy giờ", "mấy ngày", "còn mấy", tính như một từ trọn vẹn,
+  không có "cũng" đứng sau hay "dù" đứng trước: "ngày nào cũng …" không
+  phải là hỏi giá trị; một cụm có lời phủ định trong bốn từ trước nó, cùng
+  câu ("don't", "do not", "never", "without", "no need", "đừng", "không
+  cần": "don't tell me how many emails, just say good morning") cũng
+  không, trừ lời phủ định của việc quên ("don't forget", "never miss",
+  "without fail", "đừng quên"), vốn càng là hỏi giá trị; "the time" hay "the date" sau "all", "by", "at", "on", "from",
+  "since", "until", "till" hay "same" ("all the time") cũng không), và mọi
+  câu `say` cố định của kỹ năng hẹn giờ đều không có chữ số và không lặp
+  lại cụm đó. Agent được báo phần lời yêu cầu từ cụm đó tới hết câu, làm
+  ghi chú, giữ nguyên chữ hoa chữ thường của yêu cầu. Một `say = { note }`
+  bên cạnh các câu `say` cố định khiến kỹ năng được giữ, vì mô hình có thể
+  nói giá trị lúc đó; khi có ghi chú `left out:` của người tạo thì vẫn bị
+  giữ lại, vì ghi chú đó là giá trị bị bỏ của câu `say` cố định (P3 của El
+  trên #8732, test
+  `the_date_the_time_a_negation_and_a_note_say_beside_a_fixed_one`). Một
   câu `say` có chữ số thuộc về told-only (`CHANGING_SAY_REPAIR`); một câu
   lặp lại yêu cầu ("Time to check how much you spent today.") là lời nhắc
   và được giữ; một yêu cầu không hỏi giá trị nào ("remind me to stretch")
