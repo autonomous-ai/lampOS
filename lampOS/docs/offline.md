@@ -406,6 +406,19 @@ and its gate needs a ready session.
   `/var/lib/lampOS/voice/schedule-delivery`, which the product reset plan
   wipes; they take no plan path of their own, as the plan is at its 64
   (#7771, [setup.md](setup.md)).
+- **The old folder goes at the voice's start (the Reviewer-lead's points on
+  #8671):** a lamp on a build between #8906 and #8671 kept its clips in
+  `/var/lib/lampOS/voice/ring-clips` (`ring_clips::OLD_DIR`), which no reset
+  plan path covers. Each start of the served voice removes the regular files
+  and symlinks in it (a link removed as a link, never followed), then the
+  folder with a plain `remove_dir`, and the journal says once
+  `lamp-voice: the old offline ring clips folder was removed (N files)`. Any
+  other entry (a folder) is left with the folder, and the journal says
+  `... was left: not empty (N files removed)`. With no old folder nothing is
+  done or said, and this step never touches the new folder. A factory reset
+  run before the new voice's first start leaves the old folder; the next
+  voice start removes it. The code is PARKED (#8906, #8671): dropped once no lamp
+  can be on a build between them.
 - **Turned off again, every clip goes (#8894, the Reviewer-lead's P3 2 on
   #8800):** off, every clip goes when the voice or its Schedule consumer
   starts. The consumer's start removes every file in the folder; with

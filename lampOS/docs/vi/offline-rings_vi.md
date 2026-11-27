@@ -59,6 +59,19 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
   `/var/lib/lampOS/voice/schedule-delivery`, thư mục mà kế hoạch reset của sản
   phẩm xoá; chúng không chiếm đường dẫn riêng trong kế hoạch, vì kế hoạch đã
   đủ 64 đường dẫn (#7771).
+- **Thư mục cũ bị xoá khi giọng nói khởi động (các điểm của Reviewer-lead trên
+  #8671):** đèn chạy bản dựng giữa #8906 và #8671 giữ đoạn âm thanh ở
+  `/var/lib/lampOS/voice/ring-clips` (`ring_clips::OLD_DIR`), không đường dẫn
+  nào của kế hoạch reset bao gồm. Mỗi lần giọng nói phục vụ khởi động, nó xoá
+  các tệp thường và symlink trong đó (symlink bị xoá như một liên kết, không
+  bao giờ đi theo), rồi xoá thư mục bằng `remove_dir` thường, và nhật ký ghi
+  một dòng `lamp-voice: the old offline ring clips folder was removed (N files)`.
+  Mục khác (một thư mục) được giữ lại cùng thư mục cũ, và nhật ký ghi
+  `... was left: not empty (N files removed)`. Không có thư mục cũ thì không
+  làm gì và không ghi gì; bước này không bao giờ động đến thư mục mới. Một
+  lần khôi phục cài đặt gốc chạy trước lần khởi động đầu của giọng nói mới để
+  lại thư mục cũ; lần khởi động tiếp theo của giọng nói xoá nó. Mã này PARKED (#8906,
+  #8671): bỏ khi không đèn nào còn có thể chạy bản dựng giữa hai PR đó.
 - **Tắt công tắc thì mọi đoạn âm thanh bị xoá (#8894, P3 2 của Reviewer-lead
   trên #8800):** khi công tắc tắt, mọi đoạn âm thanh bị xoá lúc giọng nói
   hoặc tiến trình con Schedule của nó khởi động. Tiến trình con xoá mọi tệp
