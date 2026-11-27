@@ -608,8 +608,12 @@ pub fn capture_on<D: CaptureDevice>(
     )?;
     let mut microphone = MicrophoneOn::<D>::new(device, controller, CaptureConfig::default())?;
     let mut held = VecDeque::new();
+    // Kept here, not in the loop, so that a refused link can be read for
+    // the speaker's own Stopped at the end (#7224).
+    let mut link = None;
     let result = capture_loop(
         &mut channels,
+        &mut link,
         &mut microphone,
         worker,
         directory,
@@ -628,9 +632,18 @@ pub fn capture_on<D: CaptureDevice>(
     // reference link; this worker's own Stop is queued behind. That is the
     // Stop's clean end, as the loop's own would have been, never a fault
     // that fails the voice's cleanup. A refused link with no Stop queued
-    // still is one.
+    // still is one. So is a closed slide in a ridden gap (#7224): the
+    // speaker ended on the denied authority and said Stopped; that, or the
+    // denied authority queued here, is the same clean end.
     let result = match result {
-        Err(error) if peer_stop::stopped_with_peer(&mut channels, &mut held, error.as_ref()) => {
+        Err(error)
+            if peer_stop::stopped_with_peer(
+                &mut channels,
+                &mut held,
+                link.as_mut().map(|link| &mut link.control),
+                error.as_ref(),
+            ) =>
+        {
             eprintln!(
                 "lamp-voice: capture: the speaker had gone at the voice's stop ({error}); capture ends stopped"
             );
@@ -647,6 +660,8 @@ pub fn capture_on<D: CaptureDevice>(
         }
         result => result,
     };
+    // Closed where the loop's own end closed it before.
+    drop(link);
     // Invalidate input authority and close hardware before any filesystem acknowledgement wait.
     let close = microphone.control_lost();
     drop(microphone);
@@ -671,6 +686,8 @@ pub fn capture_on<D: CaptureDevice>(
 #[allow(clippy::too_many_arguments)]
 fn capture_loop<D: CaptureDevice>(
     channels: &mut WorkerChannels,
+    // The reference link to the speaker, bound at ConnectReference.
+    link: &mut Option<ReferenceChannels>,
     microphone: &mut MicrophoneOn<D>,
     worker: BootId,
     directory: &Path,
@@ -695,7 +712,6 @@ fn capture_loop<D: CaptureDevice>(
     // loop returns is dropped with it.
     let mut hold = CaptureHold::new(hold_blocks)
         .ok_or_else(|| io::Error::other("capture hold beyond its bound"))?;
-    let mut link: Option<ReferenceChannels> = None;
     let mut prepare_requested = false;
     let mut capture_prepared = false;
     let mut at_start = OpenAtStart::default();
@@ -840,7 +856,7 @@ fn capture_loop<D: CaptureDevice>(
                     if link.is_some() {
                         return Err(io::Error::other("reference peer already bound").into());
                     }
-                    link = Some(ReferenceChannels::bind(directory, "capture", worker, peer)?);
+                    *link = Some(ReferenceChannels::bind(directory, "capture", worker, peer)?);
                 }
                 Control::StartCapture => {
                     if prepare_requested {
@@ -1675,7 +1691,12 @@ fn ended_at_peer_stop(
 ) -> Result<EndReason> {
     let error = match result {
         Err(error)
-            if peer_stop::stopped_with_peer(channels, &mut VecDeque::new(), error.as_ref()) =>
+            if peer_stop::stopped_with_peer(
+                channels,
+                &mut VecDeque::new(),
+                None,
+                error.as_ref(),
+            ) =>
         {
             error
         }
