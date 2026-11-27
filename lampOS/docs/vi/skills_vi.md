@@ -6798,10 +6798,10 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   bước khác vẫn làm các bước đó ngay, tác vụ vẫn bị từ chối trên luồng của
   nó.
 - **Không cần cái "có" cho thư mục, khi `LAMP_TASK_NO_YES=on`** (#8475,
-  thiết kế người xây dựng đầu tiên đã duyệt; tắt nếu không đặt, và tắt
-  trong sản phẩm: không unit sản phẩm nào đặt nó cho tới khi phần 2 của
-  #8475 (#8535) được merge, lúc đó mới bật với dòng thử riêng
-  (docs/switches.md); một công tắc, `lamp_services::task_no_yes::on`,
+  thiết kế người xây dựng đầu tiên đã duyệt; tắt nếu không đặt, và bật
+  trong sản phẩm: bốn unit sản phẩm đọc nó, lamp-control, lamp-skills,
+  lamp-services và lamp-voice, đặt nó từ lần bật công tắc của #8475, sau
+  khi phần 2 (#8535) được merge (docs/switches.md); một công tắc, `lamp_services::task_no_yes::on`,
   `lamp_skills::task_no_yes_on`). (1) Tác vụ của kỹ năng không chờ cái
   "có" cho thư mục, dù kỹ năng đến từ đâu (được đẩy lên, từ Store, thêm
   bằng tay, được tạo trên đèn) và dù ai bắt đầu lần chạy (giọng nói,
