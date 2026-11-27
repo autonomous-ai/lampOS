@@ -426,7 +426,9 @@ fn listen(root: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::say::tts_cache::{Render, TtsCache, kept_under};
     use lamp_msgs::FirstRun;
+    use std::sync::Arc;
 
     const S: u64 = 1_000_000;
 
@@ -568,6 +570,7 @@ mod tests {
         waits.came(coach(finished, None));
         let mut moment = quiet(finished + 100_000);
         moment.last_speech_us = finished;
+        moment.last_words_us = finished;
         assert!(waits.next(&moment).is_none(), "someone talking");
         moment.now_us = finished + TALK_PAUSE_US - 1;
         assert!(waits.next(&moment).is_none());
@@ -614,6 +617,7 @@ mod tests {
         waits.came(coach(finished, None));
         let mut talking = quiet(finished + 100_000);
         talking.last_speech_us = finished;
+        talking.last_words_us = finished;
         assert!(waits.next(&talking).is_none());
         let gone = quiet(finished + 120 * S);
         assert!(
@@ -706,5 +710,161 @@ mod tests {
         assert!(on_with(Some("on")));
         assert!(!on_with(Some("1")));
         assert!(!on_with(None));
+    }
+
+    #[test]
+    fn an_empty_turn_three_seconds_before_leaves_the_pause_alone() {
+        // The ROW on #8842 (lamp-9adf, 27 Nov 14:05): request 6 heard no
+        // words and ended 2.5 s after the install; the line waited 3 s more.
+        let mut waits = Waits::default();
+        let finished = 1_000 * S;
+        waits.came(coach(finished, None));
+        let mut moment = quiet(finished + 200_000);
+        moment.face = true;
+        moment.last_speech_us = moment.now_us - 3 * S;
+        moment.last_words_us = moment.now_us - 90 * S;
+        let told = waits.next(&moment).expect("nothing was said: at once");
+        assert_eq!(told.after_finish_ms, 200);
+    }
+
+    #[test]
+    fn a_worded_line_three_seconds_before_still_waits_for_the_pause() {
+        let mut waits = Waits::default();
+        let finished = 1_000 * S;
+        waits.came(coach(finished, None));
+        let mut moment = quiet(finished + 200_000);
+        moment.face = true;
+        let spoke = moment.now_us - 3 * S;
+        moment.last_speech_us = spoke;
+        moment.last_words_us = spoke;
+        assert!(waits.next(&moment).is_none(), "people's talk");
+        moment.now_us = spoke + TALK_PAUSE_US;
+        assert!(waits.next(&moment).is_some(), "at the 5 s pause");
+    }
+
+    /// A speech cache of a scratch folder whose renders are counted.
+    fn counted_cache(name: &str) -> (TtsCache, Arc<Mutex<Vec<String>>>, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("lvf-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&asked);
+        let render: Render = Box::new(move |text: &str| {
+            seen.lock().unwrap().push(text.to_owned());
+            Ok(vec![7; 2_400])
+        });
+        let cache = TtsCache::new(&dir, "Rachel", "eleven_v4_turbo", "en", render);
+        (cache, asked, dir)
+    }
+
+    #[test]
+    fn its_words_are_rendered_into_the_speech_cache_as_its_install_comes() {
+        let (cache, asked, dir) = counted_cache("render");
+        let waits = Mutex::new(Some(Waits::default()));
+        let finished = 1_000 * S;
+        arrived(coach(finished, Some(ASKS)), Some(&cache), &waits);
+        // At the event, before any moment is looked at: both its wordings.
+        assert_eq!(
+            *asked.lock().unwrap(),
+            [ASKS.to_owned(), format!("By the way, {ASKS}")]
+        );
+        assert!(cache.kept(ASKS).is_some());
+        assert_eq!(
+            kept_under(&dir, cache.identity(), ASKS),
+            cache.kept(ASKS),
+            "the second route reads the same file"
+        );
+        let mut moment = quiet(finished + 200_000);
+        moment.face = true;
+        let told = waits
+            .lock()
+            .unwrap()
+            .as_mut()
+            .unwrap()
+            .next(&moment)
+            .expect("at once");
+        assert!(told.kept, "{told:?}");
+        assert!(
+            told.journal().contains("its words kept in the speech cache"),
+            "{}",
+            told.journal()
+        );
+        // The name-only line too, and a second event of the same install
+        // renders nothing more.
+        arrived(coach(finished, Some(ASKS)), Some(&cache), &waits);
+        assert_eq!(asked.lock().unwrap().len(), 2, "once per install");
+        arrived(coach(finished + 10 * S, None), Some(&cache), &waits);
+        assert_eq!(
+            asked.lock().unwrap()[2..],
+            [
+                "Gym Coach is ready.".to_owned(),
+                "By the way, Gym Coach is ready.".to_owned()
+            ]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_at_once_line_waits_for_its_render_but_never_past_the_hold() {
+        let mut waits = Waits::default();
+        let finished = 1_000 * S;
+        let event = coach(finished, None);
+        waits.came_rendering(event.clone());
+        let mut moment = quiet(finished + 200_000);
+        moment.face = true;
+        assert!(waits.next(&moment).is_none(), "its words are rendering");
+        waits.rendered(&event, true);
+        let told = waits.next(&moment).expect("rendered: at once");
+        assert!(told.kept);
+        // A render that never ends holds it at most RENDER_HOLD_US.
+        let later = coach(finished + 20 * S, None);
+        waits.came_rendering(later.clone());
+        moment.now_us = later.finished_us + RENDER_HOLD_US - 1;
+        assert!(waits.next(&moment).is_none());
+        moment.now_us = later.finished_us + RENDER_HOLD_US;
+        let told = waits.next(&moment).expect("past the hold, said as it comes");
+        assert!(!told.kept);
+        assert!(told.journal().contains("its words not kept yet"));
+    }
+
+    #[test]
+    fn the_note_gives_back_its_words_said_with_no_chat_only_in_english() {
+        let mut waits = Waits::default();
+        let finished = 1_000 * S;
+        let odd = "Ready: try (it) now)";
+        waits.came(coach(finished, Some(odd)));
+        let mut moment = quiet(finished + 100_000);
+        moment.face = true;
+        let told = waits.next(&moment).unwrap();
+        assert_eq!(words_of_note(&told.note), Some(odd));
+        assert_eq!(said_with_no_chat(&told.note, None), Some(odd));
+        assert_eq!(
+            said_with_no_chat(&told.note, Some(crate::language::Language::Vietnamese)),
+            None,
+            "in another language the model says it in theirs"
+        );
+        assert_eq!(words_of_note("(Nobody has spoken. [x"), None);
+        assert_eq!(words_of_note("What time is it?"), None);
+    }
+
+    #[test]
+    fn its_first_sound_is_journaled_with_its_handing_on_one_line_once() {
+        let mut waits = Waits::default();
+        let finished = 1_000 * S;
+        waits.came(coach(finished, None));
+        let mut moment = quiet(finished + 200_000);
+        moment.face = true;
+        let told = waits.next(&moment).unwrap();
+        let mut sounding = Sounding::default();
+        sounding.handed(7, &told);
+        assert_eq!(sounding.sounded(8, finished + S), None, "another turn");
+        let line = sounding.sounded(7, finished + 1_400_000).expect("its sound");
+        assert!(
+            line.contains(
+                "handed to speech 200 ms and its first sound 1400 ms after its install finished"
+            ),
+            "{line}"
+        );
+        assert!(!line.contains("Gym Coach is ready"), "never the words");
+        assert_eq!(sounding.sounded(7, finished + 2 * S), None, "once");
     }
 }
