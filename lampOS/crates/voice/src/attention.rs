@@ -348,22 +348,29 @@ pub const NEWS_REPLY_US: u64 = 180_000_000;
 pub(crate) const AFTER_NEWS: &str = "the first thing said after the lamp's own news";
 
 /// One-word replies to the lamp's news: such a line still takes the news's
-/// one reply ([`noise_after_news`]).
-const NEWS_ONE_WORD_REPLIES: [&str; 20] = [
+/// one reply ([`noise_after_news`]). English and Vietnamese ("vâng", "dạ",
+/// "ừ", "ờ", "không", "sao"), the question words and greetings too (the
+/// Reviewer-lead's P3 on #8809).
+const NEWS_ONE_WORD_REPLIES: [&str; 32] = [
     "thanks", "thx", "cheers", "ok", "okay", "great", "cool", "nice", "wow", "awesome", "perfect",
-    "good", "yes", "yeah", "yep", "no", "nope", "sure", "what", "really",
+    "good", "yes", "yeah", "yep", "no", "nope", "sure", "what", "really", "why", "huh", "hello",
+    "hi", "sorry", "wait", "vâng", "dạ", "ừ", "ờ", "không", "sao",
 ];
 
 /// Whether `heard` is a line of one word or none that is no reply to the
-/// news ([`NEWS_ONE_WORD_REPLIES`]): a noise cut-in, which leaves the
-/// news's one reply ([`AFTER_NEWS`]) to the next line (#8701).
+/// news ([`NEWS_ONE_WORD_REPLIES`]), and not asked as a question ("Tokyo?"):
+/// a noise cut-in, which leaves the news's one reply ([`AFTER_NEWS`]) to
+/// the next line (#8701).
 pub(crate) fn noise_after_news(heard: &str) -> bool {
     let mut words = heard
         .split(|c: char| !(c.is_alphanumeric() || c == '\''))
         .filter(|word| !word.is_empty());
     match (words.next(), words.next()) {
         (None, _) => true,
-        (Some(word), None) => !NEWS_ONE_WORD_REPLIES.contains(&word.to_lowercase().as_str()),
+        (Some(word), None) => {
+            !heard.trim_end().ends_with('?')
+                && !NEWS_ONE_WORD_REPLIES.contains(&word.to_lowercase().as_str())
+        }
         _ => false,
     }
 }
@@ -6398,6 +6405,17 @@ mod tests {
         assert!(noise_after_news("Um."));
         assert!(!noise_after_news("Thanks!"));
         assert!(!noise_after_news("Thank you."));
+        // Real one-word replies (the Reviewer-lead's P3 on #8809), and any
+        // one word asked as a question.
+        for reply in [
+            "Why?", "Huh?", "Hello", "Hi.", "Sorry?", "What?", "Really?", "OK.", "Okay", "Yes",
+            "No.", "Yeah", "Wait!", "Cool", "Wow.", "Vâng.", "Dạ", "Ừ", "Ờ", "Không", "Sao?",
+            "Hmm?", "Tokyo?",
+        ] {
+            assert!(!noise_after_news(reply), "{reply}");
+        }
+        assert!(noise_after_news("Hmm."));
+        assert!(noise_after_news("Achoo"));
     }
 
     /// The Second on #1378 (20:29): with `AFTER_NEWS` taken on timing alone,
