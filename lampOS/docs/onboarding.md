@@ -915,7 +915,7 @@ switch off, nothing below changes anything.
   know it's you, not a guest. It stays on this lamp." (`walk_v2::FACE_ASK`, a question the
   worker's setup save takes a yes to); a step left for later says "We'll
   do this later.". Who you are keeps the file's "What should I call you?"
-  and its consent clauses; how you sound keeps its lines for now.
+  and its consent clauses; how you sound has Call Lamp's lines (below).
 - **Try a skill.** Asked as a note for the model, in its step word: "Say
   'Hey Lamp, turn blue.' See how easy asking is." No "Hey Lamp" is needed during the walk. Done only when a light call (`light_colour`, `light_scene`, any
   `light_*`) answered without an error in a turn of the person's own line
@@ -936,20 +936,86 @@ switch off, nothing below changes anything.
   like: remind me to drink water every 30 minutes."" in its place. A vague
   ask gets one short question from the model (its note); asked for ideas,
   "Or: turn the light warm at 8 pm, or tell me to stand up every hour."
-- **Quiet, then later.** For both: no words 10 s after the ask, with the room
-  quiet (`walk_v2::REMIND_QUIET_US`), one reminder: "Just say: turn blue." or
-  the ideas line. The give-up is `STEP_GIVE_UP_US` (90 s) from the ask or the
-  lamp's latest words, plus the longest make for make a skill
-  (`make_skill_local::longest_make`), once the room has been quiet 20 s: with
-  no words heard, asked once more; otherwise, or the second time, `later`,
-  said with the `later` line. The model may only skip them (`setup_step`
-  skipped, said "Okay, we'll skip trying a skill for now." / "… making a
-  skill …"); a model's done is refused.
-- **Tried and not done is later.** With the switch on, a walk step that ends
-  `failed` (who you are, touch, how you sound, try and make a skill; never
-  where you sit) is kept `later` instead (`Onboarding::finish`, the one
-  place), so it is offered again after the walk as a step nobody tried is,
-  and the app shows it as later.
+- **Quiet, then a reminder.** For both: no words 10 s after the ask, with
+  the room quiet (`walk_v2::REMIND_QUIET_US`), one reminder: "Just say: turn
+  blue." or the ideas line. The give-up is `STEP_GIVE_UP_US` (90 s) from the
+  ask or the lamp's latest words, plus the longest make for make a skill
+  (`make_skill_local::longest_make`), once the room has been quiet 20 s:
+  with no words heard, asked once more; then the step is asked again,
+  coached (below). A model's done is refused, and so is its skip.
+- **Every walk step is needed (phase 2).** No walk step ends `later`,
+  `failed` or `skipped`: only `done`, or `not_available` for missing
+  hardware. A step that would end any other way is asked again
+  (`Onboarding::finish`, the one place, `Onboarding::ask_again`): its own
+  failed or later line is never said, and after a quiet gap
+  (`walk_v2::reask_gap_us`: 15 s, then 30 s, 60 s, at most 2 minutes, so
+  Lamp never talks on alone) it is asked with a coached line, a different
+  one each time (`walk_v2::coach`): touch "Pet the top of my head, right
+  here." / "Just a light tap on top." / "Touch the top of my head,
+  gently."; where you sit, try a skill and make a skill each have three
+  too. Who you are is asked with its own note again (its face part stays
+  optional, with consent: a no to the face is fine; the name is needed).
+  There is no "No worries" line in the walk. A model's `setup_step`
+  skipped of a walk step is refused with `walk_v2::SKIP_REFUSED`: it says
+  "This one's needed. Let's try once more." and asks again.
+- **Missing hardware never stalls it.** A step this lamp's body can't do
+  ends `not_available` with one line (`walk_v2::not_available_line`):
+  touch with no working head pads, "My head pads aren't working right now,
+  so we'll skip touch."; where you sit with no camera, "My camera's off,
+  so I'll learn where you sit later.".
+- **Call Lamp merged (phase 2).** One step: "Say 'Hey Lamp' three times,
+  so I learn your voice from your seat and never miss you."
+  (`walk_v2::NEAR_FIRST`, with its step counter). Three accepted calls,
+  counted down "Got it, two more." then "One more." then "That's me! Say
+  'Hey Lamp' whenever you need me."; no sentence part (the three calls'
+  bar stored ends the step). A missed call is never counted and is
+  coached by its cause (`walk_v2::near_coach`): said over Lamp, "Wait till
+  I finish, then say it."; the name not heard, "Say 'Hey Lamp' a bit
+  louder."; heard too weakly, "Come a little closer."; otherwise, and every
+  third miss so no line comes three times in a row, "I didn't catch that.
+  Try again when I stop talking."; from the sixth miss, "Just say 'Hey
+  Lamp'." in turn with them (never "Just say 'Lamp'"). The step is never
+  ended by its prompts: the kept count starts again from the calls
+  accepted when it reaches the progress file's bound (5), and the misses
+  are counted in memory. While it waits for a call, a line that begins
+  "Hey Lamp" with a short sentence after it is a call too
+  (`walk_v2::hey_lamp_first`), never answered as a turn. Each accepted
+  call is told to the app: the heartbeat's `asking` gets `tries`,
+  `{ok, need}`, and a new `at`, and lamp-cloud adds `tries_ok` and
+  `tries_need` to its `onboarding.step` `asked` event.
+- **The answer window is the walk's own.** While a step's ask waits (led,
+  asked, the walk not paused: `StateLines::waits`), the person's plain
+  answer is said to Lamp with no name and no face turned, however long
+  after the ask (`walk_v2::holds_answer`, read by the second route's
+  attention verdict and by `said_to_me::judge`). Another voice than the
+  conversation's is not taken as the answer. The window ends when the
+  walk pauses, is left or is done.
+- **What the person says to the walk itself (phase 2).** Answered by the
+  walk's own lines in the second route's worker, no chat asked, each with
+  the step's ask (`walk_v2::talk_words`, from `StateLines::talk`):
+  impatience ("how long?", "this is taking forever", "is this necessary?",
+  "I'm bored", "can we skip this?") gets a pleading line with the real
+  steps left, rotated so none is said twice in a row: "I know, sorry it's
+  taking a bit! Just N more, I promise. It'll help me really get you." /
+  "Please bear with me, only N steps left. After this, I'll know how to
+  help you best." / "Almost done, I promise! N more and we're friends for
+  real."; on the last step "This is the last one, I promise! Then I'm all
+  yours."; "what do I do?" gets "Right now, just this: <ask>"; a plain
+  "skip" gets "This one's needed. Let's try once more. <ask>". A pause
+  ("let's pause", "not now", "I'm busy", "I'm done") and "start over" each
+  wait for one yes ("Pause setup for now? Just say yes."); a no goes on
+  ("Great, let's keep going. <ask>"). Paused (`{"walk":"pause"}` to the
+  mailbox), nothing is asked and the step is kept; when the person is back
+  in view after being away, one offer, "Shall we carry on? We were at
+  <step>." (`walk_v2::carry_on_offer`), once a pause; "carry on", or a yes
+  to it, carries on (`{"walk":"resume"}`) at the same step. A start over
+  posts `{"redo": true}`. "Redo the whole setup", "from the start",
+  "everything" are the whole walk, and a redo is never refused twice in a
+  row (`walk_v2::whole_walk`, `walk_v2::refused_again`).
+- **Off-topic, brought back.** While the ask waits, the model's turn gets
+  one note (`walk_v2::STEER_NOTE`): setup isn't finished, answer anything
+  else in one short sentence and gently bring them back. Never which step
+  or a step list.
 - **Wi-Fi is step one, and every opener says its step.** The counter
   counts Wi-Fi, done by the time Lamp speaks (`in_language::Counter::Wifi`):
   the walk opens "Hi! Let's get to know each other. It takes a few
@@ -966,7 +1032,8 @@ switch off, nothing below changes anything.
   ask: "We're on step 5 of 7, Call Lamp: say 'Hey Lamp' when I stop
   talking." for "which step are we on?", "what were we doing?", "where are
   we?"; "Three more, about two minutes. Right now, Call Lamp: …" for "how
-  many more?", "how much longer?"; "Almost! Wi-Fi's done, and we're at step
+  many more?" ("how much longer?" is impatience, pleaded with, above);
+  "Almost! Wi-Fi's done, and we're at step
   5 of 7, Call Lamp: …" for "is setup done?", "are we finished?". The step
   names are the owner's: Where you sit, Who you are, Touch, Call Lamp, Try a
   skill, Make a skill. They go to the second route's worker with the walk's
@@ -998,8 +1065,14 @@ switch off, nothing below changes anything.
 
 Tests: `onboarding::tests::a_light_call_and_a_skill_made_from_their_lines_end_the_walk_read_back`,
 `a_light_call_before_try_a_skill_or_a_models_done_ends_nothing`,
-`a_silent_try_is_reminded_once_then_left_for_later`,
-`with_the_walk_v2_a_failed_step_is_kept_for_later_only_with_its_switch`,
+`a_silent_try_is_reminded_then_coached_again_never_left_for_later`,
+`with_the_walk_v2_a_step_not_done_is_asked_again_only_with_its_switch`,
+`with_the_walk_v2_touch_is_coached_until_felt_never_left_for_later`,
+`with_the_walk_v2_a_step_without_its_hardware_completes_with_one_line`,
+`with_the_walk_v2_a_models_skip_is_refused_warmly`,
+`a_walk_paused_by_voice_offers_once_and_carries_on_at_the_same_step`,
+`a_whole_setup_redo_is_never_refused_twice_with_the_walk_v2`,
+`near_flow_tests::with_the_walk_v2_call_lamp_keeps_asking_after_misses_and_is_done_on_three`,
 `the_walk_v2_counts_wifi_as_step_one_and_tells_where_it_stands`,
 `with_the_walk_v2_off_the_walk_is_as_before`, `onboarding::walk_v2::tests`,
 `lamp_msgs` `walk_steps_only_add_a_field_and_the_old_shape_is_unchanged`, and
