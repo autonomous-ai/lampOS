@@ -310,17 +310,77 @@ pub fn names_the_looking(heard: &str) -> bool {
 /// person says of the looking is told the state even with the lamp's name
 /// and half its words lost to the speech-to-text ("Now stop watching the").
 /// It matches too often rather than too rarely: the note is a few words.
+/// The looking verbs among them ([`LOOKING_STATE_VERBS`]) count only as
+/// [`names_the_noticing`] says.
 pub const STATE_WORDS: [&str; 15] = [
     "looking", "look", "looked", "watching", "watch", "watched", "noticing", "notice", "noticed",
     "see", "seeing", "camera", "desk", "eye", "eyes",
 ];
 
-/// Whether `heard` names the lamp's looking or the desk, any one of
-/// [`STATE_WORDS`] as a whole word, any case: the lines told the state.
+/// The bare looking verbs of [`STATE_WORDS`]: each names the noticing only
+/// with no object in its clause, or the desk or the lamp's own looking as
+/// its object ([`LOOKING_OBJECTS`]), never another ("watch the timer",
+/// Twelve's P3 on #8807, c7205447473).
+const LOOKING_STATE_VERBS: [&str; 11] = [
+    "looking", "look", "looked", "watching", "watch", "watched", "noticing", "notice", "noticed",
+    "see", "seeing",
+];
+
+/// The words passed over after a looking verb on the way to its object:
+/// prepositions, determiners, the lamp's name and the adverbs ("stop
+/// looking at my desk", "stop watching now", "Now stop watching the").
+const LOOKING_FILLER: [&str; 19] = [
+    "at", "the", "my", "our", "your", "a", "an", "on", "over", "to", "around", "now", "anymore",
+    "again", "please", "right", "still", "lamp", "out",
+];
+
+/// A looking verb's objects that keep it about the desk noticing: the
+/// person, the lamp itself, the desk, and what the person does ("are you
+/// seeing what I'm doing?", "do you see anything?").
+const LOOKING_OBJECTS: [&str; 11] = [
+    "me",
+    "us",
+    "you",
+    "yourself",
+    "desk",
+    "what",
+    "how",
+    "anything",
+    "something",
+    "everything",
+    "it",
+];
+
+/// The words that end a looking verb's clause, as its punctuation does
+/// ("stop looking and play some music").
+const CLAUSE_ENDS: [&str; 5] = ["and", "but", "so", "then", "or"];
+
+/// Whether `heard` names the lamp's looking or the desk, any case, whole
+/// words: one of [`STATE_WORDS`] that is no looking verb, or a looking
+/// verb ([`LOOKING_STATE_VERBS`]) whose clause ends before any object, or
+/// whose object is one of [`LOOKING_OBJECTS`]: the lines told the state.
+/// "Lamp, watch the timer." and "Look at the weather for me." name nothing.
 pub fn names_the_noticing(heard: &str) -> bool {
-    words(heard)
-        .iter()
-        .any(|word| STATE_WORDS.contains(&word.as_str()))
+    heard
+        .split(['.', ',', '?', '!', ';', ':'])
+        .map(words)
+        .any(|clause| {
+            clause.iter().enumerate().any(|(at, word)| {
+                if !STATE_WORDS.contains(&word.as_str()) {
+                    return false;
+                }
+                if !LOOKING_STATE_VERBS.contains(&word.as_str()) {
+                    return true;
+                }
+                clause[at + 1..]
+                    .iter()
+                    .map(String::as_str)
+                    .find(|next| !LOOKING_FILLER.contains(next))
+                    .is_none_or(|object| {
+                        CLAUSE_ENDS.contains(&object) || LOOKING_OBJECTS.contains(&object)
+                    })
+            })
+        })
 }
 
 /// With `LAMP_NOTICING_BY_DEFAULT` on (#7767), the note beside a heard line
@@ -400,11 +460,18 @@ pub fn without_state_note(text: &str) -> Option<String> {
         .flat_map(|yes| [true, false].map(|by_default| (yes, by_default)))
         .flat_map(|(yes, by_default)| [true, false].map(|face| state_words(yes, by_default, face)))
         .find(|note| text.contains(note.as_str()))
-        .map(|note| {
-            text.replacen(note.as_str(), "", 1)
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ")
+        .and_then(|note| {
+            // Only the whitespace just before the state, or just after it
+            // when it opens the note, goes: the rest stays byte for byte
+            // (the Reviewer-lead's P3 on #8807, c7205367542).
+            let (before, after) = text.split_once(note.as_str())?;
+            let before = before.trim_end();
+            let after = if before.is_empty() {
+                after.trim_start()
+            } else {
+                after
+            };
+            Some(format!("{before}{after}"))
         })
 }
 
