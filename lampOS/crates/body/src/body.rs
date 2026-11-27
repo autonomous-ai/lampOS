@@ -1150,8 +1150,13 @@ impl Standing {
     /// Over its load or off its goal for this long, two seconds, with the
     /// lamp already told to go down: the run ends.
     pub const STUCK_STEPS: u8 = 100;
-    /// As warm as this for `Limits::temperature_steps`, likewise sent down.
-    pub const TEMPERATURE: u8 = 62;
+    /// As warm as this for `Limits::temperature_steps`, likewise sent down:
+    /// the body's heat stop, also `Limits::temperature`'s default (#8828).
+    /// 69 since 27 Nov, the lead's ruling with the product owner: at 62 some
+    /// lamps' elbows (lamp-74ff's) sat the lamp down while it only stood,
+    /// and one under the STS3215's own limit (EEPROM 13, 70), so the body
+    /// sits the arm down before the servo cuts its torque and drops it.
+    pub const TEMPERATURE: u8 = 69;
     /// Sent back down, it stays down this long; after the third time inside
     /// [`Self::RETREAT_WINDOW`] it stays down [`Self::LONG_REST`], and then
     /// it may rise again. Until 24 Oct the third time was for the rest of
@@ -1583,7 +1588,7 @@ impl Limits {
         tracking: 30,
         tracking_steps: 10,
         bystander_drift: 6,
-        temperature: 62,
+        temperature: Standing::TEMPERATURE,
         temperature_steps: 50,
         start_reach: 60,
         force: None,

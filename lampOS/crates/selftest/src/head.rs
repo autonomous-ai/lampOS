@@ -47,7 +47,9 @@ pub const QUIET: Duration = Duration::from_secs(60);
 /// A body at least this far up is standing (`standing` in its report).
 pub const STANDING: f64 = 0.95;
 /// The body stops at this temperature reading; a joint this warm is not moved.
-pub const WARM: u32 = 62;
+/// The body's own heat stop (lamp-body's `Standing::TEMPERATURE`), 69 since
+/// #8828.
+pub const WARM: u32 = 69;
 /// The body reports how it is once a second.
 pub const REPORT_WITHIN: Duration = Duration::from_millis(2_500);
 /// Easing out and back, as Expression's moves do.
@@ -923,7 +925,7 @@ mod tests {
         assert!(why(may_move(&before(None))).contains("lamp-body said nothing"));
         assert!(why(may_move(&before(Some(report("speaking", 1.0, 40))))).contains("speaking"));
         assert!(why(may_move(&before(Some(report("resting", 0.0, 40))))).contains("not standing"));
-        assert!(why(may_move(&before(Some(report("resting", 1.0, 62))))).contains("warm"));
+        assert!(why(may_move(&before(Some(report("resting", 1.0, 69))))).contains("warm"));
         let mut touched = before(Some(report("resting", 1.0, 40)));
         touched.pushed = true;
         assert!(why(may_move(&touched)).contains("hand"));

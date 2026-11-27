@@ -9203,7 +9203,7 @@ body = { gesture = "nod" }
         speed: 50.0,
         acceleration: 400.0,
         force: None,
-        heat_stop: 62,
+        heat_stop: 69,
         stands,
     };
     let ask = "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.";
