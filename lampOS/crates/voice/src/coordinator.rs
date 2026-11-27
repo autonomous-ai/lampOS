@@ -15081,13 +15081,20 @@ fn conversation_with_gate_inner(
         let room_busy = room.busy();
         #[cfg(test)]
         let room_busy = room.busy() || TEST_ROOM_BUSY.with(std::cell::Cell::get);
+        // A busy room holds news only while its talk goes on
+        // (`task_news::talk_over`, #8783): it stays busy 30 s, past the 15 s
+        // its speakers count as there for.
+        let room_busy =
+            room_busy && !crate::task_news::talk_over(clock, last_turn_us, last_speech_us);
         // What came in since is taken in first.
         if let Some(news) = task_news.as_mut() {
             news.waiting();
         }
         // `overdue_pause`: people's talk leaves room for news
-        // (`task_news::talk_paused`, #8783), for all news waiting.
-        let (overdue_whole, overdue_short, overdue_pause) =
+        // (`task_news::talk_paused`, #8783), for all news waiting;
+        // `overdue_there`: someone is there for it; `overdue_answered`: the
+        // lamp answered someone since it came in.
+        let (overdue_whole, overdue_short, overdue_pause, overdue_there, overdue_answered) =
             match task_news.as_mut().filter(|news| news.has_waiting()) {
                 Some(news) => {
                     let quiet = crate::task_news::quiet_for_news(
@@ -15106,8 +15113,11 @@ fn conversation_with_gate_inner(
                     let present = presence
                         .as_ref()
                         .is_some_and(|presence| presence.present(clock));
+                    // A sign-in's news, which the person just asked for and
+                    // may be typing in silence, needs no one seen or heard.
                     let there =
-                        crate::task_news::someone_there(clock, present, last_speech_us, said_at_us);
+                        crate::task_news::someone_there(clock, present, last_speech_us, said_at_us)
+                            || news.sign_in_waits();
                     // The lamp answered someone since the news came in.
                     let answered = answered_at_us
                         .filter(|at| news.landed_us(clock).is_some_and(|landed| *at >= landed));
@@ -15141,9 +15151,9 @@ fn conversation_with_gate_inner(
                         not_ready: !snapshot.listening_ready(now())
                             || unasked_session(&cloud, unasked_paused).is_none(),
                     });
-                    (whole, short, pause)
+                    (whole, short, pause, there, answered)
                 }
-                _ => (false, None, false),
+                _ => (false, None, false, false, None),
             };
         // The short line: the lamp's own turn, said once; the news stays
         // first in line, never handed on as heard (#8240).
@@ -15203,14 +15213,11 @@ fn conversation_with_gate_inner(
                     last_capture,
                 ),
             )
-            && crate::task_news::someone_there(
-                clock,
-                presence
-                    .as_ref()
-                    .is_some_and(|presence| presence.present(clock)),
-                last_speech_us,
-                said_at_us,
-            )
+            // After its short line, the whole news waits for an answer,
+            // in a quiet room too (#8783); asked after the sign-in is put
+            // first, so a sign-in's news is not held behind it.
+            && !news.short_unanswered(overdue_answered)
+            && overdue_there
             && (overdue_whole || !room_busy)
             && reply.is_none()
             && provider_queue.is_empty()

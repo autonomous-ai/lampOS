@@ -265,6 +265,13 @@ pub fn talk_paused(
     paused && (answered || now_us.saturating_sub(last_turn_us.max(last_speech_us)) >= LONG_PAUSE_US)
 }
 
+/// Whether other people's talk is over, for a busy room's hold on news
+/// (#8783): nobody heard (`last_speech_us`) and no turn (`last_turn_us`)
+/// for [`TALK_OVER_US`] by `now_us`.
+pub fn talk_over(now_us: u64, last_turn_us: u64, last_speech_us: u64) -> bool {
+    now_us.saturating_sub(last_turn_us.max(last_speech_us)) >= TALK_OVER_US
+}
+
 /// Without eyes that say someone is there, something said this recently
 /// says it: about 15 s (#8783, the product owner's rule of 26 Nov: no
 /// sensor holds a person; two minutes, as before, told an empty desk).
@@ -1385,6 +1392,17 @@ impl TaskNews {
             (None, Some(note)) => waited.then(|| Overdue::Short(note.clone())),
             (None, None) => (waited || answered_us.is_some()).then_some(Overdue::Whole),
         }
+    }
+
+    /// Whether the short line of the news first in line was said and the
+    /// lamp answered no one since (`answered_us`, as [`Self::overdue`]
+    /// takes it): its whole news waits for that answer, in a quiet room
+    /// too (#8783).
+    pub fn short_unanswered(&self, answered_us: Option<u64>) -> bool {
+        self.waiting
+            .front()
+            .and_then(|front| self.short_said.get(&front.key))
+            .is_some_and(|at| answered_us.is_none_or(|answered| answered <= *at))
     }
 
     /// When the news first in line came in, on the voice's clock (`now_us`

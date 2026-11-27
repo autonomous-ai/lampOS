@@ -764,10 +764,17 @@ minutes, not one, and:
   "By the way, the work you handed over is done." (`BY_THE_WAY_DONE`,
   `BY_THE_WAY_ASKING`, `BY_THE_WAY_STOPPED`) to a room still talking, the
   whole news to a quiet one. After a short line, the whole news follows
-  once the lamp answers someone again, not at anyone's next line.
-- Any news is told only with someone there now: a face in view, or anyone
-  heard speaking within about 15 s (`task_news::someone_there`,
+  only once the lamp answers someone again, not at anyone's next line nor
+  at the next long pause of a quiet room (`TaskNews::short_unanswered`).
+- Any news (but a sign-in's, which the person just asked for and may be
+  typing in silence) is told only with someone there now: a face in view,
+  or anyone heard speaking within about 15 s (`task_news::someone_there`,
   `HEARD_WITHIN_US`). Otherwise it waits, untold, until someone is. A
+  room busy with other people's talk holds news only until the talk is
+  over, 10 s with nobody heard and no turn (`task_news::TALK_OVER_US`,
+  `talk_over`): the room itself stays busy 30 s, past the 15 s its
+  speakers count as there for, and news after a talk with no face in view
+  would otherwise wait for the next voice. A
   reminder and a skill run's held write keep their two minutes
   (`reminders::HEARD_WITHIN_US`).
 
@@ -777,6 +784,7 @@ minutes, not one, and:
 | Pause in talk it is told at | 5 s with nobody heard speaking and no turn (1 s before #8783) | `task_news::LONG_PAUSE_US` |
 | Pause after the lamp answered someone | 1 s with nobody heard speaking, the turn over as long | `task_news::PAUSE_US` (unchanged) |
 | Someone there | a face, or anyone heard within 15 s (2 min before #8783) | `task_news::HEARD_WITHIN_US` |
+| A busy room's talk over | 10 s with nobody heard speaking and no turn | `task_news::TALK_OVER_US` |
 | After the lamp's own words | 3 s with nobody starting | `task_news::AFTER_LAMP_US` (unchanged) |
 | An answer that is one short line already | at most 80 characters, whole | `task_news::SHORT_FITS_CHARS` |
 | Short lines said | one for each news, once | `TaskNews::short_told` |
