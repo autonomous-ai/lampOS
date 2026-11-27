@@ -1724,13 +1724,25 @@ lamp-ee17 on 27 Nov, so with `LAMP_TASKS_AFTER_NEWS=on` the second route
 decides in code: such a line whose words ask for new agent-shaped work
 (`agent_tasks::new_work_after_news`: research, compare, find and
 summarise, plan, write) has its first chat round forced to call
-`start_agent_task`; a reply or a follow-up about the news is not. The
-rule's verdict is the same either way.
+`start_agent_task`; a reply or a follow-up about the news is not, and
+neither is a quick lookup the lamp answers itself (the weather, the time or
+the date, a news headline, a quick fact: "can you look up the weather in
+Hanoi tomorrow morning?", "find out what time it is in Tokyo"), unless the
+line also asks for several steps (summarise, compare, list, write, plan:
+"find this week's main AI news and summarise it in five points" is still
+forced). The rule's verdict is the same either way.
+`AFTER_NEWS` is taken on timing alone, so a colleague's line in the window
+is forced too when it asks for such work: "can you look up flights to Tokyo
+next Friday", said to someone else within 180 s of the news in a room not
+known to be busy, gets the lamp's read-back ("I'll have … look up …, shall
+I?"). Nothing starts unasked: the task starts only on a yes
+(`confirm_agent_task`), so the cost is one read-back said to nobody.
 A line of one word or none that is no reply to the news (a noise cut-in,
 `attention::noise_after_news`) does not take the news's one reply: it is
 judged as any other line, and the next line is still the first thing said
 after the news, told the note and forced as above. A one-word reply
-("Thanks.", "OK", "Great") still takes it, as since #918.
+("Thanks.", "OK", "Why?", "Hello", "Sorry?", "Vâng", "Dạ", "Ừ"), and any one
+word said as a question ("Tokyo?"), still takes it, as since #918.
 Tests: `the_first_line_after_the_news_is_marked_whatever_it_asks`,
 `a_one_word_noise_after_the_news_leaves_its_reply_to_the_next_line`.
 
