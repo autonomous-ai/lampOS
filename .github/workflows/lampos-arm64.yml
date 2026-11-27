@@ -665,9 +665,13 @@ jobs:
   # nothing, this job builds the same targets here instead, from the last
   # cache, and saves them under the same key. Nothing waits on it: publish
   # needs only the ARM64 jobs. A push that reuses the train's build (#6556)
-  # built nothing, so it renews here only when lamp-voice has no cache for its
+  # built nothing, so it renews here when lamp-voice has no cache for its
   # Cargo.lock: trains restore only that hash's, and built cold after every
-  # lock change until a push that reused nothing (#8009).
+  # lock change until a push that reused nothing (#8009). It also renews when
+  # that cache is older than MAX_AGE_HOURS: with the lock unchanged, the one
+  # saved on 25 Nov was still the newest on 27 Nov, 246 commits behind, and
+  # every pull request's test build took 22 to 25 min against 15 to 16 min
+  # in the hour after it was saved (#8009).
   cache:
     needs: [route, reuse]
     if: ${{ !cancelled() && github.event_name == 'push' && github.run_attempt == '1' && (needs.reuse.outputs.run_id != '' || needs.route.outputs.studio == 'true') }}
@@ -707,19 +711,32 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 install -y --no-install-recommends \
             ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file
       - uses: actions/checkout@v4
-      # As a train's lookup: lamp-voice's newest cache for this Cargo.lock. Found,
-      # a reusing push builds nothing; none (or an API error), it renews (#8009).
+      # As a train's lookup: lamp-voice's newest cache for this Cargo.lock. Found
+      # and younger than MAX_AGE_HOURS, a reusing push builds nothing; none, too
+      # old (or an API error), it renews from it (#8009).
       - name: lamp-voice's newest cache (a push that reused the train's build)
         id: lv
         if: needs.reuse.outputs.run_id != ''
         env:
           GH_TOKEN: ${{ github.token }}
           PREFIX: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+          MAX_AGE_HOURS: '2'
         run: |
-          key=$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?ref=refs/heads/lamp-voice&key=$PREFIX&sort=created_at&direction=desc&per_page=100" \
-            --jq '[.actions_caches[] | select(.ref == "refs/heads/lamp-voice")][0].key // ""') || key=''
-          [[ "$key" =~ ^lampos-arm64-u2204-[0-9a-f]+-[0-9a-f]{40}$ ]] || key=''
-          echo "lamp-voice's cache: ${key:-none, renewing}"
+          row=$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?ref=refs/heads/lamp-voice&key=$PREFIX&sort=created_at&direction=desc&per_page=100" \
+            --jq '[.actions_caches[] | select(.ref == "refs/heads/lamp-voice")][0] | "\(.key) \(.created_at | sub("\\.[0-9]+Z$"; "Z") | fromdate)"' 2>/dev/null) || row=''
+          read -r key created <<< "$row" || true
+          [[ "$key" =~ ^lampos-arm64-u2204-[0-9a-f]+-[0-9a-f]{40}$ && "$created" =~ ^[0-9]+$ ]] || key=''
+          if [ -n "$key" ]; then
+            age=$(( ($(date +%s) - created) / 60 ))
+            if [ "$age" -ge $(( MAX_AGE_HOURS * 60 )) ]; then
+              echo "lamp-voice's cache: $key, $age min old, renewing"
+              key=''
+            else
+              echo "lamp-voice's cache: $key, $age min old"
+            fi
+          else
+            echo "lamp-voice's cache: none, renewing"
+          fi
           echo "key=$key" >> "$GITHUB_OUTPUT"
       - name: Rust 1.96.0
         if: steps.lv.outputs.key == ''
