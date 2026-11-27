@@ -3554,6 +3554,11 @@ fn run_source(
     if lifetime.continuous() && options.diagnostics {
         return Err(io::Error::other("serve does not allow raw audio diagnostics").into());
     }
+    // PARKED (#8906, #8671): the old ring clips folder, which no reset plan
+    // path covers, emptied and removed at a served start (`ring_clips::OLD_DIR`).
+    if lifetime.continuous() {
+        crate::ring_clips::remove_old_dir_at_start();
+    }
     if let Some(ceiling) = options.ring_channel_ceiling {
         lamp_ring::ChannelCeiling::new(ceiling).map_err(io::Error::other)?;
     }

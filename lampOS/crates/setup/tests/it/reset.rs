@@ -1491,7 +1491,15 @@ fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
 
 /// What a crate's code keeps under `/var/lib` and the reset leaves, each
 /// for a reason (#7771).
-const KEPT_IN_CODE: [(&str, &str); 13] = [
+const KEPT_IN_CODE: [(&str, &str); 14] = [
+    // PARKED (#8906, #8671): the ring clips' folder before #8671, no plan
+    // path (the plan is at its 64). The voice's start removes it
+    // (`ring_clips::OLD_DIR`), so a reset run before that start leaves it
+    // only until the next.
+    (
+        "/var/lib/lampOS/voice/ring-clips",
+        "removed at the voice's start",
+    ),
     // The voice's own counts and system lines, no one's words.
     ("/var/lib/lampOS/voice/day-tally", "numbers only"),
     (

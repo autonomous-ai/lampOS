@@ -54,6 +54,14 @@ use std::{
 /// here is 0700 as the ledger requires of its own.
 pub const DIR: &str = "/var/lib/lampOS/voice/schedule-delivery/ring-clips";
 
+/// PARKED (#8906, #8671): where the clips were kept before #8671, a folder
+/// no reset plan path covers. #8906 turned `LAMP_OFFLINE_RINGS` on, so a
+/// lamp on a build between the two holds clips here, the person's
+/// reminders as sound; each served voice start removes them
+/// ([`remove_old_dir`]). Drop this, [`remove_old_dir`] and its call in
+/// `coordinator.rs` once no lamp can be on a build between #8906 and #8671.
+pub const OLD_DIR: &str = "/var/lib/lampOS/voice/ring-clips";
+
 /// A WAV file's header, as `hound` writes a mono 16-bit one.
 pub const WAV_HEADER_BYTES: u64 = 44;
 
@@ -442,6 +450,51 @@ pub fn renderer_from_environment() -> Option<Renderer> {
     }
     let cache = crate::say::tts_cache::built_from_environment()?;
     Some(Renderer::new(Clips::at_dir(), cache))
+}
+
+/// PARKED (#8906, #8671): the old folder ([`OLD_DIR`]) emptied and removed,
+/// at the served voice's start. Only its regular files and symlinks go, each
+/// read without following it, so a link is removed as a link and its target
+/// kept; then the folder by [`fs::remove_dir`], never recursively, so any
+/// other entry (a folder) leaves it in place. Returns the journal line, none
+/// with no old folder.
+pub fn remove_old_dir(dir: &Path) -> Option<String> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return None,
+        Err(error) => {
+            return Some(format!(
+                "lamp-voice: the old offline ring clips folder was left: unreadable ({error})"
+            ));
+        }
+    };
+    let mut removed = 0usize;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        let kind = metadata.file_type();
+        if (kind.is_file() || kind.is_symlink()) && fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    Some(match fs::remove_dir(dir) {
+        Ok(()) => {
+            format!("lamp-voice: the old offline ring clips folder was removed ({removed} files)")
+        }
+        Err(_) => format!(
+            "lamp-voice: the old offline ring clips folder was left: not empty \
+             ({removed} files removed)"
+        ),
+    })
+}
+
+/// [`remove_old_dir`] over [`OLD_DIR`], its line to the journal.
+pub fn remove_old_dir_at_start() {
+    if let Some(line) = remove_old_dir(Path::new(OLD_DIR)) {
+        eprintln!("{line}");
+    }
 }
 
 #[cfg(test)]
