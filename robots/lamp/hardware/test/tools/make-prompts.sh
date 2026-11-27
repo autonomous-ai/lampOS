@@ -78,4 +78,18 @@ factory_padcheck_10|Ten seconds left.
 factory_padcheck_rest|Now hands off me for thirty seconds. Do not touch.
 factory_inputs_done|Inputs recorded.
 factory_inputs_fail|Input test failed. Please check the laptop.
+factory_run_start|Factory test starting. Hands off me until I ask.
+factory_checks_done|Camera and speaker checked. Checking my servos.
+factory_cal_ok|Servos calibrated.
+factory_cal_needed|My servos need calibration. Calibration starts in ten seconds. Fold my arm down, rest my head on its stop, and let go.
+factory_cal_rest|Hold still.
+factory_cal_move|Now move every joint slowly through its whole range. Touch each head pad, press my button, and slide the privacy switch. Press the reset button when you are done.
+factory_cal_more|Keep moving. Not every joint has gone through its whole range yet. Press reset again when done.
+factory_cal_30|Thirty seconds left.
+factory_cal_stop|Stop. Fold my arm down, rest my head on its stop, and let go.
+factory_cal_done|Calibration saved. Continuing in ten seconds.
+factory_cal_fail|Calibration failed. Please check the laptop.
+factory_head_rest|Reading my rest position. Hands off me.
+factory_key_next|Next, the update key.
+factory_gaze|Setting my gaze.
 EOF

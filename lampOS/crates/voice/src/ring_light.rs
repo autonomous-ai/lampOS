@@ -231,7 +231,7 @@ fn while_muted(
 }
 
 /// The light kept at `path`, if it is one there is.
-fn kept_on_disk(path: &Path) -> Option<Light> {
+pub(crate) fn kept_on_disk(path: &Path) -> Option<Light> {
     let text = std::fs::read_to_string(path).ok()?;
     serde_json::from_str::<Light>(&text)
         .ok()

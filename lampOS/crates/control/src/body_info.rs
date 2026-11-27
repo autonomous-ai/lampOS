@@ -136,7 +136,7 @@ mod tests {
                 {"name": "head_roll", "min": 2014, "max": 2074, "home": 2044},
                 {"name": "head_pitch", "min": 1955, "max": 2015, "home": 2000},
             ],
-            "speed": 50.0, "acceleration": 400.0, "force": 600, "heat_stop": 62, "stands": true,
+            "speed": 50.0, "acceleration": 400.0, "force": 600, "heat_stop": 69, "stands": true,
         })
     }
 
@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(shoulder["stand_counts"].as_f64(), Some(2_650.0));
         assert_eq!(body["speed_deg_s"].as_f64(), Some(4.4));
         assert_eq!(body["load_limit"].as_f64(), Some(0.6));
-        assert_eq!(body["heat_stop_c"], 62);
+        assert_eq!(body["heat_stop_c"], 69);
     }
 
     #[test]

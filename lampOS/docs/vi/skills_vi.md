@@ -4614,8 +4614,9 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
 - **Những kỹ năng nào** (`core_agent::PILOTS`), theo nhóm:
   - `pilot`: Sip of water và Stretch break.
   - `nudges`: Stand up, Rest your eyes, Sit back (lời nhắc và lời cảm ơn của
-    nó, mỗi trigger một task, `on = "leaned_in"` và `on = "sat_well"`), Wind
-    down, Comfort break, Meal check (trưa và tối, mỗi bữa một task), Quiet focus
+    nó, mỗi trigger một task, `on = "leaned_in"` và `on = "sat_well"`),
+    Posture (mỗi trigger theo vùng một task: `neck`, `trunk`, `upper_arm`,
+    `lower_arm`, `general`), Wind down, Comfort break, Meal check (trưa và tối, mỗi bữa một task), Quiet focus
     và Stuffy air. Meal check và Quiet focus là kỹ năng cài thêm (từ Store):
     biến thể của chúng chỉ đi theo gói của chúng.
   - Không bao giờ: một phản ứng nhanh; một kỹ năng mà lần kích hoạt chỉ là ánh
@@ -6798,10 +6799,10 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   bước khác vẫn làm các bước đó ngay, tác vụ vẫn bị từ chối trên luồng của
   nó.
 - **Không cần cái "có" cho thư mục, khi `LAMP_TASK_NO_YES=on`** (#8475,
-  thiết kế người xây dựng đầu tiên đã duyệt; tắt nếu không đặt, và tắt
-  trong sản phẩm: không unit sản phẩm nào đặt nó cho tới khi phần 2 của
-  #8475 (#8535) được merge, lúc đó mới bật với dòng thử riêng
-  (docs/switches.md); một công tắc, `lamp_services::task_no_yes::on`,
+  thiết kế người xây dựng đầu tiên đã duyệt; tắt nếu không đặt, và bật
+  trong sản phẩm: bốn unit sản phẩm đọc nó, lamp-control, lamp-skills,
+  lamp-services và lamp-voice, đặt nó từ lần bật công tắc của #8475, sau
+  khi phần 2 (#8535) được merge (docs/switches.md); một công tắc, `lamp_services::task_no_yes::on`,
   `lamp_skills::task_no_yes_on`). (1) Tác vụ của kỹ năng không chờ cái
   "có" cho thư mục, dù kỹ năng đến từ đâu (được đẩy lên, từ Store, thêm
   bằng tay, được tạo trên đèn) và dù ai bắt đầu lần chạy (giọng nói,
@@ -7023,7 +7024,7 @@ nudge', 'no more eye nudges'), give that kind: never all, and never the one
 that came last.", và lời của `kind` bảo đưa loại mỗi khi người dùng gọi tên
 một loại, số ít hay số nhiều (#7473: trên lamp-06c1, chỉ được nghe `about`,
 mô hình dừng cái sau cùng cho "snooze only the eyes nudges", 3 trên 3);
-không có loại thì mô tả là `about`, từng byte. Tám kỹ năng wellbeing khai loại của mình (#7473, HOLD của Heron): `water`, `eyes`, `stand-up`, `break`, `meal`, `sit-back`, `wind-down` và `focus`, nên trên sản phẩm hàm luôn có `kind`, và `about` của chúng nói `all` là cho "the nudges" khi không gọi tên loại nào, nên "no more eye nudges" chỉ dừng nhắc mắt.
+không có loại thì mô tả là `about`, từng byte. Chín kỹ năng wellbeing khai loại của mình (#7473, HOLD của Heron; `posture` từ khi quyết định của chủ sở hữu ngày 23/11 tách nó khỏi Sit back): `water`, `eyes`, `stand-up`, `break`, `meal`, `sit-back`, `posture`, `wind-down` và `focus`, nên trên sản phẩm hàm luôn có `kind`, và `about` của chúng nói `all` là cho "the nudges" khi không gọi tên loại nào, nên "no more eye nudges" chỉ dừng nhắc mắt.
 
 **Đèn đọc lời người nói** (#7473, quyết định của chủ sản phẩm, 19/11: trên
 lamp-06c1 mô hình không đưa `kind` lẫn `all`, 0 trên 7), đọc chặt để một câu
@@ -7048,7 +7049,8 @@ câu khác) trước khi lời gọi tới lamp-skills, không gọi mô hình l
 - **Không thì, một loại gọi tên lời nhắc**: từ của loại (`KIND_WORDS`, một
   bảng duy nhất: water: "water", "drink", "drinking", "sip"; eyes: "eye",
   "eyes", "screen"; stand-up: "stand", "standing", "stand up"; break:
-  "break", "breaks"; sit-back: "posture", "sit back", "slouch"; wind-down:
+  "break", "breaks"; sit-back: "sit back", "lean"; posture: "posture",
+  "slouch"; wind-down:
   "wind down", "bedtime", "evening"; meal: "meal", "eat", "food", "lunch",
   "dinner"; focus: "focus") đứng ngay trước "nudge", "reminder" hay "one"
   (số ít hay số nhiều, `NOUNS`), hoặc trước từ của một loại khác như vậy,
@@ -7180,30 +7182,23 @@ cửa sổ vừa bị xoá), nên nó hết hạn như khi không có lamp-seen.
 `[[while]]` có `unknown = "holds"` đúng, vì nó chỉ áp dụng cho chủ đề chưa
 từng nói gì; `unknown = "holds_stale"` đúng cả khi giá trị đã hết hạn.
 
-Năm kỹ năng đi kèm đọc chúng như vậy (#6543, phần kỹ năng), mỗi điều kiện có
+Bốn kỹ năng đi kèm đọc chúng như vậy (#6543, phần kỹ năng), mỗi điều kiện có
 `unknown = "holds_stale"`, nên khi không có `lamp-seen`, hoặc nó đã im, mỗi
 kỹ năng chạy đúng như trước: Uống ngụm nước (`drank_s_ago` trên 1799, 30
 phút của các trigger, ở cả hai khối), Đứng dậy (`break_s_ago` trên 5999), Vươn vai
 (`break_s_ago` trên 1799: 30 phút của `sooner` theo cái ngáp, không phải 50
 phút của chính nó, nên một cái ngáp vẫn đưa lần vươn vai sớm lên), Hỏi bữa ăn
-(`ate_s_ago` trên 4499, 75 phút của các trigger; phiên bản 1.1.0) và Ngồi
-thẳng lại (`bad_share` của `humans/posture` trên 0.5: chỉ là trigger tốt hơn,
-lời nói vẫn không bao giờ nhắc tới cơ thể). Một lần thấy uống, ăn hay vươn
+(`ate_s_ago` trên 4499, 75 phút của các trigger; phiên bản 1.1.0). Một lần thấy uống, ăn hay vươn
 vai chỉ giữ một lời nhắc lại, không bao giờ thành một lời nói riêng, và không
 lưu gì về một người (quyết định của PM). Nghỉ giải lao (comfort break) không
 đọc chủ đề nào: không việc gì thấy được cho biết lần nghỉ đỡ cần hơn (thấy
-uống nước càng không). Điều kiện của Ngồi thẳng lại cũng giữ lời cảm ơn, vì
-`[[while]]` là của cả kỹ năng: nếu lúc đó tư thế đã được đọc là tốt, lời cảm
-ơn bị bỏ qua. Các ca: `a-sip-when-lamp-seen-saw-no-drink`,
+uống nước càng không). Các ca: `a-sip-when-lamp-seen-saw-no-drink`,
 `quiet-after-a-drink-was-seen`, `a-sip-when-lamp-seen-went-quiet`,
 `a-stand-when-lamp-seen-saw-no-stretch` của Đứng dậy,
 `acts-when-lamp-seen-saw-no-stretch` của Vươn vai,
 `quiet-after-a-stretch-was-seen` của Đứng dậy và Vươn vai,
 `lunch-when-lamp-seen-saw-no-meal` và `not-when-a-meal-was-seen` của Hỏi bữa
-ăn, `a-word-when-the-posture-reads-bad`, `let-be-when-the-posture-reads-well`
-và `a-word-when-lamp-seen-has-no-posture-sample` của Ngồi thẳng lại
-(lamp-seen đang chạy, cửa sổ chưa có mẫu tư thế nào, chủ đề chưa từng nói:
-lời nhắc như trước); kiểm thử
+ăn; kiểm thử
 `a_yawn_still_brings_the_stretch_forward_with_lamp_seen_saying_no_stretch`.
 Mọi ca ghi trước đây không có `humans/doing` hay `humans/posture`, tức chủ đề
 chưa từng nói, và vẫn qua không đổi. Ngưỡng của mỗi bộ đếm bằng đúng `for`
@@ -7211,6 +7206,66 @@ của trigger, không có khoảng dư: nếu lúc đến bàn của lamp-seen (
 khi có `room/stood_up`) muộn hơn lần ngồi mà trigger đếm (lần ngồi này vẫn
 giữ qua các khoảng trống tới 2 phút), lời nhắc phải chờ bộ đếm, và chờ quá
 `wait` của trigger thì mất lời nhắc của lần ngồi đó.
+
+Tư thế (Posture, `skills/posture`, #6543; quyết định của chủ sở hữu ngày
+23/11, "tách chúng ra": Ngồi thẳng lại là khuôn mặt to hơn, kỹ năng này là
+kết quả đọc của mô hình trên cloud) là kỹ năng duy nhất đọc `humans/posture`:
+lời nhắc tư thế của V1, như `motion.py` của V1 gộp `[posture_summary]` vào
+(cửa sổ đã đủ, người vẫn đang ngồi, ít nhất 3 mẫu, `bad_ratio` ít nhất 0.6),
+trên một phút gồm hai lần kiểm tra (quyết định của chủ sở hữu trên #8377,
+27/11, tại lamp-06c1: "we should tell user when they slump for like 1m (two
+posture check right?). Which health check only tell user when they are slump
+for 10m? thay is too late"). Mỗi `region` một trigger (`neck`, `trunk`, `upper_arm`, `lower_arm`, và
+`general` cho một cửa sổ xấu theo mức rủi ro RULA chung mà không vùng nào nổi
+bật, hàng "empty / mixed" của V1; là `none` cho tới quyết định của chủ sở hữu
+ngày 27/11, vì đọc như không có gì sai), mỗi trigger một câu nêu một cách sửa cụ thể (bảng trong `posture.md` của
+V1, cùng quyết định của chủ sở hữu ngày 27/11 trên #8377 cho cổ và `general`:
+đầu cúi xuống như khi nhìn điện thoại thì hại cho cổ, nâng thứ đang nhìn lên
+ngang tầm mắt hoặc ngẩng đầu lên; ngồi tựa ra để ghế đỡ lưng; thả lỏng vai;
+chỉnh bàn phím; và với `general`, ngồi thẳng lưng, vai thả lỏng, một lời về
+tư thế chứ không phải vươn vai). Cổ được tính là cao từ điểm RULA 3 (cúi quá
+20°), các vùng khác từ 4 (`window::NECK_HIGH_SUBSCORE` của lamp-seen), với các `[[while]]` `bad_share` trên
+0.5999 (0.6 trở lên của V1, vì `above` là so sánh ngặt) và `window_s` trên
+59 (đủ một phút của lamp-seen); một giá trị được nói ra đã có nghĩa là có
+người đang ngồi với đủ hai mẫu (`pose::window::MIN_SAMPLES`), nên 0.6 là cả
+hai lần kiểm tra đều xấu. Không có `unknown`: không có lamp-seen thì chủ đề
+không bao giờ được nói, và kỹ năng không nói gì. Giọng nói nghỉ 5 s và đèn im
+10 s; vẫn nói khi có người khác trong khung hình và vào bất kỳ giờ nào (chủ sở
+hữu, 27/11: "what if user working late or early morning? we should tell them
+about bad posture too"); `cooldown` 15 phút ("only 15m cooldown, not 60m") và
+không có `rearm`, mỗi vùng riêng: tư thế xấu chuyển từ cổ sang lưng thì nói
+một lời mới ngay ("neck slump and back slump is two different thing"). Không
+có `[budget]`, nên không bao giờ thuộc giờ của nhóm wellbeing: không chờ nó,
+cũng không dùng nó. Không điều kiện nào đọc các khuôn mặt;
+`humans/faces/tracked` vẫn có trong chủ đề cho lần quay về khuôn mặt
+(`look_at = "face"` đọc nó). Không có `most_a_day` và không có `[rest]` (V1 không có). Câu nói chỉ
+nói "một lúc", không bao giờ một con số, và không gọi tên bệnh nào. `[stop]
+kind = "posture"`, với `[stop] group = "wellbeing"`, nên nó dùng chung
+`wellbeing_nudges` của các lời nhắc wellbeing mà không có `[budget]` riêng (#8377). Các ca trong
+`skills/posture/tests`; kiểm thử
+`posture_reads_the_posture_alone_and_names_a_region_never_a_condition`, và
+ca `a-bad-posture-alone-is-let-be` của Ngồi thẳng lại.
+
+Một lệnh dừng nói ra trước khi Tư thế thành kỹ năng riêng được chuyển sang nó
+một lần (P2 của Reviewer-lead trên #8377): trước đó "posture" và "slouch" là
+từ dừng của Ngồi thẳng lại, nên ai đã nói "stop the posture nudges" thì
+`sit-back` đang tắt, tạm hoãn hoặc đang nghỉ. Ở lần khởi động đầu tiên của
+bản này, khi `DIR/carried` (cạnh `DIR/off`, mỗi dòng một tên, ghi như tệp
+off) chưa có `posture`, `sit-back` đang tắt thì `posture` cũng bị tắt (giữ
+trong `DIR/off`), và một lần tạm hoãn hay nghỉ `[stop.done]` của `sit-back`
+đọc lại cùng các hold cho `posture` cùng thời điểm kết thúc. Sau đó `posture`
+được ghi vào `DIR/carried`, dù có chuyển gì hay không, nên việc chuyển chỉ
+làm một lần: `posture` bật lại thì vẫn bật, và `sit-back` bị dừng sau bản này
+chỉ dừng Ngồi thẳng lại. Nhật ký ghi `lamp-skills: posture is off as sit-back
+was, carried once from before posture was its own skill` (hoặc `is snoozed
+as`), không có thông tin về người nào. Không có `--state-dir` thì không chuyển
+gì. Khi không giữ được lệnh tắt đã chuyển vào `DIR/off`, `posture` không
+được ghi vào `DIR/carried` (P3 của Friday trên #8377): nó tắt cho đến khi
+chương trình dừng, nhật ký ghi `lamp-skills: posture's carried off not kept,
+so the carry is made again at the next start`, và lần khởi động sau chuyển
+lại. Đặt lại (reset) xoá `DIR/carried` cùng phần còn lại của thư mục.
+Kiểm thử trong `crates/skills/tests/it/posture_carry.rs`.
+
 Khi `LAMP_SEEN_BREAK_IS_STANDING=on` (#6543 bước 2, bật trong sản phẩm,
 [seen.md](../seen.md)),
 nghỉ giải lao là đứng dậy, không phải vươn vai: `break_s_ago` đếm từ lúc
@@ -7336,8 +7391,10 @@ cơ hội bị nó giữ lại thì bị bỏ, không bao giờ được giữ. 
 đó cho tới khi được dùng hoặc hết `wait`, dù các giá trị sau không còn tăng
 (phép thử của trường, `above = 0`, vẫn phải đúng); và `[stop] group`, trong
 kỹ năng không có `[budget]`, để các kỹ năng dưới thư mục skills ghi cùng một
-`group` dùng chung hàm `[stop]` mà không có giới hạn nào (không được đặt cạnh
-`[budget]`; kỹ năng được đẩy lên không dùng chung). Nhịp clip: mặc định
+`group` dùng chung hàm `[stop]` mà không có giới hạn nào, cùng với các kỹ năng
+của nhóm `[budget]` cùng tên (#8377: Tư thế dùng chung hàm của các lời nhắc
+wellbeing) (không được đặt cạnh `[budget]`; kỹ năng được đẩy lên không dùng
+chung). Nhịp clip: mặc định
 một burst mỗi phút; với `LAMP_SEEN_BURST_15S=on` (tối, không unit nào đặt),
 cloud có thể đặt nhịp từ 15 s tới 60 s qua `seen_clip` trong phản hồi
 `/ping` (`{"every_s": N, "until_unix_s": T}`, số giây nguyên). lamp-cloud

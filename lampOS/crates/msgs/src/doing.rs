@@ -212,24 +212,28 @@ pub enum PostureRegion {
     Trunk,
     UpperArm,
     LowerArm,
-    /// No region stood out, or no bad sample yet.
-    #[serde(rename = "none")]
-    Nothing,
+    /// Bad by the overall RULA risk (`risk_level` 2 or more) with no one
+    /// region high (the neck's subscore 3 or more, any other's 4 or more), or no bad sample yet: `general`, never
+    /// `none`, which the owner read as nothing wrong (27 Nov, #8377).
+    General,
 }
 
-/// How the person has sat over the current window: its length so far, the
+/// How the person has sat over the current window: the time it stands for, the
 /// share of its samples read as bad, and the region that was most often
-/// bad. `window_s` is always in a value said, 0 at the window's start, so a
+/// bad. `window_s` is always in a value said, so a
 /// skill's `[[while]] above` on it is never blocked by a missing field.
 ///
-/// Not said while the window holds fewer than 3 samples (frames not going
+/// Not said while the window holds fewer than 2 samples (frames not going
 /// out: the opt-in off, the slide shut, the server busy, no body found, the
 /// sitting just begun, a privacy or sleep wipe), so the topic runs out and a
 /// skill holding on it with `unknown = "holds_stale"` runs as it did. A
-/// `bad_share` of 0 is said only over at least 3 samples, never for fewer.
+/// `bad_share` of 0 is said only over at least 2 samples, never for fewer.
+/// lamp-seen's window is its newest two samples, a check every 30 s, so it
+/// says `window_s` 60, a full minute (the owner, #8377).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HumanPosture {
-    /// How long the window has run, in whole seconds, at most an hour.
+    /// The time the window stands for, in whole seconds, at most an hour:
+    /// lamp-seen's is its oldest kept sample's age plus 30 s, at most 60.
     pub window_s: u32,
     /// The share of the window's samples read as bad, 0 to 1.
     pub bad_share: f32,
@@ -241,7 +245,7 @@ impl HumanPosture {
     pub const VERSION: u32 = 1;
     pub const TOPIC: &str = "humans/posture";
     /// Said every 30 s while someone sits at the desk and the window holds
-    /// at least 3 samples.
+    /// at least 2 samples.
     pub const EVERY: Duration = Duration::from_secs(30);
     /// A value means nothing this long after it was said.
     pub const LASTS: Duration = Duration::from_secs(90);
@@ -486,7 +490,7 @@ mod tests {
         for field in ["window_s", "bad_share", "region"] {
             needs::<HumanPosture>(text, field);
         }
-        for region in ["neck", "trunk", "upper_arm", "lower_arm", "none"] {
+        for region in ["neck", "trunk", "upper_arm", "lower_arm", "general"] {
             let text = format!(r#"{{"window_s":0,"bad_share":0.0,"region":"{region}"}}"#);
             assert!(
                 serde_json::from_str::<HumanPosture>(&text).is_ok(),

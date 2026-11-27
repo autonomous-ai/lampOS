@@ -194,6 +194,10 @@ fn main() -> ExitCode {
     })
     .and_then(|rater| rater.map_err(|why| say(&why)).ok());
     let hermes_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
+    // The person's own model for the agent too (#8735), with LAMP_OWN_KEYS=on:
+    // the model service's files the unit hands in, read once.
+    let hermes_own = (std::env::var(lamp_cloud::settings::KEYS_ENVIRONMENT).as_deref() == Ok("on"))
+        .then(|| lamp_cloud::hermes_llm::OwnKeys::credentials(&credentials));
     let build = std::fs::read_to_string(credentials.join("build"))
         .map(|state| lamp::build(&state))
         .unwrap_or_default();
@@ -264,6 +268,9 @@ fn main() -> ExitCode {
         .clone()
         .zip(login.as_ref().map(|login| login.watch()));
     let alerts_bus = bus.clone();
+    // The heartbeat's OpenClaw, Hermes and Harness versions (#8881): only
+    // with LAMP_BEAT_ENGINES=on, read from lamp-update's kept status.
+    let beat_bus = ping::engines_on().then(|| bus.clone()).flatten();
     // The energy kept with the character words, said for the body (#6893).
     let energy_bus = bus.clone();
     let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
@@ -451,7 +458,7 @@ fn main() -> ExitCode {
         attachments: None,
         shutdown: None,
     };
-    runtime.block_on(async move {
+    let stopped = runtime.block_on(async move {
         let looks = async move {
             loop {
                 tokio::time::sleep(IDENTITY_EVERY).await;
@@ -524,6 +531,7 @@ fn main() -> ExitCode {
             &mut keep,
             &mut heard,
             login.as_mut(),
+            beat_bus,
         );
         let telling = async move {
             match telling {
@@ -567,28 +575,45 @@ fn main() -> ExitCode {
             }
         };
         let mut said_hermes = |line: &str| say(line);
+        // systemd's stop (SIGTERM, as at the keys helper's restart after a
+        // model key's change, #8735): the forwarder drains the agent's chats
+        // in flight, then lamp-cloud exits. Without a handler, it exits at once.
+        let stop = async {
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut terminate) => {
+                    terminate.recv().await;
+                }
+                Err(_) => std::future::pending().await,
+            }
+        };
         let forwarding = async move {
             lamp_cloud::hermes_llm::run(
                 hermes_state.as_deref(),
                 hermes_second.as_deref(),
                 &hermes_key,
+                hermes_own,
+                stop,
                 &mut said_hermes,
             )
             .await
         };
         tokio::select! {
-            () = forwarding => {}
-            () = alerting => {}
-            () = wiping => {}
-            () = pinging => {}
-            () = staying => {}
-            () = looks => {}
-            () = reporting => {}
-            () = telling => {}
-            () = energy => {}
+            () = forwarding => true,
+            () = alerting => false,
+            () = wiping => false,
+            () = pinging => false,
+            () = staying => false,
+            () = looks => false,
+            () = reporting => false,
+            () = telling => false,
+            () = energy => false,
         }
     });
-    ExitCode::from(1)
+    if stopped {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
 }
 
 #[cfg(test)]

@@ -53,7 +53,7 @@ fn a_key_absent_present_and_removed() {
     let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null, "gemini": null, "anthropic": null});
     assert_eq!(
         reply,
-        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "anthropic": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null}, "offers": reply["done"]["offers"]}})
+        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "anthropic": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null, "agent": "relay", "agent_why": "no_model_key"}, "offers": reply["done"]["offers"]}})
     );
     for service in ["deepseek", "deepgram"] {
         let (reply, done) = keys::answer(&set(service, ""), &store, &mut works, true);
@@ -464,13 +464,13 @@ fn elevenlabs_is_offered_beside_the_model_services() {
     assert_eq!(
         which["offers"],
         json!([
-            {"service": "deepseek", "name": "DeepSeek", "kind": "model", "models": [], "base_url": true, "fields": []},
-            {"service": "deepgram", "name": "Deepgram", "kind": "model", "models": [], "base_url": false, "fields": []},
-            {"service": "elevenlabs", "name": "ElevenLabs", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"]},
-            {"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"]},
-            {"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1"},
-            {"service": "gemini", "name": "Gemini", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai"},
-            {"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1"},
+            {"service": "deepseek", "name": "DeepSeek", "kind": "model", "models": [], "base_url": true, "fields": [], "agent": true},
+            {"service": "deepgram", "name": "Deepgram", "kind": "model", "models": [], "base_url": false, "fields": [], "agent": false},
+            {"service": "elevenlabs", "name": "ElevenLabs", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"], "agent": false},
+            {"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"], "agent": true},
+            {"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1", "agent": true},
+            {"service": "gemini", "name": "Gemini", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai", "agent": true},
+            {"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1", "agent": true},
         ])
     );
     assert_eq!(which["elevenlabs"], "lamp");
@@ -604,11 +604,14 @@ fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
         .expect("openai_compatible offered");
     assert_eq!(
         compatible,
-        &json!({"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"]})
+        &json!({"service": "openai_compatible", "name": "OpenAI-compatible", "kind": "model", "models": [], "base_url": true, "fields": ["model"], "agent": true})
     );
     assert_eq!(which["openai_compatible"], "lamp");
     assert_eq!(which["model"]["openai_compatible"], Value::Null);
-    assert_eq!(which["in_use"], json!({"model": null}));
+    assert_eq!(
+        which["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "no_model_key"})
+    );
 
     // DeepSeek's own first, then the OpenAI-compatible one over it.
     keys::answer(&set("deepseek", ""), &store, &mut works, true);
@@ -658,7 +661,10 @@ fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
     assert_eq!(which["openai_compatible_host"], "api.compatible.invalid");
     assert_eq!(which["model"]["openai_compatible"], "grok-4");
     assert_eq!(which["checked"]["openai_compatible"], "works");
-    assert_eq!(which["in_use"], json!({"model": "openai_compatible"}));
+    assert_eq!(
+        which["in_use"],
+        json!({"model": "openai_compatible", "agent": "own", "agent_why": null})
+    );
     // Removed: the lamp's own model again, and nothing of it left.
     let (reply, done) = keys::answer(
         r#"{"remove":"openai_compatible"}"#,
@@ -679,7 +685,10 @@ fn an_openai_compatible_model_is_kept_with_its_endpoint_and_model() {
         assert!(!store.0.join(file).exists(), "{file}");
     }
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
-    assert_eq!(reply["done"]["in_use"], json!({"model": null}));
+    assert_eq!(
+        reply["done"]["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "no_model_key"})
+    );
 }
 
 /// An OpenAI-compatible key needs its https endpoint and a model, each
@@ -749,7 +758,7 @@ fn an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint() {
         .clone();
     assert_eq!(
         offer,
-        json!({"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1"})
+        json!({"service": "openrouter", "name": "OpenRouter", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://openrouter.ai/api/v1", "agent": true})
     );
     assert_eq!(which["openrouter"], "lamp");
     assert_eq!(which["model"]["openrouter"], Value::Null);
@@ -838,7 +847,10 @@ fn an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint() {
     );
     assert_eq!(which["model"]["openrouter"], "openai/gpt-4o-mini");
     assert_eq!(which["checked"]["openrouter"], "works");
-    assert_eq!(which["in_use"], json!({"model": "openrouter"}));
+    assert_eq!(
+        which["in_use"],
+        json!({"model": "openrouter", "agent": "own", "agent_why": null})
+    );
     // An OpenAI-compatible one over it takes OpenRouter's away in turn.
     keys::answer(&compatible, &store, &mut works, true);
     for file in ["openrouter.key", "openrouter.model", "openrouter.checked"] {
@@ -847,7 +859,7 @@ fn an_openrouter_model_is_kept_with_its_model_at_openrouters_own_endpoint() {
     let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
     assert_eq!(
         reply["done"]["in_use"],
-        json!({"model": "openai_compatible"})
+        json!({"model": "openai_compatible", "agent": "own", "agent_why": null})
     );
     // Removed: nothing of it left.
     keys::answer(&line, &store, &mut works, true);
@@ -883,7 +895,7 @@ fn a_gemini_model_is_kept_with_its_model_at_geminis_own_endpoint() {
         .clone();
     assert_eq!(
         offer,
-        json!({"service": "gemini", "name": "Gemini", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai"})
+        json!({"service": "gemini", "name": "Gemini", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai", "agent": true})
     );
     assert_eq!(which["gemini"], "lamp");
     assert_eq!(which["model"]["gemini"], Value::Null);
@@ -955,7 +967,10 @@ fn a_gemini_model_is_kept_with_its_model_at_geminis_own_endpoint() {
     assert_eq!(which["openrouter"], "lamp");
     assert_eq!(which["model"]["gemini"], "gemini-2.5-flash");
     assert_eq!(which["checked"]["gemini"], "works");
-    assert_eq!(which["in_use"], json!({"model": "gemini"}));
+    assert_eq!(
+        which["in_use"],
+        json!({"model": "gemini", "agent": "own", "agent_why": null})
+    );
     // OpenRouter's over it takes Gemini's away in turn.
     keys::answer(&openrouter, &store, &mut works, true);
     for file in ["gemini.key", "gemini.model", "gemini.checked"] {
@@ -994,7 +1009,7 @@ fn an_anthropic_model_is_kept_with_its_model_at_anthropics_own_endpoint() {
         .clone();
     assert_eq!(
         offer,
-        json!({"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1"})
+        json!({"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1", "agent": true})
     );
     assert_eq!(which["anthropic"], "lamp");
     assert_eq!(which["model"]["anthropic"], Value::Null);
@@ -1066,7 +1081,10 @@ fn an_anthropic_model_is_kept_with_its_model_at_anthropics_own_endpoint() {
     assert_eq!(which["gemini"], "lamp");
     assert_eq!(which["model"]["anthropic"], "claude-sonnet-4-5");
     assert_eq!(which["checked"]["anthropic"], "works");
-    assert_eq!(which["in_use"], json!({"model": "anthropic"}));
+    assert_eq!(
+        which["in_use"],
+        json!({"model": "anthropic", "agent": "own", "agent_why": null})
+    );
     // Gemini's over it takes Anthropic's away in turn.
     keys::answer(&gemini, &store, &mut works, true);
     for file in ["anthropic.key", "anthropic.model", "anthropic.checked"] {
@@ -1083,4 +1101,122 @@ fn an_anthropic_model_is_kept_with_its_model_at_anthropics_own_endpoint() {
     for file in ["anthropic.key", "anthropic.model", "anthropic.checked"] {
         assert!(!store.0.join(file).exists(), "{file}");
     }
+}
+
+/// #8735: what the agent uses, from the tool check at `keys.set`. A model
+/// key whose chat made a tool call serves the agent; one whose chat made
+/// none is kept for the voice, while the agent stays on the relay and says
+/// why; a voice key alone, and no key, leave it on the relay too.
+#[test]
+fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
+    let store = Store(folder("agent"));
+    let which = |store: &Store| {
+        let (reply, _) = keys::answer(
+            r#"{"which":true}"#,
+            store,
+            &mut Told(Verdict::Works, vec![]),
+            true,
+        );
+        never_said(&reply, &None);
+        // Under the 4 096 bytes lamp-cloud reads of a reply.
+        assert!(
+            reply.to_string().len() < 4_096,
+            "{}",
+            reply.to_string().len()
+        );
+        reply["done"].clone()
+    };
+    let offer = |which: &Value, service: &str| {
+        which["offers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|offer| offer["service"] == service)
+            .unwrap()["agent"]
+            .clone()
+    };
+    let gemini = json!({"set": "gemini", "key": PLANTED, "model": "gemini-3.6-flash"}).to_string();
+
+    // Tools work: the agent's own.
+    let (reply, done) = keys::answer(&gemini, &store, &mut Told(Verdict::Works, vec![]), true);
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["code"], "works");
+    let now = which(&store);
+    assert_eq!(
+        now["in_use"],
+        json!({"model": "gemini", "agent": "own", "agent_why": null})
+    );
+    assert_eq!(offer(&now, "gemini"), true);
+
+    // A chat with no tool call: kept, the voice on it, the agent on the relay.
+    let (reply, done) = keys::answer(
+        &gemini,
+        &store,
+        &mut Told(Verdict::WorksNoTools, vec![]),
+        true,
+    );
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["uses"], "own");
+    assert_eq!(reply["done"]["code"], "works_no_tools");
+    let answer = reply["done"]["answer"].as_str().unwrap();
+    assert!(
+        answer.starts_with("that key works for the lamp's voice: your conversations now go to"),
+        "{answer}"
+    );
+    assert!(
+        answer.ends_with("so the lamp's agent stays on the lamp's own model"),
+        "{answer}"
+    );
+    let done = done.unwrap();
+    assert!(done.restart_voice);
+    assert!(
+        done.said.contains("made no tool call, kept"),
+        "{}",
+        done.said
+    );
+    assert!(store.0.join("gemini.key").is_file());
+    let now = which(&store);
+    assert_eq!(now["gemini"], "own");
+    assert_eq!(now["checked"]["gemini"], "works");
+    assert_eq!(
+        now["in_use"],
+        json!({"model": "gemini", "agent": "relay", "agent_why": "no_tool_calls"})
+    );
+    assert_eq!(offer(&now, "gemini"), false);
+    assert_eq!(offer(&now, "openrouter"), true);
+
+    // Removed: no model key, the relay.
+    keys::answer(
+        r#"{"remove":"gemini"}"#,
+        &store,
+        &mut Told(Verdict::Works, vec![]),
+        true,
+    );
+    let now = which(&store);
+    assert_eq!(
+        now["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "no_model_key"})
+    );
+    assert_eq!(offer(&now, "gemini"), true);
+
+    // An ElevenLabs key alone: the voice, never the agent.
+    let voice = json!({"set": "elevenlabs", "key": PLANTED, "voice_id": "Voice8735"}).to_string();
+    let (reply, _) = keys::answer(&voice, &store, &mut Told(Verdict::Works, vec![]), true);
+    assert_eq!(reply["done"]["code"], "works");
+    let now = which(&store);
+    assert_eq!(
+        now["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "tts_only"})
+    );
+    assert_eq!(offer(&now, "elevenlabs"), false);
+    assert_eq!(offer(&now, "deepgram"), false);
+
+    // A model key kept before the tool check: the relay until set again.
+    fs::write(store.0.join("deepseek.key"), PLANTED).unwrap();
+    fs::write(store.0.join("deepseek.checked"), "works").unwrap();
+    assert_eq!(
+        which(&store)["in_use"],
+        json!({"model": "deepseek", "agent": "relay", "agent_why": "unchecked"})
+    );
+    let _ = fs::remove_dir_all(store.0.parent().unwrap());
 }

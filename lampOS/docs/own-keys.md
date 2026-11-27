@@ -62,9 +62,9 @@ The contract posted on #2094 (11:13, with its additions after), which
 
 | Kind | Asked | Success `data` |
 |---|---|---|
-| `keys.set` | `{"service": "deepseek" \| "deepgram" \| "elevenlabs", "key"?, "base_url"?, "voice_id"?, "request_id"?}` (`key` only absent for ElevenLabs' voice alone) | `{"service", "uses": "own", "code": "works", "answer"}` |
+| `keys.set` | `{"service": "deepseek" \| "deepgram" \| "elevenlabs", "key"?, "base_url"?, "voice_id"?, "request_id"?}` (`key` only absent for ElevenLabs' voice alone) | `{"service", "uses": "own", "code": "works" \| "works_no_tools", "answer"}` (#8735, below) |
 | `keys.remove` | `{"service", "request_id"?}` | `{"service", "uses": "lamp"}` |
-| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "elevenlabs": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …, "elevenlabs": …}, "deepseek_host": host \| null, "voice_id": {"elevenlabs": id \| null}, "offers": [...]}` (#8367, below) |
+| `keys.get` | `{"request_id"?}` | `{"deepseek": "own" \| "lamp", "deepgram": "own" \| "lamp", "elevenlabs": "own" \| "lamp", "since": {"deepseek": RFC 3339 \| null, "deepgram": …, "elevenlabs": …}, "deepseek_host": host \| null, "voice_id": {"elevenlabs": id \| null}, "offers": [...]}` (#8367, below; `in_use` and each offer's `agent`, #8735 below) |
 
 Each is `starting` at once, then one `success` or `failure` of the same kind
 within 15 s; `request_id` comes back in `data` on each. A `failure` has the
@@ -109,7 +109,7 @@ followed, and the only request setup or the helper makes with the key:
 
 `/etc/lampOS/voice/own/`: `deepseek.key`, `deepseek.url` (the endpoint,
 the old key removed first, so a key never sits beside another key's endpoint) and
-`deepgram.key`. The folder is root's, 0700, each file 0600, written whole and
+`deepgram.key`. The folder is root's alone, 0700, each file 0600 (no group or other reads it), written whole and
 renamed into place. The voice's drop-in loads the folder whole
 (`LoadCredential=own:/etc/lampOS/voice/own`), so each file is the credential
 `own_<file>` in its `CREDENTIALS_DIRECTORY`; `ConfigurationDirectory=` makes
@@ -238,10 +238,28 @@ service.
   own key and voice (LAMP_OWN_KEYS)", never the key or the ID. The helper
   restarts the voice only once the lamp is quiet ("The route at its next
   start"), so the change is heard from the next thing the lamp says, and a
-  sentence being spoken is never cut. Not the lamp's cached fixed lines:
-  the speech cache (`say/tts_cache.rs`) is made from the configuration
-  without the person's keys, so those lines stay in the lamp's own voice
-  (a follow-up, #8367).
+  sentence being spoken is never cut.
+- **The cached fixed lines (`say/tts_cache.rs`, the Reviewer-lead's P2 on
+  #8394):** the speech cache, in the voice's main process, reads the
+  person's key and voice ID the same way (`with_own_keys`, `LAMP_OWN_KEYS`
+  and the unit's credentials), so the lamp's fixed lines are warmed and
+  played in the person's voice, one journal line, "the speech cache keeps
+  its lines in the person's own voice, apart from the lamp's". Their key
+  names the voice that rendered them: `own:<voice_id>@<address>`, the
+  address the person's voice is asked at (ElevenLabs' own API, or a test
+  lamp's `LAMP_OWN_ELEVENLABS_URL`), so they are never the lamp's lines,
+  another voice ID's or another address's; the lamp's own lines keep their
+  key as before. A new key with the same voice ID plays the lines kept, the
+  same voice. The person's render has no fallback of its own: a refusal
+  (401 to 404) is a render that failed, never kept under the person's key.
+  The line is said again in the lamp's own voice and kept under the
+  lamp's key, and every later line is the lamp's, kept or rendered, until
+  the voice starts again; one journal line, "the speech cache: ElevenLabs
+  refused the person's own key or voice (HTTP <status>)". A line not kept
+  in the person's voice yet plays the lamp's kept one. With the key
+  removed, the voice starts again in the lamp's voice and plays the lamp's
+  kept lines. The app's voice preview (#7485) always uses the lamp's own
+  key, never the person's.
 - **The fallback:** the relay's address, key and voice are kept beside the
   person's. A piece ElevenLabs refuses for the person's key or voice (401,
   402, 403 or 404, a bad key, a voice gone, credits run out) is said in the
@@ -620,6 +638,126 @@ tests that pin it: `setup/tests/it/keys.rs`
   calls.
 - **Not yet run on a lamp:** a real key and model from the app, as for
   OpenRouter.
+
+## The lamp's agent (#8735, built)
+
+With `LAMP_OWN_KEYS=on`, the lamp's agent (OpenClaw or Hermes) chats with
+the person's own model too, through lamp-cloud's forwarder
+(docs/cloud.md, "The person's own model"):
+
+- **The same model as the voice:** the first kept model key in
+  `lamp_msgs::own_model::PRECEDENCE`, the one order the keys helper, the
+  voice and the forwarder all read: OpenAI-compatible, OpenRouter, Gemini,
+  Anthropic, then DeepSeek. Each named service's endpoint is kept there
+  once, too.
+- **Only with tools:** only when that key's check at `keys.set` saw the
+  model make a tool call, the second line of its `.checked` record `tools`
+  (#8735's setup part). Kept before that check, or no tool call: the agent
+  stays on the relay. A Deepgram or ElevenLabs key alone leaves the agent
+  on the relay.
+- **Not the relay's day:** these chats are not counted in the relay's day
+  used, which bounds skills' runs (the lead on #8735).
+- **A refused key:** 401 or 403 from the person's endpoint before anything
+  is passed back sends that chat to the relay, said once in the journal.
+- **How lamp-cloud gets the key:** by credential, as it gets the relay's
+  key. Its unit hands in only each model service's `.key`, `.url`,
+  `.model` and `.checked` from this folder, each as `own_<file>` with a
+  blank fallback, so lamp-cloud starts on a lamp with none. The folder
+  stays root's, 0700.
+- **When a change takes effect:** lamp-cloud reads them at its start. After
+  a person changes their model key, the helper restarts lamp-cloud (#8741),
+  so **the cloud link drops for a few seconds on purpose**, and the agent
+  uses the new route from then. An agent chat in flight is drained first,
+  for up to 10 s; one still running then is cut, said in the journal.
+- **An agent task across that restart:** a task is many chat rounds. The
+  round in flight at the stop ends within the drain, or is cut, said. A
+  round the agent sends in the few seconds before lamp-cloud listens again
+  is refused by the system (the port is closed), and lamp-cloud can't count
+  it. Then the task depends on the runtime. The settings lampOS writes for
+  OpenClaw and Hermes (`crates/tasks/src/openclaw_config.rs`,
+  `hermes_config.rs`) set no model retry. Whether OpenClaw or Hermes
+  retries a refused model request is their own code's, not verified here.
+  If it doesn't retry, the task fails, and lamp-tasks ends the run as
+  failed with the runtime's reason (`direct.rs`, `after_wait`), which the
+  person hears. At the stop, the journal says `the Hermes forwarder:
+  stopped, N chats in flight ended, M cut; a chat sent before lamp-cloud is
+  back is refused`.
+- **Who can read the key:** lamp-cloud's credentials are readable by its
+  user, `lampos`, as the relay's key is. The agent runtimes run as
+  `lampos` too, so they can read the person's model key, as they can read
+  the relay's key today.
+
+## The agent's tool check (#8735, PR2: setup side)
+
+The lamp's agent (OpenClaw, Hermes) breaks on a model that makes no tool
+calls, so a model key is checked for them once, at `keys.set` and at setup
+(the lead's answer to Q3 on #8735). lamp-cloud's forwarder (#8742) gets the
+person's model key by `LoadCredential=`, which systemd copies only at its
+start; the folder stays root's alone, 0700, each file 0600.
+
+- **When:** after a model service's key check works (DeepSeek,
+  OpenAI-compatible, OpenRouter, Gemini, Anthropic; never Deepgram or
+  ElevenLabs), one more request within 6 s of its own (`TOOLS_WITHIN`, so
+  both stay under `lamp-cloud`'s 15 s): `POST <base>/chat/completions` at
+  the endpoint and model just checked, the key as the bearer, as the voice
+  chats. Body: one user line, one tool `ping` with no arguments,
+  `tool_choice: "required"`, `max_tokens: 256`, `stream: false`; DeepSeek's
+  with `thinking: {"type": "disabled"}` (a forced `tool_choice` is refused
+  while it thinks), Gemini's with `reasoning_effort: "minimal"`.
+- **Works:** a 2xx whose `choices[0].message.tool_calls` is a non-empty
+  list. Anything else (no tool call, an error status, a body that isn't
+  JSON, no answer in 6 s) is `works_no_tools`.
+- **`works_no_tools`:** the key is kept and the voice uses it as with
+  `works`; the reply is `success` `{"service", "uses": "own", "code":
+  "works_no_tools", "answer"}`, the answer "that key works for the lamp's
+  voice: <where the data goes>. It made no tool call, so the lamp's agent
+  stays on the lamp's own model".
+- **Kept:** in the key's `<service>.checked`, a second line beside its
+  code: `works` then `tools` or `no_tools`. `checked.<service>` still says
+  the first line alone. A key kept before #8735 has no second line.
+- **`keys.get`:** `in_use` is `{"model": service | null, "agent": "own" |
+  "relay", "agent_why": code | null}`. `own` only when the in-use model key's
+  tool check passed; otherwise `relay`, `agent_why` one of `no_model_key`,
+  `tts_only` (an ElevenLabs key and no model key), `no_tool_calls`, `refused`
+  (the last `keys.set` for that service was refused) or `unchecked` (kept
+  before the tool check: set it again). Each `offers[]` entry adds `agent`:
+  `false` for Deepgram and ElevenLabs and for a kept model key whose tool
+  check failed, `true` otherwise. Never a key.
+- **lamp-cloud restarted:** after a person sets or removes a model key, the
+  helper restarts lamp-voice and lamp-cloud, so the cloud link drops for a
+  few seconds on purpose; an ElevenLabs or Deepgram change restarts only the
+  voice. #8742's forwarder finishes an agent turn in flight before it stops.
+  In detail: after a `keys.set` that kept a model key, or a
+  `keys.remove` of one, the helper restarts lamp-cloud
+  (`systemctl try-restart lamp-cloud.service`) after the voice, under the
+  same update lock (`keys::restart_after`), so the forwarder loads the
+  change. The voice restarts once it has rested 1 s
+  (`change::KEY_CHANGE_QUIET`, #8710), the reply already written and
+  flushed to lamp-cloud before the wait starts. lamp-cloud restarts a fixed
+  5 s (`keys::CLOUD_AFTER_REPLY`) after the voice's restart returns, under
+  the same lock, with no rest waited for: a room with sound (a TV, an
+  office's faint sound giving a 0-word line every ~40 s) never gives an
+  update's 45 s of rest, and lamp-cloud must still load the key (option (b)
+  on #8741). lamp-cloud publishes the reply on its 50 ms online tick while
+  connected, so a connected link has it out well before. With the link down
+  at the change, the reply held only in lamp-cloud's memory is lost at its
+  restart: the app says the lamp didn't answer, though the key was kept, and
+  `keys.get` then tells the truth. That harms only the person who set their
+  own key, so it doesn't block (the own-keys rule); a publish-acked restart
+  (#8742's `Changes::acked` as the signal) is the later step. Its journal
+  line: "lamp-cloud
+  restarted to load the person's model key for the agent (its
+  LoadCredential= is copied only at its start, #8742)". Never for an
+  ElevenLabs or Deepgram key. Restarting lamp-cloud drops the app's link
+  until it reconnects. Tested in `tests/update_lock.rs`
+  (`a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet`,
+  `lamp_cloud_restarts_5_s_after_the_voice_even_while_the_room_keeps_sounding`).
+- **`lamp-cloud`** passes the helper's `done` through as it is
+  (`settings::ask_keys`), under its 4096-byte read of a reply.
+- **Tests:** `src/keys.rs` (`a_model_check_asks_once_for_a_tool_call`) and
+  `tests/it/keys.rs`
+  (`the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call`). Not yet
+  run against a real service.
 
 ## Updates
 

@@ -127,7 +127,16 @@ against lamp-06c1.
   and V1's `PingPayload` fields V2 has. With `LAMP_CLOUD_TLS=on` the body
   also says `"mqtt_tls": true`, so the backend can hand the lamp its TLS
   broker; with the switch off or unset the key is left out and the body is
-  as before (#6031). A reply that carries a different
+  as before (#6031). With `LAMP_BEAT_ENGINES=on` (off unless set, #8881)
+  the body also says `engines.openclaw`, `engines.hermes` and `harness`,
+  each `{"version", "installed"}` with `version` left out unless known,
+  taken at each ping from lamp-update's kept `update/status` (the one
+  `update.status` answers from) only while it is fresh; versions and
+  `installed` only, never a path or another field. With the switch off, or
+  no or a stale status, each is left out and the body is byte for byte as
+  before. With the switch on, the journal says those two fields of the body
+  sent, `lamp-cloud: the heartbeat says {"engines":…,"harness":…}`, at the
+  first ping and again only when they change. A reply that carries a different
   broker (`mqtt_server`, `mqtt_port`, `mqtt_usr`, `mqtt_pwd` and the
   channels) or a new `device_id` replaces the account: the connection is made
   again with it, and the rotated login is kept in `lamp-cloud`'s own state
@@ -219,7 +228,7 @@ lamp says so.
 | `engines.default` (`{"engine": "<engine>"}`, any engine Harness reports on the lamp) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`, as `engines.install` (#6492, "The lamp's default agent" below): the owner's choice of the lamp's default agent, handed to lamp-tasks (`app_engine_default`). `{"default": "<engine>", "chosen_in_app": true}`, or `failure` with lamp-tasks' code and a `message` the app shows: `engine_unknown` (an empty or missing name, refused here before lamp-tasks is asked, or a name lamp-tasks does not know; "That isn't an agent this lamp knows."), `engine_not_installed` ("That engine isn't installed on the lamp."), `engine_default_unsaved` (lamp-tasks could not keep it), or `unreachable` and other codes ("The lamp could not be reached just now. Try again in a moment."). Without the switches, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
-| `keys.set` (`{"service": "deepseek" \| "deepgram" \| "elevenlabs" \| "openai_compatible", "key"?, "base_url"?, "voice_id"?, "model"?, "request_id"?}`, `key` absent only for ElevenLabs' voice alone, #8367; `base_url` and `model` both needed for `openai_compatible`, #8362; `openrouter`, `gemini` and `anthropic` too, with `model` needed and any `base_url` refused by the helper, #8420), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "elevenlabs": …, "since": {"deepseek", "deepgram", "elevenlabs"}, "deepseek_host", "voice_id": {"elevenlabs"}, "openai_compatible": …, "openrouter": …, "gemini": …, "anthropic": …, "openai_compatible_host", "model": {…}, "checked": {…}, "in_use": {"model"}, "offers"}` (#8362), or `failure` with `error` and `data.code`: `refused`, `voice_refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
+| `keys.set` (`{"service": "deepseek" \| "deepgram" \| "elevenlabs" \| "openai_compatible", "key"?, "base_url"?, "voice_id"?, "model"?, "request_id"?}`, `key` absent only for ElevenLabs' voice alone, #8367; `base_url` and `model` both needed for `openai_compatible`, #8362; `openrouter`, `gemini` and `anthropic` too, with `model` needed and any `base_url` refused by the helper, #8420), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works" \| "works_no_tools", "answer"}` (#8735) (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "elevenlabs": …, "since": {"deepseek", "deepgram", "elevenlabs"}, "deepseek_host", "voice_id": {"elevenlabs"}, "openai_compatible": …, "openrouter": …, "gemini": …, "anthropic": …, "openai_compatible_host", "model": {…}, "checked": {…}, "in_use": {"model", "agent", "agent_why"}, "offers"}` (#8362; `agent` in `in_use` and each offer, #8735), or `failure` with `error` and `data.code`: `refused`, `voice_refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
 | `system.reboot` | with `LAMP_APP_RESTART=on` (#2193, "A restart from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"restarting": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). The lamp's parts restart (`lampos.target`), not the machine. `data` is not read. Without the switch, V1's "not on this lamp" |
 | `system.shutdown` | with `LAMP_SHUTDOWN=on` (#3697, "The lamp turned off from the app" below): asked of setup's change helper, never done by `lamp-cloud`; `success` with `{"shutting_down": true}` once the helper has taken it, before the lamp goes down, or `failure` with the helper's reason ("an update is being installed: try again once it is done"). `data` is not read. Once taken, asked again within 60 s (`lamp::YES_KEPT`) it is answered the same `success` and the helper is not asked again; after that the helper is asked again. Without the switch, V1's "not on this lamp" |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters), `language.set` (`{"language": "en" \| "vi" \| "ja" \| "zh" \| "ko" \| "fr"}`, #4473, fr #8381) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}`, `{"name"}` or `{"language"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
@@ -3678,6 +3687,73 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   unreachable relay is 502. One request per connection.
 - **Logs:** one line when it starts listening, or why it couldn't (no state
   folder, the port taken); never a body, the token or the key.
+- **The person's own model** (#8735, with `LAMP_OWN_KEYS=on`, which the
+  product unit sets; docs/own-keys.md, "The lamp's agent"): when the person
+  has given their own model key, the agent's chat goes to their model, not
+  the relay.
+  - **Which key:** the one the voice uses, in the one order every reader of
+    the keys takes (`lamp_msgs::own_model::PRECEDENCE`): OpenAI-compatible,
+    then OpenRouter, Gemini, Anthropic, then DeepSeek. Each service's
+    endpoint is in the same place (`lamp_msgs::own_model`), for the keys
+    helper, the voice and this forwarder alike.
+  - **Only with tools:** only when that key's check at `keys.set` saw the
+    model make a tool call (the second line of its `.checked` record is
+    `tools`). Without it, OpenClaw and Hermes can't work, so the agent stays
+    on the relay. A hearing or voice key alone (Deepgram, ElevenLabs), or
+    no model key, is the relay too, as before.
+  - **What is sent:** the agent still asks for `deepseek-flash` (its
+    settings don't change, so no agent restart), and anything else is
+    still 400. `model` is changed to the person's model, and the chat goes
+    to `<their endpoint>/chat/completions` (Gemini's under `/openai`) with
+    their key as the bearer. The rest of the body and the answer pass as
+    they are, a stream too. `GET /v1/deepseek/models` is answered here,
+    with `deepseek-flash` alone.
+  - **Refused key:** if their endpoint refuses the key (401 or 403) before
+    anything is passed back, that chat goes to the relay, said once in the
+    journal. If it can't be reached, the answer is 502.
+  - **Not counted:** the relay's day used (`day-used.json`) is not counted
+    for these chats: the person pays for them.
+  - **Journal:** one line at lamp-cloud's start: `the agent's model:
+    own openrouter google/gemini-3.6-flash at openrouter.ai`, or `the
+    agent's model: relay (no model key of the person's)` with its reason.
+    Never a key.
+  - **Where it reads them:** lamp-cloud holds only the model key and what
+    goes with it, by credential, as it holds the relay's key. Its unit hands
+    in each model service's `.key`, `.url`, `.model` and `.checked` from
+    root's keys folder (`/etc/lampOS/voice/own`, root's, 0700) as the
+    credential `own_<file>`. It never hands in the folder, a Deepgram key or
+    an ElevenLabs key. Each has a blank `SetCredential=own_<file>:\n` first,
+    so a lamp with no key of the person's still starts lamp-cloud: systemd
+    252 fails a unit whose `LoadCredential=` file is missing otherwise, as
+    lamp-skills' `owner` showed (lamp-75c9, 5 Nov). A blank credential is no
+    key.
+  - **When a change takes effect:** the forwarder reads the credentials
+    once, at lamp-cloud's start, and says the route then. After a model
+    key's `keys.set` or `keys.remove`, the keys helper restarts lamp-cloud
+    (#8741), so the change takes effect then. **The cloud link drops for a
+    few seconds on purpose** while lamp-cloud restarts.
+  - **A chat in flight at the stop:** on systemd's stop (SIGTERM), the
+    forwarder stops taking connections and new chats (a 503, "the lamp's
+    link is restarting") and gives the chats in flight up to 10 s
+    (`DRAIN_ON_STOP`, well inside the 90 s stop timeout; the unit sets no
+    `TimeoutStopSec=`) to end, then lamp-cloud exits 0. Each one still
+    running is cut and said: `lamp-cloud: the Hermes forwarder: a chat in
+    flight was cut by a stop (N ms in)`, after one line `the Hermes
+    forwarder: stopped, N chats in flight ended, M cut; a chat sent before
+    lamp-cloud is back is refused`. The agent's next round, sent while
+    lamp-cloud is down, is refused at the closed port (docs/own-keys.md,
+    "An agent task across that restart"). Before #8735 lamp-cloud had no
+    SIGTERM handler and exited at once. Tests:
+    `a_stop_drains_a_chat_in_flight`, `a_chat_past_the_drain_is_cut_and_said`.
+  - **Who can read the key:** lamp-cloud's credentials are readable by its
+    user, `lampos`, as the relay's key is. The agent runtimes run as
+    `lampos` too, so they can read the person's model key, as they can read
+    the relay's.
+  - Tests: `hermes_llm::tests::an_own_model_takes_the_agents_chat_and_a_removed_one_gives_it_back`,
+    `an_own_401_falls_back_to_the_relay`,
+    `a_forged_model_is_still_a_400_on_the_own_route`,
+    `the_route_is_the_voices_model_and_only_with_its_tool_check` and
+    `the_unit_hands_in_only_the_model_keys_each_with_a_blank_fallback`.
 
 ## Not yet known, for the backend (#1396)
 

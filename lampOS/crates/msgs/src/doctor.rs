@@ -5,6 +5,7 @@
 //! text field, so a sentence a person said, a name or a speaker has nowhere
 //! to be put: every string in them is a member of a closed list here.
 use crate::Invalid;
+use lamp_bus::{Declaration, Kind};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -22,6 +23,8 @@ pub enum Outcome {
     NoAnswer,
     /// The answer was made and never said.
     LostAnswer,
+    /// The turn ended before any answer: cut in on, stopped, or let go.
+    Cancelled,
 }
 
 /// Which of the voice's two routes took a turn.
@@ -116,15 +119,18 @@ pub struct TurnRecord {
     /// From the end of what was heard to the first sound, in milliseconds;
     /// none when nothing was said.
     pub heard_to_first_sound_ms: Option<u32>,
-    pub cut_ins: u32,
+    /// None when the voice does not count them yet.
+    pub cut_ins: Option<u32>,
     pub tool_calls: u32,
     /// Calls that hit the 4.5 s timeout.
     pub tool_timeouts: u32,
     /// Calls that failed with an error, apart from the timeouts.
     pub tool_errors: u32,
     pub outcome: Outcome,
-    pub words_heard: u32,
-    pub words_said: u32,
+    /// Words heard and said, as counts; none when the voice has no
+    /// transcription of it.
+    pub words_heard: Option<u32>,
+    pub words_said: Option<u32>,
     /// Asked again within 10 s, read as heard wrongly.
     pub heard_wrongly: bool,
     pub name_missed: bool,
@@ -136,6 +142,33 @@ pub struct TurnRecord {
     pub route: Route,
     /// The lamp's build number.
     pub build: u32,
+}
+
+impl TurnRecord {
+    pub const TYPE: &str = "lamp_msgs/TurnRecord";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/turn_record";
+
+    /// Something that happened and is over: no value is kept, and none is
+    /// promised at any period.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// At most this many failed calls and proofs a turn carries.
+    pub const MOST_CASES: usize = 16;
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        if self.failed.len() > Self::MOST_CASES || self.proofs.len() > Self::MOST_CASES {
+            return Err(Invalid("a turn record's cases are at most 16".into()));
+        }
+        Ok(())
+    }
+}
+
+/// The voice's turn-record topic, for the apps' `turns` grant (#8726).
+pub fn turn_record_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(TurnRecord::TOPIC, TurnRecord::declaration())]
 }
 
 /// Something the lamp's other parts journal, as a fixed code the scorer
@@ -424,13 +457,13 @@ mod tests {
             turn: 7,
             at_min: 29_000_000,
             heard_to_first_sound_ms: Some(1_800),
-            cut_ins: 1,
+            cut_ins: Some(1),
             tool_calls: 2,
             tool_timeouts: 1,
             tool_errors: 1,
             outcome: Outcome::AskedAgain,
-            words_heard: 9,
-            words_said: 31,
+            words_heard: Some(9),
+            words_said: None,
             heard_wrongly: true,
             name_missed: false,
             held_then_repeated: false,
@@ -532,6 +565,20 @@ mod tests {
 
     fn one_case() -> Value {
         json!({"at": "10:00", "kind": "tool", "outcome": "error", "waited_ms": 1, "request": 1})
+    }
+
+    #[test]
+    fn a_turn_record_is_an_event_on_voice_turn_record_and_its_cases_are_few() {
+        assert_eq!(TurnRecord::TOPIC, "voice/turn_record");
+        assert_eq!(turn_record_topics().len(), 1);
+        let mut many = record();
+        assert!(many.check().is_ok());
+        many.failed = vec![many.failed[0]; TurnRecord::MOST_CASES + 1];
+        assert!(many.check().is_err());
+        assert_eq!(
+            crate::declaration_of("voice/turn_record"),
+            Some(TurnRecord::declaration())
+        );
     }
 
     #[test]

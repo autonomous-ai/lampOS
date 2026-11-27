@@ -1117,10 +1117,10 @@ fn a_new_flag_a_moved_elbow_or_a_hot_joint_stops_it() {
         }
     );
     assert_eq!(
-        ended(PITCH, Event::Heat(63)),
+        ended(PITCH, Event::Heat(70)),
         Stop::Temperature {
             joint: 5,
-            temperature: 63
+            temperature: 70
         }
     );
 }
@@ -2922,9 +2922,10 @@ fn under_the_strain_guard_an_elbow_that_cannot_lift_is_said_at_once_and_seats_on
 /// and whether it ends by itself.
 type SeatSeen = Vec<(Duration, f32, Option<(&'static str, &'static str)>, bool)>;
 
-/// The elbow warmed from 45 to 63 a degree each 0.1 s from `from`.
+/// The elbow warmed from 52 to 70 a degree each 0.1 s from `from`, one
+/// over the heat stop (69).
 fn warms(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
-    (46..=63u8)
+    (53..=70u8)
         .zip(0u64..)
         .map(move |(to, n)| (from + Duration::from_millis(100 * n), 2, to))
 }
@@ -2938,7 +2939,7 @@ fn cools(from: Duration) -> impl Iterator<Item = (Duration, usize, u8)> {
         .map(move |(to, n)| (from + Duration::from_secs(n), 2, to))
 }
 
-/// Under the strain guard (#7281), standing with the elbow at 63 from 6 s:
+/// Under the strain guard (#7281), standing with the elbow at 70 from 6 s:
 /// it sits down hot, cools from 12 s and stands again after its minute,
 /// and hot again from 80 s, the second sit-down seats it at about 83 s.
 /// `heats` follow; it is never touched.
@@ -3018,7 +3019,7 @@ fn a_hot_seat_stands_again_after_five_cool_minutes() {
         report
             .retreats
             .iter()
-            .all(|why| why.contains("elbow_pitch at 63 degrees")),
+            .all(|why| why.contains("elbow_pitch at 70 degrees")),
         "{:?}",
         report.retreats
     );
@@ -3193,41 +3194,68 @@ const LAMP_74FF_WARMTH: &[(u64, u8, u8)] = &[
     (64518, 48, 51),
 ];
 
+/// How far [`lamp_74ff_replay`] lifts 74ff's elbow (#8828): its journal sat
+/// it down at 62, the stop then; lifted by the stop's rise, the seat tests
+/// that replay it still meet the stop (69) where 74ff met its own.
+const LAMP_74FF_LIFT: u8 = Standing::TEMPERATURE - 62;
+
 /// [`LAMP_74FF_WARMTH`] played from `from` (a step is 20 ms), shoulder and
-/// elbow. Its last read, 51, never gets under [`StrainGuard::COOL`] (50):
-/// SYNTHETIC from there, the elbow cools a degree a minute as 74ff's did
-/// (62 to 51 in 12 min), 50 one minute on and 49 two minutes on, then 48.
-/// The heats, and when the elbow first reads under 50.
+/// elbow, the elbow SYNTHETICALLY [`LAMP_74FF_LIFT`] warmer. Its last read,
+/// 51 and so 58, never gets under [`StrainGuard::COOL`] (50): SYNTHETIC from
+/// there, the elbow cools a degree a minute as 74ff's did (62 to 51 in 12
+/// min) down to 48. The heats, and when the elbow first reads under 50.
 fn lamp_74ff_replay(from: Duration) -> (Vec<(Duration, usize, u8)>, Duration) {
+    lamp_74ff_replay_lifted(from, LAMP_74FF_LIFT)
+}
+
+/// [`LAMP_74FF_WARMTH`] played from `from` with the elbow `lift` warmer, and
+/// the cooling tail after it (as [`lamp_74ff_replay`]).
+fn lamp_74ff_replay_lifted(from: Duration, lift: u8) -> (Vec<(Duration, usize, u8)>, Duration) {
     let mut heats: Vec<_> = LAMP_74FF_WARMTH
         .iter()
         .flat_map(|(step, shoulder, elbow)| {
             let at = from + TICK * *step as u32;
-            [(at, 1, *shoulder), (at, 2, *elbow)]
+            [(at, 1, *shoulder), (at, 2, *elbow + lift)]
         })
         .collect();
     let last = from + TICK * LAMP_74FF_WARMTH.last().unwrap().0 as u32;
     // Synthetic cooling tail, past the journal's end.
-    for (minutes, to) in [(1, 50), (2, 49), (3, 48)] {
-        heats.push((last + Duration::from_secs(60 * minutes), 2, to));
+    let last_elbow = LAMP_74FF_WARMTH.last().unwrap().2 + lift;
+    let mut under = None;
+    for (to, minutes) in (48..last_elbow).rev().zip(1u64..) {
+        let at = last + Duration::from_secs(60 * minutes);
+        heats.push((at, 2, to));
+        if to < StrainGuard::COOL && under.is_none() {
+            under = Some(at);
+        }
     }
-    (heats, last + Duration::from_secs(120))
+    (heats, under.expect("cools under COOL"))
 }
 
 /// lamp-74ff's elbow standing as it did on 16 Nov (`LAMP_74FF_WARMTH` from
 /// 6 s on, and `then`), under the strain guard with `LAMP_BODY_SEAT_COOLS`:
 /// what each step said, and each line its seat would say (`SeatSay`, out
-/// of the quiet hours).
+/// of the quiet hours). The elbow is [`LAMP_74FF_LIFT`] warmer, as
+/// [`lamp_74ff_replay`] plays it.
 fn lamp_74ff(
+    then: Vec<(Duration, usize, u8)>,
+    ends: Duration,
+) -> (BodyReport, SeatSeen, Vec<&'static str>) {
+    lamp_74ff_lifted(LAMP_74FF_LIFT, then, ends)
+}
+
+/// [`lamp_74ff`] with the elbow `lift` warmer: 0 is 74ff's own journal.
+fn lamp_74ff_lifted(
+    lift: u8,
     then: Vec<(Duration, usize, u8)>,
     ends: Duration,
 ) -> (BodyReport, SeatSeen, Vec<&'static str>) {
     let (mut lamp, mut clock) = folded(ends);
     lamp.arm_moves = true;
     lamp.overload_clears = 3;
-    let (first, second) = (LAMP_74FF_WARMTH[0].1, LAMP_74FF_WARMTH[0].2);
+    let (first, second) = (LAMP_74FF_WARMTH[0].1, LAMP_74FF_WARMTH[0].2 + lift);
     (lamp.servos[1].temperature, lamp.servos[2].temperature) = (first, second);
-    lamp.heats = lamp_74ff_replay(Duration::from_secs(6))
+    lamp.heats = lamp_74ff_replay_lifted(Duration::from_secs(6), lift)
         .0
         .into_iter()
         .chain(then)
@@ -3267,6 +3295,19 @@ fn lamp_74ff(
     (report, seen, lines)
 }
 
+/// #8828: lamp-74ff's own journal of 16 Nov, standing at 61 to 63, sat it
+/// down hot twice under the stop at 62; under 69 it stands through the
+/// whole journal and is never seated.
+#[test]
+fn lamp_74ff_standing_at_61_to_63_is_never_sat_down_hot() {
+    let (_, under) = lamp_74ff_replay_lifted(Duration::from_secs(6), 0);
+    let (report, seen, lines) = lamp_74ff_lifted(0, Vec::new(), under);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.retreats.is_empty(), "{:?}", report.retreats);
+    assert!(seen.iter().all(|(_, _, seated, _)| seated.is_none()));
+    assert!(lines.is_empty(), "{lines:?}");
+}
+
 /// #7281, lamp-74ff's seat at 16:22:19 replayed: seated hot, it says it
 /// will rest, once, stays down through the journal's whole cooling (62 to
 /// 51 in 12 min), and stands again by itself five minutes after the elbow
@@ -3281,7 +3322,7 @@ fn lamp_74ff_hot_seat_at_16_22_stands_again_after_five_cool_minutes() {
         report
             .retreats
             .iter()
-            .all(|why| why.contains("elbow_pitch at 62 degrees")),
+            .all(|why| why.contains("elbow_pitch at 69 degrees")),
         "{:?}",
         report.retreats
     );
@@ -3313,7 +3354,7 @@ fn lamp_74ff_hot_seat_at_16_22_stands_again_after_five_cool_minutes() {
 fn a_hot_seat_after_standing_by_itself_within_the_hour_stays_seated() {
     let (_, under) = lamp_74ff_replay(Duration::from_secs(6));
     let stands = under + StrainGuard::COOL_FOR;
-    let warm: Vec<_> = (49..=61u8)
+    let warm: Vec<_> = (49..=61u8 + LAMP_74FF_LIFT)
         .zip(1u32..)
         .map(|(to, n)| (stands + Duration::from_secs(10) * n, 2, to))
         .collect();
@@ -4254,6 +4295,7 @@ fn gesture_run_full(
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -4390,6 +4432,7 @@ fn expression_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -4567,6 +4610,7 @@ fn speaking_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -5287,6 +5331,7 @@ fn rest_glances_watched(
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -6370,6 +6415,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -6448,6 +6494,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -6544,6 +6591,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -7330,6 +7378,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     asleep: false,
                     woken: false,
                     replace: false,
+                    queue: false,
                     lively: false,
                     energy: 0,
                     present: false,
@@ -7421,6 +7470,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -7517,6 +7567,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 night_woke: false,
                 aim_from_home: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -8081,7 +8132,7 @@ fn a_run_that_will_not_stand_asks_the_owner_once_why() {
             Some(standing(100, 60)),
             news,
             |glimpse| {
-                let health = crate::bus_out::health(glimpse, 0);
+                let health = crate::bus_out::health(glimpse, 0, Standing::TEMPERATURE);
                 let ask = crate::ask::asks(&health).map(str::to_owned);
                 if asks.last() != Some(&ask) {
                     asks.push(ask);
@@ -8148,7 +8199,12 @@ fn a_run_that_will_not_stand_asks_the_owner_once_why() {
         Some(HOME),
         Some(standing(100, 60)),
         || None,
-        |glimpse| asks.push(crate::ask::asks(&crate::bus_out::health(glimpse, 0)).is_some()),
+        |glimpse| {
+            asks.push(
+                crate::ask::asks(&crate::bus_out::health(glimpse, 0, Standing::TEMPERATURE))
+                    .is_some(),
+            )
+        },
     );
     assert!(report.standing.is_some(), "{report:?}");
     assert!(!asks.is_empty() && asks.iter().all(|asks| !asks));
@@ -10525,6 +10581,7 @@ fn called_run(
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -12541,19 +12598,19 @@ fn heated_pitch(start: u8, glitch: Option<u8>, heats: Vec<(Duration, usize, u8)>
     run(&mut lamp, &mut clock, Limits::FOLDED, None, news, |_| {})
 }
 
-/// Real heat still stops it: a head that warms from 58 to 63 a degree
+/// Real heat still stops it: a head that warms from 65 to 70 a degree
 /// each 0.1 s, a rise `judge_temperatures` lets in, ends the run after `temperature_steps`
 /// hot steps.
 #[test]
 fn a_joint_that_really_warms_still_stops_after_its_hot_steps() {
-    let ramp = (59..=63)
+    let ramp = (66..=70)
         .zip(0..)
         .map(|(to, n)| (Duration::from_millis(1_500 + 100 * n), PITCH, to))
         .collect();
-    let report = heated_pitch(58, None, ramp);
+    let report = heated_pitch(65, None, ramp);
     let hot = Stop::Temperature {
         joint: 5,
-        temperature: 63,
+        temperature: 70,
     };
     assert_eq!(report.stop, hot, "{report:?}");
     assert_eq!(report.bad_temperatures, [0; 5]);
@@ -12628,7 +12685,8 @@ fn a_small_glitch_near_the_limit_then_a_flicker_down_is_not_heat() {
 
 /// The seventh's 5 degrees a second row: the first read 5, the servo
 /// rising from 45 at once. The rise settles a read at a time, so it is
-/// judged on it within a second and stops on heat near 62, not at 120.
+/// judged on it within a second and stops on heat near the stop (69), not
+/// at 120.
 #[test]
 fn a_fast_rise_after_a_low_first_read_still_stops_near_the_limit() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(8));
@@ -12644,7 +12702,7 @@ fn a_fast_rise_after_a_low_first_read_still_stops_near_the_limit() {
             report.stop,
             Stop::Temperature {
                 joint: 5,
-                temperature: 62..=70
+                temperature: 69..=75
             }
         ),
         "{report:?}"
@@ -12989,7 +13047,7 @@ fn a_true_value_settles_through_glitches_after_a_low_first_read() {
             report.stop,
             Stop::Temperature {
                 joint: 5,
-                temperature: 62..=72
+                temperature: 69..=79
             }
         ),
         "{report:?}"
@@ -13274,17 +13332,17 @@ fn a_lamp_found_standing_whose_start_is_refused_folds_then_lets_go() {
 }
 
 /// A first read at the limit with a cool read agreeing after it is not
-/// heat: both agreeing reads must be hot. 62, then 61, starts as usual
+/// heat: both agreeing reads must be hot. 69, then 68, starts as usual
 /// (70 and 70: `a_hot_first_read_that_repeats_is_refused_as_before`).
 #[test]
 fn a_first_read_at_the_limit_then_one_below_starts_as_usual() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(4));
-    lamp.servos[PITCH].temperature = 61;
-    lamp.flicker = Some((Duration::ZERO, PITCH, vec![Some(62)], 0));
+    lamp.servos[PITCH].temperature = 68;
+    lamp.flicker = Some((Duration::ZERO, PITCH, vec![Some(69)], 0));
     let news = script(&clock.time);
     let report = run(&mut lamp, &mut clock, Limits::FOLDED, None, news, |_| {});
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
-    assert_eq!(report.hot_rereads, vec![[45, 45, 45, 45, 61]]);
+    assert_eq!(report.hot_rereads, vec![[45, 45, 45, 45, 68]]);
     assert!(report.moved, "{report:?}");
 }
 
@@ -13430,15 +13488,15 @@ fn a_shoulder_flapping_between_55_and_61_runs_20_minutes_judged_at_61() {
     );
 }
 
-/// The same flap two degrees over the limit, 60 and 64 by turns, is heat:
-/// judged on 64, it stops on `Temperature`, not as unreadable.
+/// The same flap two degrees over the limit, 67 and 71 by turns, is heat:
+/// judged on 71, it stops on `Temperature`, not as unreadable.
 #[test]
-fn a_joint_flapping_between_60_and_64_stops_on_heat() {
+fn a_joint_flapping_between_67_and_71_stops_on_heat() {
     let readings = (0..3_000)
-        .map(|n| Some(if n % 2 == 0 { 64 } else { 60 }))
+        .map(|n| Some(if n % 2 == 0 { 71 } else { 67 }))
         .collect();
     let (report, _) = scripted_pitch(
-        60,
+        67,
         Vec::new(),
         Duration::from_millis(1_500),
         readings,
@@ -13449,7 +13507,7 @@ fn a_joint_flapping_between_60_and_64_stops_on_heat() {
             report.stop,
             Stop::Temperature {
                 joint: 5,
-                temperature: 62..
+                temperature: 69..
             }
         ),
         "{report:?}"
@@ -21250,7 +21308,7 @@ fn a_held_arm_that_heats_is_let_down_slowly() {
     let found = [2_035, 3_441, 218, 2_035, 2_478];
     let powered = powered_up(found, |lamp| {
         lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
-        lamp.heats.push((Duration::from_secs(5), 2, 63));
+        lamp.heats.push((Duration::from_secs(5), 2, 70));
     });
     let lamp = &powered.lamp;
     assert!(held_with_torque_on(lamp));
@@ -22443,7 +22501,7 @@ fn a_lamp_folded_for_a_strain_with_someone_in_front_of_it_stays_down() {
 }
 
 /// #7344, the first builder's rule: a lamp that sat down hot cools first,
-/// then a person. The elbow reads 63 from about 8 s and sits it down (down
+/// then a person. The elbow reads 70 from about 8 s and sits it down (down
 /// by 15 s), then cools from 12 s to 45 at 29 s (under 50 from 25 s). With
 /// a 600 s window from talk at 0 s, off it stands again after its minute;
 /// on, a line at 120 s, still in its five cool minutes, leaves it down, and
@@ -22454,7 +22512,7 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
         let (mut lamp, mut clock) = folded(Duration::from_secs(360));
         lamp.arm_moves = true;
         lamp.overload_clears = 3;
-        lamp.heats = (46..=63u8)
+        lamp.heats = (53..=70u8)
             .zip(0u64..)
             .map(|(to, n)| (Duration::from_millis(6_000 + 100 * n), 2, to))
             .chain(
@@ -22496,7 +22554,7 @@ fn a_lamp_folded_hot_stays_down_until_cool_and_then_a_new_line() {
         );
         assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
         assert!(
-            report.retreats.len() == 1 && report.retreats[0].contains("elbow_pitch at 63"),
+            report.retreats.len() == 1 && report.retreats[0].contains("elbow_pitch at 70"),
             "{:?}",
             report.retreats
         );
@@ -22798,5 +22856,288 @@ fn a_gesture_under_way_ends_as_the_lamp_begins_to_keep_still() {
     assert!(
         fates.contains(&("laugh", crate::body::QUIET_HELD)),
         "{fates:?}"
+    );
+}
+
+/// A paired computer's move as lamp-control sends it (`replace`, at `skill`), when, from which computer, and whether it is
+/// queued (`"queue": true`).
+type QueueAsk = (Duration, &'static Clip, &'static str, bool);
+
+/// One step of a queue run: when, the gesture it makes, whether that began on this step, and the head's goals.
+type QueueStep = (Duration, Option<&'static str>, bool, [u16; 3]);
+
+/// Two computer moves, both named as lamp-control names every one (`parts::MOVE_NAME`), each 1 s at a 50 ms step: the first
+/// lifts the head's pitch 40 counts and back, the second lowers it 40 and back, so the pitch crosses the stand at speed where
+/// they meet (the fixture's roll reach is 15 counts, too little to see); and a third, a nod of pitch.
+static QUEUE_FIRST: Clip = Clip {
+    name: "control",
+    step_ms: 50,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [-4, 0, 0, 0, 0],
+        [-8, 0, 0, 0, 0],
+        [-12, 0, 0, 0, 0],
+        [-16, 0, 0, 0, 0],
+        [-20, 0, 0, 0, 0],
+        [-24, 0, 0, 0, 0],
+        [-28, 0, 0, 0, 0],
+        [-32, 0, 0, 0, 0],
+        [-36, 0, 0, 0, 0],
+        [-40, 0, 0, 0, 0],
+        [-36, 0, 0, 0, 0],
+        [-32, 0, 0, 0, 0],
+        [-28, 0, 0, 0, 0],
+        [-24, 0, 0, 0, 0],
+        [-20, 0, 0, 0, 0],
+        [-16, 0, 0, 0, 0],
+        [-12, 0, 0, 0, 0],
+        [-8, 0, 0, 0, 0],
+        [-4, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+static QUEUE_SECOND: Clip = Clip {
+    name: "control",
+    step_ms: 50,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [4, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [12, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [20, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [28, 0, 0, 0, 0],
+        [32, 0, 0, 0, 0],
+        [36, 0, 0, 0, 0],
+        [40, 0, 0, 0, 0],
+        [36, 0, 0, 0, 0],
+        [32, 0, 0, 0, 0],
+        [28, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [20, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [12, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [4, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+static QUEUE_THIRD: Clip = Clip {
+    name: "control",
+    step_ms: 50,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+
+/// A standing lamp reading, asked `asks` with `LAMP_BODY_MOVE_QUEUE` on or off: the report, the fates said and each step.
+fn queue_run(
+    move_queue: bool,
+    asks: Vec<QueueAsk>,
+    seconds: u64,
+) -> (BodyReport, Fated, Vec<QueueStep>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        move_queue,
+        ..gesture_limits()
+    };
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut asks = VecDeque::from(asks);
+    let (mut fates, mut seen) = (Vec::new(), Vec::new());
+    let report = run_told(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Reading, 60)),
+        move || match asks.front() {
+            Some((at, clip, source, queue)) if time.get() >= *at => {
+                let asked = Asked {
+                    gesture: Some(*clip),
+                    replace: true,
+                    queue: *queue,
+                    ..Asked::default()
+                };
+                let told = (asked, Priority::Skill, Source::new(source));
+                asks.pop_front();
+                told
+            }
+            _ => (Asked::default(), Priority::Conversation, None),
+        },
+        |glimpse| {
+            fates.extend(glimpse.gesture_fates);
+            seen.push((
+                seen_at.get(),
+                glimpse.gesture,
+                glimpse.gesture_began,
+                glimpse.goals,
+            ));
+        },
+    );
+    (report, fates, seen)
+}
+
+/// The steps a gesture began on, by when.
+fn began_at(seen: &[QueueStep]) -> Vec<Duration> {
+    seen.iter()
+        .filter(|step| step.2)
+        .map(|step| step.0)
+        .collect()
+}
+
+/// A computer's move queued behind its own move playing starts on the step that one ends: no step between them makes no
+/// gesture, nothing eases back to the stand, and the head's pitch, crossing the stand at speed where they meet, moves on every
+/// step of the join, never still and never back. Each is said begun, though both are named alike.
+#[test]
+fn a_queued_move_starts_on_the_step_the_one_before_it_ends() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run(true, asks, 14);
+    assert_eq!(report.gestures, 2, "{fates:?}");
+    assert_eq!(
+        fates,
+        [
+            ("control", "taken: it plays"),
+            ("control", "taken: it plays")
+        ]
+    );
+    let began = began_at(&seen);
+    assert_eq!(began.len(), 2, "{began:?}");
+    let (first, second) = (
+        seen.iter().position(|step| step.0 == began[0]).unwrap(),
+        seen.iter().position(|step| step.0 == began[1]).unwrap(),
+    );
+    // The second begins one second (the first's length) after the first, to the step.
+    assert!(
+        began[1] - began[0] >= ms(1_000) && began[1] - began[0] <= ms(1_000) + TICK,
+        "{began:?}"
+    );
+    assert!(
+        seen[first..second + 40]
+            .iter()
+            .all(|step| step.1 == Some("control"))
+    );
+    // Around the join the pitch's goal goes down every step (more counts): from the first's way back into the second's way
+    // down, never still and never back.
+    let pitches: Vec<u16> = seen[second - 8..second + 8]
+        .iter()
+        .map(|step| step.3[0])
+        .collect();
+    assert!(
+        pitches.windows(2).all(|pair| pair[1] > pair[0]),
+        "{pitches:?}"
+    );
+}
+
+/// The queue off, a queued move is asked as before: as a replace, it ends the move playing, which eases back to the stand,
+/// and plays after it.
+#[test]
+fn with_the_queue_off_a_queued_move_replaces_as_before() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run(false, asks, 14);
+    assert_eq!(report.gestures, 2, "{fates:?}");
+    assert!(
+        fates.contains(&("control", crate::moves::REPLACED)),
+        "{fates:?}"
+    );
+    let began = began_at(&seen);
+    let gap = seen
+        .iter()
+        .filter(|step| step.0 > began[0] && step.0 < began[1] && step.1.is_none())
+        .count();
+    assert!(gap > 0, "the first eases back with no gesture: {began:?}");
+}
+
+/// Queued behind another computer's move, a move is asked as if unqueued: as a replace, it ends that one.
+#[test]
+fn a_move_queued_behind_another_askers_move_replaces_it_as_before() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_2", true),
+    ];
+    let (_, fates, _) = queue_run(true, asks, 14);
+    assert!(
+        fates.contains(&("control", crate::moves::REPLACED)),
+        "{fates:?}"
+    );
+}
+
+/// A move waiting for one that is ended early (here a replace from the same computer, unqueued) is dropped, said why, and
+/// never plays.
+#[test]
+fn a_queued_move_is_dropped_when_the_one_before_it_does_not_play_out() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+        (ms(8_500), &QUEUE_THIRD, "control:c_1", false),
+    ];
+    let (report, fates, _) = queue_run(true, asks, 14);
+    assert!(
+        fates.contains(&("control", crate::moves::QUEUED_FIRST_ENDED)),
+        "{fates:?}"
+    );
+    assert!(
+        fates.contains(&("control", crate::moves::REPLACED)),
+        "{fates:?}"
+    );
+    // The first and the third played; the queued one never did.
+    assert_eq!(report.gestures, 2, "{fates:?}");
+}
+
+/// One move waits at a time: a second queued one takes the first's place, which is said dropped, and plays after the move
+/// playing.
+#[test]
+fn a_second_queued_move_takes_the_place_of_the_first() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+        (ms(8_500), &QUEUE_THIRD, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run(true, asks, 14);
+    assert!(
+        fates.contains(&("control", "dropped: another was asked after it")),
+        "{fates:?}"
+    );
+    assert_eq!(report.gestures, 2, "{fates:?}");
+    let began = began_at(&seen);
+    assert!(
+        began.len() == 2 && began[1] - began[0] <= ms(1_000) + TICK,
+        "{began:?}"
     );
 }

@@ -881,7 +881,7 @@ mod tests {
             .keys()
             .filter(|path| path.ends_with(&format!("/{CORE_BRIEF}")))
             .collect();
-        assert_eq!(briefs.len(), 8, "{briefs:?}");
+        assert_eq!(briefs.len(), 9, "{briefs:?}");
         for path in briefs {
             let name = path.split('/').nth_back(2).unwrap();
             let pilot = lamp_skills::core_agent::pilot(name).unwrap();

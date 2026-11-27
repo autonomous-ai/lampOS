@@ -591,8 +591,21 @@ a Harness idempotency key. A receipt with an already-bound agent or creation
 ID on a different task becomes uncertain. The adapter validates the expected
 machine, label, engine and ask-mode receipt before accepting a new binding.
 
-At startup, old prepared/queued tasks become `invalidated`; they are never
-automatically dispatched. An interrupted `attempting` record becomes
+At startup, old prepared/queued tasks become `invalidated` (code `restart`,
+ended at the new start); they are never automatically dispatched. A queued
+one the person said yes to in this boot, at most 40 minutes before (its
+30-minute queued life, `QUEUED_MS`, plus ten; an update restarts lamp-tasks
+and lamp-voice), is told once by task news within ten minutes of that start, as
+a hand-over that did not reach its agent, with an offer to try again
+(`task_news::failed_hand_over`, the `failed` words); a prepared one never
+said yes to stays unsaid, and so does one said yes to before a reboot, as
+how long ago is not known, and so does one whose yes is older (lamp-tasks
+stayed down past its start limit and started again hours later). Told is kept in the voice's told file, so a
+voice that starts again does not tell it twice, and a later restart of
+lamp-tasks leaves its end as it was. Tests:
+`engine::tests::a_queued_task_said_yes_to_ends_restart_with_its_yes_kept`,
+`task_news::tests::a_hand_over_said_yes_to_that_a_restart_ended_is_told_once`.
+An interrupted `attempting` record becomes
 `uncertain`. An interrupted observation becomes a failed read, without a new
 launch. An outstanding speech claim becomes uncertain. Accepted, pending,
 uncertain and reported-spoken history remains. Old confirmations and speech
@@ -2202,34 +2215,68 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     the `targets` answer: the `lamp` target's `engine` (its default) first,
     then its `engines`, each once (`[engine]` alone from an older tasks
     part). They are whatever Harness reports on the lamp; the voice keeps no
-    list of engines. While the tasks part has the `lamp` target,
-    `start_agent_task` also takes `engine`, its `enum` the lamp's engines as
-    last read (none before they are read), filled only when the person
-    names one of them for work on the lamp. A hand-over to the lamp naming
-    one, by `engine` or by `who` (its id or the name it is called, any case,
-    spaces and "the " left off), sends `"engine"` with the `prepare` and
-    says that engine as who does it ("Pi on the lamp"); naming none, or a
-    name not among the lamp's engines, sends no `engine` and says the
-    lamp's default. A `who` naming one of the lamp's engines goes to the
-    lamp with that engine even when a computer has an agent of that name
-    ("Claude Code"); only `where` `"computer"` sends it to the computer. An
-    `engine` for a computer is ignored. Names are said from a small table
+    list of engines. The route is decided in code, never by the model (the
+    owner, 25 Nov): `start_agent_task` declares no `engine`; the model only
+    reports what was said (`who`, `where`, `session`), and while the tasks
+    part has the `lamp` target `who`'s `enum` is every agent name the person
+    may say (Claude Code, Codex, OpenCode, Devin, Hermes, OpenClaw), so a
+    name no computer has still reaches the code. An `engine` the model sends
+    anyway is never read. One agent per lamp (the owner's
+    design, 25 Nov: Hermes and OpenClaw have the same role and replace each
+    other); the lamp's default is the person's choice in the app, Hermes
+    when none is chosen. The rules (`START` in `agent_tasks.rs`), the same
+    both ways ("OpenClaw" named on a Hermes lamp, "Hermes" named on an
+    OpenClaw lamp):
+    1. **None named, or the default named:** prepared on the lamp with no
+       `engine`; the read-back says "the lamp", never the agent.
+    2. **Another agent named for the lamp** (`who`: one of the lamp's names,
+       `lamp_names`, the lamp's engines plus Hermes and OpenClaw, or an
+       agent the voice knows; `named_for_the_lamp`): it never runs on the
+       lamp, even when installed there. (a) A computer paired through
+       Harness can take it (`computer_with`: Harness not signed out, a
+       computer whose `agents` has it and not known offline, the most
+       recently used of several by its `used`; else one of the staff whose
+       own agent it is): prepared on that computer with `"engine"`, the
+       read-back says it ("Hermes on the office computer"), then the usual
+       yes. (b) None can: `{"error":"Nothing was handed over: <Name> isn't
+       available (<why>). Say so plainly in a few words, and do not give the
+       work to anyone else unless the person asks you to.","code":
+       "agent_not_available","reason":<reason>}` (`not_available`), the
+       reason `none` ("no computer of theirs has it"), `computer_offline`
+       ("the computer that has it is offline") or `harness_signed_out` ("the
+       lamp is signed out of Harness, so no computer can take it"); nothing
+       is prepared.
+    3. **The computer named with an agent on it** (`where` `"computer"`,
+       `who` an agent in that computer's `agents` that is not one of the
+       staff): there with that `engine`, as 2a; one of the staff, as before.
+    The tasks part's `targets` answer carries, per computer, `agents` (the
+    engines its engines look says installed and not known signed out, Hermes
+    and OpenClaw among them; one whose install is unknown is not listed),
+    `status` (`online`/`offline`) and `used` (its last task id), and
+    Harness's `signed_in`; the voice keeps them (`computers_in`) and adds one
+    line to the session note while the lamp has its own target
+    (`computers_note`): "Your computers: macbook-air (online: Claude Code,
+    Hermes)." A named session and a named machine come first, as before.
+    A `who` naming the lamp's default goes to the lamp even when a computer
+    has an agent of that name; only `where` `"computer"` (or the person
+    naming their computer) sends it to the computer. Any other `engine` the
+    model gives for a computer is ignored. Names are said from a small table
     (Hermes, OpenClaw, Claude Code, Codex, OpenCode, Devin), else the id
-    with a capital ("Pi"); the table only names, it gates nothing. A
-    refusal `engine_not_here` is said "<Name> isn't set up on me, so I
-    didn't start that." (`engine_unknown`: "I don't know <Name> here, so I
-    didn't start that."), and is never retried on another engine. Tests:
-    `agent_tasks::tests::a_named_lamp_engine_goes_with_the_prepare_and_is_said`,
-    `agent_tasks::tests::the_lamp_engine_is_declared_only_with_the_lamp`,
+    with a capital ("Pi"); the table only names, it gates nothing. Tests:
+    `agent_tasks::tests::a_named_agent_runs_on_the_lamp_only_as_its_default_else_on_a_computer_that_has_it`,
+    `agent_tasks::tests::a_named_agent_goes_to_the_most_recent_online_computer_that_has_it`,
+    `agent_tasks::tests::no_engine_is_declared_and_who_takes_every_agent_name_with_the_lamp`,
+    `runtime::tests::status_says_harness_signed_in_once_read`,
     `agent_tasks::tests::the_lamp_engines_are_read_from_the_targets_answer`,
     `agent_tasks::tests::an_engine_is_said_by_its_name_or_its_id_with_a_capital`,
     `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
   - **Named in the heard words, by code (#6492, the lead's V2).** While
     the lamp has its own target, the voice reads the person's own heard
     line for the request (a line the lamp wrote is not read) and sets
-    `where`/`engine`/`who` itself, so a model that leaves them out can't
+    `where`/`who` itself (and drops any `engine`), so a model that leaves them out can't
     send the task elsewhere. The names come only from what this lamp has:
-    the lamp's engines as last read (by id or the name it is called) and
+    the lamp's engines as last read plus Hermes and OpenClaw (by id or the
+    name it is called) and
     the computer staff (Claude Code when none is read); never a fixed list
     of agents. A name counts only as the doer: after "ask", "have", "tell",
     "get" or "let", or "with", "using", "via" or "use" (not "don't ask …",
@@ -2239,8 +2286,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     work verb (`WORK_VERBS`) right after it, after "please" or a stop too
     ("Hey Lamp Hermes look up …", "Hermes. Look up …", #7023); any case,
     its words together or apart ("Open Claw"). One
-    of the lamp's engines named: `where` `lamp` and that `engine`, whatever
-    the model sent. One of the staff named: `where` `computer`, `who` them,
+    of the lamp's engines named: `where` `lamp` and `who` that agent,
+    whatever the model sent (the rules above decide: the default runs on the lamp;
+    another goes to a computer that has it, or is said not available). One of the staff named: `where` `computer`, `who` them,
     no `engine`. A name on both the lamp and a computer is the lamp's,
     unless the computer is named as the place or the words need the
     computer's things: "my" + repo, repository, codebase, code, project,
@@ -2249,21 +2297,20 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     "Mac", "MacBook", "laptop" or "PC" (a word may come between: "my office
     computer") sets `where` `computer` and drops `engine` (and a `who`
     naming only the lamp's engine); negated ("don't use my computer") or
-    "on the lamp", "yourself", "right here" sets `where` `lamp`, the model's
-    `engine` kept. A mention names nothing ("what is Hermes?", "OpenClaw's
+    "on the lamp", "yourself", "right here" sets `where` `lamp`. A mention names nothing ("what is Hermes?", "OpenClaw's
     update"), nor a name in no list; words that disagree (two agents, the
     lamp and the computer, an agent only on the lamp with "on my computer",
     one only on a computer with "on the lamp") set nothing, leaving the
     model's args. Each override logs one line with what was set and what
-    the model sent, never the words. The read-back says where it runs, as
-    before ("OpenClaw on the lamp", "Claude Code on the office computer").
+    the model sent, never the words. The read-back says where it runs ("the
+    lamp", "Claude Code on the office computer").
     A turn where the model calls no `start_agent_task` is caught on the
     second route (next point).
     Tests: `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
     `agent_tasks::tests::a_name_called_first_is_the_doer_as_heard`,
     `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
-    `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
-    `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
+    `agent_tasks::tests::the_heard_words_set_where_and_who_never_an_engine`,
+    `agent_tasks::tests::the_heard_words_set_the_place_over_the_model`.
   - **Named, nothing handed over: asked again once (#6547 (1b)).** On the
     second route, with the tasks part, a spoken line whose own words name
     an agent for the work, read exactly as above (the doer only, from the
@@ -2577,17 +2624,28 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     The `targets` answer's `lamp` entry says the default as its `engine`
     and lists them all, default first:
     `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
-    (no `engines` when there are none). A `prepare` for the `lamp` target
-    may carry `"engine"` with any engine's name (absent: not written;
-    another target ignores it). Named, the work runs on exactly that engine
-    while it is among the lamp's engines and not known missing there, passed
-    to Harness by its name (`harness new <engine>` in the lamp's folder, as
-    Harness starts that engine: no per-engine runner here; OpenClaw's
-    Gateway wait and lost-first-prompt check, #6226, stay keyed by its
-    name as Harness's documented behaviour); otherwise the prepare is
-    refused with `engine_not_here` and nothing is launched: never moved to
-    another engine. An empty or blank name is refused with
-    `engine_unknown`. Named none, the work runs on the default. The lamp's
+    (no `engines` when there are none). A `prepare` may carry `"engine"`
+    with any engine's name (absent: not written), but it is not read: one
+    agent per lamp (the owner's design), so work for the `lamp` target
+    always runs on the lamp's default, whatever engine is named, installed
+    or not, blank or unknown; a name is never refused (`engine_not_here` is
+    no longer returned) and never moves the lamp's work to another engine,
+    to Harness or to a computer. The default is the person's choice in the
+    app, Hermes when none is chosen. Another target runs on its own agent, as
+    before, unless the `prepare` names an agent that computer is known to have
+    now (`Engine::computer_agents`: installed in its engines look, not
+    offline or known signed out; rule 2a, 25 Nov), which then runs there; the
+    `targets` answer lists those as the computer's `agents`
+    (`{"alias":"office","engine":"claude","agents":["hermes","openclaw"]}`).
+    An OpenClaw launch on a computer found from the machines (project
+    `MACHINES_PROJECT`) never waits for the lamp's Gateway
+    (`gateway::launch_with` and the cold-launch hold skip it). Tests:
+    `engine::tests::a_computer_runs_an_agent_named_only_while_it_is_known_to_have_it`,
+    `gateway::tests::an_openclaw_launch_on_a_computer_never_waits_for_the_lamps_gateway`. The default is passed to Harness by its name
+    (`harness new <engine>` in the lamp's folder, as Harness starts that
+    engine: no per-engine runner here; OpenClaw's Gateway wait and
+    lost-first-prompt check, #6226, stay keyed by its name as Harness's
+    documented behaviour). The lamp's
     folder gets Hermes's or OpenClaw's guidance only for those two; any
     other engine reads its own settings, as Harness starts it. The app
     sets the default on the app's route (`--app-socket`) with
@@ -2624,11 +2682,11 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     other targets and the lamp target's machine are left as they are. One
     journal line: `no app choice: the lamp's target written on its default
     engine, hermes`. Shown in tests:
-    `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
-    `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
+    `engine::tests::a_named_engine_still_runs_the_lamps_work_on_its_default`,
+    `engine::tests::a_named_engine_not_in_the_lamps_order_runs_on_the_default_never_refused`,
     `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
     `engine::tests::with_no_app_choice_and_no_look_yet_the_builds_default_wins_over_the_targets_file`,
-    `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
+    `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_the_default_but_not_named`,
     `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
     `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
     `runtime::tests::a_first_look_that_times_out_leaves_the_builds_default_hermes`,
@@ -3204,7 +3262,11 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   forwarder's token file), `api` `"openai-completions"`, and one model,
   `deepseek-flash` (the forwarder's only model). A loopback target may
   need `request.allowPrivateNetwork: true` on the provider.
-- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
+- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`. That name is
+  the forwarder's alias: with a person's own model key whose check made a
+  tool call, the forwarder sends the chat to their model under their model's
+  name, and these settings don't change (#8735, docs/cloud.md, "The
+  person's own model"). The same holds for Hermes' `deepseek-flash` above.
 - `agents.defaults.workspace`: the lamp's own work folder
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
   `lampos`'s home), where the lamp's skills keys point and the guidance
@@ -4076,7 +4138,7 @@ runs its script itself: no agent, no Harness, no prompt
   owner's kept yes naming `net` for the folder as it is, or, with
   `LAMP_MADE_CODE_ON_AT_ONCE` on (the product's lamp-control unit), for a
   skill made on the lamp with no yes (#8180, below), or, with
-  `LAMP_TASK_NO_YES` on (#8475, off in the product until #8535), for any
+  `LAMP_TASK_NO_YES` on (#8475, the product's four units), for any
   skill's folder as it is with no yes; not agreed, refused
   `no_token` (`skill_run::NO_NET_YES`), no token and no egress socket.
   With `LAMP_TASK_NET` on, `DirectRunner::egress` makes the run's own egress
@@ -4905,7 +4967,7 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   `net` asks nothing. A Store, pushed or other skill still needs its kept
   yes, and with the switch off so does a made one, exactly as before.
   With `LAMP_TASK_NO_YES` on in lamp-control (#8475,
-  `lamp_skills::task_no_yes_on`; off in the product until #8535), the source no longer
+  `lamp_skills::task_no_yes_on`; on in the product's lamp-control unit), the source no longer
   counts: a pushed, Store, hand-added or made skill alike is minted its
   folder's declared grants and its check agreed for its folder as it is,
   whoever started the run (the voice, a trigger, a schedule;
@@ -5905,7 +5967,7 @@ and the run's folder `skill-<run id>` is removed, so a later turn in the
 same session holds no pass. A write to a linked service still waits for
 the owner's spoken yes: lamp-services sends only what the owner said yes
 to, once a run. The one exception (#8475, `LAMP_TASK_NO_YES` on in
-lamp-services; off in the product until #8475's part 2, #8535, lands): the
+lamp-services, on in the product's unit since #8475's switch-on): the
 run the owner asked for aloud just now, and only that run. Two things must
 agree. The origin: lamp-skills marks the hand-over of the voice's named
 call alone (`"asked_aloud": true`); lamp-tasks mints the run so
@@ -6575,11 +6637,17 @@ own session, and both may be on (`direct::lamps`).
 Each direct session, Hermes's and OpenClaw's, takes a task only while its
 engine is the lamp's default (`direct::serves_now`, the first of `lamp_order`,
 read live so the app's choice counts at once), because lamp-update runs one
-agent's gateway at a time, the default's. On a lamp whose default is OpenClaw,
-a task named for Hermes ("Ask Hermes to ...", `LAMP_TASKS_NAMED_ONLY`) keeps
-Harness's path and its progress, as before this switch, with no wait for a
-gateway that never starts. On a lamp whose default is Hermes, a spoken task
-for OpenClaw is refused at once with `agent_not_lamp_default`
+agent's gateway at a time, the default's. One agent per lamp: Hermes and
+OpenClaw have the same role on the lamp and replace each other; the default is
+the person's choice in the app, Hermes when none is chosen (the build's
+default, `runtime::lamp_default`). Every task for the lamp's own target is
+prepared on that default, whatever engine is named (the voice sends an agent
+that is not the default to a computer that has it, or says it isn't
+available, never to the lamp), so this is only a guard for a launch prepared
+just before the default moved. A Hermes launch left from before a move to
+OpenClaw keeps Harness's path and its progress, with no wait for a gateway
+that never starts. A spoken OpenClaw launch left from before a move to Hermes
+is refused at once with `agent_not_lamp_default`
 (`direct::not_default_for`; the voice's Task news tells it in one short line,
 `failed_not_default`: "OpenClaw isn't the lamp's agent right now."),
 and a skill run or make for it fails at once with words naming that code,
@@ -7555,7 +7623,9 @@ finished." (1.82 s). Three faults, all mended the same night:
   the person said yes to that fails is told as news within ten minutes, in
   plain words, with an offer to try again (`task_news::failed_hand_over`);
   so is one said yes to that expired before it was sent (`invalidated`
-  `expired`, #8601).
+  `expired`, #8601), or that a restart of lamp-tasks ended still queued
+  (`invalidated` `restart`, said yes to in this boot, at most 40 minutes
+  before).
 - **News told to an empty office.** At 00:49:48, 11 s after the restart, the
   lamp told the 22:39 task's names with nobody there: the presence check took
   the start of the service for someone speaking. Now only something a person
@@ -8770,6 +8840,75 @@ never have asked or taken an answer on a lamp).
   type it (the Harness app under Machines ▸ Approve a device, or
   harness.autonomous.ai). A start refused says why: only the switch being
   off is "not set up"; a busy tasks part is "busy just now".
+- **A sign-in only on the person's ask or yes (#8700, always on).** Once, 1
+  in 10, "ask Codex to tell me the capital of Japan" on a lamp not signed
+  in made the model call `sign_in_computer` itself. Its description now
+  says to call it only when the person asked, in their own words, to sign
+  in, pair or connect a computer (or Harness), or said yes to the lamp's
+  own offer, and never because an agent or computer isn't there: say so
+  and offer instead. The voice also checks it in code before asking the
+  tasks part anything (`sign_in::may_start`). A START runs while a
+  sign-in's code is kept (it then only gives back the same code, so "say
+  it again" or "what was the number?" need no word of it), or when the
+  person's heard words:
+  - ask for a sign-in (`sign_in::asks_to_sign_in`): a sign-in word with
+    no agent named (`agent_tasks::names_an_agent`: any form of a name the
+    voice knows, or "agent"), as in "I want to sign in" or "help me sign
+    in", or with a computer word (computer, laptop, Mac, MacBook, PC,
+    Harness, hand-over, or "the lamp", not the lamp called by name); a
+    pairing word only with a computer word;
+  - or say yes (`sign_in::yes_to_the_offer`) to the lamp's last line,
+    which asked a question, was not cut, was said at most
+    `CONFIRM_WITHIN` (120 s) before, and offered a sign-in in that
+    question (its words after the last full stop), by the same words as
+    the ask: a plain yes (`agent_tasks::yes_to_a_question`, the confirm's
+    yes test), or any reply with a sign-in or pairing word ("Yeah, sign it
+    in.", "Sure, sign it in.").
+
+  A refusal counts only where it governs (Twelve's P2 on #8808): a
+  refusal word (`sign_in::refusal_word`: "no", "not", "never", "don't",
+  "dont", "cancel", "stop", any "…n't", "không", "đừng", "chưa") at most
+  two words before the sign-in word, in its clause (split at `,` `.` `?`
+  `!` `;` `:` and dashes; `sign_in::free_sign_in_words`), or a whole reply
+  that says no or not now (`sign_in::refuses_whole`: it begins with "no",
+  "nope", "nah", "không", "chưa" or "đừng", or says "not now", "not yet",
+  "later" or "để sau"). So "No, don't sign it in", "Yes, but not now",
+  "Sign it in later" and "I'd rather you didn't sign it in" are refused;
+  "It's not signed in, can you sign it in?", "Don't forget to sign me in
+  to my computer" and "Sign me in, I can't wait" are not.
+
+  The words, one set for both sides (`sign_in::sign_in_word`): sign-in
+  words are "sign … in/into/onto" or "signed … in/into/onto" (within three
+  words), "signing", "signin", "login", "log/logged … in/on/into/onto"; pairing words are "pair",
+  "pairing", "connect", "connecting", "link", "linking", "setup", "set …
+  up", "hook … up".
+
+  Otherwise the call is refused with a final error, never retried: "Not
+  started: the person did not ask to sign in or pair a computer, nor say
+  yes to your offer to. Answer what they asked; if a computer is needed,
+  say it isn't available, offer to sign it in, and call this only on their
+  yes." The journal says `lamp-voice: sign-in: request N:
+  sign_in_computer refused: the person did not ask to sign in, nor say yes
+  to the lamp's offer (#8700)`. "Ask Codex to sign in to GitHub" is an
+  agent's work, not a sign-in. The words are read in English only, as the
+  other English-only gates: with the owner's language set to another
+  ([`language.rs`](../crates/voice/src/language.rs)) the check is off, and
+  words not known for the request are not refused either (a false refusal
+  of the person's own ask is worse than none, as #6537). So for a
+  Vietnamese owner nothing is refused: the confirm's yes has no Vietnamese
+  words either. Tests:
+  `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
+  `a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`,
+  `the_code_asked_again_in_any_words_starts_while_one_is_kept`,
+  `a_sign_in_asked_in_plain_words_starts_unless_an_agent_is_named`,
+  `a_yes_to_an_offer_in_any_sign_in_words_starts`,
+  `a_sign_in_said_with_into_or_signed_starts`,
+  `a_yes_with_the_offers_verb_starts_and_a_no_never`,
+  `a_refusal_counts_only_where_it_governs_the_sign_in`,
+  `the_blind_table_of_asks_yeses_and_refusals` (39 rows written from the
+  spec alone; one named exception: "đừng đăng nhập" from a Vietnamese
+  owner is let through while the check is off in Vietnamese),
+  `a_vietnamese_owners_ask_code_again_and_yes_are_never_refused`.
 - **The news, in the coordinator, from the tasks part**
   (`sign_in::news`, read every 2 s while a sign-in is open, every 10 s
   otherwise): a code whose atomic claim it wins (`code_told` was false

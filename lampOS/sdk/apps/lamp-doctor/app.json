@@ -1,0 +1,11 @@
+{
+  "name": "lamp-doctor",
+  "title": "Lamp Doctor",
+  "version": "0.2.0",
+  "min_build": 14268,
+  "runtime": { "name": "python3", "entry": "lamp_doctor.app" },
+  "grants": ["hear", "speech", "device", "notes"],
+  "net": false,
+  "logs": false,
+  "triggers": []
+}

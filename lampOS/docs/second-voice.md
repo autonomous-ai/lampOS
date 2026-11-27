@@ -6949,8 +6949,12 @@ after a take-over, but now for every turn:
   1.5 s by someone else; an answer to it keeps the window open. The row
   counts it: the lead's two-way legs (#7570, 18:25), and Twelve's quiet-room
   legs on #8656 (TV or a third voice 25 to 40 s after an answer, and a
-  two-turn TV exchange). With `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on` (the
-  product owner, 26 Nov 2026), a line begun over the lamp's own answer
+  two-turn TV exchange). The product doesn't set the next switch since
+  #8839 (27 Nov 2026): a line begun over the lamp's own answer is a
+  follow-up like any line in the 20 s, with no look and no test of its
+  words, by the product owner's rule of 26 Nov. With
+  `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on` (the product owner, 26 Nov 2026,
+  earlier that day), a line begun over the lamp's own answer
   takes no follow-up pass and is judged as before
   (`Heeding::over_the_answer_no_follow_up`). With no look, its words decide
   both look-free doors, the one cut-in and the one answer to the lamp's

@@ -2720,22 +2720,70 @@ fn the_product_turns_the_skill_flows_three_switches_on_where_they_are_read() {
     }
 }
 
-/// #8475 (the first builder's P2 on #8550): `LAMP_TASK_NO_YES` lands dark.
-/// No product unit sets it or names it in its settings; it is switched on
-/// after #8475's part 2 (#8535) lands, with its own row. Fails on the
-/// pull request's first head, whose four units (lamp-control, lamp-skills,
-/// lamp-services, lamp-voice) each set `Environment=LAMP_TASK_NO_YES=on`.
+/// #8475: `LAMP_TASK_NO_YES` (a skill's task with no folder yes, a send
+/// asked aloud just now with no per-send yes, a half match running
+/// nothing) is `on` once in each of the four units whose part reads it,
+/// lamp-control, lamp-skills, lamp-services and lamp-voice, and named in
+/// no other unit's settings. Fails before this pull request: no unit set it.
 #[test]
-fn the_product_leaves_task_no_yes_off() {
+fn the_product_turns_task_no_yes_on_in_the_four_units_that_read_it() {
     let name = lamp_skills::TASK_NO_YES_ENVIRONMENT;
     assert_eq!(name, "LAMP_TASK_NO_YES");
+    let owners = [
+        "lamp-control.service",
+        "lamp-skills.service",
+        "lamp-services.service",
+        "lamp-voice.service",
+    ];
+    let line = format!("Environment={name}=on");
     for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
         let mentioned = text
             .lines()
             .filter(|set| !set.starts_with('#') && set.contains(name))
             .count();
-        assert_eq!(mentioned, 0, "{unit}: {name}");
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
     }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner} is not a product unit"
+        );
+    }
+}
+
+/// #8839 (the lead's test on lamp-52e6 at stable 16443, 27 Nov): a line
+/// begun over the lamp's own answer is a follow-up like any line in the
+/// conversation's 20 s, with no look and no test of its words, by the
+/// product owner's rule of 26 Nov ("Hey Lamp" opens 20 s, and no look
+/// gates it). `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER` sent such a line to the
+/// no-look doors, where five of the lead's follow-ups were held and the
+/// window renewed nothing; no product unit sets it now.
+#[test]
+fn the_product_takes_a_line_over_the_answer_as_a_follow_up() {
+    let name = "LAMP_FOLLOW_UPS_AFTER_THE_ANSWER";
+    for (unit, text) in install::PRODUCT {
+        let set = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains(name))
+            .count();
+        assert_eq!(set, 0, "{unit}: {name}");
+    }
+    // Its partner stays: in the window no camera sign holds a line.
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    assert!(
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_FOLLOW_UPS=on")
+    );
 }
 
 /// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
@@ -5027,8 +5075,9 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     // The FAQ, How to use the lamp, since #5790.
     // Bedtime and Morning since its nights on lamp-06c1 (#5753).
     // Light show since #5745; Light scenes and Point the light since #5744.
-    // The four seen reactions since the owner's call (#6543).
-    assert_eq!(installed.len(), 35);
+    // The four seen reactions since the owner's call (#6543), and Posture
+    // since the owner's call of 23 Nov split it from Sit back.
+    assert_eq!(installed.len(), 36);
     // The four the desk-noticing yes covers (the owner's call, 23 Nov on
     // #7668) are installed, each core and on.
     for name in lamp_skills::SEEN_PRODUCT {
@@ -5066,17 +5115,17 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     );
     assert!(root.join("bedtime-morning/SKILL.md").is_file());
     // Inventory includes the disabled core and its grants; only live skills
-    // contribute functions. The thirty live skills (with Bedtime and
+    // contribute functions. The thirty-one live skills (with Bedtime and
     // Morning, which declares none, since #5753) (with music sway since
     // #5770 and watch you leave since #2834, Head pat and its wiggle, which declare
-    // none, and Sit back, which shares wellbeing_nudges) offer Dance,
+    // none, and Sit back and Posture, which share wellbeing_nudges) offer Dance,
     // prepare_to_unplug, hidden at run time unless LAMP_UNPLUG=on, the
     // wellbeing nudges' one wellbeing_nudges (since 25 Oct), Pose's set_pose (#4135),
     // the FAQ's lamp_help (#5790), Light show's light_show (#5745), and
     // Light scenes' light_scene and Point the light's point_light (#5744),
     // and the four seen reactions' one seen_remarks (#6543).
     let inventory = lamp_skills::load_each(&root);
-    assert_eq!(inventory.len(), 35);
+    assert_eq!(inventory.len(), 36);
     assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
     let listed = lamp_skills::package::list(&root).unwrap();
     let row = listed
@@ -5100,7 +5149,7 @@ fn the_installed_bedtime_skill_is_live_and_adds_no_function() {
     );
     let (live, errors) = lamp_skills::load_all(&root);
     assert!(errors.is_empty(), "{errors:?}");
-    assert_eq!(live.len(), 30);
+    assert_eq!(live.len(), 31);
     assert!(live.iter().any(|skill| skill.name == bedtime.name));
     // Each core skill installed off is disabled on the lamp and adds no
     // function, its tool or not: the 9 above are all a session is told.

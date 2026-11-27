@@ -518,6 +518,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "onboarding",
             "point-light",
             "pose",
+            "posture",
             "prepare-unplug",
             "reminders",
             "rest-your-eyes",
@@ -3871,17 +3872,13 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
             );
         }
     }
-    // `humans/posture` (#6543) is lamp-seen's share of bad samples, never a
-    // picture or a keypoint: a better trigger, never words of the body.
+    // The eyes' leaning in alone: the cloud's posture reading
+    // (`humans/posture`) is Posture's, never Sit back's (the owner's call of
+    // 23 Nov, "split them").
     assert_eq!(
         toml["permissions"]["topics"].as_array().unwrap(),
-        &[
-            "room/activity",
-            "humans/faces/tracked",
-            "voice/state",
-            "humans/posture"
-        ]
-        .map(|topic| toml::Value::String(topic.to_owned()))
+        &["room/activity", "humans/faces/tracked", "voice/state"]
+            .map(|topic| toml::Value::String(topic.to_owned()))
     );
     // In the wellbeing group's hour, as the other nudges: another wellbeing
     // skill's run holds it back (`a_shared_budget_gives_its_group_its_runs_an_hour_between_them`);
@@ -3889,6 +3886,112 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
     assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
     assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
     // Core, in the product, since its played check with a person (#5208).
+    assert_eq!(skill.kind, SkillKind::Core);
+}
+
+/// Posture (#6543, the owner's call of 23 Nov: split from Sit back): V1's
+/// posture reminder from the cloud's posture reading alone, one trigger a
+/// region `humans/posture` names, each its own line with one concrete fix,
+/// and lamp-seen's minute full (`window_s` past 59, two checks) and at
+/// least 0.6 bad (`above` 0.5999, as `above` is strict: both checks). It
+/// reads no picture and no leaning in; its lines give no number and name no
+/// condition. The owner's calls of 27 Nov (#8377): a 15m cooldown for
+/// each region alone ("neck slump and back slump is two different thing"),
+/// no `[budget]` and so never the wellbeing group's hour, said with others
+/// in view and at night; still stopped as a wellbeing nudge by its own
+/// kind, through its `[stop] group`. The faces topic only for its turn
+/// to the face (`look_at = "face"` reads it).
+#[test]
+fn posture_reads_the_posture_alone_and_names_a_region_never_a_condition() {
+    let folder = skills_root().join("posture");
+    let skill = load(&folder).unwrap();
+    let toml: toml::Value =
+        toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
+    assert_eq!(
+        toml["permissions"]["topics"].as_array().unwrap(),
+        &["humans/posture", "humans/faces/tracked", "voice/state"]
+            .map(|topic| toml::Value::String(topic.to_owned()))
+    );
+    let triggers = toml["trigger"].as_array().unwrap();
+    let regions: Vec<&str> = triggers
+        .iter()
+        .map(|trigger| {
+            assert_eq!(trigger["topic"].as_str(), Some("humans/posture"));
+            assert_eq!(trigger["field"].as_str(), Some("region"));
+            assert!(trigger.get("rearm").is_none(), "{trigger:?}");
+            assert_eq!(trigger["cooldown"].as_str(), Some("15m"));
+            trigger["equals"].as_str().unwrap()
+        })
+        .collect();
+    assert_eq!(
+        regions,
+        ["neck", "trunk", "upper_arm", "lower_arm", "general"]
+    );
+    let whiles = toml["while"].as_array().unwrap();
+    let on_posture = |field: &str| {
+        whiles
+            .iter()
+            .find(|cond| {
+                cond["topic"].as_str() == Some("humans/posture")
+                    && cond["field"].as_str() == Some(field)
+            })
+            .and_then(|cond| {
+                cond["above"]
+                    .as_float()
+                    .or(cond["above"].as_integer().map(|n| n as f64))
+            })
+    };
+    assert_eq!(on_posture("bad_share"), Some(0.5999));
+    assert_eq!(on_posture("window_s"), Some(59.0));
+    assert!(
+        whiles
+            .iter()
+            .all(|cond| cond.get("faces_at_most").is_none()),
+        "said with others in view: {whiles:?}"
+    );
+    let not_speaking = whiles
+        .iter()
+        .find(|cond| cond.get("not_equals").and_then(toml::Value::as_str) == Some("speaking"))
+        .unwrap();
+    assert_eq!(not_speaking["for"].as_str(), Some("10s"));
+    assert!(toml.get("quiet").is_none(), "at any hour");
+    assert!(
+        toml.get("present").is_none(),
+        "no wellbeing hour with the switch either"
+    );
+    let steps = toml["do"].as_array().unwrap();
+    assert_eq!(steps.len(), 5);
+    for step in steps {
+        let say = step["say"].as_str().unwrap();
+        assert!(say.contains("never a number"), "{say}");
+        assert!(say.contains("name no condition or illness"), "{say}");
+        assert!(say.contains("never mention a camera"), "{say}");
+        assert!(step.get("look").is_none(), "{step:?}");
+        let lower = say.to_lowercase();
+        for word in [
+            "slouch", "hunched", "disease", "syndrome", "spine", "posture",
+        ] {
+            assert!(
+                !lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|token| token == word),
+                "{word} in {say:?}"
+            );
+        }
+    }
+    assert_eq!(skill.budget, None, "no hour of any group");
+    assert!(toml.get("budget").is_none());
+    assert_eq!(skill.stop.as_ref().unwrap().tool, "wellbeing_nudges");
+    assert_eq!(
+        skill.stop.as_ref().unwrap().group.as_deref(),
+        Some("wellbeing")
+    );
+    assert_eq!(
+        skill.stop.as_ref().unwrap().kind.as_deref(),
+        Some("posture")
+    );
+    assert_eq!(skill.most_a_day, None);
+    assert!(skill.rest.is_none());
     assert_eq!(skill.kind, SkillKind::Core);
 }
 
@@ -9203,7 +9306,7 @@ body = { gesture = "nod" }
         speed: 50.0,
         acceleration: 400.0,
         force: None,
-        heat_stop: 62,
+        heat_stop: 69,
         stands,
     };
     let ask = "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.";
@@ -13579,6 +13682,8 @@ fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minute
     let names = [
         "comfort-break",
         "meal-check",
+        // Not Posture: its own `[budget]` group (the owner, #8377), test
+        // `posture_reads_the_posture_alone_and_names_a_region_never_a_condition`.
         "quiet-focus",
         "rest-your-eyes",
         "sip-of-water",
@@ -14102,6 +14207,7 @@ fn wellbeing_nudges_takes_just_drank_for_the_water_nudge_alone() {
     let names = [
         "comfort-break",
         "meal-check",
+        "posture",
         "quiet-focus",
         "rest-your-eyes",
         "sip-of-water",
@@ -14349,6 +14455,65 @@ fn kinded_stops(dir: &Path) -> Vec<lamp_skills::Skill> {
     let (loaded, errors) = load_all(dir);
     assert!(errors.is_empty(), "{errors:?}");
     loaded
+}
+
+/// #8377: a `[stop] group` named as a `[budget]` group shares that group's
+/// function from a skill in no `[budget]` (Posture's, in the wellbeing
+/// nudges' stop but not their hour): one function, a kind stops its skill
+/// alone, and `all` every one. Beside a `[budget]` it is still refused.
+#[test]
+fn a_stop_group_shares_a_budget_groups_function_from_a_skill_in_no_budget() {
+    let dir = tempfile::tempdir().unwrap();
+    let trigger = "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n";
+    skill_with(
+        dir.path(),
+        "water",
+        &format!(
+            "{trigger}[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\nkind = \"water\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+        ),
+    );
+    skill_with(
+        dir.path(),
+        "pose",
+        &format!(
+            "{trigger}[stop]\ntool = \"nudges\"\nabout = \"When.\"\ngroup = \"wellbeing\"\nkind = \"pose\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+        ),
+    );
+    let apart = tempfile::tempdir().unwrap();
+    let own = skill_with(
+        apart.path(),
+        "own",
+        &format!(
+            "{trigger}[budget]\ngroup = \"own\"\nper_hour = 4\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\ngroup = \"wellbeing\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+        ),
+    );
+    let refused = load(&own).unwrap_err();
+    assert!(
+        refused.contains("[stop] group is for a skill in no [budget] group"),
+        "{refused}"
+    );
+    let (loaded, errors) = load_all(dir.path());
+    assert!(errors.is_empty(), "{errors:?}");
+    let tools = tools_file(&loaded);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 1, "{tools}");
+    assert_eq!(
+        tools["tools"][0]["parameters"]["properties"]["kind"]["enum"],
+        serde_json::json!(["pose", "water"]),
+        "{tools}"
+    );
+    let mut engine = Engine::new(loaded, true);
+    engine
+        .tool(
+            "nudges",
+            &serde_json::json!({"how": "off", "kind": "pose"}),
+            0,
+        )
+        .unwrap();
+    assert!(engine.stopped("pose", 0) && !engine.stopped("water", 0));
+    engine
+        .tool("nudges", &serde_json::json!({"how": "off", "all": true}), 0)
+        .unwrap();
+    assert!(engine.stopped("water", 0));
 }
 
 /// #7473 on #7401's `[stop] group`: skills in no `[budget]` sharing a stop
@@ -17454,7 +17619,7 @@ fn every_when_in_the_repo_is_within_its_bound() {
             stops.insert(stop.when.clone());
         }
     }
-    // Each of the eight wellbeing skills loaded, and all say one when.
+    // Each of the nine wellbeing skills loaded, and all say one when.
     assert_eq!(
         loaded
             .iter()
@@ -17463,7 +17628,7 @@ fn every_when_in_the_repo_is_within_its_bound() {
                 .as_ref()
                 .is_some_and(|stop| stop.tool == "wellbeing_nudges"))
             .count(),
-        8
+        9
     );
     assert_eq!(stops.len(), 1, "{stops:?}");
     assert!(stops.iter().all(Option::is_some));
@@ -17588,4 +17753,49 @@ fn music_sway_follows_the_energy_level_and_level_one_is_as_written() {
         why.contains("twenty-minutes-of-one-playlist") && why.contains("made 1 calls, 4 expected"),
         "{why}"
     );
+}
+
+/// The Reviewer-lead's HOLD on #8377 (06c1, 27 Nov 15:49: a posture line
+/// let go unsaid, `no_audio_answer`): Posture's line never heard gives its
+/// cooldown back and keeps its chance, so it comes at the next
+/// `humans/posture` (every 30 s) while the window stays bad, not only once
+/// it has come good. Heard, the next waits its 15 minutes.
+#[test]
+fn an_unsaid_posture_line_comes_again_at_the_next_reading_while_still_bad() {
+    for unheard in [true, false] {
+        let skill = lamp_skills::load(&skills_root().join("posture")).unwrap();
+        let mut engine = Engine::new(vec![skill], true);
+        // 10:00 local at 0 s.
+        engine.clock(0, 0, 36_000_000);
+        let mut runs: Vec<u64> = Vec::new();
+        for second in 0..=20 * 60u64 {
+            let now = second * 1_000_000;
+            engine.observe("voice/state", now, br#"{"state":"resting"}"#, None);
+            if second == 0 || second % 30 != 0 {
+                continue;
+            }
+            for run in engine.observe(
+                "humans/posture",
+                now,
+                br#"{"window_s":60,"bad_share":1.0,"region":"neck"}"#,
+                None,
+            ) {
+                if run
+                    .calls
+                    .iter()
+                    .any(|call| matches!(call, Call::Say(_) | Call::Words(_)))
+                {
+                    runs.push(second);
+                    if unheard && runs.len() == 1 {
+                        assert_eq!(engine.unsaid(&run.skill, now), None);
+                    }
+                }
+            }
+        }
+        if unheard {
+            assert_eq!(runs, [30, 60, 960], "let go at 30 s, said at 60 s");
+        } else {
+            assert_eq!(runs, [30, 930], "heard, it waits its 15 minutes");
+        }
+    }
 }

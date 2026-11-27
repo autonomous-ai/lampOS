@@ -29,8 +29,14 @@ The rules are as phase 0 has them on #6543, with the first builder's
 seventh line. The lead approved all seven, adding to the seventh that the
 lamp also says once when the opt-in is turned off.
 
-1. **The opt-in is off by default.** It is the owner's yes on that lamp,
-   given in the app or spoken. `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
+1. **The opt-in is off by default.** It is a yes on that lamp, given in
+   the app or spoken at the lamp by anyone: one spoken ask turns desk
+   noticing on and one turns it off, with no mouth seen, no owner match, no
+   voice likeness and no offer first (the owner's call on #7767,
+   c7210153642, 27 Nov: "Just one ask and the lamp can turn on and off,
+   not mouth or owner check"). Only a line spoken at the lamp counts
+   (`heard`); one nobody spoke (a skill's, a written turn's) is refused
+   (`seen_yes::NOT_SPOKEN`). `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
    switches.md; off unless set, in no unit) turns a missing
    `seen-activity.json` into a yes nobody gave (`"by":"default"`, no
    time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
@@ -49,14 +55,15 @@ lamp also says once when the opt-in is turned off.
    off and on leave them as they are. The stop's answer counts face reads
    too: with only faces on it says it stopped, in its own line
    (`seen_yes::STOPPED_FACES`, since lamp-seen says back only seen
-   activity's change). `look_at_my_desk` ("start looking again") keeps the
-   owner's own spoken yes with no offer and no "turn it on in the app",
+   activity's change). `look_at_my_desk` ("start looking again") keeps
+   anyone's spoken ask with no offer and no "turn it on in the app",
    turning a no in either file back to a yes, and says it is on already
    only when both were (`LOOKING_FACES` when only faces come back). With
    both on already, anyone's ask is told it is on already and nothing is
-   written, never "only the owner can turn this on": nothing is turned on
-   (lamp-06c1's re-row of #8674, 26 Nov, Q9); a guest's ask with either a
-   kept no is still refused, and anyone's stop still keeps a no. On the
+   written (lamp-06c1's re-row of #8674, 26 Nov, Q9); anyone's stop still
+   keeps a no, under the mark's lock. With the switch off the same one
+   spoken ask keeps seen activity's yes, with or without the voice's offer
+   before it. On the
    second route, a heard line naming the looking or the desk
    (`seen_yes::STATE_WORDS`: "look", "watching", "notice", "see",
    "camera", "desk", "eye", "eyes" and the like, one word enough, so a line
@@ -760,16 +767,28 @@ either's). One frame and one blink can serve both.
   answer clears it all.
 - **The window** (`pose/window.rs`), V1's rules (`pose.py` `_aggregate`):
   - a sample is bad when `risk_level` is 2 or more, or any region's
-    subscore on either side is 4 or more;
-  - `bad_share` is the share of bad samples over the last ten minutes,
-    said only over at least 3 samples (V1's minimum; V1 said 0 under it);
+    subscore on either side is high: 3 or more for the neck (RULA's bent
+    forward past 20°; flexion alone never reaches 4, so at V1's 4 a head
+    bent to a phone read as no one region: 06c1, 27 Nov, the owner's call
+    on #8377), 4 or more for any other;
+  - the window is the newest two samples, a minute of checks 30 s apart
+    (the owner's call on #8377, 27 Nov: "we should tell user when they
+    slump for like 1m (two posture check right?). Which health check only
+    tell user when they are slump for 10m? thay is too late"; it was ten
+    minutes and at least 3 samples, V1's minimum). A sample older than
+    120 s (`window::KEPT_US`, two of a hot board's one-a-minute checks)
+    no longer counts, so one check missed still pairs with the one before;
+  - `bad_share` is the share of bad samples over those two, 0, 0.5 or 1,
+    said only over two samples (V1 said 0 under its minimum);
   - `region` is the region most often high among the bad samples, with
     ties going to neck, trunk, upper arm, then lower arm. Wrist counts
     toward a bad sample, as in V1, but is never the region: the server
     fixes it at 1;
-  - `window_s` is how long this sitting has been watched, at most 600 s;
+  - `window_s` is the time the window's checks stand for, each its 30 s:
+    the older sample's age and 30 s, at most 60 s, so two checks 30 s
+    apart say 60, the window full;
   - a partial answer (`ergo.partial: true`: the hips hidden, the upper body
-    scored alone) is bad only when the neck subscore on either side is 4
+    scored alone) is bad only when the neck subscore on either side is 3
     or more, and its region can only be neck. The server fixes trunk and
     legs at 1 and caps `risk_level` low, and it measures the upper arm
     against a trunk made from the shoulder line, so neither `risk_level`
@@ -786,18 +805,20 @@ either's). One frame and one blink can serve both.
   if the gate opens again within them, and is forgotten after.
 - **Said on `humans/posture`** (`lamp_msgs/HumanPosture` v1:
   `{window_s, bad_share, region}`) every 30 s while posture's gate is
-  open and the window holds at least 3 samples: as soon as the sitting's
-  third sample lands, then every 30 s. Closed, the topic says nothing and
-  its last value runs out, so no old sample is said while the privacy is
-  on. **Under 3 samples, nothing is said either** (#6839's and #6660's
+  open and the window holds its two samples: as soon as the sitting's
+  second sample lands (30 s into the sitting), then every 30 s. Closed,
+  the topic says nothing and its last value runs out, so no old sample is
+  said while the privacy is on. **Under 2 samples, nothing is said
+  either** (#6839's and #6660's
   reviews): frames not going out (the opt-in off, the slide shut), the
   server busy or failing, no body found, the sitting just begun, or the
   window just wiped (the privacy, sleep, `room/stood_up`, or
   a closing longer than 120 s).
-  The topic runs out, so a skill holding on it with
-  `unknown = "holds_stale"` (Sit back) runs as it did, rather than reading
-  a fresh `bad_share` of 0 that would hold it quiet: a `bad_share` of 0 is
-  said only over at least 3 samples.
+  The topic runs out, and its one reader, Posture (`skills/posture`, V1's
+  posture reminder, split from Sit back by the owner's call of 23 Nov),
+  says nothing until a value says the window full (`window_s` above 59)
+  and at least 0.6 bad, which over two checks is both bad: a `bad_share`
+  of 0 is said only over two samples. Sit back reads no `humans/posture`.
 - **Health.** `diagnostics` says `sends: activity+pose` (in place of
   `activity`), and adds `pose` (`idle`, `sending`
   or `backing_off`), the counts sent, answered, with no body, busy, failed
@@ -877,9 +898,9 @@ the owner onto someone who takes the seat:
   #6543; the keep holds timers only (`keep::Away::timer`), nothing about
   a person.
 - **The bounds:** `room/stood_up` or a forget wipes both at once; nobody
-  at the desk for 120 s wipes both (`keep::KEEP_US`); posture's samples
-  age out of its ten-minute window, so after 10 minutes it holds only the
-  one sitting now. Held without a face (`LAMP_SEEN_HOLDS_SITTING`), the
+  at the desk for 120 s wipes both (`keep::KEEP_US`); posture's window
+  is its newest two samples, so it holds only the one sitting now within
+  a minute. Held without a face (`LAMP_SEEN_HOLDS_SITTING`), the
   sitting ends when, after the face was lost and an answer with no close
   person, a face comes into view under another passing id than the one it
   was open on (`hold::End::OtherFace`, which wipes both and starts the
@@ -899,8 +920,8 @@ the owner onto someone who takes the seat:
 
 On lamp-06c1's run 3 (16 Nov) the gate closed four times in eight minutes
 on brief misreads and the face lost for a moment, and each closing forgot
-the posture window. With 3 samples wanted and one each 30 s, posture was
-almost never said. So a closing that is not one of those that wipe at
+the posture window. With 3 samples wanted then and one each 30 s, posture
+was almost never said. So a closing that is not one of those that wipe at
 once keeps the posture window and the doing timers, in memory only, for
 up to 120 s (`keep.rs`, `KEEP_US`):
 
@@ -925,7 +946,8 @@ up to 120 s (`keep.rs`, `KEEP_US`):
   (`Why::OtherFace`), so a second person within the 120 s never takes on
   the first one's window or timers (the Reviewer-lead's P2 on #7251).
   Past 120 s both are wiped, as any closing wiped them before. The
-  posture window's samples older than its ten minutes still age out.
+  posture window's samples older than 120 s (`window::KEPT_US`) still
+  age out.
 
   | Carry rule | Value | Source |
   |---|---|---|
@@ -1122,9 +1144,13 @@ names"). On, they name it.
 | Stopped | `burst aborted (gate nobody) after 2 frames, 15300 bytes: its answers dropped` |
 | A posture frame handed to its socket | `posture sample sent: 7650 bytes` |
 | Its answer | `posture sample answered: scored, 640 ms`, or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
-| Its answer, with labels | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms` (`score 3, risk 2, partial, bad, …` on a partial answer) |
-| `humans/posture` said | `posture said: window 93 s, 4 samples` |
-| `humans/posture` said, with labels | `posture said: window 93 s, 4 samples, bad_share 0.75, region neck` |
+| Its answer, with labels | `posture sample answered: scored, bad, high neck,trunk, risk 2, score 4, 1770 ms` (`high general` when bad by the risk alone, no `high` when good, `partial, ` before the verdict on a partial answer) |
+| `humans/posture` said | `posture said: window 60 s, 2 samples` |
+| `humans/posture` said, with labels | `posture said: window 60 s, 2 samples, 100% bad, region general` (`0% bad, no region` with no bad sample) |
+
+The posture lines with labels name flags and numbers only, nothing of the
+frame; they stay behind the switch (the owner, 27 Nov on #8377: "Behind the
+debug switch").
 
 With labels, `top` is the surest label any frame's answer gave; `counted` is what the
 burst counts as drinking, eating or a break (`sitting.rs`), or `none`. The
@@ -1216,7 +1242,7 @@ touches nothing, and the eyes serve no link.
 
 | Item | What | When |
 |---|---|---|
-| Giving the yes | Built in #6912 (onboarding.md "Seen activity"): the voice's offer naming the server (only with `LAMP_SEEN_VOICE_OFFER=on`, off in the product, where the yes comes from the app), counted only when played whole and uncut, then only the owner's spoken yes in the very next turn writes `seen-activity.json`; the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`; removal on every forget and "stop looking" (Fourteen's design on #6543; the PM's wording). Owed: the backend's written retention confirmation behind "deleted once they're checked" | before the switch goes on, with #6912's reads and that confirmation |
+| Giving the yes | Built in #6912 (onboarding.md "Seen activity"): the voice's offer naming the server (only with `LAMP_SEEN_VOICE_OFFER=on`, off in the product, where a yes comes from the app or anyone's one spoken ask), counted only when played whole and uncut, then a spoken yes in the very next turn wrote `seen-activity.json` (since the owner's call on #7767, c7210153642, anyone's one spoken ask writes it, with no offer before it); the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`; removal on every forget and "stop looking" (Fourteen's design on #6543; the PM's wording). Owed: the backend's written retention confirmation behind "deleted once they're checked" | before the switch goes on, with #6912's reads and that confirmation |
 | Posture's on line wording | The posture line (`said_back::POSTURE_ON_LINE`, above) is gated in code but awaits the PM's wording | before `LAMP_SEEN_POSTURE` is on anywhere |
 | The more doings' on line wording | `said_back::MORE_ON_LINE` and `POSTURE_MORE_ON_LINE` (above) are gated in code but await the PM's wording | before `LAMP_SEEN_MORE_DOINGS` is on anywhere |
 | Posture at 320×240 | A slump read on `humans/posture` from frames sent at 320×240 (every frame is, above) against V1's 640×480, to see whether the 3D lifter's scale changes RULA (above) | with the lamp rows |

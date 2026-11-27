@@ -454,7 +454,9 @@ pub struct Stop {
     pub done: Option<StopDone>,
     /// `[stop] group` (#7401): the skills under the skills folder that name
     /// it share the function as a `[budget]` group's do, in a skill with no
-    /// `[budget]` (the seen reactions, with no limit of their own).
+    /// `[budget]` (the seen reactions, with no limit of their own), and
+    /// with the skills of the `[budget]` group of that name (#8377: Posture
+    /// keeps the wellbeing nudges' stop without their hour).
     pub group: Option<String>,
     /// The word a call of a shared stop may name this skill by, beside its
     /// name, as [`STOP_KIND`] (#6543): "drinks" for "stop telling me about
@@ -589,6 +591,20 @@ pub const CAMERA_FILE: &str = "camera";
 /// trigger, no `[[while]]`, no `sooner` reads it ([`Engine::reread_seen_more`]),
 /// but for [`SEEN_PRODUCT`] while the desk-noticing yes stands.
 pub const SEEN_MORE_FILE: &str = "seen_more";
+/// The file in `--state-dir` beside [`OFF_FILE`] that keeps which one-time
+/// carries were made, one name a line ([`read_names`], [`keep_names`]): only
+/// [`CARRIED_POSTURE`] for now. A carry named here is never made again.
+pub const CARRIED_FILE: &str = "carried";
+/// The carry of a stop from Sit back to Posture (#6543, the Reviewer-lead's
+/// P2 on #8377): until Posture was its own skill, "posture" and "slouch"
+/// were Sit back's stop words, so a person who said "stop the posture
+/// nudges" has `sit-back` off or snoozed. At the first load of this build
+/// ([`Engine::keep_off_in`]) that off, snooze or `[stop.done]` rest is given
+/// to `posture` too, once: the name is then kept in [`CARRIED_FILE`], so
+/// `posture` turned on again stays on.
+pub const CARRIED_POSTURE: &str = "posture";
+/// The skill whose stops [`CARRIED_POSTURE`] carries from.
+const CARRIED_POSTURE_FROM: &str = "sit-back";
 /// What the owner's [`SEEN_MORE_FILE`] yes gives: tiredness, desk work and
 /// celebrating (`lamp_msgs::HumanDoingMore`, `LAMP_SEEN_MORE_DOINGS=on`).
 pub const SEEN_MORE_TOPIC: &str = lamp_msgs::HumanDoingMore::TOPIC;
@@ -635,8 +651,8 @@ fn hears_more_with(kept: &BTreeSet<String>, desk: bool, skill: &Skill) -> bool {
     kept.contains(&skill.name) || (desk && desk_covers(skill))
 }
 
-/// The names kept in `file` ([`OFF_FILE`], [`ON_FILE`], [`CAMERA_FILE`] or
-/// [`SEEN_MORE_FILE`]),
+/// The names kept in `file` ([`OFF_FILE`], [`ON_FILE`], [`CAMERA_FILE`],
+/// [`SEEN_MORE_FILE`] or [`CARRIED_FILE`]),
 /// one a line; a line that is not a skill's name is passed over, and no
 /// file is none. The one reader of each, for the running program and the
 /// manage helper.
@@ -668,9 +684,10 @@ pub fn read_names(file: &Path) -> std::io::Result<BTreeSet<String>> {
 /// then moved over it, and the folder synced, so a power cut leaves the
 /// old file or the new one whole, never an empty one, and the move itself
 /// holds (the reviewer's P3 on #1837, as #1732's daily journal does). The
-/// one writer of [`OFF_FILE`], [`ON_FILE`], [`CAMERA_FILE`] and
-/// [`SEEN_MORE_FILE`]: a `[stop]`'s off and on, and the app's
-/// ([`package::turn`], [`package::camera`], [`package::seen_more`]). Root's helper writes it in a folder
+/// one writer of [`OFF_FILE`], [`ON_FILE`], [`CAMERA_FILE`],
+/// [`SEEN_MORE_FILE`] and [`CARRIED_FILE`]: a `[stop]`'s off and on, the
+/// app's ([`package::turn`], [`package::camera`], [`package::seen_more`]),
+/// and the one-time carries made ([`Engine::keep_off_in`]). Root's helper writes it in a folder
 /// another user owns (the reviewer's P2 on #2878), so the file beside is
 /// only ever made new (`O_CREAT | O_EXCL`, which never follows a link): a
 /// file left there by a cut-off run is removed first, and a link there is
@@ -1260,10 +1277,6 @@ pub const SAY_TABLE_KEYS: [&str; 6] = [
 /// How the voice's `unsaid` outcome is written in a run's outcome
 /// ([`ended_unsaid`]).
 pub const UNSAID: &str = "say: unsaid";
-
-/// Before a `[stop] group`'s name where the loader keeps what a function is
-/// shared by: never in a `[budget]` group's name, so the two never meet.
-const STOP_GROUP_MARK: &str = "[stop] ";
 
 /// The `[stop] group` of `skill`, in no `[budget]` group (#7401).
 fn stop_group(skill: &Skill) -> Option<&str> {
@@ -3849,8 +3862,8 @@ pub fn set_no_yes_switch_here(on: Option<bool>) {
 /// Whether a skill's task runs on its declared grants with no folder yes,
 /// whatever its source (#8475, `LAMP_TASK_NO_YES`,
 /// `lamp_services::task_no_yes`, the one switch read alike by lamp-control,
-/// lamp-skills, lamp-services and lamp-voice; off in the product until
-/// #8475's part 2, #8535): on, lamp-control mints every source's declared
+/// lamp-skills, lamp-services and lamp-voice; on in the product's four
+/// units since #8475's switch-on): on, lamp-control mints every source's declared
 /// grants, `net` among them, with no kept yes (its folder's SHA-256 still
 /// checked at the yes check, a changed folder a new one), the hand-over
 /// asks no yes ([`task::hand`]), and the voice's call of a skill's task
@@ -7089,13 +7102,11 @@ pub fn load_each_with(
                 continue;
             }
             let group = skill.budget.as_ref().map(|(group, _)| group.clone());
-            // Or a `[stop] group`'s (#7401), apart from the `[budget]`
-            // groups' names; a pushed skill's never, so it shares nothing.
+            // Or a `[stop] group`'s (#7401), shared with the `[budget]`
+            // group of that name too (#8377, Posture's with the wellbeing
+            // nudges'); a pushed skill's never, so it shares nothing.
             let stop_shared = match skill.stop.as_ref().and_then(|stop| stop.group.as_ref()) {
-                Some(named) => skill
-                    .pushed_by
-                    .is_none()
-                    .then(|| format!("{STOP_GROUP_MARK}{named}")),
+                Some(named) => skill.pushed_by.is_none().then(|| named.clone()),
                 None => group.clone(),
             };
             let functions: Vec<(String, Option<String>)> = skill
@@ -7533,6 +7544,10 @@ pub struct Engine {
     off: BTreeSet<String>,
     /// Where `off` is kept across a restart ([`OFF_FILE`]), if anywhere.
     off_file: Option<PathBuf>,
+    /// Set at this start's [`Engine::keep_off_in`] when the
+    /// [`CARRIED_POSTURE`] carry had not been made: Sit back's snooze read
+    /// back after it ([`Engine::keep_holds_in`]) is carried too.
+    posture_carry: bool,
     /// Who was at the lamp, from `room/presence`, for a `[history]` (#1685).
     visits: visits::Visits,
     /// With `LAMP_WHO_WAS_HERE_KNOWN=on`: the eyes' known file, for the
@@ -7871,6 +7886,7 @@ impl Engine {
             done_until: HashMap::new(),
             off: BTreeSet::new(),
             off_file: None,
+            posture_carry: false,
             visits: visits::Visits::default(),
             known_file: None,
             naming: false,
@@ -7996,6 +8012,9 @@ impl Engine {
         }
         self.restoring = read;
         self.restore_holds();
+        if self.posture_carry {
+            self.carry_posture_snooze();
+        }
         Ok(count)
     }
 
@@ -8406,7 +8425,80 @@ impl Engine {
             BTreeSet::new()
         });
         journal::hide(self.seen_more.iter().map(String::as_str));
+        self.carry_posture_once(dir);
         Ok(self.off.iter().cloned().collect())
+    }
+
+    /// The [`CARRIED_POSTURE`] carry, made once for a state folder: when
+    /// [`CARRIED_FILE`] in `dir` does not name it, an off of Sit back
+    /// also turns `posture` off (kept in the off file), its snooze is
+    /// carried now and again once the holds are read back, and the name is
+    /// kept in [`CARRIED_FILE`] whether anything was carried or not, but
+    /// not when the off it carried could not be kept, so the next load
+    /// carries again. The file not read, nothing is carried.
+    fn carry_posture_once(&mut self, dir: &Path) {
+        let file = dir.join(CARRIED_FILE);
+        let mut carried = match read_names(&file) {
+            Ok(carried) => carried,
+            Err(error) => {
+                eprintln!(
+                    "lamp-skills: the carries made not read from {}, so none is made: {error}",
+                    file.display()
+                );
+                return;
+            }
+        };
+        if carried.contains(CARRIED_POSTURE) {
+            return;
+        }
+        let mut kept = true;
+        if self.off.contains(CARRIED_POSTURE_FROM) && self.off.insert(CARRIED_POSTURE.to_owned()) {
+            eprintln!(
+                "lamp-skills: posture is off as sit-back was, carried once from before posture was its own skill"
+            );
+            kept = self.keep_off();
+        }
+        self.posture_carry = true;
+        self.carry_posture_snooze();
+        // An off not kept is carried again at the next load (Friday's P3 on
+        // #8377): the name is kept only once every write the carry needed
+        // was made.
+        if !kept {
+            eprintln!(
+                "lamp-skills: posture's carried off not kept, so the carry is made again at the next start"
+            );
+            return;
+        }
+        carried.insert(CARRIED_POSTURE.to_owned());
+        if let Err(error) = keep_names(&file, &carried) {
+            eprintln!(
+                "lamp-skills: the carries made not kept in {}: {error}",
+                file.display()
+            );
+        }
+    }
+
+    /// Sit back's snooze, and its `[stop.done]` rest, given to `posture` as
+    /// well (the later of the two kept, as a snooze read back is), for the
+    /// [`CARRIED_POSTURE`] carry.
+    fn carry_posture_snooze(&mut self) {
+        let Some(&until) = self.snoozed.get(CARRIED_POSTURE_FROM) else {
+            return;
+        };
+        if self.off.contains(CARRIED_POSTURE) {
+            return;
+        }
+        let kept = self
+            .snoozed
+            .entry(CARRIED_POSTURE.to_owned())
+            .or_insert(until);
+        *kept = (*kept).max(until);
+        if *kept == until && self.done_until.get(CARRIED_POSTURE_FROM) == Some(&until) {
+            self.done_until.insert(CARRIED_POSTURE.to_owned(), until);
+        }
+        eprintln!(
+            "lamp-skills: posture is snoozed as sit-back was, carried once from before posture was its own skill"
+        );
     }
 
     /// The owner's yeses to hearing [`SEEN_MORE_TOPIC`] read again from
@@ -8714,10 +8806,10 @@ impl Engine {
             .find(|skill| skill.name == sharing[0])
             .and_then(|skill| {
                 skill
-                    .budget
+                    .stop
                     .as_ref()
-                    .map(|(group, _)| group.as_str())
-                    .or_else(|| stop_group(skill))
+                    .and_then(|stop| stop.group.as_deref())
+                    .or_else(|| skill.budget.as_ref().map(|(group, _)| group.as_str()))
             })
             .map(str::to_owned);
         let last = sharing
@@ -9035,12 +9127,25 @@ impl Engine {
     /// does ([`Engine::unwritten`], #6543): its trigger's `cooldown` (the
     /// per-kind rest counts from a line heard), and a run never heard is no
     /// longer the one that came last for its `[stop]`, so a "stop that"
-    /// stops the remark they heard. None is said.
+    /// stops the remark they heard. A trigger held a `for` (the wellbeing
+    /// nudges' sitting, Sit back's lean) or held on a value with no rearm
+    /// (Posture's region, the Reviewer-lead's HOLD on #8377) keeps its
+    /// chance too: the line comes at the trigger's next message while it
+    /// holds, not only after it leaves (the Reviewer-lead's P2 on #8868); a
+    /// trigger on a rise or with a rearm (the seen reactions) has had it,
+    /// as before. None is said.
     pub fn unsaid(&mut self, skill: &str, now_us: u64) -> Option<String> {
         let known = self.skills.iter().find(|known| known.name == skill)?;
         let Some((group, _)) = known.budget.as_ref() else {
             stop_group(known)?;
-            if self.unwritten(skill) {
+            let held = self
+                .unwritten
+                .get(skill)
+                .and_then(|spent| known.triggers.get(spent.index))
+                .is_some_and(|trigger| {
+                    trigger.for_us > 0 || (trigger.when == When::Present && !trigger.rearm)
+                });
+            if self.give_back(skill, !held) {
                 eprintln!(
                     "lamp-skills: {skill}'s line was never heard: its cooldown is given back"
                 );
@@ -9088,6 +9193,13 @@ impl Engine {
     /// next time it holds, never at the trigger's next message. Whether
     /// anything was given back.
     pub fn unwritten(&mut self, skill: &str) -> bool {
+        self.give_back(skill, true)
+    }
+
+    /// [`Engine::unwritten`], with this time's chance `spent` or kept: kept,
+    /// the trigger may run again at its next message while it holds
+    /// ([`Engine::unsaid`]).
+    fn give_back(&mut self, skill: &str, spend: bool) -> bool {
         let Some(spent) = self.unwritten.remove(skill) else {
             return false;
         };
@@ -9099,8 +9211,8 @@ impl Engine {
                 watch.disarmed = false;
             }
             if watch.since_us == spent.since_us {
-                watch.spent = true;
-                watch.unwritten = true;
+                watch.spent = spend;
+                watch.unwritten = spend;
             }
         }
         match spent.day {

@@ -752,9 +752,9 @@ fn declared_with_the_lamp() -> bool {
 /// #6492): `where` `"lamp"`, or, while the lamp has its target, anything
 /// but `where` `"computer"` or an agent on a computer named (`who`), which
 /// go to a computer as before. `who` naming the lamp ("the lamp") or, while
-/// the lamp has its target, one of the lamp's engines ([`lamp_engines`]) is
-/// the lamp's own, with that engine, even when one of the staff on a
-/// computer has the same name ("Claude Code" on the office computer and
+/// the lamp has its target, one of the lamp's engines ([`lamp_names`]) is
+/// the lamp's own, done by the lamp's default engine (one agent per lamp),
+/// even when one of the staff on a computer has the same name ("Claude Code" on the office computer and
 /// "claude" on the lamp): a named agent runs on the lamp, as Hermes always
 /// did; only `where` `"computer"` sends it to the computer. Without the lamp's
 /// target, only `where` `"lamp"` or `who` the lamp, which the tasks part
@@ -768,7 +768,23 @@ fn declared_with_the_lamp() -> bool {
 /// while the lamp has its target goes to the lamp too, never to a computer
 /// that isn't there.
 fn on_the_lamp_now(args: &Value, there: bool, unpaired: bool) -> bool {
-    on_the_lamp_with(args, there, unpaired, &lamp_engines())
+    on_the_lamp_with(args, there, unpaired, &lamp_names())
+}
+
+/// The engine names that put a hand-over on the lamp's own machine (one
+/// agent per lamp): the lamp's engines as last read ([`lamp_engines`]),
+/// and Hermes and OpenClaw, the two lamp-update installs, even when not
+/// read as installed. Naming any of them only places the work on the lamp:
+/// the lamp's default engine does it whatever is named, so such a name is
+/// never sent to a computer, never said not set up, and never asked about.
+fn lamp_names() -> Vec<String> {
+    let mut engines = lamp_engines();
+    for own in ["hermes", "openclaw"] {
+        if !engines.iter().any(|engine| engine == own) {
+            engines.push(own.to_owned());
+        }
+    }
+    engines
 }
 
 /// [`on_the_lamp_now`] with the lamp's `engines` given: a name said in
@@ -845,11 +861,14 @@ pub fn route_of(args: &Value, default: &str) -> (&'static str, String) {
     if engines.is_empty() {
         engines = vec!["hermes".to_owned(), "openclaw".to_owned()];
     }
+    for own in ["hermes", "openclaw"] {
+        if !engines.iter().any(|engine| engine == own) {
+            engines.push(own.to_owned());
+        }
+    }
     if on_the_lamp_with(args, true, false, &engines) {
-        let engine = who
-            .and_then(|who| lamp_engine_called(&engines, who))
-            .map_or(lamp_name(), |engine| display_name(engine));
-        (LAMP_TARGET, engine.to_owned())
+        // One agent per lamp: the lamp's default does it, named or not.
+        (LAMP_TARGET, lamp_name().to_owned())
     } else {
         ("computer", who.unwrap_or(default).to_owned())
     }
@@ -873,29 +892,10 @@ pub fn tools_on_the_lamp(place: &Place, engine: Option<&str>) -> (Vec<Tool>, &'s
     (declared_on(place, &staff, true), default)
 }
 
-/// `start_agent_task`'s `engine` while the lamp has its own target (#6492):
-/// one of the lamp's engines the person named, else the lamp's default.
-const ENGINE: &str =
-    "Only when they name one of these agents for work on the lamp; else leave it out.";
-
-/// The lamp's own engine a hand-over to the lamp names (#6492): `engine`
-/// when it is one of the lamp's engines, else `who` naming one (by id or
-/// the name the person calls it by, as [`lamp_engine_called`] reads it);
-/// `None` when neither does, and the lamp's default does the work. A name
-/// not among the lamp's engines is never sent as one.
-fn named_lamp_engine(args: &Value) -> Option<String> {
-    let said = |key: &str| {
-        args.get(key)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|said| !said.is_empty())
-    };
-    let engines = lamp_engines();
-    said("engine")
-        .and_then(|engine| lamp_engine_called(&engines, engine))
-        .or_else(|| said("who").and_then(|who| lamp_engine_called(&engines, who)))
-        .cloned()
-}
+/// `start_agent_task`'s `who` while the lamp has its own target and no
+/// computer agent is to be chosen: the agent the person named, as said.
+const WHO_SAID: &str =
+    "The agent the person named for the work, if they named one; else leave it out.";
 
 /// A place the person's own words name for a hand-over (#6492, the lead's
 /// V2): the lamp itself, or their computer.
@@ -1244,11 +1244,12 @@ fn named_in_with_rest(
 /// `args` with `where`, `engine` and `who` as the heard words name them
 /// ([`named_in`], #6492), and a line saying what code set, or `None` when
 /// the words name nothing or the model already sent the same. One of the
-/// lamp's engines named: `where` the lamp and that `engine`, whatever the
-/// model sent. One of the staff named: `where` `"computer"`, `who` them,
-/// no `engine`. The computer alone: `where` `"computer"`, no `engine`, and
-/// no `who` naming the lamp or only one of its engines. The lamp alone:
-/// `where` the lamp, the model's `engine` kept. The line names what was set
+/// lamp's engines named: `where` the lamp and `who` that agent, whatever
+/// the model sent ([`START`] then routes it: the lamp's default on the
+/// lamp, another to a computer that has it, else not available). One of
+/// the staff named: `where` `"computer"`, `who` them. The computer alone:
+/// `where` `"computer"`, and no `who` naming the lamp or only one of its
+/// engines. The lamp alone: `where` the lamp. `engine` is never kept. The line names what was set
 /// and what the model sent, never the person's words.
 fn set_by_the_words(
     args: &Value,
@@ -1272,8 +1273,13 @@ fn set_by_the_words(
     match place {
         NamedPlace::Lamp => {
             set["where"] = json!(LAMP_TARGET);
+            // The agent named goes in `who`, which the route reads
+            // ([`named_for_the_lamp`]); an `engine` is never read.
+            if let Some(fields) = set.as_object_mut() {
+                fields.remove("engine");
+            }
             if let Some(engine) = &named.lamp_engine {
-                set["engine"] = json!(engine);
+                set["who"] = json!(display_name(engine));
             }
         }
         NamedPlace::Computer => {
@@ -1315,7 +1321,7 @@ fn set_by_the_words(
 
 /// The words the person said in the line `request` answers, when a person
 /// said it (`heard`); a test sets its own, on its own thread.
-fn heard_words(request: u64, heard: bool) -> Option<String> {
+pub(crate) fn heard_words(request: u64, heard: bool) -> Option<String> {
     if !heard {
         return None;
     }
@@ -1472,19 +1478,6 @@ impl AskedAgain {
         asked.push(request);
         true
     }
-}
-
-/// What the model is told when the tasks part refuses a hand-over to the
-/// lamp naming an engine (#6492): `engine_not_here`, that engine is off or
-/// not installed on the lamp, or else `engine_unknown`; `name` is how the
-/// person calls it. Never retried on another engine.
-fn engine_refused(code: &str, name: &str) -> String {
-    let line = if code == "engine_not_here" {
-        format!("{name} isn't set up on me, so I didn't start that.")
-    } else {
-        format!("I don't know {name} here, so I didn't start that.")
-    };
-    format!("{line} Nothing was handed over. Say so plainly in a few words.")
 }
 
 /// `start_agent_task`'s `where` while the lamp has its own target (#5978),
@@ -1985,15 +1978,18 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
             "enum": places,
             "description": where_description(!staff.is_empty())
         });
-        // The lamp's engine, only when one is named (#6492).
-        // Offered from the lamp's engines as last read, whatever they are
-        // (Harness has many agents); with none read, a plain string.
-        let engines = lamp_engines();
-        let mut engine = json!({"type": "string", "description": ENGINE});
-        if !engines.is_empty() {
-            engine["enum"] = json!(engines);
+        // No `engine` is declared (the owner, 25 Nov): the model only
+        // reports who was named, the place and the session; the route is
+        // decided in code ([`START`]). `who` takes every agent name the
+        // person may say, so a name no computer has still reaches the code
+        // and is said not available.
+        if start_parameters["properties"].get(WHO).is_none() {
+            start_parameters["properties"][WHO] = json!({
+                "type": "string",
+                "description": WHO_SAID,
+            });
         }
-        start_parameters["properties"]["engine"] = engine;
+        start_parameters["properties"][WHO]["enum"] = json!(agent_names());
         // Scored by `provider-check --hand-overs` (#6547). #5978: the lamp does the
         // work by default, so the description says what is handed over and
         // what is not, the whole ask goes (#6527), and `who` is for a name said.
@@ -2467,13 +2463,18 @@ pub fn session_note(place: &Place) -> Option<String> {
 /// What a new session is told after the persona, `told`, with
 /// [`session_note`] added when the switch is on.
 pub fn noted(told: Option<String>, place: Option<&Place>) -> Option<String> {
-    match place.and_then(session_note) {
+    let told = match place.and_then(session_note) {
         Some(note) => {
             if place.is_some_and(|place| place.questions) {
                 journal_note(&note);
             }
             Some(told.unwrap_or_default() + &note)
         }
+        None => told,
+    };
+    // The person's computers and their agents (the owner, 25 Nov).
+    match place.and(computers_note()) {
+        Some(line) => Some(told.unwrap_or_default() + &line),
         None => told,
     }
 }
@@ -2895,6 +2896,192 @@ fn where_done(place: &Place, alias: &str) -> String {
     }
 }
 
+/// The engine the agent a hand-over names is (`who`, as said: one of the
+/// lamp's names, [`lamp_names`], else an agent the voice knows), for
+/// [`START`]'s route: the default on the lamp, else a computer that has
+/// it, else not available. The model gives no `engine` (the owner, 25
+/// Nov): one it sends anyway is never read.
+fn named_for_the_lamp(args: &Value) -> Option<String> {
+    let who = args
+        .get(WHO)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|said| !said.is_empty())?;
+    lamp_engine_called(&lamp_names(), who).cloned().or_else(|| {
+        let who = plain(who.trim_start_matches("the "));
+        KINDS
+            .iter()
+            .find(|kind| kind.close.contains(&who.as_str()))
+            .map(|kind| kind.engine.to_owned())
+    })
+}
+
+/// The lamp's default engine as last read: the app's choice, else the
+/// build's, Hermes until read ([`lamp_name`]).
+fn lamp_default() -> String {
+    lamp_engines()
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| "hermes".to_owned())
+}
+
+/// A computer paired through Harness as the tasks part's `targets` answer
+/// says it (rule 2a, 25 Nov): its alias, the agents its engines look says
+/// are installed there with Harness signed in (`agents`), whether it is
+/// online (`status`; `None` unknown), and its last task (`used`, larger is
+/// more recent; 0 none).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Computer {
+    pub(crate) alias: String,
+    pub(crate) agents: Vec<String>,
+    pub(crate) online: Option<bool>,
+    pub(crate) used: u64,
+}
+
+/// The computers as last read, and whether the tasks part said Harness is
+/// signed out (`signed_in` `"no"`). A test sets its own, on its own thread.
+static COMPUTERS: Mutex<(Vec<Computer>, bool)> = Mutex::new((Vec::new(), false));
+
+/// [`Computer`]s in a `targets` answer, plain aliases and ids only, never
+/// the lamp's own target; and whether it says Harness is signed out.
+fn computers_in(answer: &Value) -> (Vec<Computer>, bool) {
+    let computers = answer["targets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|target| {
+            let name = target["alias"].as_str().filter(|name| alias(name))?;
+            if name == LAMP_TARGET {
+                return None;
+            }
+            let agents: Vec<String> = target["agents"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter(|engine| engine_id(engine))
+                .map(str::to_owned)
+                .collect();
+            Some(Computer {
+                alias: name.to_owned(),
+                agents,
+                online: match target["status"].as_str() {
+                    Some("online") => Some(true),
+                    Some("offline") => Some(false),
+                    _ => None,
+                },
+                used: target["used"].as_u64().unwrap_or(0),
+            })
+        })
+        .collect();
+    (computers, answer["signed_in"] == "no")
+}
+
+/// The computers and Harness's sign-out as last read ([`COMPUTERS`]).
+fn computers_now() -> (Vec<Computer>, bool) {
+    #[cfg(test)]
+    {
+        tests::COMPUTERS_HERE.with(|here| here.borrow().clone())
+    }
+    #[cfg(not(test))]
+    COMPUTERS
+        .lock()
+        .map(|known| known.clone())
+        .unwrap_or_default()
+}
+
+/// Why no computer can take an agent (rule 2b, 25 Nov), as the tool's
+/// `reason` says it.
+pub(crate) const NO_COMPUTER_HAS_IT: &str = "none";
+pub(crate) const COMPUTER_IS_OFFLINE: &str = "computer_offline";
+pub(crate) const HARNESS_SIGNED_OUT: &str = "harness_signed_out";
+
+/// A computer paired through Harness that can take `named` now (rule 2a,
+/// 25 Nov): Harness signed in, one whose `agents` has it and is not known
+/// offline, the most recently used if several; else one of the staff whose
+/// own agent it is. Else why not ([`NO_COMPUTER_HAS_IT`],
+/// [`COMPUTER_IS_OFFLINE`], [`HARNESS_SIGNED_OUT`]).
+fn computer_with(staff: &[Member], named: &str) -> Result<String, &'static str> {
+    let (computers, signed_out) = computers_now();
+    if signed_out {
+        return Err(HARNESS_SIGNED_OUT);
+    }
+    let has = |computer: &&Computer| {
+        computer
+            .agents
+            .iter()
+            .any(|agent| agent.eq_ignore_ascii_case(named))
+    };
+    let with: Vec<&Computer> = computers.iter().filter(has).collect();
+    if let Some(best) = with
+        .iter()
+        .filter(|computer| computer.online != Some(false))
+        .max_by_key(|computer| computer.used)
+    {
+        return Ok(best.alias.clone());
+    }
+    if let Some(member) = staff
+        .iter()
+        .find(|member| member.kind.engine.eq_ignore_ascii_case(named))
+    {
+        return Ok(member.alias.clone());
+    }
+    Err(if with.is_empty() {
+        NO_COMPUTER_HAS_IT
+    } else {
+        COMPUTER_IS_OFFLINE
+    })
+}
+
+/// One line for the session (the owner, 25 Nov): the person's computers
+/// and the agents each has, so the model can name them; only while the
+/// lamp has its own target and a computer's agents are known.
+/// "Your computers: macbook-air (online: Claude Code, Hermes)."
+fn computers_note() -> Option<String> {
+    if !lamp_there() {
+        return None;
+    }
+    let (computers, _) = computers_now();
+    let said: Vec<String> = computers
+        .iter()
+        .filter(|computer| !computer.agents.is_empty())
+        .map(|computer| {
+            let agents: Vec<&str> = computer
+                .agents
+                .iter()
+                .map(|agent| name_of(agent).unwrap_or_else(|| display_name(agent)))
+                .collect();
+            let status = match computer.online {
+                Some(true) => "online: ",
+                Some(false) => "offline: ",
+                None => "",
+            };
+            format!("{} ({status}{})", computer.alias, agents.join(", "))
+        })
+        .collect();
+    (!said.is_empty()).then(|| format!("\nYour computers: {}.", said.join("; ")))
+}
+
+/// What the model is told when the person named an agent that is not the
+/// lamp's and no computer paired through Harness can take it (rule 2b, 25
+/// Nov): `agent_not_available` with the `reason`, plainly said, and that
+/// nothing went to anyone, as for an agent not set up ([`named_not_set_up`]).
+fn not_available(who: &str, reason: &str) -> Value {
+    let why = match reason {
+        COMPUTER_IS_OFFLINE => "the computer that has it is offline",
+        HARNESS_SIGNED_OUT => "the lamp is signed out of Harness, so no computer can take it",
+        _ => "no computer of theirs has it",
+    };
+    json!({
+        "error": format!(
+            "Nothing was handed over: {who} isn't available ({why}). Say so plainly in a few \
+             words, and do not give the work to anyone else unless the person asks you to."
+        ),
+        "code": "agent_not_available",
+        "reason": reason,
+    })
+}
+
 /// The staff as read now, kept, with a journal line when it changed.
 fn keep_staff(read: Vec<Member>) {
     if let Ok(mut known) = STAFF.lock()
@@ -2980,6 +3167,9 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
     };
     let lamp = lamp_engines_in(&answer).unwrap_or_default();
     LAMP_THERE.store(!lamp.is_empty(), Ordering::Relaxed);
+    if let Ok(mut known) = COMPUTERS.lock() {
+        *known = computers_in(&answer);
+    }
     if let Ok(mut engines) = LAMP_ENGINES.lock() {
         *engines = lamp;
     }
@@ -3472,7 +3662,7 @@ fn yes_in_the_same_turn_now(pending: &Pending, request: u64, heard: bool) -> boo
 /// nothing prepared, [`CONFIRM`] then says to prepare the task said back
 /// and confirm again ([`NOTHING_PREPARED`]), and only
 /// [`yes_in_the_same_turn`] lets that yes start it.
-fn yes_to_a_question(
+pub(crate) fn yes_to_a_question(
     heard: bool,
     words: Option<&str>,
     last: Option<(&str, Duration, bool)>,
@@ -3675,7 +3865,7 @@ fn same_work(waiting: &str, task: &str) -> bool {
 }
 
 /// Lower-case words of letters and digits; an apostrophe stays inside one.
-fn plain_words(text: &str) -> Vec<String> {
+pub(crate) fn plain_words(text: &str) -> Vec<String> {
     text.split(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '’'))
         .map(|word| {
             word.trim_matches(|c: char| c == '\'' || c == '’')
@@ -3740,7 +3930,7 @@ pub(crate) fn plain_yes_with(words: &str, more_yes: &[&str], more_phrases: &[&[&
 }
 
 /// Whether the lamp's `line` ends with a question.
-fn asks(line: &str) -> bool {
+pub(crate) fn asks(line: &str) -> bool {
     line.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '”' | '\'' | '’' | ')'))
         .ends_with('?')
 }
@@ -3933,12 +4123,27 @@ const NUMBER_WORDS: [(&str, &str); 24] = [
 /// ("ugh, rough day, anyway have Claude fix the login bug"), and the
 /// refusal must never push the model to send an aside to an agent (#6537,
 /// the Reviewer-lead's privacy read).
-fn ask_words(text: &str, after_name: bool) -> Vec<(String, String)> {
+/// Whether `text` names an agent the voice knows ([`KINDS`]: its name, the
+/// forms heard and the close forms, each a whole run of words) or says
+/// "agent": work for one, never the lamp's own sign-in
+/// (`crate::sign_in::asks_to_sign_in`, #8700).
+pub(crate) fn names_an_agent(text: &str) -> bool {
     let words: Vec<String> = text
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())
         .map(str::to_lowercase)
         .collect();
+    let names = every_name_form();
+    (0..words.len()).any(|at| {
+        matches!(words[at].as_str(), "agent" | "agents")
+            || names.iter().any(|form| words[at..].starts_with(form))
+    })
+}
+
+/// Every form of an agent's name the voice knows ([`KINDS`]: its name, the
+/// forms heard and the close forms), as lower-case runs of words, the
+/// longest first, so "claude code" goes whole before "claude".
+fn every_name_form() -> Vec<Vec<String>> {
     let mut names: Vec<Vec<String>> = KINDS
         .iter()
         .flat_map(|kind| {
@@ -3954,8 +4159,17 @@ fn ask_words(text: &str, after_name: bool) -> Vec<(String, String)> {
         })
         .filter(|form| !form.is_empty())
         .collect();
-    // The longest first, so "claude code" goes whole before "claude".
     names.sort_by_key(|form| std::cmp::Reverse(form.len()));
+    names
+}
+
+fn ask_words(text: &str, after_name: bool) -> Vec<(String, String)> {
+    let words: Vec<String> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let names = every_name_form();
     let mut found: Vec<(String, String)> = Vec::new();
     let mut at = 0;
     while at < words.len() {
@@ -4717,8 +4931,9 @@ fn unreached(place: &Place) -> Value {
 
 /// The tasks part's `prepare` request: with a session only when the
 /// person named one ([`REPLY_NAMED_FLAG`], #5535), so without it the
-/// request is as it always was; with an `engine` only when the person named
-/// one of the lamp's engines for work on the lamp (#6492).
+/// request is as it always was. With an `engine` only for an agent the
+/// lamp doesn't run, taken to a computer that has it (rule 2a, 25 Nov);
+/// never for the lamp: one agent per lamp, its default does the work.
 fn preparation(
     guard: Value,
     task: &str,
@@ -4825,7 +5040,7 @@ fn run_for_asked(
                 .then(|| heard_words(request, heard))
                 .flatten()
                 .and_then(|words| {
-                    let engines = lamp_engines();
+                    let engines = lamp_names();
                     // Without staff read, the one who does the work on the
                     // computer, as the person calls them.
                     let mut staff_names: Vec<&str> = Vec::new();
@@ -4899,14 +5114,49 @@ fn run_for_asked(
             // own target (#6547, V2's P1 on 12587): refused, nothing
             // prepared, never quietly the lamp's. Without the lamp's target
             // it goes to the configured target as before.
-            if unpaired && there && asks_a_computer(&call.args, &lamp_engines()) {
+            if unpaired && there && asks_a_computer(&call.args, &lamp_names()) {
                 eprintln!(
                     "lamp-voice provider: request {request}: a computer was asked for and none is paired: refused, nothing prepared"
                 );
                 return (json!({"error": NO_COMPUTER_PAIRED}), true);
             }
-            let on_the_lamp = on_the_lamp_now(&call.args, there, unpaired);
-            let member = if on_the_lamp {
+            let mut on_the_lamp = on_the_lamp_now(&call.args, there, unpaired);
+            // One agent per lamp (the owner's 25 Nov rules): an agent named
+            // for the lamp that is not its default (the app's choice,
+            // Hermes when none) never runs on the lamp. A computer paired
+            // through Harness that has it takes it there, said in the
+            // read-back (rule 2a); none has it: said not available, and
+            // nothing is handed to anyone (rule 2b).
+            let mut elsewhere: Option<(String, String)> = None;
+            if on_the_lamp
+                && let Some(named) = named_for_the_lamp(&call.args)
+                && !named.eq_ignore_ascii_case(&lamp_default())
+            {
+                match computer_with(staff, &named) {
+                    Ok(alias) => {
+                        on_the_lamp = false;
+                        elsewhere = Some((alias, named));
+                    }
+                    Err(reason) => {
+                        eprintln!(
+                            "lamp-voice provider: request {request}: an agent not the lamp's was named and no computer can take it ({reason}): nothing prepared"
+                        );
+                        return (not_available(display_name(&named), reason), true);
+                    }
+                }
+            } else if !on_the_lamp
+                && let Some(named) =
+                    named_for_the_lamp(&json!({"who": call.args.get("who").cloned()}))
+                && !staff.iter().any(|member| member.kind.engine == named)
+                && let Ok(alias) = computer_with(&[], &named)
+            {
+                // A computer named with an agent on it that is not its
+                // target's own (rule 3): taken there by name, as rule 2a.
+                elsewhere = Some((alias, named));
+            }
+            let member = if let Some((alias, _)) = &elsewhere {
+                staff.iter().find(|member| member.alias == *alias)
+            } else if on_the_lamp {
                 None
             } else {
                 match chosen(place, staff, &call.args) {
@@ -4914,16 +5164,17 @@ fn run_for_asked(
                     Err(told) => return (told, true),
                 }
             };
-            // The lamp's engine named (#6492): sent with the prepare and said
-            // as who does it; an engine given for a computer is ignored.
-            let engine = on_the_lamp.then(|| named_lamp_engine(&call.args)).flatten();
-            let (target, who) = if on_the_lamp {
+            // One agent per lamp: no engine is ever sent for the lamp; the
+            // lamp's default does the lamp's work. Only an agent taken to a
+            // computer that has it (rule 2a) is sent, by name.
+            let (target, who) = if let Some((alias, named)) = &elsewhere {
+                (alias.as_str(), display_name(named))
+            } else if on_the_lamp {
                 (
                     LAMP_TARGET,
                     // The lamp's own engine is never named to the person
-                    // (the owner, #7930): the lamp itself does the work;
-                    // an engine they named is said back as named.
-                    engine.as_deref().map_or(OWN_ENGINE, display_name),
+                    // (the owner, #7930): the lamp itself does the work.
+                    OWN_ENGINE,
                 )
             } else {
                 member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
@@ -4931,16 +5182,13 @@ fn run_for_asked(
                 })
             };
             // Who does it, for `voice/decision` (#7267): on the lamp, the
-            // engine named or else the lamp's default as last read (Hermes
-            // until read, as [`lamp_name`] says it); a computer's, Claude
-            // when none is chosen.
-            let handed_engine = if on_the_lamp {
-                Some(engine.clone().unwrap_or_else(|| {
-                    lamp_engines()
-                        .into_iter()
-                        .next()
-                        .unwrap_or_else(|| "hermes".to_owned())
-                }))
+            // lamp's default as last read (Hermes until read, as
+            // [`lamp_name`] says it); a computer's, Claude when none is
+            // chosen.
+            let handed_engine = if let Some((_, named)) = &elsewhere {
+                Some(named.clone())
+            } else if on_the_lamp {
+                Some(lamp_default())
             } else {
                 Some(
                     member
@@ -4992,7 +5240,13 @@ fn run_for_asked(
             };
             let mut prepared = ask_until_sure(
                 &place.directory.join("request.sock"),
-                &preparation(guard, task, target, session, engine.as_deref()),
+                &preparation(
+                    guard,
+                    task,
+                    target,
+                    session,
+                    elsewhere.as_ref().map(|(_, named)| named.as_str()),
+                ),
                 left,
             );
             // The target the work was prepared for, for the read-back.
@@ -5211,12 +5465,6 @@ fn run_for_asked(
                         // A start there that timed out is still being
                         // checked (#8170): held, never a failure.
                         Some("start_checking") => START_CHECKING_HELD.to_owned(),
-                        // The lamp's engine named is off or not installed
-                        // there (#6492): said plainly, never retried on the
-                        // another engine.
-                        Some(code @ ("engine_not_here" | "engine_unknown")) => {
-                            engine_refused(code, who)
-                        }
                         // Refused early from what the tasks part knows of
                         // that computer (#5199): said plainly, naming who
                         // and where, with nothing handed over.
@@ -6994,6 +7242,12 @@ pub(crate) mod tests {
         /// ([`super::heard_words`], #6492).
         pub(crate) static HEARD_HERE: std::cell::Cell<Option<&'static str>> =
             const { std::cell::Cell::new(None) };
+    }
+    thread_local! {
+        /// The computers and Harness's sign-out for a test on this thread
+        /// only ([`super::computers_now`]).
+        pub(crate) static COMPUTERS_HERE: std::cell::RefCell<(Vec<super::Computer>, bool)> =
+            const { std::cell::RefCell::new((Vec::new(), false)) };
     }
     /// Sets the lamp's engines, the default first, for a test on this
     /// thread only (#6492); `None` goes back to the engines as last read.
@@ -14754,13 +15008,13 @@ pub(crate) mod tests {
         );
         assert_eq!(lamp["where"], "the lamp", "{lamp}");
         assert_eq!(prepare()["target"], "lamp");
-        // Hermes named: the lamp's engine, prepared on the lamp.
+        // Hermes, the default, named: prepared on the lamp, no agent said.
         let hermes = run_with(
             Some("Ask Hermes to write a poem about tea into tea.md."),
             json!({"task":"Write a poem about tea into tea.md","who":"Hermes"}),
             9,
         );
-        assert_eq!(hermes["where"], "Hermes on the lamp", "{hermes}");
+        assert_eq!(hermes["where"], "the lamp", "{hermes}");
         assert_eq!(prepare()["target"], "lamp");
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
@@ -15095,7 +15349,10 @@ pub(crate) mod tests {
             (json!({"who":"Pi"}), true),
             (json!({"who":"the pi"}), true),
             (json!({"who":"Codex"}), true),
-            (json!({"who":"Hermes"}), false),
+            // Hermes and OpenClaw are always the lamp's names
+            // ([`lamp_names`]); [`START`] then sends one that is not the
+            // default to a computer that has it, or says it isn't available.
+            (json!({"who":"Hermes"}), true),
             (json!({"who":"Claude Code"}), true),
             (json!({"who":"Claude Code","where":"computer"}), false),
             (json!({"who":"Claude Code","where":"lamp"}), true),
@@ -15155,9 +15412,10 @@ pub(crate) mod tests {
         );
         let none = run_with(false, json!({"task":"Write a poem","where":"lamp"}), 6);
         assert_eq!(none, json!({"error": LAMP_NOT_SET_UP}));
-        // Hermes named is the lamp's, never a computer's (the eval's find).
+        // Hermes, the default, named is the lamp's, never a computer's (the
+        // eval's find), said as the lamp's own (25 Nov rule 1).
         let named = run_with(true, json!({"task":"Write a poem","who":"Hermes"}), 7);
-        assert_eq!(named["where"], "Hermes on the lamp", "{named}");
+        assert_eq!(named["where"], "the lamp", "{named}");
         let targets: Vec<Value> = (0..10)
             .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
             .filter(|line| line["op"] == "prepare")
@@ -15177,12 +15435,6 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
-    /// #6492: a hand-over to the lamp naming one of the lamp's engines, by
-    /// `engine` or by `who`, sends that engine with the prepare and says it
-    /// as who does the work, a third engine ("pi") as any other; naming
-    /// none, or a name not among the lamp's engines, sends no `engine` and
-    /// says the lamp's default; an `engine` for a computer is ignored; and
-    /// `engine_not_here` is said plainly, never retried on another engine.
     /// #8170: a hand-over the tasks part holds while a start that timed out
     /// is checked is said as being checked, never as failed, and is never
     /// sent again by the voice.
@@ -15226,8 +15478,17 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(&directory);
     }
 
+    /// One agent per lamp, the owner's 25 Nov rules, both ways (a Hermes
+    /// lamp and an OpenClaw lamp, the app's choice). Rule 1: none named, or
+    /// the lamp's default named, is prepared on the lamp with no `engine`,
+    /// said as the lamp's own, no agent named. Rule 2a: the other agent
+    /// named and a computer paired through Harness has it, prepared on that
+    /// computer with that `engine`, said as that agent there, never on the
+    /// lamp. Rule 2b: no computer has it, said not available, nothing
+    /// prepared. Rule 3: the computer named with an agent on it, there, as
+    /// 2a. An `engine` the model gives is never read.
     #[test]
-    fn a_named_lamp_engine_goes_with_the_prepare_and_is_said() {
+    fn a_named_agent_runs_on_the_lamp_only_as_its_default_else_on_a_computer_that_has_it() {
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -15238,29 +15499,36 @@ pub(crate) mod tests {
             json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
         let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
         let mut answers = Vec::new();
-        for _ in 0..6 {
+        for _ in 0..20 {
             answers.push(("request.sock", status.clone()));
             answers.push(("request.sock", prepared.clone()));
         }
-        answers.push(("request.sock", status.clone()));
-        answers.push((
-            "request.sock",
-            json!({"ok":false,"error":"engine_not_here"}),
-        ));
-        // Answers a retry would get, if one were ever sent.
-        answers.push(("request.sock", status));
-        answers.push(("request.sock", prepared));
         let seen = tasks_part(&directory, answers);
         let at = place(&directory, false);
-        let run_with = |engines: &[&str], args: Value, request: u64| {
+        let run_with = |engines: &[&str], agents: &[&str], args: Value, request: u64| {
             LAMP_THERE_HERE.with(|here| here.set(Some(true)));
             lamp_engines_here(Some(engines));
+            COMPUTERS_HERE.with(|here| {
+                *here.borrow_mut() = if agents.is_empty() {
+                    (Vec::new(), false)
+                } else {
+                    (
+                        vec![Computer {
+                            alias: "office".to_owned(),
+                            agents: agents.iter().map(|agent| (*agent).to_owned()).collect(),
+                            ..Computer::default()
+                        }],
+                        false,
+                    )
+                };
+            });
             let call = ToolCall {
                 id: "c".into(),
                 name: START.into(),
                 args,
             };
             let told = run(&at, &call, request, true, PEER_WAIT).0;
+            COMPUTERS_HERE.with(|here| *here.borrow_mut() = (Vec::new(), false));
             lamp_engines_here(None);
             LAMP_THERE_HERE.with(|here| here.set(None));
             told
@@ -15271,16 +15539,98 @@ pub(crate) mod tests {
                 return line;
             }
         };
-        let hermes_first = ["hermes", "openclaw"];
-        let by_engine = run_with(
-            &hermes_first,
-            json!({"task":"Write a poem","engine":"openclaw"}),
-            3,
+        let mut request = 3;
+        for (default, other, other_name) in [
+            ("hermes", "openclaw", "OpenClaw"),
+            ("openclaw", "hermes", "Hermes"),
+        ] {
+            let lamp = [default, other];
+            // 1. None named, or the default named by `engine` or `who`.
+            for args in [
+                json!({"task":"Write a poem"}),
+                // An `engine` the model sends anyway is never read.
+                json!({"task":"Write a poem","engine":other}),
+                json!({"task":"Write a poem","who":display_name(default)}),
+            ] {
+                let told = run_with(&lamp, &[other], args.clone(), request);
+                request += 1;
+                assert_eq!(told["where"], "the lamp", "{args}: {told}");
+                for name in ["Hermes", "OpenClaw"] {
+                    assert!(!told.to_string().contains(name), "{args}: {told}");
+                }
+                let sent = prepare();
+                assert_eq!(sent["target"], "lamp", "{sent}");
+                assert_eq!(sent.get("engine"), None, "{sent}");
+            }
+            // 2a. The other named, the office computer has it: there.
+            for args in [
+                json!({"task":"Write a poem","who":other}),
+                json!({"task":"Write a poem","who":other_name}),
+                json!({"task":"Write a poem","where":"lamp","who":format!("the {other}")}),
+            ] {
+                let told = run_with(&lamp, &[default, other], args.clone(), request);
+                request += 1;
+                assert_eq!(
+                    told["where"],
+                    format!("{other_name} on the office computer"),
+                    "{args}: {told}"
+                );
+                let sent = prepare();
+                assert_eq!(
+                    (&sent["target"], &sent["engine"]),
+                    (&json!("office"), &json!(other)),
+                    "{sent}"
+                );
+            }
+            // 2b. No computer has it (or the lamp has only its default):
+            // not available, nothing prepared.
+            for (engines, args) in [
+                (&lamp[..], json!({"task":"Write a poem","who":other})),
+                (
+                    &[default][..],
+                    json!({"task":"Write a poem","who":other_name}),
+                ),
+            ] {
+                let told = run_with(engines, &[], args.clone(), request);
+                request += 1;
+                assert_eq!(
+                    told,
+                    json!({
+                        "error": format!(
+                            "Nothing was handed over: {other_name} isn't available (no computer of theirs has it). Say so plainly in a few words, and do not give the work to anyone else unless the person asks you to."
+                        ),
+                        "code": "agent_not_available",
+                        "reason": "none",
+                    }),
+                    "{args}"
+                );
+            }
+            // 3. The computer named with an agent on it.
+            let told = run_with(
+                &lamp,
+                &[other],
+                json!({"task":"Write a poem","where":"computer","who":other_name}),
+                request,
+            );
+            request += 1;
+            assert_eq!(
+                told["where"],
+                format!("{other_name} on the office computer"),
+                "{told}"
+            );
+            let sent = prepare();
+            assert_eq!(
+                (&sent["target"], &sent["engine"]),
+                (&json!("office"), &json!(other))
+            );
+        }
+        assert!(
+            seen.recv_timeout(Duration::from_millis(200)).is_err(),
+            "nothing more prepared"
         );
-        assert_eq!(by_engine["where"], "OpenClaw on the lamp", "{by_engine}");
-        // An engine named on the lamp runs on the lamp: its 20 s line is
-        // the lamp's own, never the computer's (the first builder's P3 on
-        // #8510).
+        // An `engine` the model gives for a computer otherwise: ignored.
+        // Its 20 s line is the computer's, never the lamp's (the first
+        // builder's P3 on #8510).
         let on_lamp = || {
             PENDING
                 .lock()
@@ -15288,28 +15638,11 @@ pub(crate) mod tests {
                 .as_ref()
                 .map(|pending| pending.on_lamp)
         };
-        assert_eq!(on_lamp(), Some(true));
-        let sent = prepare();
-        assert_eq!(
-            (&sent["target"], &sent["engine"]),
-            (&json!("lamp"), &json!("openclaw"))
-        );
-        let by_who = run_with(
-            &["openclaw", "hermes"],
-            json!({"task":"Write a poem","who":"the hermes"}),
-            4,
-        );
-        assert_eq!(by_who["where"], "Hermes on the lamp", "{by_who}");
-        assert_eq!(prepare()["engine"], "hermes");
-        let unnamed = run_with(&hermes_first, json!({"task":"Write a poem"}), 5);
-        assert_eq!(unnamed["where"], "the lamp", "{unnamed}");
-        let sent = prepare();
-        assert_eq!(sent["target"], "lamp");
-        assert_eq!(sent.get("engine"), None, "{sent}");
         let computer = run_with(
-            &hermes_first,
+            &["hermes", "openclaw"],
+            &[],
             json!({"task":"Write a poem","where":"computer","engine":"hermes"}),
-            6,
+            request,
         );
         assert_eq!(
             computer["where"], "Claude Code on the office computer",
@@ -15319,50 +15652,91 @@ pub(crate) mod tests {
         let sent = prepare();
         assert_eq!(sent["target"], "office");
         assert_eq!(sent.get("engine"), None, "{sent}");
-        // A third engine Harness reports on the lamp is named as any other.
-        let pi = run_with(
-            &["openclaw", "hermes", "pi"],
-            json!({"task":"Write a poem","engine":"pi"}),
-            7,
-        );
-        assert_eq!(pi["where"], "Pi on the lamp", "{pi}");
-        assert_eq!(prepare()["engine"], "pi");
-        // A name not among the lamp's engines is never sent as one.
-        let elsewhere = run_with(
-            &hermes_first,
-            json!({"task":"Write a poem","where":"lamp","engine":"codex"}),
-            8,
-        );
-        assert_eq!(elsewhere["where"], "the lamp", "{elsewhere}");
-        let sent = prepare();
-        assert_eq!(sent.get("engine"), None, "{sent}");
-        let refused = run_with(
-            &hermes_first,
-            json!({"task":"Write a poem","engine":"openclaw"}),
-            9,
-        );
-        assert_eq!(
-            refused,
-            json!({"error": "OpenClaw isn't set up on me, so I didn't start that. Nothing was handed over. Say so plainly in a few words."})
-        );
-        assert_eq!(prepare()["engine"], "openclaw");
-        assert!(
-            seen.recv_timeout(Duration::from_millis(200)).is_err(),
-            "never retried on another engine"
-        );
-        assert_eq!(
-            engine_refused("engine_unknown", display_name("pi")),
-            "I don't know Pi here, so I didn't start that. Nothing was handed over. Say so plainly in a few words."
-        );
-        lamp_engines_here(Some(&hermes_first));
-        assert_eq!(named_lamp_engine(&json!({"engine":"claude"})), None);
-        assert_eq!(
-            named_lamp_engine(&json!({"who":"OpenClaw"})).as_deref(),
-            Some("openclaw")
-        );
-        lamp_engines_here(None);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Rule 2a/2b (25 Nov): the computers are read from the targets answer
+    /// (plain ids only, never the lamp's own target, Harness's sign-out
+    /// with them); an agent goes to an online computer that has it, the
+    /// most recently used of several; else why not: none has it, the one
+    /// that has it is offline, or Harness is signed out. The session gets
+    /// one line naming the computers and their agents.
+    #[test]
+    fn a_named_agent_goes_to_the_most_recent_online_computer_that_has_it() {
+        let answer = json!({"ok":true,"signed_in":"yes","targets":[
+            {"alias":"lamp","engine":"hermes","agents":["openclaw"]},
+            {"alias":"office","engine":"claude","agents":["claude","hermes","bad id"],"status":"online","used":3},
+            {"alias":"macbook-air","engine":"claude","agents":["claude","hermes","openclaw"],"status":"online","used":9},
+            {"alias":"studio","engine":"codex","agents":["openclaw","codex"],"status":"offline","used":12},
+            {"alias":"desk","engine":"codex"}]});
+        let (computers, signed_out) = computers_in(&answer);
+        assert!(!signed_out);
+        assert_eq!(computers.len(), 4);
+        assert_eq!(computers[0].agents, ["claude", "hermes"]);
+        assert_eq!((computers[2].online, computers[2].used), (Some(false), 12));
+        assert!(computers_in(&json!({"ok":true,"signed_in":"no","targets":[]})).1);
+        let with = |computers: Vec<Computer>, signed_out: bool, named: &str| {
+            COMPUTERS_HERE.with(|here| *here.borrow_mut() = (computers, signed_out));
+            let to = computer_with(&[], named);
+            COMPUTERS_HERE.with(|here| *here.borrow_mut() = (Vec::new(), false));
+            to
+        };
+        // Both ways: Hermes and OpenClaw, the most recent online one.
+        assert_eq!(
+            with(computers.clone(), false, "hermes"),
+            Ok("macbook-air".to_owned())
+        );
+        assert_eq!(
+            with(computers.clone(), false, "openclaw"),
+            Ok("macbook-air".to_owned())
+        );
+        // Only the offline studio has Codex; nobody has Devin.
+        assert_eq!(
+            with(computers.clone(), false, "codex"),
+            Err(COMPUTER_IS_OFFLINE)
+        );
+        assert_eq!(
+            with(computers.clone(), false, "devin"),
+            Err(NO_COMPUTER_HAS_IT)
+        );
+        assert_eq!(
+            with(computers.clone(), true, "hermes"),
+            Err(HARNESS_SIGNED_OUT)
+        );
+        for (reason, why) in [
+            (NO_COMPUTER_HAS_IT, "no computer of theirs has it"),
+            (COMPUTER_IS_OFFLINE, "the computer that has it is offline"),
+            (
+                HARNESS_SIGNED_OUT,
+                "the lamp is signed out of Harness, so no computer can take it",
+            ),
+        ] {
+            let told = not_available("Codex", reason);
+            assert_eq!(told["code"], "agent_not_available");
+            assert_eq!(told["reason"], reason);
+            assert!(
+                told["error"].as_str().unwrap().starts_with(&format!(
+                    "Nothing was handed over: Codex isn't available ({why})."
+                )),
+                "{told}"
+            );
+        }
+        // The session's line, only while the lamp has its own target.
+        COMPUTERS_HERE.with(|here| *here.borrow_mut() = (computers.clone(), false));
+        let note = computers_note();
+        LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+        let there = computers_note();
+        LAMP_THERE_HERE.with(|here| here.set(None));
+        COMPUTERS_HERE.with(|here| *here.borrow_mut() = (Vec::new(), false));
+        assert_eq!(note, None);
+        assert_eq!(
+            there.as_deref(),
+            Some(
+                "\nYour computers: office (online: Claude Code, Hermes); macbook-air (online: \
+                 Claude Code, Hermes, OpenClaw); studio (offline: OpenClaw, Codex)."
+            )
+        );
     }
 
     /// #6492, the lead's V2: what the heard words name, by code, from the
@@ -15531,10 +15905,11 @@ pub(crate) mod tests {
         );
     }
 
-    /// #6492, the lead's V2: what code sets over the model's args, and
+    /// #6492, the lead's V2: what code sets over the model's args (the
+    /// agent named in `who`, never an `engine`: the owner, 25 Nov), and
     /// nothing when the model already sent it or the words name nothing.
     #[test]
-    fn the_heard_words_set_where_engine_and_who() {
+    fn the_heard_words_set_where_and_who_never_an_engine() {
         let engines: Vec<String> = ["hermes", "openclaw"].map(str::to_owned).to_vec();
         let staff = ["Claude Code"];
         let set = |args: Value, heard: &str| {
@@ -15543,14 +15918,14 @@ pub(crate) mod tests {
         };
         assert_eq!(
             set(json!({"task":"t"}), "have OpenClaw write a list"),
-            Some(json!({"task":"t","where":"lamp","engine":"openclaw"}))
+            Some(json!({"task":"t","where":"lamp","who":"OpenClaw"}))
         );
         assert_eq!(
             set(
                 json!({"task":"t","where":"computer","engine":"hermes"}),
                 "ask OpenClaw to tidy up my notes"
             ),
-            Some(json!({"task":"t","where":"lamp","engine":"openclaw"}))
+            Some(json!({"task":"t","where":"lamp","who":"OpenClaw"}))
         );
         assert_eq!(
             set(
@@ -15568,12 +15943,12 @@ pub(crate) mod tests {
         );
         assert_eq!(
             set(json!({"task":"t","engine":"openclaw"}), "do it yourself"),
-            Some(json!({"task":"t","where":"lamp","engine":"openclaw"}))
+            Some(json!({"task":"t","where":"lamp"}))
         );
         // The model already sent the same, or the words name nothing.
         assert_eq!(
             set(
-                json!({"task":"t","where":"lamp","engine":"hermes"}),
+                json!({"task":"t","where":"lamp","who":"Hermes"}),
                 "ask Hermes to write"
             ),
             None
@@ -15591,15 +15966,17 @@ pub(crate) mod tests {
         .unwrap();
         assert_eq!(
             line,
-            "the heard words set where=lamp engine=hermes who=none (the model sent where=none engine=none who=none)"
+            "the heard words set where=lamp engine=none who=Hermes (the model sent where=none engine=none who=none)"
         );
     }
 
     /// #6492, the lead's V2, through the hand-over: the heard words fix a
-    /// model that sent no engine, the wrong engine or the wrong place; a
-    /// bare mention leaves the model's args as they are.
+    /// model that sent the wrong place or engine; an agent named that is not
+    /// the lamp's default, with no computer having it, is said not available
+    /// (rule 2b); the default named runs on the lamp with no engine sent; a
+    /// bare mention leaves the model's place as it is.
     #[test]
-    fn the_heard_words_set_the_engine_and_place_over_the_model() {
+    fn the_heard_words_set_the_place_over_the_model() {
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -15643,11 +16020,14 @@ pub(crate) mod tests {
             json!({"task":"Write a packing list to a file"}),
             3,
         );
-        assert_eq!(no_engine["where"], "OpenClaw on the lamp", "{no_engine}");
-        let sent = prepare();
-        assert_eq!(
-            (&sent["target"], &sent["engine"]),
-            (&json!("lamp"), &json!("openclaw"))
+        // OpenClaw, not the lamp's default (Hermes), and no computer has
+        // it: not available, nothing prepared (rule 2b).
+        assert!(
+            no_engine["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("Nothing was handed over: OpenClaw isn't available ("),
+            "{no_engine}"
         );
         // The model sent the wrong engine and the computer.
         let wrong = run_with(
@@ -15655,11 +16035,12 @@ pub(crate) mod tests {
             json!({"task":"Fix the tests","where":"computer","engine":"hermes"}),
             4,
         );
-        assert_eq!(wrong["where"], "Codex on the lamp", "{wrong}");
-        let sent = prepare();
-        assert_eq!(
-            (&sent["target"], &sent["engine"]),
-            (&json!("lamp"), &json!("codex"))
+        assert!(
+            wrong["error"]
+                .as_str()
+                .unwrap()
+                .starts_with("Nothing was handed over: Codex isn't available ("),
+            "{wrong}"
         );
         // The model sent the lamp; the person named their computer.
         let to_computer = run_with(
@@ -15692,17 +16073,19 @@ pub(crate) mod tests {
             json!({"task":"Write a poem","engine":"hermes"}),
             7,
         );
-        assert_eq!(unchanged["where"], "Hermes on the lamp", "{unchanged}");
-        assert_eq!(prepare()["engine"], "hermes");
+        assert_eq!(unchanged["where"], "the lamp", "{unchanged}");
+        // Hermes, the default, named: no agent said.
+        assert!(!unchanged.to_string().contains("Hermes"), "{unchanged}");
+        assert_eq!(prepare().get("engine"), None);
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }
 
-    /// #6492: `engine` is declared only while the lamp has its own target,
-    /// its `enum` the lamp's engines as last read, whatever they are, and
-    /// none before they are read.
+    /// The owner, 25 Nov: `engine` is never declared (the route is decided
+    /// in code); with the lamp's own target `who` takes every agent name
+    /// the person may say, so a name no computer has still reaches the code.
     #[test]
-    fn the_lamp_engine_is_declared_only_with_the_lamp() {
+    fn no_engine_is_declared_and_who_takes_every_agent_name_with_the_lamp() {
         let off = place(Path::new("/run/t"), false);
         let start = |lamp: bool| {
             declared_on(&off, &[], lamp)
@@ -15714,23 +16097,25 @@ pub(crate) mod tests {
             start(false).parameters.unwrap()["properties"].get("engine"),
             None
         );
-        let engine_with = |engines: &[&str]| {
+        for engines in [&["hermes", "openclaw"][..], &["openclaw", "hermes"], &[]] {
             lamp_engines_here(Some(engines));
             let on = start(true);
             lamp_engines_here(None);
             assert!(fits(&on));
-            on.parameters.unwrap()["properties"]["engine"].clone()
-        };
-        let engine = engine_with(&["hermes", "openclaw"]);
-        assert_eq!(engine["enum"], json!(["hermes", "openclaw"]));
-        assert_eq!(engine["description"], ENGINE);
-        assert_eq!(
-            engine_with(&["openclaw", "pi", "codex"])["enum"],
-            json!(["openclaw", "pi", "codex"])
-        );
-        let unread = engine_with(&[]);
-        assert_eq!(unread.get("enum"), None, "{unread}");
-        assert_eq!(unread["type"], "string");
+            let properties = on.parameters.unwrap()["properties"].clone();
+            assert_eq!(properties.get("engine"), None, "{properties}");
+            assert_eq!(properties[WHO]["enum"], json!(agent_names()));
+            for name in [
+                "Claude Code",
+                "Codex",
+                "OpenCode",
+                "Hermes",
+                "OpenClaw",
+                "Devin",
+            ] {
+                assert!(agent_names().contains(&name), "{name}");
+            }
+        }
     }
 
     /// lamp-74ff, 25 Nov 2026 18:56: with the lamp's own target and no
@@ -15954,7 +16339,8 @@ pub(crate) mod tests {
                 && !said.contains("Hermes"),
             "{lamp}"
         );
-        assert_eq!(named["where"], "OpenClaw on the lamp", "{named}");
+        // The default named: the lamp's own, no agent said (25 Nov rule 1).
+        assert_eq!(named["where"], "the lamp", "{named}");
         let targets: Vec<Value> = (0..4)
             .map(|_| seen.recv_timeout(PEER_WAIT).unwrap())
             .filter(|line| line["op"] == "prepare")

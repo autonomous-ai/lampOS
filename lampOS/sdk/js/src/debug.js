@@ -31,6 +31,18 @@ export const SHOWN = new Set([
   // hello's lamp: the owner's language (en, vi, ja, zh, ko), and the lamp's build (143+ab12cd34ef56, the text the app shows).
   'language',
   'build',
+  // Lamp Doctor's `turns.finished` and `log.send`: counts and fixed codes, never a word (`failed` is a turn's failed calls,
+  // each a case of fixed names and numbers; `failures` a report's categories with their counts; `tool_errors` a count).
+  'failed',
+  'failures',
+  'tool_errors',
+  'answered_within_5s_pct', 'asked_again', 'at_min', 'band', 'cases',
+  'cases_dropped', 'category', 'cut_ins', 'diagnosis_version', 'fault',
+  'heard_to_first_sound_ms', 'heard_to_first_sound_ms_median', 'heard_to_first_sound_ms_p90', 'heard_wrongly', 'held',
+  'held_then_repeated', 'http', 'name_missed', 'outcome', 'proofs',
+  'proved', 'report', 'request', 'route', 'stuck',
+  'tier', 'tool_calls', 'tool_timeouts', 'turns', 'waited_ms',
+  'words_heard', 'words_said',
   // A skill run's `service.read` / `service.write`: the service's code (its
   // grants, `<code>-read` / `<code>-write`, show in `grants`).
   'service',

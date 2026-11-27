@@ -443,12 +443,15 @@ pub fn judge(line: Line<'_>) -> Said {
     if line.going_on {
         // `LAMP_FOLLOW_UPS`, the product owner's rules (25 Nov 2026, #7570
         // 18:16 and 18:30): a follow-up in a conversation is said to the
-        // lamp, looking or not, and no line is held on a camera sign alone;
-        // only another voice than the conversation's holds it here. On
-        // lamp-74ff that evening follow-ups were held "looking away" in 40
-        // of 40 looks while the owner looked straight at the lamp, and "no
-        // look" while the camera saw no face.
-        if line.follow_ups && !line.another_voice {
+        // lamp, looking or not, and no line is held on a camera sign alone.
+        // On lamp-74ff that evening follow-ups were held "looking away" in
+        // 40 of 40 looks while the owner looked straight at the lamp, and
+        // "no look" while the camera saw no face. Nor does another voice's
+        // print hold it (#8839, the product owner's rule of 26 Nov: no
+        // unmeasured sensor holds a person): on lamp-52e6 at stable 16443 a
+        // room voice's low score carried into the caller's next lines, and
+        // "And times two?" and "Are you sure? …" were held as no look.
+        if line.follow_ups {
             return Said::FollowUp;
         }
         // `LAMP_NAME_SIGN_TIED` (#8092): no look, no renewal; one answer
@@ -622,13 +625,14 @@ mod tests {
         for line in [looking_away, head_down, no_look, short_silent, second_voice] {
             assert_eq!(judge(on(line)), Said::FollowUp, "{line:?}");
         }
-        // Another voice than the conversation's still holds it.
+        // Nor does another voice's print (#8839): an unmeasured print may
+        // only help a line through, never hold one.
         assert_eq!(
             judge(Line {
                 another_voice: true,
                 ..on(looking_away)
             }),
-            Said::Held(Held::AwayInConversation)
+            Said::FollowUp
         );
         // Out of the window nothing changes: a turned face looking away,
         // not named, is held as before.

@@ -1817,6 +1817,10 @@ fn worker_command(
             role,
             var(crate::app_help::ENVIRONMENT).as_deref(),
         ))
+        .envs(doctor_turns_worker_environment(
+            role,
+            var(crate::turn_ledger::ENVIRONMENT).as_deref(),
+        ))
         .envs(make_skill_asked_worker_environment(
             role,
             var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
@@ -3038,6 +3042,17 @@ fn app_help_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::app_help::ENVIRONMENT, "on"))
+}
+
+// The failed calls a turn's record carries (`turn_ledger`, #8726) are told
+// in the second route's worker, which sends them to the coordinator: the exact
+// `on`, to the second route alone.
+fn doctor_turns_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::turn_ledger::ENVIRONMENT, "on"))
 }
 
 // A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
@@ -4717,6 +4732,13 @@ mod tests {
                     (
                         app_help_worker_environment,
                         "LAMP_APP_HELP",
+                        ["second"].as_slice(),
+                    ),
+                    // The failed calls of a turn, for its record (#8726): the
+                    // second route alone.
+                    (
+                        doctor_turns_worker_environment,
+                        "LAMP_DOCTOR_TURNS",
                         ["second"].as_slice(),
                     ),
                     // A plain ask to make a skill calls make_skill: the

@@ -151,7 +151,7 @@ at once and records `stopped`, never a pass.
 
 | Test | What runs | Proposed stop / pass | Matrix id |
 |---|---|---|---|
-| Servo endurance | the arm's normal moves in a loop, 30 min, within the joint limits | stops at the body's own bounds (`docs/body.md`): a joint's temperature at 62 °C, or load over pitch 240, roll 150 or yaw 220 for six steps in a row; passes under 58 °C with no temperature or load stop in the 30 minutes, set from a known-good unit's run first | `servo_endurance` |
+| Servo endurance | the arm's normal moves in a loop, 30 min, within the joint limits | stops at the body's own bounds (`docs/body.md`): a joint's temperature at 69 °C, or load over pitch 240, roll 150 or yaw 220 for six steps in a row; passes under 58 °C with no temperature or load stop in the 30 minutes, set from a known-good unit's run first | `servo_endurance` |
 | Give way | a person pushes the arm while it holds and while it moves, 20 times | lets go every time | `servo_give_way` |
 | Power under peak | all servos at peak together, speaker loud, ring full | supply never below the board's brown-out level (the hardware lead names it) | `power_servo_peak` |
 | Power cut | cut and back, 20 times, at idle and mid-move | back by itself every time, nothing left muted, arm safe; the self-test's storage check after every cut, stopping on the first SD-card I/O or ext4 error, since repeated cuts can corrupt a card | `recovery_power_cut` |

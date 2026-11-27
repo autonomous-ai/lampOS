@@ -3121,12 +3121,9 @@ fn run_call_with_scope(
             "the lamp's agent",
             (crate::agent_asks::run(call, request, heard, lease), true),
         ),
-        Route::SeenActivity(posture, offer) => (
+        Route::SeenActivity(posture, _) => (
             "the seen activity yes",
-            (
-                crate::seen_yes::run(call, request, heard, lease, *posture, *offer),
-                true,
-            ),
+            (crate::seen_yes::run(call, request, heard, *posture), true),
         ),
         Route::Decline
         | Route::Clock
@@ -6876,16 +6873,13 @@ mod tests {
             assert_eq!(route(&off, name), Route::Nobody);
             assert_eq!(answer(&off, &call(name), 7, true), unavailable());
         }
-        // An ordinary "look at my desk, where are my keys" called as a
-        // yes, spoken or typed: no offer was said, so nothing is kept.
+        // A start typed, not spoken at the lamp: nothing is kept (the
+        // spoken one is anyone's, `seen_yes`'s own tests, kept in a test
+        // folder rather than the lamp's).
         let look = call(crate::seen_yes::LOOK);
         assert_eq!(
             answer_typed(&on, &look, crate::messages::REQUESTS_FROM + 1)["note"],
-            crate::seen_yes::OFFER_FIRST
-        );
-        assert_eq!(
-            answer(&on, &look, 70_101, true)["note"],
-            crate::seen_yes::OFFER_FIRST
+            crate::seen_yes::NOT_SPOKEN
         );
         // The offer names posture with its switch.
         let offer = call(crate::seen_yes::OFFER);
@@ -6898,8 +6892,8 @@ mod tests {
     /// The first builder on #7506: with `LAMP_SEEN_ACTIVITY=on` and the
     /// voice's own offer off (`LAMP_SEEN_VOICE_OFFER` unset, as in the
     /// product), no request is offered `offer_desk_noticing` and a call of
-    /// it is nobody's, while the yes (refused with no offer before it) and
-    /// "stop looking" are declared and routed as ever.
+    /// it is nobody's, while the start (anyone's spoken ask, the owner's
+    /// call on #7767) and "stop looking" are declared and routed as ever.
     #[test]
     fn with_the_voice_offer_off_no_request_is_offered_the_desk_offer() {
         let flags = crate::seen_yes::arguments(Some("on"), Some("on"), None);
@@ -6926,19 +6920,16 @@ mod tests {
                 Route::SeenActivity(settings.seen_posture, false)
             );
         }
-        // Heron on #7506: the look's refusal names the app, never the
-        // offer that is not declared, and no refusal names a function the
-        // model was not told.
-        let look = answer(&settings, &call(crate::seen_yes::LOOK), 70_202, true);
-        assert_eq!(look["note"], crate::seen_yes::APP_FIRST);
-        let note = look["note"].as_str().unwrap();
-        assert!(note.contains("in the app"), "{note}");
-        for name in [
-            crate::seen_yes::OFFER,
-            crate::seen_yes::LOOK,
-            crate::seen_yes::STOP,
+        // Heron on #7506: no refusal names a function the model was not
+        // told (the start on a line nobody spoke, the offer's call).
+        let look = answer(&settings, &call(crate::seen_yes::LOOK), 70_202, false);
+        assert_eq!(look["note"], crate::seen_yes::NOT_SPOKEN);
+        for (name, heard) in [
+            (crate::seen_yes::OFFER, true),
+            (crate::seen_yes::LOOK, false),
+            (crate::seen_yes::STOP, true),
         ] {
-            let refused = answer(&settings, &call(name), 70_203, true);
+            let refused = answer(&settings, &call(name), 70_203, heard);
             let said = refused.to_string();
             assert!(!said.contains(crate::seen_yes::OFFER), "{name}: {said}");
         }

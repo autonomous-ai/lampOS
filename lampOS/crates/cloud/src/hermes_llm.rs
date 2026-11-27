@@ -26,6 +26,19 @@
 //! skills' runs (`lamp_skills::relay_share`), and each chat answer has one
 //! journal line of its numbers. Only read: every request is forwarded as
 //! before. Off, nothing is read, kept or said.
+//!
+//! With `LAMP_OWN_KEYS=on` and a person's own model key ([`OwnKeys`],
+//! #8735, `docs/own-keys.md`), a chat goes to their model in place of the
+//! relay: the one the voice uses, in `lamp_msgs::own_model::PRECEDENCE`, and
+//! only once its check at `keys.set` saw it make a tool call. The agent
+//! still asks for [`MODEL`]; `model` is changed to theirs, the body and the
+//! stream pass as they are, `/models` is answered here with [`MODEL`], and
+//! the relay's day is not counted. A hearing or voice key alone, no model
+//! key, or no tool call: the relay, as before. Their endpoint refusing the
+//! key (401, 403) before anything is passed: that request goes to the
+//! relay, said once. The route is read and said once, at lamp-cloud's
+//! start; never a key.
+use lamp_msgs::own_model::{self, Model};
 use serde_json::Value;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -73,6 +86,10 @@ pub const MODEL: &str = "deepseek-flash";
 /// The head, then the body, must arrive within these.
 const HEAD_WITHIN: Duration = Duration::from_secs(10);
 const BODY_WITHIN: Duration = Duration::from_secs(30);
+/// At a stop (SIGTERM), how long the chats in flight are given to end
+/// before lamp-cloud exits: well inside systemd's stop timeout (90 s, the
+/// default: `lamp-cloud.service` sets no `TimeoutStopSec=`).
+pub const DRAIN_ON_STOP: Duration = Duration::from_secs(10);
 /// A refused request's unread rest is drained at most this long.
 const DRAIN_WITHIN: Duration = Duration::from_secs(1);
 /// Each write to the caller must be taken within this.
@@ -209,6 +226,139 @@ impl Started {
     }
 }
 
+/// Root's keys helper's folder (`lamp_setup::keys::FOLDER`): root's alone,
+/// 0700. lamp-cloud never reads it; its unit hands in only the model
+/// services' files, one credential each.
+pub const OWN_FOLDER: &str = "/etc/lampOS/voice/own";
+
+/// The person's own model key and what goes with it (#8735), as lamp-cloud's
+/// unit hands them in: each model service's `.key`, `.url`, `.model` and
+/// `.checked` from [`OWN_FOLDER`] as the credential `own_<file>`
+/// (`LoadCredential=own_<file>:<folder>/<file>`), blank (`SetCredential=`)
+/// when there is none, so lamp-cloud always starts. No hearing or voice key
+/// is handed in. Read once, at lamp-cloud's start: systemd copies a
+/// credential then, so the keys helper restarts lamp-cloud after a model
+/// key's change.
+#[derive(Debug, Clone)]
+pub struct OwnKeys {
+    dir: PathBuf,
+}
+
+/// The files of each model service lamp-cloud's unit hands in, each the
+/// credential `own_<file>` ([`OwnKeys`]).
+pub fn handed_in() -> Vec<String> {
+    own_model::PRECEDENCE
+        .into_iter()
+        .flat_map(|model| {
+            let id = model.id();
+            let url = matches!(model, Model::OpenAiCompatible | Model::DeepSeek);
+            [
+                Some(format!("{id}.key")),
+                url.then(|| format!("{id}.url")),
+                model.has_model_file().then(|| format!("{id}.model")),
+                Some(format!("{id}.checked")),
+            ]
+        })
+        .flatten()
+        .collect()
+}
+
+impl OwnKeys {
+    /// The unit's credentials folder (`$CREDENTIALS_DIRECTORY`).
+    pub fn credentials(dir: &Path) -> Self {
+        Self {
+            dir: dir.to_path_buf(),
+        }
+    }
+
+    /// One file's text, trimmed; `None` when there is none, or it is the
+    /// unit's blank fallback.
+    fn read(&self, name: &str) -> Result<Option<String>, ()> {
+        match std::fs::read_to_string(self.dir.join(format!("own_{name}"))) {
+            Ok(text) if text.trim().is_empty() => Ok(None),
+            Ok(text) => Ok(Some(text.trim().to_owned())),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(_) => Err(()),
+        }
+    }
+
+    /// The person's own model the agent chats with, or why the relay.
+    fn route(&self) -> Result<OwnRoute, String> {
+        let Some(model) = own_model::PRECEDENCE
+            .into_iter()
+            .find(|model| !matches!(self.read(&format!("{}.key", model.id())), Ok(None)))
+        else {
+            return Err("no model key of the person's".into());
+        };
+        let id = model.id();
+        let unread = |what: &str| format!("the person's {id} {what} can't be read");
+        let key = self
+            .read(&format!("{id}.key"))
+            .ok()
+            .flatten()
+            .ok_or_else(|| unread("key"))?;
+        let kept_url = self
+            .read(&format!("{id}.url"))
+            .map_err(|()| unread("URL"))?;
+        let base = match (model.base(), kept_url) {
+            (_, Some(url)) if url_taken(&url) => url,
+            (_, Some(_)) | (None, None) => return Err(unread("URL")),
+            (Some(base), None) => base.to_owned(),
+        };
+        let name = if model.has_model_file() {
+            self.read(&format!("{id}.model"))
+                .ok()
+                .flatten()
+                .filter(|name| own_model::fits_model(name))
+                .ok_or_else(|| unread("model"))?
+        } else {
+            MODEL.to_owned()
+        };
+        // The agent's tool check at `keys.set` (#8735): the `.checked`
+        // record's second line, `tools` when the model made a tool call.
+        let checked = self.read(&format!("{id}.checked")).ok().flatten();
+        if checked.as_deref().and_then(|text| text.lines().nth(1)) != Some("tools") {
+            return Err(format!(
+                "the person's {id} model made no tool call at its check"
+            ));
+        }
+        Ok(OwnRoute {
+            model,
+            chat_base: model.chat_base(&base),
+            name,
+            key,
+        })
+    }
+}
+
+/// An own model's URL as the voice takes one; in this file's tests, their
+/// local plain server too.
+fn url_taken(url: &str) -> bool {
+    own_model::https_url(url) || (cfg!(test) && url.starts_with("http://127.0.0.1:"))
+}
+
+/// The person's own model, as the agent's chat is sent to it.
+struct OwnRoute {
+    model: Model,
+    chat_base: String,
+    name: String,
+    key: String,
+}
+
+impl OwnRoute {
+    /// Its journal line: the service, the model and the host, never a key.
+    fn told(&self) -> String {
+        let host = self
+            .chat_base
+            .split_once("://")
+            .map_or(self.chat_base.as_str(), |(_, rest)| rest)
+            .split('/')
+            .next()
+            .unwrap_or_default();
+        format!("own {} {} at {host}", self.model.id(), self.name)
+    }
+}
+
 /// The forwarder: the relay's DeepSeek, the key, and the local token.
 pub struct Forwarder {
     base: String,
@@ -219,6 +369,31 @@ pub struct Forwarder {
     unread: Arc<Semaphore>,
     started: Mutex<Started>,
     meter: Option<Meter>,
+    /// The person's own model, read at the start with `LAMP_OWN_KEYS=on`
+    /// (#8735); `None`: the relay.
+    own: Option<OwnRoute>,
+    /// The own route's refusal was said.
+    said_refused: Mutex<String>,
+    /// The chats in flight, by number, and when each began; and set once a
+    /// stop has begun, so no new chat is taken.
+    flights: Arc<Mutex<Vec<(u64, Instant)>>>,
+    next_flight: std::sync::atomic::AtomicU64,
+    stopping: std::sync::atomic::AtomicBool,
+}
+
+/// A chat in flight, taken off [`Forwarder::flights`] when it ends.
+struct Flight {
+    flights: Arc<Mutex<Vec<(u64, Instant)>>>,
+    number: u64,
+}
+
+impl Drop for Flight {
+    fn drop(&mut self) {
+        self.flights
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .retain(|(number, _)| *number != self.number);
+    }
 }
 
 /// The relay's day as its answers say it, kept for lamp-skills
@@ -406,7 +581,9 @@ enum Refusal {
     LengthRequired,
     TooMany,
     Unreachable,
+    OwnUnreachable,
     NotThisModel,
+    Stopping,
 }
 
 impl Refusal {
@@ -420,7 +597,13 @@ impl Refusal {
             Self::LengthRequired => (411, "Length Required", "a Content-Length is needed"),
             Self::TooMany => (429, "Too Many Requests", "too many requests now"),
             Self::Unreachable => (502, "Bad Gateway", "the relay can't be reached now"),
+            Self::OwnUnreachable => (
+                502,
+                "Bad Gateway",
+                "the person's model can't be reached now",
+            ),
             Self::NotThisModel => (400, "Bad Request", "only the model deepseek-flash"),
+            Self::Stopping => (503, "Service Unavailable", "the lamp's link is restarting"),
         }
     }
 }
@@ -454,7 +637,81 @@ impl Forwarder {
             unread: Arc::new(Semaphore::new(UNREAD_AT_ONCE)),
             started: Mutex::new(Started::default()),
             meter: None,
+            own: None,
+            said_refused: Mutex::default(),
+            flights: Arc::default(),
+            next_flight: Default::default(),
+            stopping: Default::default(),
         })
+    }
+
+    /// The person's own model from `own` (#8735), read once, the route said
+    /// in the journal once.
+    pub fn with_own(mut self, own: &OwnKeys) -> Self {
+        let route = own.route();
+        let line = match &route {
+            Ok(route) => route.told(),
+            Err(why) => format!("relay ({why})"),
+        };
+        eprintln!("lamp-cloud: the Hermes forwarder: the agent's model: {line}");
+        self.own = route.ok();
+        self
+    }
+
+    /// A chat sent to the person's own model, `model` made theirs. `None`
+    /// when it refused their key (401, 403) before any of it was passed:
+    /// the caller sends it to the relay, said once for this route.
+    async fn ask_own(
+        &self,
+        route: &OwnRoute,
+        body: &[u8],
+    ) -> Result<Option<reqwest::Response>, Refusal> {
+        let mut asked: Value = serde_json::from_slice(body).map_err(|_| Refusal::Bad)?;
+        asked["model"] = Value::String(route.name.clone());
+        let answer = self
+            .client
+            .post(format!("{}/chat/completions", route.chat_base))
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(asked.to_string())
+            .bearer_auth(&route.key)
+            .send()
+            .await
+            .map_err(|_| Refusal::OwnUnreachable)?;
+        let status = answer.status().as_u16();
+        if !matches!(status, 401 | 403) {
+            return Ok(Some(answer));
+        }
+        let told = route.told();
+        let mut said = self
+            .said_refused
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if *said != told {
+            eprintln!(
+                "lamp-cloud: the Hermes forwarder: the agent's model: relay for this chat, \
+                 the person's {} key was refused ({status})",
+                route.model.id()
+            );
+            *said = told;
+        }
+        Ok(None)
+    }
+
+    /// `/models` on the person's own model: [`MODEL`] alone, answered here.
+    async fn models_here(stream: &mut TcpStream) -> io::Result<()> {
+        let body = serde_json::json!({
+            "object": "list",
+            "data": [{"id": MODEL, "object": "model", "owned_by": "lampos"}]
+        })
+        .to_string();
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+             Content-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        );
+        send(stream, head.as_bytes()).await?;
+        send(stream, body.as_bytes()).await?;
+        stream.shutdown().await
     }
 
     /// The relay's day used and the chats' tokens kept in `dir`'s
@@ -495,6 +752,72 @@ impl Forwarder {
                 let _ = forwarder.answer(stream, unread).await;
             });
         }
+    }
+
+    /// [`Self::serve`] until `stop` ends (SIGTERM, #8735), then no new
+    /// connection or chat is taken and the chats in flight are given
+    /// `within` to end. Returns the journal's lines: how many ended and how
+    /// many were cut, then one for each one cut.
+    pub async fn serve_until(
+        self: Arc<Self>,
+        listener: TcpListener,
+        stop: impl std::future::Future<Output = ()>,
+        within: Duration,
+    ) -> Vec<String> {
+        tokio::select! {
+            () = self.clone().serve(listener) => {}
+            () = stop => {}
+        }
+        self.stopping
+            .store(true, std::sync::atomic::Ordering::Release);
+        let until = Instant::now() + within;
+        let flying = || {
+            self.flights
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .clone()
+        };
+        let at_stop = flying().len();
+        while !flying().is_empty() && Instant::now() < until {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let cut: Vec<String> = flying()
+            .into_iter()
+            .map(|(_, began)| {
+                format!(
+                    "the Hermes forwarder: a chat in flight was cut by a stop ({} ms in)",
+                    began.elapsed().as_millis()
+                )
+            })
+            .collect();
+        // Until lamp-cloud listens again, the port is closed: the agent's
+        // next chats are refused by the system, which no part counts.
+        let mut lines = vec![format!(
+            "the Hermes forwarder: stopped, {} chats in flight ended, {} cut; \
+             a chat sent before lamp-cloud is back is refused",
+            at_stop - cut.len(),
+            cut.len()
+        )];
+        lines.extend(cut);
+        lines
+    }
+
+    /// A chat taken in flight, or `None` once a stop has begun.
+    fn take_off(&self) -> Option<Flight> {
+        if self.stopping.load(std::sync::atomic::Ordering::Acquire) {
+            return None;
+        }
+        let number = self
+            .next_flight
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.flights
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .push((number, Instant::now()));
+        Some(Flight {
+            flights: self.flights.clone(),
+            number,
+        })
     }
 
     async fn read(&self, stream: &mut TcpStream) -> Result<Request, Refusal> {
@@ -659,6 +982,29 @@ impl Forwarder {
             Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
         };
         let chat = request.path == CHAT_PATH;
+        // Held to the answer's end, so a stop drains it (#8735).
+        let _flight = match chat.then(|| self.take_off()) {
+            Some(None) => return Self::refuse(&mut stream, &Refusal::Stopping).await,
+            flight => flight.flatten(),
+        };
+        // The person's own model (#8735): no relay, so no meter.
+        if let Some(route) = &self.own {
+            if !chat {
+                return Self::models_here(&mut stream).await;
+            }
+            match self.ask_own(route, &request.body).await {
+                Ok(Some(mut answer)) => {
+                    let head = Self::head(&answer).1;
+                    return match Self::pass(&mut stream, &mut answer, head, None).await {
+                        Ok(true) => stream.shutdown().await,
+                        Ok(false) => Ok(()),
+                        Err(error) => Err(error),
+                    };
+                }
+                Ok(None) => {}
+                Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
+            }
+        }
         let upstream = match (request.method.as_str(), request.path.as_str()) {
             ("POST", CHAT_PATH) => self
                 .client
@@ -672,19 +1018,7 @@ impl Forwarder {
             Err(_) => return Self::refuse(&mut stream, &Refusal::Unreachable).await,
         };
         let status = answer.status();
-        let kind = answer
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|kind| kind.to_str().ok())
-            .filter(|kind| !kind.contains(['\r', '\n']))
-            .unwrap_or("application/json")
-            .to_owned();
-        let head = format!(
-            "HTTP/1.1 {} {}\r\nContent-Type: {kind}\r\nCache-Control: no-cache\r\n\
-             Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
-            status.as_u16(),
-            status.canonical_reason().unwrap_or("Answer"),
-        );
+        let (kind, head) = Self::head(&answer);
         // The relay's day used, read only with the switch set (#7342).
         let header = self.meter.as_ref().and_then(|_| {
             answer
@@ -705,6 +1039,25 @@ impl Forwarder {
             Ok(false) => Ok(()),
             Err(error) => Err(error),
         }
+    }
+
+    /// An upstream answer's `Content-Type` and the head passed on for it.
+    fn head(answer: &reqwest::Response) -> (String, String) {
+        let status = answer.status();
+        let kind = answer
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|kind| kind.to_str().ok())
+            .filter(|kind| !kind.contains(['\r', '\n']))
+            .unwrap_or("application/json")
+            .to_owned();
+        let head = format!(
+            "HTTP/1.1 {} {}\r\nContent-Type: {kind}\r\nCache-Control: no-cache\r\n\
+             Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+            status.as_u16(),
+            status.canonical_reason().unwrap_or("Answer"),
+        );
+        (kind, head)
     }
 
     /// The answer's `head`, then each piece as it comes, so an SSE stream
@@ -741,38 +1094,55 @@ impl Forwarder {
 /// Runs the forwarder when `LAMP_HERMES_ON_LAMP=on` or
 /// `LAMP_OPENCLAW_ON_LAMP=on`: the token kept in
 /// `state` (lamp-cloud's state folder), the relay from `second_json` (the
-/// voice's `second.json`, when handed in) and the voice's `key`. Never
-/// returns; with the switch off, or when it can't start, it says why once
-/// and waits forever, so the rest of lamp-cloud goes on.
+/// voice's `second.json`, when handed in) and the voice's `key`, and the
+/// person's `own` keys with `LAMP_OWN_KEYS=on` (#8735). Returns only once
+/// `stop` ends (SIGTERM), after the chats in flight are drained, each one
+/// cut said; with the switch off, or when it can't start, it says why once
+/// and waits for `stop`, so the rest of lamp-cloud goes on.
 pub async fn run(
     state: Option<&Path>,
     second_json: Option<&str>,
     key: &str,
+    own: Option<OwnKeys>,
+    stop: impl std::future::Future<Output = ()>,
     say: &mut dyn FnMut(&str),
 ) {
-    serve_when(on_from_environment(), PORT, state, second_json, key, say).await
+    serve_when(
+        on_from_environment().then_some(PORT),
+        state,
+        second_json,
+        key,
+        own,
+        stop,
+        say,
+    )
+    .await
 }
 
-/// [`run`] with the switches already read (`on`, [`on_from`]) and the port
-/// given, so a test can show either switch alone starts the listener
-/// (#6226). Off, nothing is listened on.
+/// [`run`] with the switches already read and the port given, `None`
+/// when off ([`on_from`]), so a test can show either switch alone starts the
+/// listener (#6226). Off, nothing is listened on.
 pub async fn serve_when(
-    on: bool,
-    port: u16,
+    port: Option<u16>,
     state: Option<&Path>,
     second_json: Option<&str>,
     key: &str,
+    own: Option<OwnKeys>,
+    stop: impl std::future::Future<Output = ()>,
     say: &mut dyn FnMut(&str),
 ) {
-    if !on {
-        return std::future::pending().await;
-    }
+    let Some(port) = port else {
+        return stop.await;
+    };
     let started = async {
         let state = state.ok_or("no state folder for the local token")?;
         let token = token(state).map_err(|_| "the local token can't be kept")?;
         let mut forwarder = Forwarder::new(&relay_base(second_json), key, &token)?;
         if lamp_skills::relay_share::on() {
             forwarder = forwarder.with_meter(state);
+        }
+        if let Some(own) = &own {
+            forwarder = forwarder.with_own(own);
         }
         let listener = Forwarder::bind(port)
             .await
@@ -792,11 +1162,13 @@ pub async fn serve_when(
                     lamp_skills::relay_share::SWITCH
                 ));
             }
-            forwarder.serve(listener).await;
+            for cut in forwarder.serve_until(listener, stop, DRAIN_ON_STOP).await {
+                say(&cut);
+            }
         }
         Err(why) => {
             say(&format!("no Hermes forwarder: {why}"));
-            std::future::pending().await
+            stop.await
         }
     }
 }

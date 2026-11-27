@@ -32,7 +32,8 @@
 //!   row or any failure pause 60 s doubling to 10 min with jitter, and
 //!   `diagnostics` says `warn` until an answer.
 //! - **The window** ([`window`]): the share of bad samples and the region
-//!   most often bad over the last ten minutes, by V1's thresholds. It is
+//!   most often bad over the last two checks, a minute (the owner, #8377),
+//!   by V1's thresholds. It is
 //!   forgotten at once on `room/stood_up` and when the gate closes for the
 //!   privacy slide, sleep, the opt-in off or a forget
 //!   ([`crate::keep::Hard`]); a stranger, a second face or a misread
@@ -42,14 +43,16 @@
 //!   per-person history is kept.
 //! - **The journal** ([`Note`], drained by `serve` with [`Pose::notes`]):
 //!   each sample sent (its bytes) and its answer (scored or no body, the
-//!   time it took), at most one each 30 s. The RULA score, its risk, bad or
-//!   good and the region, and the said window's bad share and region, only
-//!   with the diagnostics switch [`crate::JOURNAL_LABELS`] `on`: a forget or
-//!   the opt-in off does not clear the journal ([`said_line`]).
+//!   time it took), at most one each 30 s. Each answer's verdict, bad or
+//!   good, its high regions, risk level and RULA score, and the said
+//!   window's bad share and region, only with the diagnostics switch
+//!   [`crate::JOURNAL_LABELS`] `on` (the owner, 27 Nov on #8377: "Behind
+//!   the debug switch"): a forget or the opt-in off does not clear the
+//!   journal ([`said_line`]).
 //! - **Said** on `humans/posture` ([`HumanPosture`]) every 30 s while the
 //!   gate is open and the window holds at least [`window::MIN_SAMPLES`]
-//!   samples: from the third sample of a sitting. The gate closed, nothing
-//!   is said, so no old sample is said under the privacy. Under three
+//!   samples: from the second sample of a sitting. The gate closed, nothing
+//!   is said, so no old sample is said under the privacy. Under two
 //!   samples (frames not going out, the server busy, no body found, a
 //!   wipe, or the sitting just begun), nothing is said either: the topic
 //!   runs out, and a skill holding on it runs as it did.
@@ -133,15 +136,15 @@ pub enum Note {
     /// A frame handed to its socket, as sent (before Base64).
     Sent { bytes: usize },
     /// Answered with a score: the RULA score and risk level, whether the
-    /// sample is bad and its first high region (V1's rules,
-    /// [`window::judge`]), and whether it went into the window.
+    /// sample is bad and its high regions (V1's rules, [`window::judge`]'s
+    /// bits), and whether it went into the window.
     Answered {
         score: i64,
         risk_level: i64,
         /// The server scored the upper body only (the hips hidden).
         partial: bool,
         bad: bool,
-        region: &'static str,
+        high: u8,
         took: Duration,
         kept: bool,
     },
@@ -169,11 +172,17 @@ pub fn said_line(posture: &HumanPosture, samples: usize, labels: bool) -> String
         posture.window_s
     );
     if labels {
-        format!(
-            "{said}, bad_share {:.2}, region {}",
-            posture.bad_share,
-            window::region_word(posture.region)
-        )
+        if posture.bad_share > 0.0 {
+            format!(
+                "{said}, {:.0}% bad, region {}",
+                posture.bad_share * 100.0,
+                window::region_word(posture.region)
+            )
+        } else {
+            // No bad sample: no region, never `general` (Friday's read on
+            // #8377); the wire value is unchanged.
+            format!("{said}, 0% bad, no region")
+        }
     } else {
         said
     }
@@ -181,7 +190,9 @@ pub fn said_line(posture: &HumanPosture, samples: usize, labels: bool) -> String
 
 impl Note {
     /// The journal's line, without the `lamp-seen: ` prefix; `labels`
-    /// ([`crate::JOURNAL_LABELS`]) names the score, off says only scored.
+    /// ([`crate::JOURNAL_LABELS`]) names an answer's verdict, high regions
+    /// (`general` for one bad by its risk alone), risk and score, off says
+    /// only scored.
     pub fn line(&self, labels: bool) -> String {
         let held = |held_back_s: &Option<u64>| {
             held_back_s
@@ -200,16 +211,24 @@ impl Note {
                 risk_level,
                 partial,
                 bad,
-                region,
+                high,
                 took,
                 kept,
-            } => format!(
-                "posture sample answered: score {score}, risk {risk_level}, {}{}, region {region}, {} ms{}",
-                if *partial { "partial, " } else { "" },
-                if *bad { "bad" } else { "good" },
-                took.as_millis(),
-                if *kept { "" } else { "; not kept (no sitting)" }
-            ),
+            } => {
+                let names = window::high_names(*high);
+                let high = match (names.is_empty(), *bad) {
+                    (false, _) => format!(", high {names}"),
+                    (true, true) => ", high general".to_owned(),
+                    (true, false) => String::new(),
+                };
+                format!(
+                    "posture sample answered: scored, {}{}{high}, risk {risk_level}, score {score}, {} ms{}",
+                    if *partial { "partial, " } else { "" },
+                    if *bad { "bad" } else { "good" },
+                    took.as_millis(),
+                    if *kept { "" } else { "; not kept (no sitting)" }
+                )
+            }
             Note::NoBody { took } => {
                 format!(
                     "posture sample answered: no body found, {} ms",
@@ -430,7 +449,7 @@ impl Pose {
                             risk_level: ergo.risk_level,
                             partial: ergo.partial,
                             bad,
-                            region: window::region_name(high),
+                            high,
                             took,
                             kept,
                         });
@@ -483,7 +502,7 @@ impl Pose {
         }
         if gate.is_ok() {
             if self.open_at_us.is_none() {
-                // A new sitting: due at once, said with its third sample.
+                // A new sitting: due at once, said with its second sample.
                 self.next_said_us = now_us;
             }
             self.window.begin(now_us);
@@ -495,11 +514,11 @@ impl Pose {
         if !sitting || now_us < self.next_said_us {
             return None;
         }
-        // Not said while the window holds fewer than three samples (frames
+        // Not said while the window holds fewer than two samples (frames
         // not going out, the server busy or failing, no body found, just
         // wiped or just begun): the topic runs out and a skill holding on it
         // runs as it did, as doing.rs's "a `bad_share` of 0 is said only
-        // over samples" reads. Still due, so the third sample is said as
+        // over samples" reads. Still due, so the second sample is said as
         // soon as it lands.
         let posture = self.window.summary(now_us)?;
         self.next_said_us = now_us.saturating_add(us(HumanPosture::EVERY));
@@ -520,7 +539,7 @@ impl Pose {
 
     /// One step at `now_us` while the gate is closed for a while `serve` keeps
     /// ([`crate::keep`]): the window kept, in memory only (its samples
-    /// still age out of its ten minutes when it is next read); the running
+    /// still age out past [`window::KEPT_US`] when it is next read); the running
     /// request stopped and its answer dropped; no frame taken and nothing
     /// said.
     pub fn hold(&mut self, now_us: u64) {

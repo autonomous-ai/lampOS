@@ -647,6 +647,14 @@ impl Door {
 
     /// The quiet hours held on the door (lamp-control's `serve` always
     /// wires them; a door without, as in tests, holds none).
+    /// The lamp's own date, `YYYY-MM-DD`, at `wall_s` (unix seconds): none
+    /// while its zone is unknown or its clock is not set.
+    pub fn local_day(&self, wall_s: u64) -> Option<String> {
+        let local = self.quiet.as_ref()?.local_time.as_ref()?;
+        (wall_s >= CLOCK_SET_AFTER_S)
+            .then(|| lamp_msgs::doctor::day_string(local.day(wall_s.saturating_mul(1_000))))
+    }
+
     pub fn with_quiet_hours(mut self, quiet: Quiet) -> Self {
         self.quiet = Some(quiet);
         self
@@ -4717,6 +4725,8 @@ mod tests {
             client: crate::app_socket::app_client("demo"),
             grants: grants.iter().copied().collect(),
             remember: false,
+            net: false,
+            doctor: Default::default(),
         }
     }
 

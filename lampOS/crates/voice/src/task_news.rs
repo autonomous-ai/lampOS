@@ -1936,8 +1936,26 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
         // (`expired`, #8601, El's P2 on #8666: a task behind held ones in
         // the queue): told once as one that did not reach its agent. A
         // prepared task never said yes to expires too, and stays unsaid
-        // (no `confirmed`, below); one invalidated by a restart is as before.
+        // (no `confirmed`, below).
         "invalidated" if dispatch["code"].as_str() == Some(EXPIRED) => false,
+        // Said yes to, still queued when lamp-tasks restarted (an update),
+        // so never sent (`restart`): told once the same way. Only when the
+        // yes was in this boot as well: across a reboot how long ago it was
+        // asked is not known, and "just now" could be hours late. And only
+        // when the yes is at most a queued life plus "just now" old
+        // ([`YES_MS`]): a lamp-tasks that stayed down for hours (its start
+        // limit) and came back in the same boot ends the task at that late
+        // start, and it is not told then. A task that was being sent at the
+        // restart is `uncertain`, above.
+        "invalidated"
+            if dispatch["code"].as_str() == Some(RESTART)
+                && dispatch["confirmed"]["boot_id"].as_str() == Some(now.boot_id.as_str())
+                && dispatch["confirmed"]["monotonic_ms"]
+                    .as_u64()
+                    .is_some_and(|ms| now.ms.saturating_sub(ms) <= YES_MS) =>
+        {
+            false
+        }
         _ => return None,
     };
     if dispatch["confirmed"].is_null() {
@@ -1952,6 +1970,19 @@ fn failed_hand_over(item: &Value, now: &BootClock) -> Option<bool> {
 /// lamp-tasks' code for a task past its life before it was sent
 /// (`lamp_tasks::engine`'s `tick`).
 const EXPIRED: &str = "expired";
+
+/// lamp-tasks' code for work a restart of it ended (`Engine::open`): a
+/// queued task is `invalidated`, one being sent `uncertain`.
+const RESTART: &str = "restart";
+
+/// lamp-tasks' queued life (`lamp_tasks::engine::QUEUED_MS`, never linked
+/// here; a test keeps the two the same).
+const QUEUED_MS: u64 = 30 * 60_000;
+
+/// The oldest yes a task that a restart ended is told for: a task waits in
+/// the queue at most [`QUEUED_MS`], and it is told within [`JUST_MS`] of
+/// the restart.
+const YES_MS: u64 = QUEUED_MS + JUST_MS;
 
 /// lamp-tasks' code for a new start that timed out and is being checked
 /// (#8170): its dispatch stays `uncertain`, and it is never sent again.
@@ -3749,8 +3780,8 @@ mod tests {
     /// #8601 (El's P2 on #8666): a task said yes to that passed its queued
     /// life before it was sent (`invalidated` `expired`: a task behind held
     /// ones) is told once, as one that did not reach its agent, under its
-    /// one hand-over key; a prepared task never said yes to that expired,
-    /// or one invalidated by a restart, is not news.
+    /// one hand-over key; a prepared task never said yes to that expired is
+    /// not news.
     #[test]
     fn an_expired_hand_over_said_yes_to_is_told_once() {
         let item = |state: &str, confirmed: bool, boot: &str, ms: u64| {
@@ -3760,7 +3791,7 @@ mod tests {
         };
         // #8601 (El's P2 on #8666): said yes to and expired before it was
         // sent, told once as not reaching its agent; prepared and never said
-        // yes to, or invalidated by a restart, not news.
+        // yes to, not news. A restart's end: see the test below.
         let ended = |code: &str, confirmed: bool| {
             let mut item = item("invalidated", confirmed, "boot-a", NOW - 5_000);
             item["dispatch"]["code"] = json!(code);
@@ -3771,13 +3802,100 @@ mod tests {
             Some(false)
         );
         assert_eq!(failed_hand_over(&ended("expired", false), &now()), None);
-        assert_eq!(failed_hand_over(&ended("restart", true), &now()), None);
         let told =
             note_failed(&own(), &task("openclaw", json!([])), false, Some("expired")).unwrap();
         assert!(
             told.contains("did not reach") && told.contains("offer to try again"),
             "{told}"
         );
+    }
+
+    /// A task said yes to that was still queued when lamp-tasks restarted
+    /// (`invalidated` `restart`, an update) is told once, as one that did
+    /// not reach its agent, under its one hand-over key; never said yes to,
+    /// or said yes to before a reboot (how long ago is not known), it is
+    /// not news. Told is kept in the file, so a restart of the voice does
+    /// not tell it again.
+    #[test]
+    fn a_hand_over_said_yes_to_that_a_restart_ended_is_told_once() {
+        let ended = |confirmed: Value, code: &str| {
+            json!({"id":3,"observations":0,"dispatch":{"state":"invalidated",
+                "code":code,"confirmed":confirmed,
+                "finished":{"boot_id":"boot-a","monotonic_ms":NOW - 5_000}}})
+        };
+        assert_eq!(QUEUED_MS, lamp_tasks::engine::QUEUED_MS);
+        let yes = json!({"boot_id":"boot-a","monotonic_ms":NOW - 60_000});
+        assert_eq!(
+            failed_hand_over(&ended(yes.clone(), "restart"), &now()),
+            Some(false)
+        );
+        // A yes a whole queued life plus "just now" old is still told.
+        let edge = json!({"boot_id":"boot-a","monotonic_ms":NOW - YES_MS});
+        assert_eq!(
+            failed_hand_over(&ended(edge, "restart"), &now()),
+            Some(false)
+        );
+        // A yes in this boot but older (lamp-tasks stayed down past its
+        // start limit, then started hours later): silent.
+        let old = json!({"boot_id":"boot-a","monotonic_ms":NOW - YES_MS - 1});
+        assert_eq!(failed_hand_over(&ended(old, "restart"), &now()), None);
+        // A yes with no time on it: silent.
+        assert_eq!(
+            failed_hand_over(&ended(json!({"boot_id":"boot-a"}), "restart"), &now()),
+            None
+        );
+        assert_eq!(
+            failed_hand_over(&ended(Value::Null, "restart"), &now()),
+            None
+        );
+        assert_eq!(
+            failed_hand_over(&ended(json!({"boot_id":"boot-z"}), "restart"), &now()),
+            None
+        );
+        // Past "just now" of the restart: not told unasked.
+        let mut late = ended(yes, "restart");
+        late["dispatch"]["finished"]["monotonic_ms"] = json!(NOW - JUST_MS - 1);
+        assert_eq!(failed_hand_over(&late, &now()), None);
+        let told =
+            note_failed(&own(), &task("openclaw", json!([])), false, Some("restart")).unwrap();
+        assert!(
+            told.contains("did not reach") && told.contains("offer to try again"),
+            "{told}"
+        );
+        // Read from lamp-tasks as the voice reads it: offered once; once
+        // kept as told, a voice started again (reading the same file) does
+        // not offer it again.
+        let root = std::env::temp_dir().join(format!("task-news-restart-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let item = ended(
+            json!({"boot_id":"boot-a","monotonic_ms":NOW - 60_000}),
+            "restart",
+        );
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let answer = match asked["op"].as_str().unwrap() {
+                    "list" => json!({"ok":true,"store_id":"s1","items":[item.clone()]}),
+                    "get_task" => task("openclaw", json!([])),
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let file = root.join("told");
+        let first = read_once(&socket, &now(), &read_told(&file), &BTreeSet::new());
+        let keys: Vec<&str> = first.iter().map(|news| news.key.as_str()).collect();
+        assert_eq!(keys, ["s1:3:hand-over"]);
+        assert!(first[0].note.contains("did not reach"), "{}", first[0].note);
+        keep_told(&file, &first[0].key);
+        assert!(read_once(&socket, &now(), &read_told(&file), &BTreeSet::new()).is_empty());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

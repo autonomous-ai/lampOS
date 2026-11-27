@@ -1,0 +1,4 @@
+# 11:00, both checks bad but a window under a minute (window_s 30, which today's lamp-seen
+# never says: it says 60 from its second check), then up and gone at 9m30: nothing.
+clock = "11:00"
+none = true

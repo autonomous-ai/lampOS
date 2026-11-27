@@ -89,6 +89,27 @@ pub type Render = Box<dyn Fn(&str) -> Result<Vec<i16>, String> + Send + Sync>;
 /// app's voice preview (#7485), one line, the voice in use left as it is.
 pub type RenderIn = Box<dyn Fn(&str, &str) -> Result<Vec<i16>, String> + Send + Sync>;
 
+/// Whether the person's own voice was refused in this run (#8367).
+pub type Lost = Box<dyn Fn() -> bool + Send + Sync>;
+
+/// The lamp's own voice behind the person's (#8367, `LAMP_OWN_KEYS`,
+/// [`TtsCache::falling_back_to`]): its own lines under its own key.
+struct Lamps {
+    cache: TtsCache,
+    lost: Lost,
+}
+
+/// The voice part of the cache's key: `voice` as it is, or, for the
+/// person's own voice (#8367), with the address it is asked at (`own_at`),
+/// so their lines are never the lamp's, another voice ID's or another
+/// address's.
+pub fn own_voice(voice: &str, own_at: Option<&str>) -> String {
+    match own_at {
+        Some(at) => format!("own:{voice}@{at}"),
+        None => voice.to_owned(),
+    }
+}
+
 pub struct TtsCache {
     dir: PathBuf,
     /// `voice|model|language`, the key's prefix.
@@ -113,6 +134,8 @@ pub struct TtsCache {
     /// a render is the same each time, so they are never sent again in this
     /// process (Thirteen's P2 on #4523).
     rendering: Mutex<std::collections::HashSet<String>>,
+    /// The lamp's own voice, when this one is the person's (#8367).
+    lamps: Option<Box<Lamps>>,
 }
 
 impl std::fmt::Debug for TtsCache {
@@ -139,6 +162,7 @@ impl TtsCache {
             outage_lines: false,
             offline_rings: false,
             rendering: Mutex::new(std::collections::HashSet::new()),
+            lamps: None,
         }
     }
 
@@ -151,6 +175,15 @@ impl TtsCache {
     /// The owner's language, `None` for English ([`Self::speaking`]).
     pub fn owners(&self) -> Option<Language> {
         self.owners
+    }
+
+    /// This cache speaks in the person's own voice (#8367), with `lamps`,
+    /// the lamp's own, over the same folder: once `lost` says the person's
+    /// was refused, every line is the lamp's, kept under the lamp's key,
+    /// never theirs.
+    pub fn falling_back_to(mut self, lamps: TtsCache, lost: Lost) -> Self {
+        self.lamps = Some(Box::new(Lamps { cache: lamps, lost }));
+        self
     }
 
     /// The owner's language, `None` for English: the fixed lines it warms
@@ -274,8 +307,32 @@ impl TtsCache {
         self.dir.join(format!("{}.wav", self.key(text)))
     }
 
-    /// `text`'s samples: from the cache, or rendered once and kept.
+    /// `text`'s samples: from the cache, or rendered once and kept, in the
+    /// voice the lamp speaks in now ([`Self::in_voice`]).
     pub fn samples(&self, text: &str) -> Result<Vec<i16>, String> {
+        self.in_voice(|cache| cache.samples_here(text))
+    }
+
+    /// `say` in the voice the lamp speaks in now (#8367): the person's own
+    /// until it is refused, then the lamp's own. A line the person's voice
+    /// was refused for is said again in the lamp's, and kept, if at all,
+    /// under the lamp's key only: the person's render has no fallback of its
+    /// own, so it never hands back the lamp's voice to keep under theirs.
+    fn in_voice<T>(&self, say: impl Fn(&TtsCache) -> Result<T, String>) -> Result<T, String> {
+        let Some(lamps) = &self.lamps else {
+            return say(self);
+        };
+        if !(lamps.lost)() {
+            match say(self) {
+                Err(_) if (lamps.lost)() => {}
+                said => return said,
+            }
+        }
+        say(&lamps.cache)
+    }
+
+    /// [`Self::samples`] in this cache's own voice only.
+    fn samples_here(&self, text: &str) -> Result<Vec<i16>, String> {
         let path = self.path(text);
         if let Some(samples) = read(&path) {
             return Ok(samples);
@@ -314,7 +371,7 @@ impl TtsCache {
     /// pieces ([`pieces`], #7892) and played as one line, every piece in
     /// order.
     pub fn render_once(&self, text: &str) -> Result<Vec<i16>, String> {
-        in_pieces(text, |piece| (self.render)(piece))
+        self.in_voice(|cache| in_pieces(text, |piece| (cache.render)(piece)))
     }
 
     /// `text` rendered now in the lamp's voice named `voice`, never kept:
@@ -373,7 +430,7 @@ impl TtsCache {
     /// [`Self::render_once`] says it.
     fn render_piece(&self, piece: &str, voice: Option<&str>) -> Result<Vec<i16>, String> {
         match voice {
-            None => in_pieces(piece, |piece| (self.render)(piece)),
+            None => self.in_voice(|cache| in_pieces(piece, |piece| (cache.render)(piece))),
             Some(voice) => {
                 let render_in = self.render_in.as_ref().ok_or_else(|| {
                     "this lamp's speech service speaks in its own voice only".to_owned()
@@ -417,9 +474,15 @@ impl TtsCache {
     }
 
     /// `text`'s samples if kept already, never rendered here: for a caller
-    /// that must not wait on the speech service (#3748).
+    /// that must not wait on the speech service (#3748). In the person's own
+    /// voice (#8367), the lamp's line while theirs is not kept yet, and only
+    /// the lamp's once theirs was refused.
     pub fn kept(&self, text: &str) -> Option<Vec<i16>> {
-        read(&self.path(text))
+        match &self.lamps {
+            Some(lamps) if (lamps.lost)() => lamps.cache.kept(text),
+            Some(lamps) => read(&self.path(text)).or_else(|| lamps.cache.kept(text)),
+            None => read(&self.path(text)),
+        }
     }
 
     /// The sleep line (`lamp_msgs::SLEEP_LINE`, #3748) if kept: the owner's
@@ -710,12 +773,14 @@ async fn whole_within<E: std::fmt::Display>(
 }
 
 /// `text` rendered through the speech service `config` names, whole, within
-/// [`render_within`], on a runtime of its own.
+/// [`render_within`], on a runtime of its own; `refused` is told the status
+/// the service refused the key or voice with (401 to 404).
 fn render_with(
     config: &crate::second_config::SecondConfig,
     text: &str,
+    refused: &dyn Fn(u16),
 ) -> Result<Vec<i16>, String> {
-    use crate::second_provider::net::Tts;
+    use crate::second_provider::net::{Error, Tts};
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -723,7 +788,11 @@ fn render_with(
     runtime.block_on(async {
         let whole = async {
             let tts = Tts::new(config)?;
-            let mut speech = tts.speak(text).await?;
+            let mut speech = tts.speak(text).await.inspect_err(|why| {
+                if let Error::Status(status @ 401..=404) = why {
+                    refused(*status);
+                }
+            })?;
             let mut samples = Vec::new();
             while let Some(packet) = speech.next().await? {
                 samples.extend_from_slice(&packet);
@@ -732,6 +801,18 @@ fn render_with(
         };
         whole_within(text, whole).await
     })
+}
+
+/// `config` with the lamp's own speech (#8367): as the route had it before
+/// the person's own voice, when that is set; else as it is.
+fn lamps_config(config: &crate::second_config::SecondConfig) -> crate::second_config::SecondConfig {
+    let mut lamps = config.clone();
+    if let Some(voice) = lamps.hosted.lamps_voice.take() {
+        lamps.tts_base_url = voice.base_url;
+        lamps.tts_key = voice.key;
+        lamps.tts_voice = voice.voice;
+    }
+    lamps
 }
 
 fn made_from_environment() -> Option<Arc<TtsCache>> {
@@ -775,30 +856,20 @@ pub fn built_from_environment() -> Option<TtsCache> {
             return None;
         }
     };
-    let voice = voice_name(config.tts_provider, config.tts_voice.as_deref()).to_owned();
-    let model = config
+    // The person's own voice (#8367), read as the second route's worker
+    // reads it (`LAMP_OWN_KEYS`, the unit's credentials); its lines are
+    // journalled by the worker.
+    let (own, _) = config.with_own_keys(
+        std::env::var_os(crate::second_config::OWN_KEYS_ENV).is_some_and(|value| value == "on"),
+        std::env::var_os(crate::second_config::CREDENTIALS_ENV).as_deref(),
+    );
+    let lamps = lamps_config(&own);
+    let model = lamps
         .tts_model
         .clone()
-        .unwrap_or_else(|| default_model(config.tts_provider).to_owned());
-    let language = config.stt_language.clone().unwrap_or_default();
-    // Another of the lamp's voices (#7485): the same service and model,
-    // only its voice changed, for ElevenLabs, whose voices the lamp names.
-    let render_in: Option<RenderIn> =
-        (config.tts_provider == crate::second_config::TtsProvider::ElevenLabs).then(|| {
-            let config = config.clone();
-            Box::new(move |text: &str, voice: &str| {
-                let mut config = config.clone();
-                config.tts_voice = Some(voice.to_owned());
-                render_with(&config, text)
-            }) as RenderIn
-        });
-    let render: Render = Box::new(move |text: &str| render_with(&config, text));
-    let cache = TtsCache::new(DIR, &voice, &model, &language, render);
-    let cache = match render_in {
-        Some(render_in) => cache.speaking_in(render_in),
-        None => cache,
-    };
-    Some(
+        .unwrap_or_else(|| default_model(lamps.tts_provider).to_owned());
+    let language = lamps.stt_language.clone().unwrap_or_default();
+    let settled = |cache: TtsCache| {
         cache
             .speaking(crate::language::at_start())
             .hearing_its_name(
@@ -810,14 +881,64 @@ pub fn built_from_environment() -> Option<TtsCache> {
                     .as_deref()
                     == Some("on"),
             )
-            .keeping_offline_rings(crate::offline_rings::on()),
-    )
+            .keeping_offline_rings(crate::offline_rings::on())
+    };
+    // Another of the lamp's voices (#7485): the same service and model,
+    // only its voice changed, for ElevenLabs, whose voices the lamp names;
+    // always with the lamp's own key, never the person's (#8367).
+    let render_in: Option<RenderIn> =
+        (lamps.tts_provider == crate::second_config::TtsProvider::ElevenLabs).then(|| {
+            let config = lamps.clone();
+            Box::new(move |text: &str, voice: &str| {
+                let mut config = config.clone();
+                config.tts_voice = Some(voice.to_owned());
+                render_with(&config, text, &|_| {})
+            }) as RenderIn
+        });
+    let lamps_voice = voice_name(lamps.tts_provider, lamps.tts_voice.as_deref()).to_owned();
+    let lamps_cache = |lamps: crate::second_config::SecondConfig| {
+        let render: Render = Box::new(move |text: &str| render_with(&lamps, text, &|_| {}));
+        settled(TtsCache::new(DIR, &lamps_voice, &model, &language, render))
+    };
+    let cache = if own.hosted.lamps_voice.is_some() {
+        let mut own = own;
+        own.hosted.lamps_voice = None;
+        let voice = own_voice(
+            voice_name(own.tts_provider, own.tts_voice.as_deref()),
+            Some(&own.tts_base_url),
+        );
+        let lost = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let refused = Arc::clone(&lost);
+        let render: Render = Box::new(move |text: &str| {
+            render_with(&own, text, &|status| {
+                if !refused.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                    eprintln!(
+                        "lamp-voice: the speech cache: ElevenLabs refused the person's own key or voice (HTTP {status}); its lines are the lamp's own voice, kept as the lamp's, until the voice starts again (LAMP_OWN_KEYS)"
+                    );
+                }
+            })
+        });
+        eprintln!(
+            "lamp-voice: the speech cache keeps its lines in the person's own voice, apart from the lamp's (LAMP_OWN_KEYS)"
+        );
+        settled(TtsCache::new(DIR, &voice, &model, &language, render)).falling_back_to(
+            lamps_cache(lamps),
+            Box::new(move || lost.load(std::sync::atomic::Ordering::Acquire)),
+        )
+    } else {
+        lamps_cache(lamps)
+    };
+    let cache = match render_in {
+        Some(render_in) => cache.speaking_in(render_in),
+        None => cache,
+    };
+    Some(cache)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     /// A fresh folder of this test's own.
     fn scratch(name: &str) -> PathBuf {
@@ -1344,5 +1465,95 @@ mod tests {
         let slow = TtsCache::new(&dir, "Rachel", "m", "en", render);
         assert!(slow.render_once("Hi.").is_err());
         assert!(slow.render_once(&line).is_err());
+    }
+
+    /// A cache in the person's own voice (#8367) over `dir`, behind the
+    /// lamp's ("Rachel"); `refuses`, the person's voice is refused (a 401).
+    /// Its renders and the lamp's are counted.
+    fn own_over_lamps(dir: &Path, refuses: bool) -> (TtsCache, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+        let lost = Arc::new(AtomicBool::new(false));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let (seen, refused) = (Arc::clone(&calls), Arc::clone(&lost));
+        let render: Render = Box::new(move |_: &str| {
+            seen.fetch_add(1, Ordering::SeqCst);
+            if refuses {
+                refused.store(true, Ordering::SeqCst);
+                return Err("HTTP 401".into());
+            }
+            Ok(vec![7; 2_400])
+        });
+        let (lamps, lamps_calls) = counted(dir, "Rachel");
+        let voice = own_voice("abc123", Some(ELEVENLABS));
+        let own = TtsCache::new(dir, &voice, "eleven_v4_turbo", "en", render)
+            .falling_back_to(lamps, Box::new(move || lost.load(Ordering::SeqCst)));
+        (own, calls, lamps_calls)
+    }
+
+    const ELEVENLABS: &str = "https://api.elevenlabs.io/v1";
+
+    fn kept_names(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// The Reviewer-lead's P2 on #8394: a line the person's voice is
+    /// refused for is said in the lamp's own voice and kept under the
+    /// lamp's key only, never theirs; the person's is not asked again in
+    /// this run, for kept lines or exact ones.
+    #[test]
+    fn a_refused_own_voice_is_never_kept_under_it_and_the_lamps_line_is_kept_as_the_lamps() {
+        let dir = scratch("own_refused");
+        let (own, calls, lamps_calls) = own_over_lamps(&dir, true);
+        let said = own.samples("Hello.").unwrap();
+        assert_eq!(said, vec!["Hello.".len() as i16; 2_400], "the lamp's voice");
+        let (lamps, _) = counted(&dir, "Rachel");
+        assert_eq!(kept_names(&dir), [format!("{}.wav", lamps.key("Hello."))]);
+        assert_eq!(own.kept("Hello."), Some(said));
+        own.samples("Goodbye.").unwrap();
+        own.render_once("Build passed.").unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(lamps_calls.load(Ordering::SeqCst), 3);
+        assert!(!kept_names(&dir).contains(&format!("{}.wav", own.key("Hello."))));
+    }
+
+    /// The person's lines are keyed by the voice that rendered them: apart
+    /// from the lamp's, by voice ID and by the address asked; the lamp's
+    /// key is as before. A new voice ID misses the old one's lines.
+    #[test]
+    fn the_persons_lines_are_keyed_by_their_voice_id_and_address_apart_from_the_lamps() {
+        assert_eq!(own_voice("Rachel", None), "Rachel");
+        let own = own_voice("abc123", Some(ELEVENLABS));
+        assert_ne!(own, "abc123");
+        assert_ne!(own, own_voice("def456", Some(ELEVENLABS)));
+        assert_ne!(
+            own,
+            own_voice("abc123", Some("https://relay.example.invalid/api/v1/ai"))
+        );
+        let dir = scratch("own_keyed");
+        let (first, calls, _) = own_over_lamps(&dir, false);
+        first.samples("Hello.").unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(kept_names(&dir), [format!("{}.wav", first.key("Hello."))]);
+        let (changed, changed_calls) = counted(&dir, &own_voice("def456", Some(ELEVENLABS)));
+        assert_eq!(changed.kept("Hello."), None);
+        changed.samples("Hello.").unwrap();
+        assert_eq!(changed_calls.load(Ordering::SeqCst), 1);
+    }
+
+    /// The person's key removed (the voice starts again in the lamp's own):
+    /// the lines kept in the lamp's voice while theirs was refused play,
+    /// none rendered again, and none of the person's is ever played.
+    #[test]
+    fn with_the_persons_key_removed_the_lamps_kept_lines_play() {
+        let dir = scratch("own_removed");
+        let (own, _, _) = own_over_lamps(&dir, true);
+        let said = own.samples("Hello.").unwrap();
+        let (lamps, calls) = counted(&dir, "Rachel");
+        assert_eq!(lamps.samples("Hello.").unwrap(), said);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
 }

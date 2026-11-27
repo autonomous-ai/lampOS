@@ -1,0 +1,15 @@
+# 22:00, both checks bad to 10 minutes: the word at 30 s, at night too (the owner,
+# 27 Nov: "what if user working late or early morning?"; no [quiet]).
+clock = "22:00"
+
+[[expect]]
+at = "30s"
+within = "30s"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "30s"
+within = "30s"
+call = "say"
+args = { note = "Their head has been bent down for a while, as when looking down at a phone or the desk. In one short, kind line, the way a friend would, say that's hard on the neck, and suggest lifting what they're looking at up toward eye level, or lifting the head. Say only 'a while', never a number; name no condition or illness, and never mention a camera." }

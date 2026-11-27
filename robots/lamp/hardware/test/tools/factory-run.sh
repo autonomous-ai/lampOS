@@ -5,6 +5,9 @@
 # can leave for the next lamp at once.
 #
 #   factory-run.sh unset ID      lamp not set up: checks (r2, 4b, 4e–4g), the
+#                                servos calibrated when any is new or
+#                                replaced (servo-calibrate.py, spoken; the
+#                                reset button ends it, every press recorded),
 #                                head onto its stop (head-nudge.py), step 1
 #                                (the arm stand), every input in one window
 #                                (input-check.py: head pads, button, reset,
@@ -28,7 +31,7 @@
 # decides it.
 #
 # Needs in /home/orangepi: steps.sh, factory-voice.py, head-nudge.py,
-# input-check.py, ring-check.py; the prompts in /var/lib/lamp-test/prompts.
+# input-check.py, ring-check.py, servo-calibrate.py; the prompts in /var/lib/lamp-test/prompts.
 # As root.
 set -uo pipefail
 
@@ -125,6 +128,20 @@ fi
 
 # unset
 status "RUNNING checks"
+# The voice holds the C-Media speaker (device_speaker), so every prompt failed
+# "Device or resource busy" while it ran (build 10824 runs it unset, lamp-9224
+# 9 Nov): it is stopped for the run and started again at the end, pass or fail.
+voice_on=no; input_pid=""
+# Called again after the speaker step: restarting lamp-cmedia-speaker brings
+# the voice back within seconds (lamp-9224, 9 Nov).
+quiet_voice() { systemctl is-active -q lamp-voice && { voice_on=yes; systemctl stop lamp-voice; }; }
+quiet_voice
+cleanup() {
+  [[ -n $input_pid ]] && { kill -INT "$input_pid" 2>/dev/null; wait "$input_pid" 2>/dev/null; }
+  [[ $voice_on == yes ]] && systemctl start lamp-voice
+}
+trap cleanup EXIT
+speak factory_run_start
 # SET_UP_OK=yes: a lamp set up from the app before its factory steps
 # (lamp-ee17): steps.sh stops what holds the touch lines itself; lamp-body,
 # failing without lamp.env, is stopped so the servo port is free.
@@ -148,14 +165,19 @@ systemctl cat lamp-update | grep -Eq 'cdn\.autonomous\.ai/lampos/stable/|release
 r=""; for u in bootstrap os-server hal; do systemctl is-active -q $u && r="$r $u"; done
 [[ -z $r ]] && rec "V1_UNITS_4G=PASS none running" || fail "V1 units running:$r (4g)"
 
-# The speaker's hardware level, kept across boots (75%, kyle-aus 3 Nov), and
+# The speaker's hardware level, kept across boots (100%, kyle-aus 23 Nov, for
+# the new mass-production speaker, which is quieter than the old one: lamp-321f
+# was right at 100% here plus lamp volume 100; it was 75% from 3 Nov), and
 # set first, before the inputs (4 Nov), so a run that fails on an input still
 # leaves the level set. lamp-cmedia-speaker pins the C-Media "Speaker" at step 9 at every boot, so
 # alsactl store cannot hold a level. A drop-in replaces that pin with
 # SPEAKER_LEVEL and keeps the unit's other ExecStart lines (the first PCM
 # open that makes the softvol control). Delete the drop-in for the default.
 status "RUNNING speaker level"
-SPEAKER_LEVEL=${SPEAKER_LEVEL:-75%}
+SPEAKER_LEVEL=${SPEAKER_LEVEL:-100%}
+# The lamp volume (the softvol over -30..0 dB, 0-100) at the top too, kept by
+# alsactl store; LAMP_VOLUME=70 for a lamp with the old, louder speaker.
+LAMP_VOLUME=${LAMP_VOLUME:-100}
 SPK_UNIT=lamp-cmedia-speaker.service
 SPK_DROPIN=/etc/systemd/system/$SPK_UNIT.d/zz-factory-speaker.conf
 systemctl cat "$SPK_UNIT" >/dev/null 2>&1 || fail "no $SPK_UNIT: the speaker level cannot be kept"
@@ -175,6 +197,43 @@ systemctl restart "$SPK_UNIT" || fail "$SPK_UNIT failed with the speaker at $SPE
 spk=$(amixer -c device_cmedia sget Speaker | grep -o '\[[0-9]*%\]' | head -1 | tr -d '[]')
 [[ -n $spk ]] || fail "the speaker level cannot be read after setting $SPEAKER_LEVEL"
 rec "SPEAKER_LEVEL=$spk (asked $SPEAKER_LEVEL, $SPK_DROPIN)"
+amixer -q -c allwinnerhdmi cset name="Speaker Playback Volume" "$LAMP_VOLUME,$LAMP_VOLUME" \
+  || fail "the lamp volume cannot be set to $LAMP_VOLUME"
+alsactl store 2>/dev/null
+vol=$(amixer -c allwinnerhdmi cget name="Speaker Playback Volume" | sed -n 's/.*: values=\([0-9]*\).*/\1/p')
+rec "LAMP_VOLUME=$vol (asked $LAMP_VOLUME, alsactl store)"
+sleep 5; quiet_voice
+speak factory_checks_done
+
+# Servo calibration, spoken (kyle-aus 6 Nov, a replaced servo on lamp-a0ae):
+# a servo still at the factory limits 0-4095 (new or replaced) is calibrated
+# here, before the inputs are read, so moving the joints by hand cannot open
+# the touch window. CALIBRATE=yes calibrates a calibrated lamp again. A new
+# calibration moves lamp.env aside so the stand is measured afresh.
+status "RUNNING servo check"
+systemctl stop lamp-body 2>/dev/null; systemctl reset-failed lamp-body 2>/dev/null
+out=$(python3 "$HOME_DIR/servo-calibrate.py" check 2>&1); rc=$?; echo "$out"
+mapfile -t sv < <(sed -n 's/^RECORD //p' <<<"$out"); rec "${sv[@]}"
+[[ $rc == 0 || $rc == 3 ]] || fail "servo check: $(tail -1 <<<"$out")"
+touch_args=()
+if [[ $rc == 3 || ${CALIBRATE:-no} == yes ]]; then
+  rm -f "$DIR/cal-touch.json"
+  status "RUNNING servo calibration (press the reset button when done, ${CAL_SECONDS:-300} s at most)"
+  out=$(python3 "$HOME_DIR/servo-calibrate.py" run "${CAL_SECONDS:-300}" 2>&1); rc=$?; echo "$out"
+  mapfile -t cal < <(sed -n 's/^RECORD //p' <<<"$out"); rec "${cal[@]}"
+  [[ $rc == 0 ]] || fail "servo calibration: $(sed -n 's/^RECORD SERVO_CAL=FAIL //p' <<<"$out")"
+  [[ -f $ENV_FILE ]] && mv "$ENV_FILE" "$ENV_FILE.before-cal-$(date +%Y%m%d%H%M%S)"
+  # The pads and buttons pressed while calibrating are the input test's
+  # touches (kyle-aus 10 Nov): input-check.py then reads only its quiet window.
+  [[ -s $DIR/cal-touch.json ]] && touch_args=(--touch-from "$DIR/cal-touch.json")
+  sleep 10                                   # the arm folded down, as asked
+else
+  speak factory_cal_ok
+  # A rerun soon after a calibration (a stand that stopped, the accel-50
+  # rerun) keeps the touches made while calibrating: nothing pressed twice.
+  [[ -n $(find "$DIR/cal-touch.json" -mmin -120 -size +0 2>/dev/null) ]] &&
+    touch_args=(--touch-from "$DIR/cal-touch.json")
+fi
 
 # 4c2 beside 4c1 (kyle-aus 4 Nov, ~70 s a lamp): the inputs are read while
 # the arm stands, so the person touches the pads and presses the buttons
@@ -182,11 +241,10 @@ rec "SPEAKER_LEVEL=$spk (asked $SPEAKER_LEVEL, $SPK_DROPIN)"
 # (it waits up to 300 s), so nobody races the arm. INPUTS_WITH_STAND=no reads
 # them after the stand, as before. A run that fails first stops it with
 # SIGINT, so its finally starts lamp-controls and the voice again.
-INPUT_OUT=$DIR/input-check.out; input_pid=""
+INPUT_OUT=$DIR/input-check.out
 if [[ ${INPUTS_WITH_STAND:-yes} == yes ]]; then
-  python3 "$HOME_DIR/input-check.py" >"$INPUT_OUT" 2>&1 & input_pid=$!
-  # waited for: the unit ending kills what is left, its finally included
-  trap '[[ -n $input_pid ]] && { kill -INT $input_pid 2>/dev/null; wait $input_pid 2>/dev/null; }' EXIT
+  python3 "$HOME_DIR/input-check.py" ${touch_args[@]+"${touch_args[@]}"} >"$INPUT_OUT" 2>&1 & input_pid=$!
+  # waited for by cleanup (EXIT): the unit ending kills what is left, its finally included
   say "4c2 inputs read beside the arm stand: touch the pads and press the buttons now"
 fi
 
@@ -196,6 +254,7 @@ if ! grep -q ^BODY_POSES= "$ENV_FILE" 2>/dev/null; then
   # off the servo port: stopped again here.
   systemctl stop lamp-body 2>/dev/null; systemctl reset-failed lamp-body 2>/dev/null
   status "RUNNING head rest"
+  speak factory_head_rest
   rest_read() { setpriv --reuid lampos --regid lampos --init-groups -- /opt/lampOS/body/current/lamp-body-measure \
     --device /dev/ttyACM0 --unit-id "$ID" --lock-directory /run/lampos-locks/motor 2>&1 | grep -v ^BODY_POSES; }
   out=$(rest_read); echo "$out"
@@ -218,7 +277,7 @@ status "RUNNING 4c2 inputs"
 if [[ -n $input_pid ]]; then
   wait "$input_pid"; rc=$?; input_pid=""; out=$(cat "$INPUT_OUT")
 else
-  out=$(python3 "$HOME_DIR/input-check.py" 2>&1); rc=$?
+  out=$(python3 "$HOME_DIR/input-check.py" ${touch_args[@]+"${touch_args[@]}"} 2>&1); rc=$?
 fi
 echo "$out"
 mapfile -t inputs < <(sed -n 's/^RECORD //p' <<<"$out")
@@ -227,14 +286,23 @@ rec "${inputs[@]}"
 rec "FACTORY_4C2=PASS"
 
 status "RUNNING 4c3 update key"
+speak factory_key_next
 steps -- ./steps.sh --unit-id "$ID" --write --from 3 --to 3 || fail "step 3 (the update key) stopped"
 rec "FACTORY_4C3=PASS"
 
 status "RUNNING 4d gaze"
+speak factory_gaze
 grep -q -- --gaze "$ENV_FILE" || { cp -p "$ENV_FILE" "$ENV_FILE.before-4d" && sed -i "s/^\(BODY_POSES=\".*\)\"\$/\1 --gaze $GAZE\"/" "$ENV_FILE"; }
 grep -q -- "--gaze $GAZE" "$ENV_FILE" || fail "4d: --gaze $GAZE is not in lamp.env"
 jq -e '(.head_pads | length) >= 2 and (.head_rest | length) == (.head_pads | length)' "$PINS" >/dev/null || fail "the pins file has no head pads"
 rec "$(grep ^BODY_POSES= "$ENV_FILE")" "FACTORY_4D=PASS $GAZE"
+
+# lamp-body on the new lamp.env (gaze included): a run resumed after a failed
+# step, or a lamp that booted without lamp.env, left it stopped (ff83, 8dbe,
+# 0b32, a0ae on 4 Nov).
+systemctl reset-failed lamp-body 2>/dev/null; systemctl restart lamp-body
+for _ in $(seq 20); do systemctl is-active -q lamp-body && break; sleep 0.5; done
+systemctl is-active -q lamp-body || fail "lamp-body did not start on the new lamp.env"
 
 rec "RESULT_UNSET=PASS" "RESULT_UNSET_AT=$(date '+%F %T %z')"
 status "PASS unset"

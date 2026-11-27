@@ -35,13 +35,14 @@ pub const CONFIRM_MS: u64 = 120_000;
 /// Until 16031 a queued task had [`CONFIRM_MS`] too, so a cold start of
 /// about 220 s ended it `expired`, unheard.
 pub const QUEUED_MS: u64 = 30 * 60_000;
-/// A `prepare` (or the app's default) naming an engine with no name: empty
-/// or blank (#6492). Any other name is Harness's to know.
+/// The app's default naming an engine with no name: empty or blank (#6492).
+/// Any other name is Harness's to know. A `prepare` is never refused for
+/// the engine it names: the lamp's work runs on the lamp's default.
 pub const ENGINE_UNKNOWN: &str = "engine_unknown";
-/// A `prepare` for the lamp naming an engine not among its engines now
-/// (#6492, [`crate::runtime::lamp_order`]): Harness doesn't report it
-/// installed on the lamp, it takes no task, its switch is off, or it is
-/// known missing there. Refused, never moved to another engine.
+/// Formerly a `prepare` for the lamp naming an engine not among its engines
+/// (#6492). No longer returned: one agent per lamp, so a `prepare` for the
+/// lamp runs on the lamp's default whatever engine is named. Kept so a
+/// caller still matching it (the voice, an older build) compiles and reads.
 pub const ENGINE_NOT_HERE: &str = "engine_not_here";
 /// A new start whose `harness new` timed out (#8170, [`crate::start_check`]):
 /// its dispatch stays `uncertain` with this code while the lamp looks for
@@ -1586,8 +1587,8 @@ impl<P: Persistence> Engine<P> {
         self.lamp_order = order;
     }
 
-    /// The engine the lamp's own target runs work naming none on (#6492):
-    /// the lamp's default, unless its machine is known not to have it,
+    /// The engine the lamp's own target runs all its work on, named engine
+    /// or none (#6492; one agent per lamp): the lamp's default, unless its machine is known not to have it,
     /// else the targets file's.
     fn lamp_engine(&self, alias: &str, target: &Target) -> EngineKind {
         if alias != crate::runtime::LAMP_TARGET {
@@ -1601,6 +1602,35 @@ impl<P: Persistence> Engine<P> {
                     .is_some_and(|known| known.missing(*engine))
             })
             .unwrap_or(target.engine)
+    }
+
+    /// The agents `alias`'s computer is known to have now, in Harness's
+    /// order (`serve --engines-from-machines`, #5199): installed there and
+    /// not known signed out, Hermes and OpenClaw among them as any other
+    /// (offline is said apart, as the computer's `status`, and refused at
+    /// the prepare as before). None for the lamp's own target or a
+    /// computer nothing is known of. Only a `prepare` naming one of them
+    /// runs it there; the target's own engine is unchanged.
+    fn computer_agents(&self, alias: &str) -> Vec<EngineKind> {
+        if alias == crate::runtime::LAMP_TARGET {
+            return Vec::new();
+        }
+        self.readiness
+            .get(alias)
+            .map(|known| {
+                known
+                    .installed_in_order()
+                    .iter()
+                    .filter_map(|name| crate::runtime::engine_named(name))
+                    .filter(|engine| {
+                        !engine.cloud()
+                            && known
+                                .refusal(*engine)
+                                .is_none_or(|(code, _)| code == crate::readiness::COMPUTER_OFFLINE)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Whether the lamp's own Hermes may become a target
@@ -2035,6 +2065,38 @@ impl<P: Persistence> Engine<P> {
                     if self.readiness.get(alias).is_some_and(|known| known.missing(engine)) {
                         told["installed"] = false.into();
                     }
+                    // A computer's agents known there now, whether it is
+                    // online, and its last task, so the voice can route an
+                    // agent the lamp doesn't run to it (rule 2a, 25 Nov).
+                    let agents = self.computer_agents(alias);
+                    if !agents.is_empty() {
+                        told["agents"] = agents
+                            .iter()
+                            .map(|engine| engine.argument())
+                            .collect::<Vec<_>>()
+                            .into();
+                    }
+                    if alias != crate::runtime::LAMP_TARGET {
+                        match self.readiness.get(alias).and_then(|known| known.status.as_ref()) {
+                            Some(status) if status.value == "offline" => {
+                                told["status"] = "offline".into();
+                            }
+                            Some(status) if status.value == "running" => {
+                                told["status"] = "online".into();
+                            }
+                            _ => {}
+                        }
+                        if let Some(used) = self
+                            .state
+                            .tasks
+                            .iter()
+                            .filter(|task| task.target_alias == *alias)
+                            .map(|task| task.id)
+                            .max()
+                        {
+                            told["used"] = used.into();
+                        }
+                    }
                     told
                 })
                 .collect::<Vec<_>>()});
@@ -2241,34 +2303,21 @@ impl<P: Persistence> Engine<P> {
                         "A start there is still being checked; nothing is sent again until it is settled.",
                     ));
                 }
-                // The lamp's own target (#6492): an engine named runs on
-                // exactly that one or is refused, never moved to the other;
-                // none named, the lamp's default. Another target ignores it.
-                let lamp = target == crate::runtime::LAMP_TARGET;
-                let named = named.as_deref().filter(|_| lamp);
-                if let Some(named) = named {
-                    if named.trim().is_empty() {
-                        return Err(err(ENGINE_UNKNOWN, "No engine was named."));
-                    }
-                    // Any name Harness gives an engine: one of the lamp's
-                    // now, or refused. None is the lamp's by name here.
-                    let engine = crate::runtime::engine_named(named)
-                        .filter(|engine| self.lamp_order.contains(engine))
-                        .filter(|engine| {
-                            !self
-                                .readiness
-                                .get(target)
-                                .is_some_and(|known| known.missing(*engine))
-                        })
-                        .ok_or_else(|| {
-                            err(
-                                ENGINE_NOT_HERE,
-                                "The engine named is not installed on this lamp, or is switched off.",
-                            )
-                        })?;
+                // One agent per lamp: the lamp's own target always runs on
+                // the lamp's default engine, whatever engine the person
+                // named; a name never moves the lamp's work to another
+                // engine, and is never refused. A computer runs the engine
+                // named only while it is known to have it there
+                // ([`Self::computer_agents`], the owner's 25 Nov rule 2a:
+                // the voice hands an agent the lamp doesn't run to a
+                // computer that has it); else, as before, its target's.
+                target_value.engine = self.lamp_engine(target, &target_value);
+                if let Some(engine) = named
+                    .as_deref()
+                    .and_then(crate::runtime::engine_named)
+                    .filter(|engine| self.computer_agents(target).contains(engine))
+                {
                     target_value.engine = engine;
-                } else {
-                    target_value.engine = self.lamp_engine(target, &target_value);
                 }
                 // Known to fail on that computer (#5199): refused now, with
                 // why, rather than after the person's yes. A session the
@@ -4517,6 +4566,51 @@ mod tests {
         }
     }
 
+    /// A task the person said yes to, still queued when lamp-tasks restarts
+    /// (an update), ends `invalidated` `restart` with its yes kept and the
+    /// end stamped at the restart, never sent: what the voice tells once as
+    /// one that did not reach its agent. A second restart leaves it as it
+    /// was, so the end the voice reads never moves. This pins what `open`
+    /// already did before #8715; the voice's test is the one that fails
+    /// without the change.
+    #[test]
+    fn a_queued_task_said_yes_to_ends_restart_with_its_yes_kept() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 1);
+        let prepared = prepare(&mut engine, 2);
+        drop(engine);
+        let recovered =
+            Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(60_000)).unwrap();
+        let ended = |engine: &Engine<Memory>, id: u64| {
+            engine.state.tasks[find(&engine.state, id).unwrap()]
+                .dispatch
+                .clone()
+        };
+        let task = ended(&recovered, id);
+        assert_eq!(task.state, DispatchState::Invalidated);
+        assert_eq!(task.code.as_deref(), Some("restart"));
+        assert!(task.confirmed.is_some());
+        assert!(task.attempted.is_none());
+        let finished = task.finished.clone().unwrap();
+        assert_eq!(finished.monotonic_ms, 60_000);
+        assert_eq!(finished.session_id, RESTART);
+        // Never said yes to: no yes on record, so the voice keeps it unsaid.
+        let unsaid = ended(&recovered, prepared);
+        assert_eq!(unsaid.state, DispatchState::Invalidated);
+        assert_eq!(unsaid.code.as_deref(), Some("restart"));
+        assert!(unsaid.confirmed.is_none());
+        drop(recovered);
+        let again = Engine::open(
+            memory,
+            targets(),
+            STORE,
+            "55555555555555555555555555555555",
+            &clock(120_000),
+        )
+        .unwrap();
+        assert_eq!(ended(&again, id).finished, Some(finished));
+    }
+
     #[test]
     fn final_dispatch_outcomes_never_automatically_resend() {
         for outcome in [
@@ -6675,47 +6769,144 @@ mod tests {
         }
     }
 
+    /// One agent per lamp: an engine the person names for the lamp's own
+    /// work is not read; the work runs on the lamp's default even when the
+    /// named one is installed and in the lamp's order.
     #[test]
-    fn a_named_engine_runs_the_lamps_work_on_it_even_when_not_first() {
+    fn a_named_engine_still_runs_the_lamps_work_on_its_default() {
         use EngineKind::{Hermes, Openclaw};
-        let mut engine = lamp_engine_rig(vec![Openclaw, Hermes], None);
+        // OpenClaw the default, Hermes installed: "hermes" named, OpenClaw.
+        let mut engine = lamp_engine_rig(vec![Openclaw, Hermes], Some(Openclaw));
         let request = lamp_prepare(&engine, "lamp", Some("hermes"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Openclaw);
+        assert_eq!(
+            engine.state.tasks.last().unwrap().launch.target.project,
+            crate::runtime::LAMP_PROJECT
+        );
+        // Hermes the default, OpenClaw installed: "openclaw" named, Hermes.
+        let mut engine = lamp_engine_rig(vec![Hermes, Openclaw], Some(Hermes));
+        let request = lamp_prepare(&engine, "lamp", Some("openclaw"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Hermes);
+        // No choice in the app: the build's default, Hermes
+        // (`runtime::lamp_default`), "openclaw" named or not.
+        use crate::runtime::{LampSide, lamp_default, lamp_order};
+        let side = LampSide::new(std::path::PathBuf::new());
+        let mut engine = lamp_engine_rig(lamp_order(&side), lamp_default(&side));
+        let request = lamp_prepare(&engine, "lamp", Some("openclaw"));
         engine.handle(&request, &clock(0), false).unwrap();
         assert_eq!(launched_engine(&engine), Hermes);
     }
 
+    /// One agent per lamp: an engine named that is not among the lamp's
+    /// engines, unknown, or blank is never refused and never moved to
+    /// Harness or another computer: the lamp's work runs on its default.
     #[test]
-    fn a_named_engine_not_in_the_lamps_order_is_refused_never_moved() {
-        use EngineKind::Openclaw;
-        let mut engine = lamp_engine_rig(vec![Openclaw], None);
-        let before = engine.revision();
-        let request = lamp_prepare(&engine, "lamp", Some("hermes"));
-        let refused = engine.handle(&request, &clock(0), false).unwrap_err();
-        assert_eq!(refused.code, ENGINE_NOT_HERE);
-        assert!(engine.state.tasks.is_empty());
-        assert_eq!(engine.revision(), before);
-        // Any other name not among the lamp's engines (#6492): one Harness
-        // has but doesn't report here, or one it starts with no task.
-        for named in ["codex", "claude", "pi", "cursor"] {
-            let request = lamp_prepare(&engine, "lamp", Some(named));
-            let refused = engine.handle(&request, &clock(0), false).unwrap_err();
-            assert_eq!(refused.code, ENGINE_NOT_HERE, "{named}");
+    fn a_named_engine_not_in_the_lamps_order_runs_on_the_default_never_refused() {
+        use EngineKind::{Hermes, Openclaw};
+        for (default, other) in [(Openclaw, "hermes"), (Hermes, "openclaw")] {
+            for named in [other, "codex", "claude", "pi", "cursor", "", "  "] {
+                let mut engine = lamp_engine_rig(vec![default], Some(default));
+                let request = lamp_prepare(&engine, "lamp", Some(named));
+                engine.handle(&request, &clock(0), false).unwrap();
+                assert_eq!(launched_engine(&engine), default, "{named:?}");
+                let task = engine.state.tasks.last().unwrap();
+                assert_eq!(
+                    task.launch.target.project,
+                    crate::runtime::LAMP_PROJECT,
+                    "{named:?}"
+                );
+                assert_eq!(engine.state.tasks.len(), 1, "{named:?}");
+            }
         }
-        // No name at all.
-        for named in ["", "  "] {
-            let request = lamp_prepare(&engine, "lamp", Some(named));
-            let refused = engine.handle(&request, &clock(0), false).unwrap_err();
-            assert_eq!(refused.code, ENGINE_UNKNOWN, "{named:?}");
+    }
+
+    /// Rule 2a (25 Nov): a computer known to have Hermes and OpenClaw (its
+    /// engines look says installed) lists them as `agents`, and a prepare
+    /// naming one runs it there; one it isn't known to have, or none named,
+    /// keeps the target's own engine, as before. The lamp's own target
+    /// still runs its default, both ways.
+    #[test]
+    fn a_computer_runs_an_agent_named_only_while_it_is_known_to_have_it() {
+        use crate::readiness::{Computer, EngineKnown, Reading};
+        use EngineKind::{Codex, Hermes, Openclaw};
+        let installed = || EngineKnown {
+            installed: Some(Reading {
+                value: true,
+                read_ms: 0,
+            }),
+            ..EngineKnown::default()
+        };
+        let desk = Computer {
+            engines: BTreeMap::from([
+                ("hermes".to_owned(), installed()),
+                ("openclaw".to_owned(), installed()),
+            ]),
+            ..Computer::default()
+        };
+        for (default, other) in [(Hermes, "openclaw"), (Openclaw, "hermes")] {
+            let mut engine = lamp_engine_rig(vec![default], Some(default));
+            engine.set_readiness(BTreeMap::from([("desk".to_owned(), desk.clone())]));
+            let told = engine
+                .handle(&Request::Targets {}, &clock(0), false)
+                .unwrap();
+            assert!(
+                told["targets"].as_array().unwrap().contains(
+                    &json!({"alias":"desk","engine":"codex","agents":["hermes","openclaw"]})
+                ),
+                "{told}"
+            );
+            for (named, runs) in [
+                (Some("hermes"), Hermes),
+                (Some("openclaw"), Openclaw),
+                (Some("claude"), Codex),
+                (None, Codex),
+            ] {
+                let request = lamp_prepare(&engine, "desk", named);
+                engine.handle(&request, &clock(0), false).unwrap();
+                assert_eq!(launched_engine(&engine), runs, "{named:?}");
+            }
+            let request = lamp_prepare(&engine, "lamp", Some(other));
+            engine.handle(&request, &clock(0), false).unwrap();
+            assert_eq!(launched_engine(&engine), default, "{other}");
+            // The desk's last task is said, for the voice's most recent.
+            let told = engine
+                .handle(&Request::Targets {}, &clock(0), false)
+                .unwrap();
+            let desk_told = told["targets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|target| target["alias"] == "desk")
+                .unwrap()
+                .clone();
+            assert!(desk_told["used"].as_u64().is_some(), "{told}");
+            // Offline: its agents still listed, its status said, and a
+            // prepare there refused as before.
+            let mut offline = desk.clone();
+            offline.status = Some(Reading {
+                value: "offline".into(),
+                read_ms: 0,
+            });
+            engine.set_readiness(BTreeMap::from([("desk".to_owned(), offline)]));
+            let told = engine
+                .handle(&Request::Targets {}, &clock(0), false)
+                .unwrap();
+            assert!(
+                told["targets"].as_array().unwrap().iter().any(|target| {
+                    target["alias"] == "desk"
+                        && target["status"] == "offline"
+                        && target["agents"] == json!(["hermes", "openclaw"])
+                }),
+                "{told}"
+            );
+            let request = lamp_prepare(&engine, "desk", Some(other));
+            assert_eq!(
+                engine.handle(&request, &clock(0), false).unwrap_err().code,
+                crate::readiness::COMPUTER_OFFLINE
+            );
         }
-        assert!(engine.state.tasks.is_empty());
-        assert_eq!(engine.revision(), before);
-        // No lamp engines known at all: refused too.
-        let mut none = lamp_engine_rig(Vec::new(), None);
-        let request = lamp_prepare(&none, "lamp", Some("openclaw"));
-        assert_eq!(
-            none.handle(&request, &clock(0), false).unwrap_err().code,
-            ENGINE_NOT_HERE
-        );
     }
 
     /// #7019 (a): no app choice and no look yet after a start, the targets
@@ -6770,7 +6961,8 @@ mod tests {
         let request = lamp_prepare(&engine, "lamp", None);
         engine.handle(&request, &clock(0), false).unwrap();
         assert_eq!(launched_engine(&engine), Openclaw);
-        // Another target: an engine named is ignored, and lists no engines.
+        // Another target: an engine it is not known to have is ignored, it
+        // lists no engines, and its last task is said (`used`).
         let mut engine = lamp_engine_rig(vec![Openclaw], None);
         let request = lamp_prepare(&engine, "desk", Some("hermes"));
         engine.handle(&request, &clock(0), false).unwrap();
@@ -6782,7 +6974,7 @@ mod tests {
             told["targets"]
                 .as_array()
                 .unwrap()
-                .contains(&json!({"alias":"desk","engine":"codex"})),
+                .contains(&json!({"alias":"desk","engine":"codex","used":1})),
             "{told}"
         );
         // No lamp engines: no `engines` on the lamp's entry.
@@ -6800,15 +6992,16 @@ mod tests {
     }
 
     /// #6492: an engine Harness reports on the lamp that is neither Hermes
-    /// nor OpenClaw (Claude) can be named, and is the default when it is
-    /// first; the targets answer lists the lamp's engines in that order.
+    /// nor OpenClaw (Claude) is the default when it is first; naming it no
+    /// longer picks it (one agent per lamp). The targets answer lists the
+    /// lamp's engines in that order.
     #[test]
-    fn a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default() {
+    fn a_third_engine_harness_reports_on_the_lamp_can_be_the_default_but_not_named() {
         use EngineKind::{Claude, Hermes, Openclaw};
-        let mut engine = lamp_engine_rig(vec![Hermes, Claude, Openclaw], None);
+        let mut engine = lamp_engine_rig(vec![Hermes, Claude, Openclaw], Some(Hermes));
         let request = lamp_prepare(&engine, "lamp", Some("claude"));
         engine.handle(&request, &clock(0), false).unwrap();
-        assert_eq!(launched_engine(&engine), Claude);
+        assert_eq!(launched_engine(&engine), Hermes);
         assert_eq!(
             engine.state.tasks.last().unwrap().launch.target.project,
             crate::runtime::LAMP_PROJECT

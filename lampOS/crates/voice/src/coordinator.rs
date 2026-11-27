@@ -2470,13 +2470,29 @@ fn sleep_light(bus: Option<&lamp_bus::Bus>) -> Option<crate::ring_face::Lit> {
     bus.and_then(crate::ring_asleep::persons_light)
 }
 
+/// Whether the person's light is off now (#8634), from the bus and the
+/// light kept on disk (Linux, where the ring is).
+#[cfg(target_os = "linux")]
+fn lights_off() -> bool {
+    let bus = lamp_bus::Bus::from_environment().ok();
+    crate::ring_asleep::persons_light_off(
+        bus.as_ref(),
+        std::path::Path::new(crate::ring_light::KEEP_PATH),
+    )
+}
+
 /// What a hand's sleep shows on the lamp's own ring (Linux): the person's
-/// own light, if their ring said one was on, and the asleep face otherwise
-/// (#1362, the first builder on #1362, 21 Oct 15:1x).
+/// own light, if their ring said one was on, the asleep face otherwise
+/// (#1362, the first builder on #1362, 21 Oct 15:1x), and nothing when
+/// their light is off (#8634).
 fn sleeping_face(ceiling: u16) -> Option<crate::ring_asleep::Asleep> {
     #[cfg(target_os = "linux")]
     {
         let bus = lamp_bus::Bus::from_environment().ok();
+        let kept = std::path::Path::new(crate::ring_light::KEEP_PATH);
+        if crate::ring_asleep::persons_light_off(bus.as_ref(), kept) {
+            return None;
+        }
         crate::ring_asleep::Asleep::sleeping(ceiling, sleep_light(bus.as_ref()))
     }
     #[cfg(not(target_os = "linux"))]
@@ -3686,7 +3702,8 @@ fn run_source(
                 termination,
                 |trace, cues| {
                     #[cfg(target_os = "linux")]
-                    let asleep = asleep_ceiling.and_then(crate::ring_asleep::Asleep::start);
+                    let asleep = crate::ring_asleep::face_ceiling(asleep_ceiling, lights_off())
+                        .and_then(crate::ring_asleep::Asleep::start);
                     #[cfg(not(target_os = "linux"))]
                     let _ = asleep_ceiling;
                     let tap_face = tap_face_ceiling.map(|ceiling| {
@@ -4478,6 +4495,13 @@ fn observe_provider_output(
         | ProviderOutput::RequestedAudio { .. } => {}
         // Tied to no turn: taken by the loop (#7418).
         ProviderOutput::MakesUnderWay { .. } => {}
+        // The failed calls of a request, from the second worker, a process of
+        // its own, for the turn's record (#8726).
+        ProviderOutput::Cases {
+            request,
+            failed,
+            proofs,
+        } => crate::turn_ledger::told_cases(*request, failed.clone(), proofs.clone()),
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
         // (#1390), as with news told unasked.
@@ -9441,6 +9465,7 @@ fn conversation_with_gate_inner(
                 // Put on its turn by `observe_provider_output`.
                 ProviderOutput::NewsAnswered { .. }
                 | ProviderOutput::OwnWordsSaid { .. }
+                | ProviderOutput::Cases { .. }
                 | ProviderOutput::MakeWaiting { .. } => {}
                 // Put on its turn by `observe_provider_output` too. A call's
                 // line the slow chat answered with its down line (#5563):
