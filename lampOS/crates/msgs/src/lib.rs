@@ -109,6 +109,8 @@ mod privacy;
 pub use privacy::*;
 mod output_caps;
 pub use output_caps::*;
+mod quiet_window;
+pub use quiet_window::*;
 mod chat;
 pub use chat::*;
 mod presence;
@@ -2776,6 +2778,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .into_iter()
         .chain(expression_topics())
         .chain(output_caps_topics())
+        .chain(quiet_topics())
         .chain(controls_topics())
         .chain(touch_topics())
         .chain(schedule_topics())

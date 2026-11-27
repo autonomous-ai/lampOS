@@ -30,6 +30,7 @@ pub mod online;
 pub mod photos;
 pub mod ping;
 pub mod privacy_light;
+pub mod quiet;
 pub mod reports;
 pub mod schedule;
 pub mod seal;

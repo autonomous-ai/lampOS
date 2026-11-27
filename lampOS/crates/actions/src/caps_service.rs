@@ -156,6 +156,10 @@ pub struct Service {
     volume_required: bool,
     published: bool,
     failed: bool,
+    /// The person's quiet hours (#8866), kept in the same folder and said
+    /// on the bus with the caps; apart from the caps' own state, so a caps
+    /// store held back or failed never loses or blocks them.
+    quiet: crate::quiet::Quiet,
 }
 
 impl Service {
@@ -219,6 +223,7 @@ impl Service {
             &OutputCaps::declaration(),
             OutputCaps::SOURCE,
         )?;
+        let quiet = crate::quiet::Quiet::open(&config.directory, &bus)?;
         Ok(Self {
             controller,
             held_back,
@@ -235,7 +240,19 @@ impl Service {
             volume_required: false,
             published: false,
             failed: false,
+            quiet,
         })
+    }
+
+    /// The answer to a `quiet_get` or `quiet_put` line (#8866,
+    /// `crate::quiet`): taken whatever the caps' own state, held back or
+    /// failed, since the window is kept apart from it.
+    pub fn answer_quiet(&mut self, line: &[u8]) -> Value {
+        if line.len() > 8192 {
+            return json!({"ok":false,"code":"bad_arguments","error":crate::quiet::SHAPE});
+        }
+        let at_us = (self.clock)().at_us;
+        self.quiet.answer(line, at_us)
     }
 
     /// The caps' state: there whenever they are not held back, the only time
@@ -480,6 +497,8 @@ impl Service {
             },
         };
         self.sync(snapshot, sound, before_restriction);
+        // The quiet window is said each second with the caps (#8866).
+        self.quiet.publish((self.clock)().at_us);
         self.looked_at = Some((self.clock)().at_us);
         Ok(())
     }

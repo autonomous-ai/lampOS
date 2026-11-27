@@ -212,7 +212,9 @@ Keys of a trigger:
   not risen for that long, #7668).
 - `lively = true`: its `cooldown` and `rearm` follow the energy level
   (`LAMP_BODY_ENERGY`, [skills.md](skills.md)); level 1 as written.
-- `during` (a window), `days` (with `during`: `["mon", "fri"]`,
+- `during` (a window: `{ from = "HH:MM", to = "HH:MM" }`, or hours from
+  the person's quiet hours, `{ after = "quiet_start" | "quiet_end", for =
+  "2h" }`, whole minutes under a day, #8866), `days` (with `during`: `["mon", "fri"]`,
   `"weekdays"` or `"weekend"`, the days the window opens on),
   `once_per_day` (with a `name` and `during`), `unless_heard`.
 - `yields_to = { skill, trigger }`: it gives way to another skill's

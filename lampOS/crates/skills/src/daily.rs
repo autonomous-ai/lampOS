@@ -86,6 +86,12 @@ impl Window {
         Ok(window)
     }
 
+    /// Minutes of the local day, each below 1440, that differ: the hours a
+    /// window follows from the person's quiet hours (#8866, `crate::quiet`).
+    pub fn of_minutes(from: u16, to: u16) -> Option<Self> {
+        (from < 1440 && to < 1440 && from != to).then_some(Self { from, to })
+    }
+
     pub fn contains(&self, local_minute: u16) -> bool {
         local_minute < 1440
             && if self.from < self.to {

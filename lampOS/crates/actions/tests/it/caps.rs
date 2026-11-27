@@ -304,6 +304,11 @@ fn disabled_service_keeps_existing_volume_behavior_and_creates_no_cap_state() {
         "unavailable"
     );
     assert_eq!(running.ask(json!({"op":"caps_get"}))["code"], "unavailable");
+    // The quiet hours are kept beside the caps, so only with them (#8866).
+    assert_eq!(
+        running.ask(json!({"op":"quiet_get"}))["code"],
+        "unavailable"
+    );
     assert!(!running.root.path().join("caps").exists());
     assert!(!running.root.path().join("bus").exists());
     assert_eq!(
@@ -312,4 +317,53 @@ fn disabled_service_keeps_existing_volume_behavior_and_creates_no_cap_state() {
     );
     assert_eq!(running.raw.load(Ordering::SeqCst), 100);
     running.finish().unwrap();
+}
+
+/// The person's quiet hours on the caps' socket (#8866): the old night with
+/// none kept, a put kept in the caps folder and said on `quiet/window` at
+/// once and each second after, a bad put refused with nothing changed.
+#[test]
+fn the_quiet_hours_are_kept_and_said_through_the_socket() {
+    let running = Running::new(true, false, false);
+    wait(|| running.ready());
+    assert_eq!(
+        running.ask(json!({"op":"quiet_get"})),
+        json!({"ok":true,"on":true,"start":"21:00","end":"06:00"})
+    );
+    let bus = lamp_bus::Bus::new(running.root.path().join("bus")).unwrap();
+    let said = || {
+        bus.latest(lamp_msgs::QuietWindow::TOPIC)
+            .unwrap()
+            .and_then(|message| lamp_msgs::QuietWindow::from_message(&message))
+    };
+    assert_eq!(said(), Some(lamp_msgs::QuietWindow::default()));
+    let night = lamp_msgs::QuietWindow {
+        on: true,
+        start: 22 * 60,
+        end: 7 * 60,
+    };
+    assert_eq!(
+        running.ask(json!({"op":"quiet_put","on":true,"start":"22:00","end":"07:00"})),
+        json!({"ok":true,"on":true,"start":"22:00","end":"07:00"})
+    );
+    assert_eq!(said(), Some(night));
+    assert_eq!(
+        lamp_actions::quiet::read(&running.root.path().join("caps")),
+        night
+    );
+    let refused = running.ask(json!({"op":"quiet_put","on":true,"start":"07:00","end":"07:00"}));
+    assert_eq!(refused["ok"], false);
+    assert_eq!(refused["error"], lamp_actions::quiet::SAME);
+    let refused = running.ask(json!({"op":"quiet_put","on":true,"start":"22:00"}));
+    assert_eq!(refused["error"], lamp_actions::quiet::SHAPE);
+    assert_eq!(running.ask(json!({"op":"quiet_get"}))["start"], "22:00");
+    // Said again on the next second's look, the same window.
+    let before = bus.latest(lamp_msgs::QuietWindow::TOPIC).unwrap().unwrap();
+    running.at.fetch_add(1_000_000, Ordering::SeqCst);
+    wait(|| {
+        bus.latest(lamp_msgs::QuietWindow::TOPIC)
+            .unwrap()
+            .is_some_and(|message| message.header.seq > before.header.seq)
+    });
+    assert_eq!(said(), Some(night));
 }

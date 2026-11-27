@@ -112,9 +112,11 @@ fn answer<S: Mixer, L: Light>(
             .as_ref()
             .and_then(|request| request.get("op"))
             .and_then(Value::as_str)
-            .filter(|op| crate::caps_service::is_operation(op));
+            .filter(|op| crate::caps_service::is_operation(op) || crate::quiet::is_operation(op));
         let (name, response, outcome) = if let Some(op) = cap_op {
             let response = match caps.as_mut() {
+                // The person's quiet hours (#8866), kept beside the caps.
+                Some(caps) if crate::quiet::is_operation(op) => caps.answer_quiet(&line),
                 Some(caps) => caps.answer_guarded(&line, &mut executive.sound, &mut || {
                     if let Some(speaker) = speaker.as_mut() {
                         speaker.before_restriction();

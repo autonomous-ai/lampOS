@@ -2,9 +2,20 @@
 //! Actions is the durable authority. Its accepted snapshot is read after a
 //! restart, so exact tokens are removed and a timed restriction is never
 //! confused with a previous person's mixer setting.
-use crate::{Skill, daily::Moment, routine::Limits};
+//!
+//! Limits with `during = "quiet"` follow the person's quiet hours (#8866,
+//! `crate::quiet`), told here by [`Client::set_quiet`]: each reconcile, once
+//! a second, holds them to the window as it is then. A cap put for one
+//! window names that window in its token (`quiet-<start>-<end>-<issued>`),
+//! so a cap put for an older window is replaced, or removed once the new
+//! window has left the current minute, at the next reconcile.
+use crate::{
+    Skill,
+    daily::{Moment, Window},
+    routine::Limits,
+};
 use lamp_local_time::LocalTime;
-use lamp_msgs::OutputCap;
+use lamp_msgs::{OutputCap, QuietWindow};
 use serde_json::{Value, json};
 use std::{
     io,
@@ -29,6 +40,9 @@ type Definitions = Vec<Definition>;
 struct Latest {
     generation: Arc<()>,
     pending: Option<Definitions>,
+    /// The person's quiet hours as last told ([`Client::set_quiet`]); the
+    /// old night's until then.
+    quiet: QuietWindow,
 }
 
 struct Batch {
@@ -98,6 +112,7 @@ impl Client {
                     if let Some(new) = worker.take() {
                         batch = Some(new);
                     }
+                    let quiet = worker.quiet();
                     if let Some(batch) = &batch {
                         let now = SystemTime::now()
                             .duration_since(SystemTime::UNIX_EPOCH)
@@ -111,7 +126,7 @@ impl Client {
                             },
                         )
                         .unwrap_or(0);
-                        let result = reconcile(&path, batch, &local, now);
+                        let result = reconcile(&path, batch, &local, now, &quiet);
                         let error = result.err().map(|error| error.to_string());
                         if error != last_error
                             && let Some(error) = &error
@@ -124,6 +139,18 @@ impl Client {
                 }
             })?;
         Ok(client)
+    }
+
+    /// The person's quiet hours now (#8866): the next reconcile, within a
+    /// second, holds the `during = "quiet"` limits to them.
+    pub fn set_quiet(&self, quiet: QuietWindow) {
+        if let Ok(mut latest) = self.0.lock() {
+            latest.quiet = quiet;
+        }
+    }
+
+    fn quiet(&self) -> QuietWindow {
+        self.0.lock().map(|latest| latest.quiet).unwrap_or_default()
     }
 
     fn take(&self) -> Option<Batch> {
@@ -170,21 +197,41 @@ impl Client {
 /// End at the first real minute outside this occurrence. Sampling the zone
 /// at each candidate keeps a repeated/skipped hour from inventing a second
 /// window. Work is bounded to 1,440 samples and a maximum 24-hour lease.
-fn end(limits: &Limits, local: &LocalTime, now: u64) -> Option<u64> {
+fn end(during: &Window, local: &LocalTime, now: u64) -> Option<u64> {
     let moment = Moment::at(local, now).ok()?;
-    let day = limits.during.occurrence_day(moment.day, moment.minute)?;
+    let day = during.occurrence_day(moment.day, moment.minute)?;
     let next_minute = now.checked_sub(now % 60_000)?.checked_add(60_000)?;
     for minutes in 0..1440_u64 {
         let at = next_minute.checked_add(minutes * 60_000)?;
         let next = Moment::at(local, at).ok()?;
-        if limits.during.occurrence_day(next.day, next.minute) != Some(day) {
+        if during.occurrence_day(next.day, next.minute) != Some(day) {
             return Some(at);
         }
     }
     None
 }
 
-fn reconcile(path: &Path, batch: &Batch, local: &LocalTime, now: u64) -> io::Result<()> {
+/// The token's first part for limits that follow the quiet hours: the
+/// window the cap was put for, so one put for another window is told
+/// apart (#8866). None for fixed hours, whose caps are kept whatever
+/// their token, as before.
+fn quiet_token(limits: &Limits, during: &Window) -> Option<String> {
+    limits.follows_quiet.then(|| {
+        format!(
+            "quiet-{}-{}-",
+            during.opens().replace(':', ""),
+            during.closes().replace(':', "")
+        )
+    })
+}
+
+fn reconcile(
+    path: &Path,
+    batch: &Batch,
+    local: &LocalTime,
+    now: u64,
+    quiet: &QuietWindow,
+) -> io::Result<()> {
     let deadline = Instant::now() + TIMEOUT;
     let answer = exchange(path, &json!({"op":"caps_get"}), deadline)?;
     // A reload can complete while caps_get is waiting. Only the accepted
@@ -203,11 +250,16 @@ fn reconcile(path: &Path, batch: &Batch, local: &LocalTime, now: u64) -> io::Res
         let definition = definitions
             .iter()
             .find(|definition| definition.output_limits && definition.source == cap.source);
+        // Out of its hours, or their window off (#8866), it is lifted.
         let remove = definition.is_none()
             || definition.is_some_and(|definition| {
                 now >= cap.issued_unix_ms
-                    && moment
-                        .is_some_and(|moment| !definition.limits.during.contains(moment.minute))
+                    && moment.is_some_and(|moment| {
+                        definition
+                            .limits
+                            .window(quiet)
+                            .is_none_or(|during| !during.contains(moment.minute))
+                    })
             });
         if remove {
             mutate(
@@ -225,7 +277,10 @@ fn reconcile(path: &Path, batch: &Batch, local: &LocalTime, now: u64) -> io::Res
             limits,
             output_limits,
         } = definition;
-        if moment.is_none_or(|moment| !limits.during.contains(moment.minute)) {
+        let Some(during) = limits.window(quiet) else {
+            continue;
+        };
+        if moment.is_none_or(|moment| !during.contains(moment.minute)) {
             continue;
         }
         if !*output_limits {
@@ -238,20 +293,25 @@ fn reconcile(path: &Path, batch: &Batch, local: &LocalTime, now: u64) -> io::Res
         // active. Recompute only on entry/replacement, not 1,440 zone
         // samples every second. A changed local window still removes the
         // cap above as soon as it ends; expiry permits a new one if needed.
+        // A cap put for another quiet window is replaced at once (#8866).
+        let token = quiet_token(limits, &during);
         if active.iter().any(|cap| {
             cap.source == *source
+                && token
+                    .as_ref()
+                    .is_none_or(|token| cap.token.starts_with(token.as_str()))
                 && cap.valid_until_unix_ms > now
                 && cap.light_channel_max == limits.light_channel_max
                 && cap.volume_raw_max == limits.volume_raw_max
         }) {
             continue;
         }
-        let Some(until) = end(limits, local, now) else {
+        let Some(until) = end(&during, local, now) else {
             continue;
         };
         let cap = OutputCap {
             source: source.clone(),
-            token: format!("window-{now}"),
+            token: format!("{}{now}", token.as_deref().unwrap_or("window-")),
             issued_unix_ms: now,
             valid_until_unix_ms: until,
             light_channel_max: limits.light_channel_max,
@@ -298,6 +358,7 @@ mod tests {
     fn limits(from: &str, to: &str) -> Limits {
         Limits {
             during: Window::parse(from, to).unwrap(),
+            follows_quiet: false,
             light_channel_max: Some(24),
             volume_raw_max: Some(35),
         }
@@ -383,6 +444,7 @@ mod tests {
         let local = LocalTime::Offset(0);
         let midnight = 1_767_225_600_000;
         let limit = limits("22:00", "06:00");
+        let limit = limit.during;
         assert_eq!(end(&limit, &local, 0), None);
         assert_eq!(end(&limit, &local, midnight + 21 * 3_600_000), None);
         assert_eq!(
@@ -394,7 +456,7 @@ mod tests {
     #[test]
     fn spring_and_autumn_windows_end_in_local_time() {
         let local = LocalTime::zone("America/New_York").unwrap();
-        let limit = limits("00:00", "04:00");
+        let limit = limits("00:00", "04:00").during;
         // 2026-03-08 00:00 EST; 04:00 EDT is three real hours later.
         let spring = 1_772_946_000_000;
         assert_eq!(end(&limit, &local, spring), Some(spring + 3 * 3_600_000));
@@ -419,6 +481,34 @@ mod tests {
         definitions: Definitions,
         now: u64,
         mutations: usize,
+    ) -> (Vec<Value>, io::Result<()>) {
+        round_in(active, definitions, now, mutations, &QuietWindow::default())
+    }
+
+    fn round_in(
+        active: Vec<OutputCap>,
+        definitions: Definitions,
+        now: u64,
+        mutations: usize,
+        quiet: &QuietWindow,
+    ) -> (Vec<Value>, io::Result<()>) {
+        round_at(
+            active,
+            definitions,
+            now,
+            mutations,
+            quiet,
+            &LocalTime::Offset(0),
+        )
+    }
+
+    fn round_at(
+        active: Vec<OutputCap>,
+        definitions: Definitions,
+        now: u64,
+        mutations: usize,
+        quiet: &QuietWindow,
+        local: &LocalTime,
     ) -> (Vec<Value>, io::Result<()>) {
         use std::{
             io::{BufRead, BufReader, Read, Write},
@@ -476,7 +566,7 @@ mod tests {
             pending: Some(definitions),
             ..Latest::default()
         })));
-        let result = reconcile(&path, &client.take().unwrap(), &LocalTime::Offset(0), now);
+        let result = reconcile(&path, &client.take().unwrap(), local, now, quiet);
         (server.join().unwrap(), result)
     }
 
@@ -607,8 +697,15 @@ mod tests {
             client.replace(&before).unwrap();
             let batch = client.take().unwrap();
             let now = cap.issued_unix_ms;
-            let worker =
-                std::thread::spawn(move || reconcile(&path, &batch, &LocalTime::Offset(0), now));
+            let worker = std::thread::spawn(move || {
+                reconcile(
+                    &path,
+                    &batch,
+                    &LocalTime::Offset(0),
+                    now,
+                    &QuietWindow::default(),
+                )
+            });
             let (mut peer, _) = listener.accept().unwrap();
             peer.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
             let mut line = String::new();
@@ -640,5 +737,324 @@ mod tests {
             );
             assert!(client.take().unwrap().fence.acquire().is_ok());
         }
+    }
+
+    /// 1 January 2026, 00:00 UTC, the zone these rounds use.
+    const MIDNIGHT: u64 = 1_767_225_600_000;
+    const HOUR: u64 = 3_600_000;
+    const LATE: QuietWindow = QuietWindow {
+        on: true,
+        start: 22 * 60,
+        end: 7 * 60,
+    };
+
+    fn quiet_definition() -> Definition {
+        Definition {
+            source: "skill-bedtime-morning".into(),
+            limits: Limits {
+                follows_quiet: true,
+                ..limits("21:00", "06:00")
+            },
+            output_limits: true,
+        }
+    }
+
+    fn quiet_round(
+        active: Vec<OutputCap>,
+        now: u64,
+        mutations: usize,
+        quiet: &QuietWindow,
+    ) -> Vec<Value> {
+        let (requests, result) = round_in(active, vec![quiet_definition()], now, mutations, quiet);
+        result.unwrap();
+        requests
+    }
+
+    /// The cap a round put, as Actions would then hold it.
+    fn held(put: &Value) -> OutputCap {
+        assert_eq!(put["op"], "caps_put", "{put}");
+        serde_json::from_value(put["cap"].clone()).unwrap()
+    }
+
+    /// #8866: with the person's window 22:00 to 07:00 the ceilings come at
+    /// 22:00, not 21:00, and are lifted at 07:00, not 06:00.
+    #[test]
+    fn quiet_limits_hold_from_the_windows_start_to_its_end() {
+        assert_eq!(
+            quiet_round(vec![], MIDNIGHT + 21 * HOUR + 59 * 60_000, 0, &LATE),
+            [json!({"op":"caps_get"})],
+            "21:59 is not quiet yet"
+        );
+        let put = quiet_round(vec![], MIDNIGHT + 22 * HOUR, 1, &LATE)
+            .pop()
+            .unwrap();
+        let cap = held(&put);
+        assert_eq!(
+            cap.valid_until_unix_ms,
+            MIDNIGHT + 31 * HOUR,
+            "07:00 next day"
+        );
+        assert_eq!(
+            (cap.light_channel_max, cap.volume_raw_max),
+            (Some(24), Some(35))
+        );
+        assert!(cap.token.starts_with("quiet-2200-0700-"), "{}", cap.token);
+        // Inside, the same cap is kept: nothing more is asked.
+        assert_eq!(
+            quiet_round(vec![cap.clone()], MIDNIGHT + 26 * HOUR, 0, &LATE),
+            [json!({"op":"caps_get"})]
+        );
+        // At 06:00 the old night would have ended; this one goes on.
+        assert_eq!(
+            quiet_round(vec![cap.clone()], MIDNIGHT + 30 * HOUR, 0, &LATE),
+            [json!({"op":"caps_get"})]
+        );
+        let lifted = quiet_round(vec![cap.clone()], MIDNIGHT + 31 * HOUR, 1, &LATE)
+            .pop()
+            .unwrap();
+        assert_eq!(
+            lifted,
+            json!({"op":"caps_remove","source":cap.source,"token":cap.token})
+        );
+        // With no window heard, the old night: 21:00 to 06:00.
+        let put = quiet_round(vec![], MIDNIGHT + 21 * HOUR, 1, &QuietWindow::default())
+            .pop()
+            .unwrap();
+        assert_eq!(held(&put).valid_until_unix_ms, MIDNIGHT + 30 * HOUR);
+    }
+
+    /// #8866: a window changed in the night takes hold at the next
+    /// reconcile: a later end replaces the cap with one to the new end, a
+    /// start moved past the current minute lifts it, and a cap the new
+    /// window still covers is put again only when its window changed.
+    #[test]
+    fn a_window_changed_in_the_night_lifts_or_moves_the_cap_at_once() {
+        let at = MIDNIGHT + 23 * HOUR;
+        let cap = held(&quiet_round(vec![], at - HOUR, 1, &LATE).pop().unwrap());
+        let later = QuietWindow {
+            end: 8 * 60,
+            ..LATE
+        };
+        let moved = held(&quiet_round(vec![cap.clone()], at, 1, &later).pop().unwrap());
+        assert_eq!(moved.source, cap.source);
+        assert_ne!(moved.token, cap.token);
+        assert!(
+            moved.token.starts_with("quiet-2200-0800-"),
+            "{}",
+            moved.token
+        );
+        assert_eq!(moved.valid_until_unix_ms, MIDNIGHT + 32 * HOUR);
+        assert!(moved.issued_unix_ms > cap.issued_unix_ms);
+        let after_midnight = QuietWindow {
+            start: 23 * 60 + 30,
+            ..LATE
+        };
+        assert_eq!(
+            quiet_round(vec![cap.clone()], at, 1, &after_midnight)
+                .pop()
+                .unwrap(),
+            json!({"op":"caps_remove","source":cap.source,"token":cap.token})
+        );
+        // An earlier end that has already passed lifts it too.
+        let earlier = QuietWindow {
+            start: 20 * 60,
+            end: 22 * 60 + 30,
+            on: true,
+        };
+        assert_eq!(
+            quiet_round(vec![cap.clone()], at, 1, &earlier)
+                .pop()
+                .unwrap()["op"],
+            "caps_remove"
+        );
+        // Then, out of the window, nothing is put again.
+        assert_eq!(
+            quiet_round(vec![], at, 0, &after_midnight),
+            [json!({"op":"caps_get"})]
+        );
+    }
+
+    /// #8866: quiet hours off lift the night ceilings and put none.
+    #[test]
+    fn quiet_hours_off_put_no_ceiling_and_lift_the_one_held() {
+        let off = QuietWindow { on: false, ..LATE };
+        let at = MIDNIGHT + 23 * HOUR;
+        assert_eq!(quiet_round(vec![], at, 0, &off), [json!({"op":"caps_get"})]);
+        let cap = held(&quiet_round(vec![], at, 1, &LATE).pop().unwrap());
+        assert_eq!(
+            quiet_round(vec![cap.clone()], at, 1, &off).pop().unwrap(),
+            json!({"op":"caps_remove","source":cap.source,"token":cap.token})
+        );
+    }
+
+    /// Fixed hours ignore the quiet window entirely, as before #8866.
+    #[test]
+    fn fixed_limits_do_not_follow_the_quiet_window() {
+        let definitions = vec![definition("skill-routine")];
+        let off = QuietWindow { on: false, ..LATE };
+        let (requests, result) =
+            round_in(vec![], definitions.clone(), MIDNIGHT + 22 * HOUR, 1, &off);
+        result.unwrap();
+        let cap = held(requests.last().unwrap());
+        assert!(cap.token.starts_with("window-"), "{}", cap.token);
+        assert_eq!(cap.valid_until_unix_ms, MIDNIGHT + 30 * HOUR);
+        // Kept whatever the window says.
+        let (requests, result) = round_in(vec![cap], definitions, MIDNIGHT + 23 * HOUR, 0, &LATE);
+        result.unwrap();
+        assert_eq!(requests, [json!({"op":"caps_get"})]);
+    }
+
+    #[test]
+    fn the_client_keeps_the_window_told_and_starts_with_the_old_night() {
+        let client = Client(Arc::default());
+        assert_eq!(client.quiet(), QuietWindow::default());
+        client.set_quiet(LATE);
+        assert_eq!(client.quiet(), LATE);
+        // A reload does not forget it.
+        client.replace(&[capped_skill()]).unwrap();
+        assert_eq!(client.quiet(), LATE);
+    }
+
+    fn quiet_round_at(
+        active: Vec<OutputCap>,
+        now: u64,
+        mutations: usize,
+        quiet: &QuietWindow,
+        local: &LocalTime,
+    ) -> Vec<Value> {
+        let (requests, result) = round_at(
+            active,
+            vec![quiet_definition()],
+            now,
+            mutations,
+            quiet,
+            local,
+        );
+        result.unwrap();
+        requests
+    }
+
+    /// Before any window is told, the client and each round use the old
+    /// night, 21:00 to 06:00 (the first builder's ask on #8866).
+    #[test]
+    fn before_any_window_the_limits_use_the_old_night() {
+        let client = Client(Arc::default());
+        let quiet = client.quiet();
+        assert_eq!(quiet, QuietWindow::default());
+        assert_eq!(
+            quiet_round(vec![], MIDNIGHT + 20 * HOUR + 59 * 60_000, 0, &quiet),
+            [json!({"op":"caps_get"})],
+            "20:59: not yet"
+        );
+        let cap = held(
+            &quiet_round(vec![], MIDNIGHT + 21 * HOUR, 1, &quiet)
+                .pop()
+                .unwrap(),
+        );
+        assert!(cap.token.starts_with("quiet-2100-0600-"), "{}", cap.token);
+        assert_eq!(cap.valid_until_unix_ms, MIDNIGHT + 30 * HOUR);
+        assert_eq!(
+            quiet_round(vec![cap.clone()], MIDNIGHT + 30 * HOUR, 1, &quiet)
+                .pop()
+                .unwrap()["op"],
+            "caps_remove"
+        );
+    }
+
+    /// The local time is read at each round, never kept: a window across
+    /// midnight holds on both sides of it, ending at the next local end.
+    #[test]
+    fn a_window_across_midnight_is_read_fresh_each_round() {
+        let local = LocalTime::Offset(0);
+        let cap = held(
+            &quiet_round_at(vec![], MIDNIGHT + 23 * HOUR + 59 * 60_000, 1, &LATE, &local)
+                .pop()
+                .unwrap(),
+        );
+        assert_eq!(cap.valid_until_unix_ms, MIDNIGHT + 31 * HOUR);
+        // 00:01 the next day, inside still: kept.
+        assert_eq!(
+            quiet_round_at(
+                vec![cap.clone()],
+                MIDNIGHT + 24 * HOUR + 60_000,
+                0,
+                &LATE,
+                &local
+            ),
+            [json!({"op":"caps_get"})]
+        );
+        // Put first after midnight, it ends the same morning.
+        let after = held(
+            &quiet_round_at(vec![], MIDNIGHT + 24 * HOUR + 60_000, 1, &LATE, &local)
+                .pop()
+                .unwrap(),
+        );
+        assert_eq!(after.valid_until_unix_ms, MIDNIGHT + 31 * HOUR);
+    }
+
+    /// A zone changed between rounds (the system zone followed as it
+    /// changes, `LocalTime::System`) moves the cap in and out at once.
+    #[test]
+    fn a_zone_change_between_rounds_moves_the_cap_in_or_out() {
+        // 23:00 UTC: inside 22:00-07:00 at UTC, 07:00 at UTC+8, outside.
+        let at = MIDNIGHT + 23 * HOUR;
+        let cap = held(
+            &quiet_round_at(vec![], at, 1, &LATE, &LocalTime::Offset(0))
+                .pop()
+                .unwrap(),
+        );
+        assert_eq!(
+            quiet_round_at(vec![cap.clone()], at, 1, &LATE, &LocalTime::Offset(8 * 60))
+                .pop()
+                .unwrap(),
+            json!({"op":"caps_remove","source":cap.source,"token":cap.token})
+        );
+        assert_eq!(
+            quiet_round_at(vec![], at, 0, &LATE, &LocalTime::Offset(8 * 60)),
+            [json!({"op":"caps_get"})]
+        );
+        // 13:00 UTC: outside at UTC, 22:00 at UTC+9, inside: put, ending at
+        // 07:00 there, 22:00 UTC.
+        let at = MIDNIGHT + 13 * HOUR;
+        assert_eq!(
+            quiet_round_at(vec![], at, 0, &LATE, &LocalTime::Offset(0)),
+            [json!({"op":"caps_get"})]
+        );
+        let east = held(
+            &quiet_round_at(vec![], at, 1, &LATE, &LocalTime::Offset(9 * 60))
+                .pop()
+                .unwrap(),
+        );
+        assert_eq!(east.valid_until_unix_ms, MIDNIGHT + 22 * HOUR);
+    }
+
+    /// A wall clock that jumps (set by hand, or synced after a long cut)
+    /// is read as it is at the next round, either way.
+    #[test]
+    fn a_wall_clock_jump_moves_the_cap_in_or_out() {
+        let local = LocalTime::Offset(0);
+        let cap = held(
+            &quiet_round_at(vec![], MIDNIGHT + 23 * HOUR, 1, &LATE, &local)
+                .pop()
+                .unwrap(),
+        );
+        // Forward to noon the next day: lifted.
+        assert_eq!(
+            quiet_round_at(vec![cap.clone()], MIDNIGHT + 36 * HOUR, 1, &LATE, &local)
+                .pop()
+                .unwrap()["op"],
+            "caps_remove"
+        );
+        // Back from noon into the night: put again.
+        assert_eq!(
+            quiet_round_at(vec![], MIDNIGHT + 12 * HOUR, 0, &LATE, &local),
+            [json!({"op":"caps_get"})]
+        );
+        let back = held(
+            &quiet_round_at(vec![], MIDNIGHT + 2 * HOUR, 1, &LATE, &local)
+                .pop()
+                .unwrap(),
+        );
+        assert_eq!(back.valid_until_unix_ms, MIDNIGHT + 7 * HOUR);
     }
 }

@@ -234,6 +234,13 @@ authority and combines with other ceilings by minimum. Actions' private
 strict schemas, including rejection of unknown fields and operations. See
 [Bedtime and Morning](bedtime-morning.md) for clock and consumer limits.
 
+`quiet_topics()` adds the person's quiet hours (#8866), said by the same
+Actions service while its caps are on:
+
+| Type | Topic | Kind | Period / lifespan | Meaning |
+|---|---|---|---|---|
+| `QuietWindow` | `quiet/window` | latest | 1,000 ms / none | The one quiet window of the lamp, set from the app (`quiet.set`) and kept by Actions in its caps folder: `on`, and `start` and `end` as minutes of the local day (0 to 1439, different; a window may cross midnight, the end left out). A setting, not a reading: no lifespan, and a reader keeps the last it heard; none heard is on, 21:00 to 06:00 (1260, 360). Only a value from `actions` of this type that checks is taken. Read by Skills ([bedtime-morning.md](bedtime-morning.md), "Quiet hours") |
+
 ## Optional controls contracts
 
 Controls' additive types live in `src/controls.rs` and are re-exported at the

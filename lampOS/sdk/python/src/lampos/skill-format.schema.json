@@ -723,6 +723,27 @@
         }
       }
     },
+    "quiet_hours_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "after",
+        "for"
+      ],
+      "properties": {
+        "after": {
+          "enum": [
+            "quiet_start",
+            "quiet_end"
+          ]
+        },
+        "for": {
+          "type": "string",
+          "pattern": "^[0-9]+(m|h)$",
+          "description": "Whole minutes or hours, from 1m to less than a day."
+        }
+      }
+    },
     "day_name": {
       "type": "string",
       "enum": [
@@ -920,7 +941,15 @@
           "type": "boolean"
         },
         "during": {
-          "$ref": "#/$defs/window"
+          "description": "Local hours in which it can hold: fixed ones, or hours from one end of the person's quiet hours (#8866), on or off.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/window"
+            },
+            {
+              "$ref": "#/$defs/quiet_hours_window"
+            }
+          ]
         },
         "days": {
           "description": "The local days of the week its `during` opens on (#6066): one name or a nonempty list of `mon` to `sun`, `weekdays`, `weekend`. Only with `during`; an overnight window's hours after midnight are the day it opened's.",

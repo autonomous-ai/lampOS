@@ -45,6 +45,7 @@ pub mod knowledge;
 pub mod known;
 pub mod limits;
 pub mod package;
+pub mod quiet;
 pub mod relay_share;
 pub mod remind;
 pub mod requested_audio;
@@ -705,11 +706,29 @@ pub fn keep_names(file: &Path, names: &BTreeSet<String>) -> std::io::Result<()> 
     Ok(())
 }
 
+/// A trigger's `during`: fixed local hours, `{ from = "HH:MM", to =
+/// "HH:MM" }`, or hours from one end of the person's quiet hours (#8866,
+/// `crate::quiet`), `{ after = "quiet_start", for = "2h" }`.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum DuringFile {
+    Fixed(QuietFile),
+    Follows(FollowsHours),
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct QuietFile {
     from: String,
     to: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FollowsHours {
+    after: String,
+    #[serde(rename = "for")]
+    lasting: String,
 }
 
 /// A trigger's `days` (#6066): a list of day names, or one name alone
@@ -936,7 +955,7 @@ struct TriggerFile {
     /// An explicitly observed empty face list, never a missing camera.
     present: Option<bool>,
     /// Local hours in which this trigger can hold.
-    during: Option<QuietFile>,
+    during: Option<DuringFile>,
     /// The local days of the week its `during` opens on (#6066).
     days: Option<DaysFile>,
     /// Consume at most one chance per local window, durably before acting.
@@ -3231,6 +3250,10 @@ pub struct Trigger {
     /// talk ends. 0: a chance held back is spent.
     pub wait_us: u64,
     pub during: Option<daily::Window>,
+    /// `during` follows the person's quiet hours (#8866): its hours are
+    /// made again from the window each time it changes
+    /// ([`Engine::set_quiet`]). None for fixed hours.
+    pub follows_quiet: Option<quiet::Follows>,
     /// The local days of the week `during` opens on (#6066); None, every
     /// day. An overnight window's hours after midnight are the day it
     /// opened's.
@@ -4168,11 +4191,26 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             "trigger name {name:?}: 1 to 64 lowercase letters, digits and _"
         ));
     }
-    let during = file
-        .during
-        .map(|window| daily::Window::parse(&window.from, &window.to))
-        .transpose()
-        .map_err(|error| format!("during: {error}"))?;
+    // Hours that follow the quiet window take the old night's until the
+    // window is heard (`Engine::set_quiet`, #8866).
+    let (during, follows_quiet) = match file.during {
+        None => (None, None),
+        Some(DuringFile::Fixed(window)) => (
+            Some(
+                daily::Window::parse(&window.from, &window.to)
+                    .map_err(|error| format!("during: {error}"))?,
+            ),
+            None,
+        ),
+        Some(DuringFile::Follows(hours)) => {
+            let follows = quiet::Follows::parse(&hours.after, &hours.lasting)
+                .map_err(|error| format!("during: {error}"))?;
+            (
+                Some(follows.window(&lamp_msgs::QuietWindow::default())),
+                Some(follows),
+            )
+        }
+    };
     let days = match file.days {
         None => None,
         Some(_) if during.is_none() => {
@@ -4410,6 +4448,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         wait_us,
         rise,
         during,
+        follows_quiet,
         days,
         once_per_day: file.once_per_day,
         unless_heard: file.unless_heard,
@@ -7590,6 +7629,9 @@ pub struct Engine {
     restoring: Option<holds::Restored>,
     /// The character's energy level ([`Engine::set_energy`], #6893).
     energy: u8,
+    /// The person's quiet hours as last heard ([`Engine::set_quiet`],
+    /// #8866): a trigger that follows them takes its hours from them.
+    quiet: lamp_msgs::QuietWindow,
 }
 
 /// What a write skill's start spent, as it was before (#6066): what
@@ -7889,6 +7931,7 @@ impl Engine {
             holds: None,
             restoring: None,
             energy: 0,
+            quiet: lamp_msgs::QuietWindow::default(),
         }
     }
 
@@ -7897,6 +7940,19 @@ impl Engine {
     /// rearm follow it (`lamp_body::energy::GESTURE`); 0 or 1, as written.
     pub fn set_energy(&mut self, level: u8) {
         self.energy = level;
+    }
+
+    /// The person's quiet hours, as Skills last heard them on
+    /// `quiet/window` (#8866, [`quiet::Heard`]): each trigger whose
+    /// `during` follows them takes the hours they make now, and a reload
+    /// keeps them. Whether they changed; fixed hours never do.
+    pub fn set_quiet(&mut self, window: lamp_msgs::QuietWindow) -> bool {
+        if window == self.quiet {
+            return false;
+        }
+        self.quiet = window;
+        quiet::follow(&mut self.skills, &window);
+        true
     }
 
     /// A `[[while]]` with `through` carries its clock through a spell of
@@ -9380,6 +9436,8 @@ impl Engine {
             &mut self.skills,
             skills.into_iter().filter(|skill| skill.enabled).collect(),
         );
+        // Hours that follow the quiet window take the one heard (#8866).
+        quiet::follow(&mut self.skills, &self.quiet);
         // A read's skill changed (its permissions mended, say) may try
         // again today: the program's once a day still says whether it
         // reads. A run under way stays so until it is done.

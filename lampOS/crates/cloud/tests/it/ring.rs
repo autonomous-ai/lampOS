@@ -84,6 +84,7 @@ fn a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_giv
         consent: None,
         desk_noticing: None,
         privacy_light: None,
+        quiet_hours: false,
         monitor: None,
         devices: None,
         apps: None,

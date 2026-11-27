@@ -103,6 +103,41 @@ fn core_bedtime_manifest_is_enabled_and_has_no_model_function() {
     assert!(!window.contains(5 * 60 + 59) && window.contains(6 * 60));
     assert!(window.contains(10 * 60 + 59) && !window.contains(11 * 60));
     assert!(morning.unless_heard);
+    // Both follow the person's quiet hours (#8866): the glow two hours
+    // from their start, the hum five from their end; the ceilings hold in
+    // them while they are on.
+    let evening = skill
+        .triggers
+        .iter()
+        .find(|trigger| trigger.name.as_deref() == Some("evening"))
+        .unwrap();
+    assert_eq!(
+        evening.follows_quiet,
+        Some(lamp_skills::quiet::Follows {
+            after: lamp_skills::quiet::Anchor::Start,
+            minutes: 120
+        })
+    );
+    assert_eq!(
+        morning.follows_quiet,
+        Some(lamp_skills::quiet::Follows {
+            after: lamp_skills::quiet::Anchor::End,
+            minutes: 300
+        })
+    );
+    let evening = evening.during.unwrap();
+    assert!(!evening.contains(20 * 60 + 59) && evening.contains(21 * 60));
+    assert!(evening.contains(22 * 60 + 59) && !evening.contains(23 * 60));
+    let limits = skill.limits.as_ref().unwrap();
+    assert!(limits.follows_quiet);
+    assert_eq!(
+        (limits.light_channel_max, limits.volume_raw_max),
+        (Some(24), Some(35))
+    );
+    assert_eq!(
+        limits.window(&lamp_msgs::QuietWindow::default()),
+        Some(lamp_skills::daily::Window::parse("21:00", "06:00").unwrap())
+    );
     assert!(
         skill
             .triggers
@@ -1709,4 +1744,176 @@ fn days_are_checked_at_load() {
         refused("topic = \"clock/local\"\nfield = \"known\"\nequals = true\ndays = [\"mon\"]");
     assert!(error.contains("days goes with during"), "{error}");
     assert!(!refused(&on_days("[1, 2]", "07:00", "08:00")).is_empty());
+}
+
+const LATE: lamp_msgs::QuietWindow = lamp_msgs::QuietWindow {
+    on: true,
+    start: 22 * 60,
+    end: 7 * 60,
+};
+
+fn hours(skill: &Skill, name: &str) -> lamp_skills::daily::Window {
+    skill
+        .triggers
+        .iter()
+        .find(|trigger| trigger.name.as_deref() == Some(name))
+        .and_then(|trigger| trigger.during)
+        .unwrap()
+}
+
+/// #8866: the glow and the hum move with the person's quiet hours, on or
+/// off, through a reload too; fixed hours never move.
+#[test]
+fn bedtimes_glow_and_hum_follow_the_quiet_hours() {
+    let root = private_root();
+    let fixed = skill(root.path(), "", morning());
+    let mut engine = Engine::new(vec![bedtime_morning(root.path()), fixed.clone()], true);
+    let window = |engine: &Engine, name: &str| {
+        let skill = engine
+            .skills()
+            .iter()
+            .find(|skill| skill.name == "bedtime-morning")
+            .unwrap();
+        hours(skill, name)
+    };
+    let parse = |from, to| lamp_skills::daily::Window::parse(from, to).unwrap();
+    assert_eq!(window(&engine, "evening"), parse("21:00", "23:00"));
+    assert_eq!(window(&engine, "morning"), parse("06:00", "11:00"));
+    assert!(!engine.set_quiet(lamp_msgs::QuietWindow::default()));
+    assert!(engine.set_quiet(LATE));
+    assert_eq!(window(&engine, "evening"), parse("22:00", "00:00"));
+    assert_eq!(window(&engine, "morning"), parse("07:00", "12:00"));
+    // Off lifts only the ceilings: the glow and the hum keep their hours.
+    assert!(engine.set_quiet(lamp_msgs::QuietWindow { on: false, ..LATE }));
+    assert_eq!(window(&engine, "morning"), parse("07:00", "12:00"));
+    // A reload loads the manifest's own hours; the window heard holds.
+    engine.replace(vec![bedtime_morning(root.path()), fixed.clone()]);
+    assert_eq!(window(&engine, "evening"), parse("22:00", "00:00"));
+    let kept = engine
+        .skills()
+        .iter()
+        .find(|skill| skill.name == fixed.name)
+        .unwrap();
+    assert_eq!(
+        hours(kept, "morning"),
+        parse("06:00", "10:00"),
+        "fixed hours"
+    );
+}
+
+/// #8866: with quiet hours to 07:00 the morning greeting waits for 07:00:
+/// a face at 06:30 is not greeted, one at 07:10 is.
+#[test]
+fn the_morning_greeting_waits_for_the_quiet_hours_end() {
+    let root = private_root();
+    let mut engine = Engine::new(vec![bedtime_morning(root.path())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    engine.set_quiet(LATE);
+    morning_minute(&mut engine, 6 * 60 + 29, false);
+    let (made, _) = morning_minute(&mut engine, 6 * 60 + 30, true);
+    assert!(made.is_empty(), "{made:?}");
+    morning_minute(&mut engine, 7 * 60 + 9, false);
+    let (made, _) = morning_minute(&mut engine, 7 * 60 + 10, true);
+    assert!(greeted(&made), "{made:?}");
+}
+
+/// A trigger's `during` takes fixed hours or hours from one end of the
+/// quiet hours (#8866), and nothing else.
+#[test]
+fn a_trigger_follows_the_quiet_hours_only_in_the_forms_it_knows() {
+    let root = private_root();
+    let trigger = |during: &str| {
+        format!(
+            "name = \"morning\"\ntopic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\nduring = {during}\nonce_per_day = true"
+        )
+    };
+    let follows = skill(
+        root.path(),
+        "",
+        &trigger("{ after = \"quiet_end\", for = \"90m\" }"),
+    );
+    assert_eq!(
+        hours(&follows, "morning"),
+        lamp_skills::daily::Window::parse("06:00", "07:30").unwrap()
+    );
+    for refused in [
+        "{ after = \"sunrise\", for = \"2h\" }",
+        "{ after = \"quiet_end\", for = \"24h\" }",
+        "{ after = \"quiet_end\" }",
+        "{ after = \"quiet_end\", for = \"2h\", from = \"06:00\" }",
+        "\"quiet\"",
+    ] {
+        let folder = root.path().join("daily-check");
+        fs::write(
+            folder.join("skill.toml"),
+            granted(&format!(
+                "[trigger]\n{}\n[ask]\npolicy = \"nudge\"\n\n[[do]]\nbody = {{ gesture = \"stretching\" }}\n",
+                trigger(refused)
+            )),
+        )
+        .unwrap();
+        assert!(load(&folder).is_err(), "{refused}");
+    }
+}
+
+/// A minute of the voice resting with `face` in view, the lamp's zone
+/// `offset` minutes east of UTC and the wall clock at UTC `minute` of day
+/// `day`: the calls made. The engine's own monotonic clock goes on.
+fn minute_in(
+    engine: &mut Engine,
+    offset: i32,
+    day: u64,
+    minute: u64,
+    mono_minute: u64,
+    face: bool,
+) -> Vec<Call> {
+    let mut made = Vec::new();
+    for second in 0..60 {
+        let now = us(mono_minute, second);
+        engine.clock(
+            offset,
+            now,
+            MIDNIGHT + day * 86_400_000 + minute * 60_000 + second * 1_000,
+        );
+        engine.observe("voice/state", now, br#"{"state":"resting"}"#, None);
+        made.extend(calls(engine.observe(
+            Faces::TOPIC,
+            now,
+            if face { FACE } else { EMPTY },
+            None,
+        )));
+    }
+    made
+}
+
+/// #8866: the trigger's hours that follow the quiet window are read with
+/// the local time of each check, never a kept one: a zone changed between
+/// checks, or a wall clock that jumped, moves the morning greeting with
+/// it. The window here ends at 07:00, so the greeting opens at 07:00.
+#[test]
+fn the_greeting_reads_the_zone_and_the_clock_fresh_at_each_check() {
+    // Zone: the same instant, 06:40 UTC, is 06:40 at UTC (not yet) and
+    // 07:40 an hour east (open).
+    let root = private_root();
+    let mut engine = Engine::new(vec![bedtime_morning(root.path())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    engine.set_quiet(LATE);
+    minute_in(&mut engine, 0, 0, 6 * 60 + 39, 400, false);
+    assert!(minute_in(&mut engine, 0, 0, 6 * 60 + 40, 401, true).is_empty());
+    minute_in(&mut engine, 60, 0, 6 * 60 + 41, 402, false);
+    let made = minute_in(&mut engine, 60, 0, 6 * 60 + 42, 403, true);
+    assert!(greeted(&made), "{made:?}");
+
+    // Clock jump: set back from 07:30 to 06:30 before the face comes, then
+    // forward to 07:30 again.
+    let root = private_root();
+    let mut engine = Engine::new(vec![bedtime_morning(root.path())], true)
+        .with_daily_journal(crate::journal(root.path().join("daily.json")));
+    engine.set_quiet(LATE);
+    minute_in(&mut engine, 0, 0, 7 * 60 + 29, 400, false);
+    minute_in(&mut engine, 0, 0, 6 * 60 + 30, 401, false);
+    assert!(minute_in(&mut engine, 0, 0, 6 * 60 + 31, 402, true).is_empty());
+    minute_in(&mut engine, 0, 0, 7 * 60 + 30, 403, false);
+    let made = minute_in(&mut engine, 0, 0, 7 * 60 + 31, 404, true);
+    assert!(greeted(&made), "{made:?}");
 }

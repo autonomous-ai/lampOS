@@ -3141,9 +3141,14 @@ lists `quiet.set`.
   factory reset wipes it. With none kept, 21:00–06:00 and on, so a lamp
   nobody sets behaves as before.
 - **Shared on the lamp:** Actions says the window on the bus,
-  `lamp_msgs::QuietWindow` on `quiet/window`, the latest value, read by
-  Skills and the light's night ceiling; none of them keeps a window of its
-  own.
+  `lamp_msgs::QuietWindow` on `quiet/window`, the latest value (minutes of
+  the day, no lifespan), read by Skills, which puts the night ceilings as
+  caps in Actions; the light, the ring and the sound follow those caps as
+  before, and none of them keeps a window of its own. Until a window is
+  heard, Skills uses 21:00–06:00, on. The kinds reach Actions as its own
+  ops, `{"op":"quiet_get"}` and `{"op":"quiet_put","on","start","end"}`,
+  not as calls; an Actions from before them is said as "this lamp's actions
+  can't keep quiet hours yet".
 - **Off is the switch's:** `LAMP_QUIET_HOURS` is off unless `on` exactly. An
   app that reads no `can`, or a lamp without the switch, keeps today's
   fixed 21:00–06:00.

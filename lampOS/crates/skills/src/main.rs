@@ -1125,6 +1125,11 @@ fn serve(
     // and rearm follow it. Off, level 1: as written.
     let mut energy = lamp_body::energy_in::enabled_from_environment()
         .then(|| lamp_body::energy_in::EnergyIn::on(bus.clone()));
+    // The person's quiet hours (#8866), as Actions says them on
+    // `quiet/window`, read once a second: triggers that follow them take
+    // their hours, and the night ceilings hold to them. None heard: the old
+    // night, 21:00 to 06:00.
+    let mut quiet = lamp_skills::quiet::Heard::on(bus.clone());
     // A sound heard as no words is slept through, only with
     // LAMP_REST_THROUGH_SOUNDS=on (#1672).
     if watch::switched_on(
@@ -1791,6 +1796,18 @@ fn serve(
             let level = energy.level();
             engine.set_energy(level);
             runner.energy.set(level);
+        }
+        let window = quiet.now();
+        if engine.set_quiet(window) {
+            eprintln!(
+                "lamp-skills: quiet hours {} to {}, {}: the skills that follow them follow",
+                lamp_msgs::quiet_time(window.start),
+                lamp_msgs::quiet_time(window.end),
+                if window.on { "on" } else { "off" }
+            );
+            if let Some(limits) = &limits {
+                limits.set_quiet(window);
+            }
         }
         let made = engine.clock_tick(now_us);
         say_dropped(&mut engine);

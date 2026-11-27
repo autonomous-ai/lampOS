@@ -103,9 +103,37 @@ excluding its end.
 
 | Part | Eligibility | Authored result |
 |---|---|---|
-| Night ceilings | 21:00–06:00, independently of presentation or presence | Maximum ordinary ring channel value 24 and raw mixer volume 35. These are device values, not measured brightness or loudness. |
-| Evening | 21:00–23:00; a nearby person for 30 seconds | One step warmer and one step dimmer than the person's own light as the ring shows it (`light/state`): the light breathes from their level down one step and back, 10 s a breath, for 20 s, then is given back. Always a level under their light, never over, in their colour when it is already warm. At level 1, off or not known, nothing is shown and the journal says why. |
-| Morning | 06:00–11:00; a nearby person for three seconds and nothing heard on `voice/heard` since 06:00 | Ask Say for a hum. The lamp's wake is Expression's, at the first face (Night sleep, #940). |
+| Night ceilings | The person's quiet hours while they are on (21:00–06:00 until set; none while off), independently of presentation or presence | Maximum ordinary ring channel value 24 and raw mixer volume 35. These are device values, not measured brightness or loudness. |
+| Evening | The two hours from the quiet hours' start, on or off (21:00–23:00 until set); a nearby person for 30 seconds | One step warmer and one step dimmer than the person's own light as the ring shows it (`light/state`): the light breathes from their level down one step and back, 10 s a breath, for 20 s, then is given back. Always a level under their light, never over, in their colour when it is already warm. At level 1, off or not known, nothing is shown and the journal says why. |
+| Morning | The five hours from the quiet hours' end, on or off (06:00–11:00 until set); a nearby person for three seconds and nothing heard on `voice/heard` since that window opened | Ask Say for a hum. The lamp's wake is Expression's, at the first face (Night sleep, #940). |
+
+### Quiet hours (#8866)
+
+The three windows above follow the person's quiet hours, one window for
+the whole lamp set from the app (`quiet.set`, [cloud.md](cloud.md), "Quiet
+hours from the app") and kept by Actions, which says it on `quiet/window`
+([actions.md](actions.md), "The person's quiet hours"). The manifest names
+it rather than fixed hours:
+
+- `[limits] during = "quiet"`: the ceilings hold while the window is on and
+  the local time is inside it, and not at all while it is off.
+- `during = { after = "quiet_start", for = "2h" }` (the evening) and
+  `during = { after = "quiet_end", for = "5h" }` (the morning): from the
+  window's start or end, for that long, whether it is on or off.
+
+Skills reads the latest `quiet/window` once a second (`lamp_skills::quiet`)
+and keeps the last one it heard while Actions is down. Until it hears one,
+every reader uses the old night, on, 21:00 to 06:00, so a lamp nobody set
+behaves as before. A new window takes hold within about a second, inside it
+too: the limits client's next reconcile lifts a cap the old window held
+once the new one has left the current minute, or replaces it with one that
+ends at the new end (a quiet cap's token names the window it was put for,
+`quiet-HHMM-HHMM-<issued>`), and the triggers' hours are made again at once
+(`Engine::set_quiet`). Local time is read at each check, as before, so a
+window across midnight, a zone change and a wall clock that jumps move the
+caps and the triggers at the next check. The old `{ from, to }` form still
+gives fixed hours that never follow the window. An older lamp-skills
+refuses the new forms, as any key it does not know.
 
 Evening and morning each have one daily chance and require Voice to
 have reported resting for 30 seconds. They retain the process's existing

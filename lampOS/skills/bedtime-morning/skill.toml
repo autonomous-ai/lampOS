@@ -14,8 +14,10 @@ light = true
 output_limits = true
 
 # Restrictions do not wait for a presentation or for someone to be there.
+# They hold in the person's quiet hours while those are on (#8866: set from
+# the app, 21:00 to 06:00 until then), and not at all while they are off.
 [limits]
-during = { from = "21:00", to = "06:00" }
+during = "quiet"
 light_channel_max = 24
 volume_raw_max = 35
 
@@ -27,7 +29,9 @@ near = 0.14
 for = "30s"
 wait = "1m"
 rearm = "ends"
-during = { from = "21:00", to = "23:00" }
+# The two hours from the quiet hours' start, on or off (21:00 to 23:00 by
+# default).
+during = { after = "quiet_start", for = "2h" }
 once_per_day = true
 
 [[trigger]]
@@ -38,9 +42,12 @@ near = 0.14
 for = "3s"
 wait = "1m"
 rearm = "ends"
-during = { from = "06:00", to = "11:00" }
+# The five hours from the quiet hours' end, on or off (06:00 to 11:00 by
+# default).
+during = { after = "quiet_end", for = "5h" }
 once_per_day = true
-# Spoken to since 06:00: already greeted, so the day's chance is let go.
+# Spoken to since the window opened (06:00 by default): already greeted,
+# so the day's chance is let go.
 unless_heard = true
 
 [[while]]
