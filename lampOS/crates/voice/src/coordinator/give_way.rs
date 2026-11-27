@@ -42,6 +42,25 @@ pub(super) fn giving_way(status: &UpdateStatus) -> Option<u64> {
         .then_some(round.started_at_unix_ms)
 }
 
+/// A done line not said by then is dropped: it is about the update just
+/// over, never one long ago.
+const DONE_WITHIN_US: u64 = 300_000_000;
+
+/// Whether `last`, the end `status` says, brought its build in: `switched`,
+/// or `self-switched` with the parts running it (lamp-update's own build
+/// switched with them). A climb, also `self-switched`, took only the updater
+/// the build carries, so the build does not run yet and nothing is done.
+fn build_in(status: &UpdateStatus, last: &lamp_msgs::UpdateResult) -> bool {
+    match last.outcome.as_str() {
+        "switched" => true,
+        "self-switched" => {
+            last.sequence.is_some()
+                && status.running.as_ref().map(|running| running.sequence) == last.sequence
+        }
+        _ => false,
+    }
+}
+
 /// Whether the round giving way is Auto update's (#8769).
 fn auto(status: &UpdateStatus) -> bool {
     status
@@ -83,8 +102,9 @@ pub(super) struct GiveWay {
     /// An Auto update round this voice saw under way, by when it began, not
     /// yet ended.
     auto_round: Option<u64>,
-    /// That round switched by day: the done line is owed.
-    done: bool,
+    /// That round's build came in by day, when (this voice's clock): the
+    /// done line is owed.
+    done: Option<u64>,
 }
 
 impl GiveWay {
@@ -111,7 +131,8 @@ impl GiveWay {
             .filter(|message| !message.expired)
             .and_then(|message| message.parse::<UpdateStatus>().ok());
         let quiet_hours =
-            (status.as_ref().is_some_and(auto) || self.auto_round.is_some()) && quiet_hours_now();
+            (status.as_ref().is_some_and(auto) || self.auto_round.is_some() || self.done.is_some())
+                && quiet_hours_now();
         self.take(status.as_ref(), quiet_hours, clock);
     }
 
@@ -129,15 +150,25 @@ impl GiveWay {
             } else if status.now == "idle"
                 && let Some(began) = self.auto_round
             {
-                // The round this voice saw has ended: switched by day, the
-                // done line is owed once; any other end, nothing.
-                let last = status.last.as_ref();
-                self.done = !quiet_hours
-                    && last.is_some_and(|last| {
-                        last.outcome == "switched" && last.started_at_unix_ms == Some(began)
-                    });
+                // The round this voice saw has ended: its build in by day,
+                // the done line is owed once; any other end, nothing.
+                let done = status.last.as_ref().is_some_and(|last| {
+                    build_in(status, last)
+                        && last
+                            .started_at_unix_ms
+                            .map_or(last.at_unix_ms >= began, |at| at == began)
+                });
+                self.done = (done && !quiet_hours).then_some(clock);
                 self.auto_round = None;
             }
+        }
+        // A done line not said within DONE_WITHIN_US, or not by the quiet
+        // hours, is dropped.
+        if self
+            .done
+            .is_some_and(|at| quiet_hours || clock.saturating_sub(at) >= DONE_WITHIN_US)
+        {
+            self.done = None;
         }
         self.auto = round.is_some() && status.is_some_and(auto);
         self.quiet_hours = quiet_hours;
@@ -176,12 +207,12 @@ impl GiveWay {
 
     /// Whether the done line is owed: Auto update's round switched by day.
     pub(super) fn done_owed(&self) -> bool {
-        self.done
+        self.done.is_some()
     }
 
     /// The line owed now: the done line, else the updating one.
     pub(super) fn note(&self) -> Option<String> {
-        if self.done {
+        if self.done.is_some() {
             crate::onboarding::said_as_is(crate::language::update_done(crate::language::at_start()))
         } else {
             Self::line()
@@ -210,8 +241,7 @@ impl GiveWay {
 
     /// The line was said (or a reply ended for it) in this round.
     pub(super) fn said(&mut self) {
-        if self.done {
-            self.done = false;
+        if self.done.take().is_some() {
             return;
         }
         self.said_round = self.round;
@@ -334,6 +364,56 @@ mod tests {
         way.take(Some(&now), false, 0);
         way.take(Some(&ended("switched", 9)), false, 0);
         assert!(!way.done_owed());
+    }
+
+    fn running(mut status: UpdateStatus, sequence: u64) -> UpdateStatus {
+        status.running = Some(lamp_msgs::UpdateBuild {
+            sequence,
+            commit: "c".into(),
+        });
+        status
+    }
+
+    #[test]
+    fn a_self_switch_with_the_build_in_is_told_done_and_a_climb_is_not() {
+        let mut watching = switching(Some(UpdateRound::ASKED_AUTO), None, 9);
+        watching.now = "watching".into();
+        // lamp-update's own build switched with the parts: the build runs.
+        let mut way = GiveWay::default();
+        way.take(Some(&watching), false, 0);
+        way.take(Some(&running(ended("self-switched", 9), 2)), false, 0);
+        assert!(way.done_owed());
+        // A climb: only the updater was taken, the parts still run build 1.
+        let mut way = GiveWay::default();
+        way.take(Some(&watching), false, 0);
+        way.take(Some(&running(ended("self-switched", 9), 1)), false, 0);
+        assert!(!way.done_owed(), "a climb is not the update done");
+        // The new updater's first word, from its records, has no start: an
+        // end at or after the round's start counts.
+        let mut way = GiveWay::default();
+        way.take(Some(&watching), false, 0);
+        let mut from_records = running(ended("self-switched", 9), 2);
+        from_records.last.as_mut().unwrap().started_at_unix_ms = None;
+        way.take(Some(&from_records), false, 0);
+        assert!(way.done_owed());
+    }
+
+    #[test]
+    fn a_done_line_not_said_is_dropped_after_five_minutes_or_at_night() {
+        let mut watching = switching(Some(UpdateRound::ASKED_AUTO), None, 9);
+        watching.now = "watching".into();
+        let mut way = GiveWay::default();
+        way.take(Some(&watching), false, 0);
+        way.take(Some(&ended("switched", 9)), false, 1_000);
+        way.take(Some(&ended("switched", 9)), false, 1_000 + 299_000_000);
+        assert!(way.done_owed());
+        way.take(Some(&ended("switched", 9)), false, 1_000 + 300_000_000);
+        assert!(!way.done_owed(), "five minutes on");
+        way.take(Some(&watching), false, 0);
+        way.take(Some(&ended("switched", 9)), false, 0);
+        assert!(way.done_owed());
+        way.take(Some(&ended("switched", 9)), true, 10);
+        assert!(!way.done_owed(), "the quiet hours came");
     }
 
     #[test]

@@ -1835,9 +1835,11 @@ each round reads the owner's mark, `/etc/lampOS/setup/auto-update-off`
   `asked` `auto`. By day the voice says "I'm updating now. I'll be back in a
   minute." once even with nobody near, and the ring breathes while the
   build comes and swells once it is kept (`LAMP_RING_UPDATE`, on with this).
-  Once the round has switched and kept the build (`last.outcome`
-  `switched`), by day the new build's voice says "I'm back. The update is
-  done." once, in the owner's language, and the ring is back to normal.
+  Once the round has brought its build in (`last.outcome` `switched`, or
+  `self-switched` with `running` at that build; a climb, which took only the
+  updater, is not), by day the new build's voice says "I'm back. The update
+  is done." once, in the owner's language, and the ring is back to normal.
+  A done line not said within 5 minutes, or by the quiet hours, is dropped.
   In the lamp's quiet hours (22:00 to 07:00 local,
   `lamp_local_time::quiet_hours`) nothing is said before or after and the
   ring shows nothing; only someone who speaks during the round (a turn
