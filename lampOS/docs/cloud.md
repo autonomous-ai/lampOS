@@ -134,7 +134,9 @@ against lamp-06c1.
   `update.status` answers from) only while it is fresh; versions and
   `installed` only, never a path or another field. With the switch off, or
   no or a stale status, each is left out and the body is byte for byte as
-  before. A reply that carries a different
+  before. With the switch on, the journal says those two fields of the body
+  sent, `lamp-cloud: the heartbeat says {"engines":…,"harness":…}`, at the
+  first ping and again only when they change. A reply that carries a different
   broker (`mqtt_server`, `mqtt_port`, `mqtt_usr`, `mqtt_pwd` and the
   channels) or a new `device_id` replaces the account: the connection is made
   again with it, and the rotated login is kept in `lamp-cloud`'s own state

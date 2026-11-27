@@ -118,6 +118,24 @@ impl Payload {
         self
     }
 
+    /// The body's `engines` and `harness` alone, as JSON, each left out as
+    /// in the body (#8881): what the journal says of the heartbeat, never
+    /// the identity or anything else the body carries.
+    pub fn engines_part(&self) -> String {
+        #[derive(Serialize)]
+        struct Parts<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            engines: Option<&'a Engines>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            harness: Option<&'a Part>,
+        }
+        serde_json::to_string(&Parts {
+            engines: self.engines.as_ref(),
+            harness: self.harness.as_ref(),
+        })
+        .unwrap_or_default()
+    }
+
     /// The payload with OpenClaw's, Hermes's and Harness's versions (#8881),
     /// with the switch `on` and `kept`, lamp-update's kept `update/status`,
     /// fresh and readable as [`crate::update_events::read`] has it. Off, or
