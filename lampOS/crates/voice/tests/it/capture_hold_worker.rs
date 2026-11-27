@@ -2203,6 +2203,28 @@ fn a_speaker_gone_mid_run_is_a_gap_for_capture_until_its_clock_starts_again() {
     rig.finish();
 }
 
+/// lamp-c0a4, 16 Nov 14:48 (#6672 leg 2): the mute's denied authority, not
+/// the voice's Stop, reached both workers while capture had a reply owed to
+/// the speaker; the speaker took its own and closed the link
+/// (`PrivacyClosed`), capture's reply was refused (`ref.c.capture:
+/// Connection refused`) and, with no Stop queued, that was a fault: exit 1.
+/// The denied authority queued is the same clean end as a Stop.
+#[test]
+fn a_mute_sent_while_the_microphone_opens_ends_capture_cleanly_though_the_speaker_has_gone() {
+    let (mut rig, held) = held_in_prepare("scripted muted in prepare, speaker gone");
+    rig.tolerate_fault = true;
+    rig.controller
+        .set_microphone_permission(now(), Permission::Denied)
+        .unwrap();
+    let snapshot = rig.controller.snapshot(now()).unwrap();
+    rig.end_with(Control::Authority { snapshot });
+    rig.speaker_gone();
+    held.release();
+    let ended = rig.ended();
+    assert_eq!(ended, Ok(()), "fault: {:?}", rig.worker_fault);
+    assert_eq!(rig.worker_fault, None);
+}
+
 impl Rig {
     /// The speaker re-primes on its own copy of the closing authority, ends
     /// on it, says `Stopped`, and closes its end of the reference link, all

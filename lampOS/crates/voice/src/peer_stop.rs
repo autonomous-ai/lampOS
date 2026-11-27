@@ -13,9 +13,16 @@
 //!   queued meanwhile, keeps it in order for its next tick, and sends
 //!   nothing to the speaker when a Stop is among it.
 //! - [`stopped_with_peer`]: a reference link refused by its peer counts as
-//!   a clean end only when the coordinator's Stop is already queued for this
-//!   worker. A refused link with no Stop queued is still the fault it was.
-use crate::{transport::WorkerChannels, wire::Control};
+//!   a clean end only when an end is already queued for this worker: the
+//!   coordinator's Stop, a denied authority (the slide closed, so the
+//!   speaker ended on its own copy, #7224), or the speaker's own `Stopped`
+//!   on the reference link. A refused link with none of those queued (the
+//!   speaker crashed, or was killed) is still the fault it was.
+use crate::{
+    transport::{Channel, WorkerChannels},
+    wire::{Control, ReferenceControl},
+};
+use lamp_turn_owner::Permission;
 use std::{collections::VecDeque, io};
 
 /// The most a look for a queued Stop reads: snapshots come no faster than
@@ -87,18 +94,50 @@ pub(crate) fn refused_by_reference_peer(error: &(dyn std::error::Error + 'static
     })
 }
 
-/// Whether a worker that ended on `error` ended at the coordinator's Stop:
-/// the reference link was refused because the other worker took the same
-/// Stop first, and that Stop is queued for this one too, in `held` (what
-/// the worker had read ahead) or on its socket. Then the end is clean. Any
-/// other error, or a refused link with no Stop queued, is not.
+/// Whether what is held ends this worker as the other one ended: a Stop, or
+/// an authority that denies the microphone (the slide closed, #7224). An
+/// authority whose permission is only unknown is not one.
+fn end_held(held: &VecDeque<Control>) -> bool {
+    held.iter().any(|control| match control {
+        Control::Stop => true,
+        Control::Authority { snapshot } => snapshot.microphone_permission() == Permission::Denied,
+        _ => false,
+    })
+}
+
+/// Whether the peer said it stopped before it closed the link: a `Stopped`
+/// among at most [`STOP_LOOK_BOUND`] controls queued on `reference`. What is
+/// read is dropped: the worker is ending. A read that fails finds nothing.
+fn peer_said_stopped(reference: &mut Channel) -> bool {
+    for _ in 0..STOP_LOOK_BOUND {
+        match reference.receive::<ReferenceControl>() {
+            Ok(Some(ReferenceControl::Stopped { .. })) => return true,
+            Ok(Some(_)) => {}
+            Ok(None) | Err(_) => return false,
+        }
+    }
+    false
+}
+
+/// Whether a worker that ended on `error` ended as its peer did: the
+/// reference link was refused because the other worker ended first, and
+/// what ended it is queued for this one too: the coordinator's Stop or a
+/// denied authority, in `held` (what the worker had read ahead) or on its
+/// socket, or the peer's own `Stopped` on `reference`, this worker's side of
+/// the reference link's control (#7224). Then the end is clean. Any other
+/// error, or a refused link with none of those queued, is not.
 pub(crate) fn stopped_with_peer(
     channels: &mut WorkerChannels,
     held: &mut VecDeque<Control>,
+    reference: Option<&mut Channel>,
     error: &(dyn std::error::Error + 'static),
 ) -> bool {
     refused_by_reference_peer(error)
-        && stop_queued(channels, held, STOP_LOOK_BOUND).unwrap_or(false)
+        && match stop_queued(channels, held, STOP_LOOK_BOUND) {
+            Ok(true) => true,
+            Ok(false) => end_held(held) || reference.is_some_and(peer_said_stopped),
+            Err(_) => false,
+        }
 }
 
 #[cfg(test)]
@@ -130,6 +169,7 @@ mod tests {
     }
 
     use crate::process::{SessionDirectory, new_boot};
+    use crate::transport::ReferenceChannels;
     use lamp_turn_owner::{Controller, MonoTime};
 
     fn now() -> MonoTime {
@@ -173,6 +213,103 @@ mod tests {
         assert!(stopped_with_peer(
             &mut capture,
             &mut VecDeque::new(),
+            None,
+            &refused("ref.c.capture")
+        ));
+    }
+
+    /// lamp-c0a4, 16 Nov 14:48 (#6672 leg 2): the mute's denied authority
+    /// reached both workers, the speaker ended on its own copy
+    /// (PrivacyClosed) and closed the link, and capture's reply to it was
+    /// refused. The denied authority queued is the same clean end as a Stop.
+    #[test]
+    fn a_refused_reference_link_with_a_denied_authority_queued_is_a_clean_end() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut coordinator, mut capture, mut controller) = pair(&directory);
+        controller
+            .set_microphone_permission(now(), lamp_turn_owner::Permission::Denied)
+            .unwrap();
+        let snapshot = controller.snapshot(now()).unwrap();
+        coordinator
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        assert!(stopped_with_peer(
+            &mut capture,
+            &mut VecDeque::new(),
+            None,
+            &refused("ref.c.capture")
+        ));
+    }
+
+    /// Capture's side and the speaker's side of the reference link,
+    /// connected both ways.
+    fn reference_pair(directory: &SessionDirectory) -> (ReferenceChannels, ReferenceChannels) {
+        let (capture_boot, speaker_boot) = (new_boot().unwrap(), new_boot().unwrap());
+        let mut capture =
+            ReferenceChannels::bind(&directory.path, "capture", capture_boot, speaker_boot)
+                .unwrap();
+        let mut speaker =
+            ReferenceChannels::bind(&directory.path, "speaker", speaker_boot, capture_boot)
+                .unwrap();
+        assert!(capture.connect_step().unwrap());
+        assert!(speaker.connect_step().unwrap());
+        (capture, speaker)
+    }
+
+    /// #7224, the speaker's side: it ended on its own copy of the closing
+    /// authority, said Stopped on the reference link and closed it, before
+    /// that authority reached capture. Its Stopped queued is a clean end.
+    #[test]
+    fn a_refused_reference_link_with_the_speakers_stopped_queued_is_a_clean_end() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut coordinator, mut capture, mut controller) = pair(&directory);
+        let snapshot = controller.snapshot(now()).unwrap();
+        coordinator
+            .control
+            .send(Control::Authority { snapshot })
+            .unwrap();
+        let (mut link, mut speaker) = reference_pair(&directory);
+        speaker
+            .control
+            .send(ReferenceControl::Stopped {
+                playback_epoch: 1,
+                observed_at_us: lamp_ipc::monotonic_us(),
+            })
+            .unwrap();
+        drop(speaker);
+        assert!(stopped_with_peer(
+            &mut capture,
+            &mut VecDeque::new(),
+            Some(&mut link.control),
+            &refused("ref.c.capture")
+        ));
+    }
+
+    /// The speaker gone with nothing said on the link and only an authority
+    /// that grants or has not yet read the slide queued: still a fault, with
+    /// the link looked at as without it.
+    #[test]
+    fn a_refused_reference_link_with_nothing_queued_still_fails() {
+        let directory = SessionDirectory::create().unwrap();
+        let (mut coordinator, mut capture, mut controller) = pair(&directory);
+        let unknown = controller.snapshot(now()).unwrap();
+        controller
+            .set_microphone_permission(now(), lamp_turn_owner::Permission::Allowed)
+            .unwrap();
+        let allowed = controller.snapshot(now()).unwrap();
+        for snapshot in [unknown, allowed] {
+            coordinator
+                .control
+                .send(Control::Authority { snapshot })
+                .unwrap();
+        }
+        let (mut link, speaker) = reference_pair(&directory);
+        drop(speaker);
+        assert!(!stopped_with_peer(
+            &mut capture,
+            &mut VecDeque::new(),
+            Some(&mut link.control),
             &refused("ref.c.capture")
         ));
     }
@@ -191,11 +328,13 @@ mod tests {
         assert!(!stopped_with_peer(
             &mut capture,
             &mut VecDeque::new(),
+            None,
             &refused("ref.c.capture")
         ));
         assert!(!stopped_with_peer(
             &mut capture,
             &mut VecDeque::new(),
+            None,
             &refused("ref.d.speaker")
         ));
     }
@@ -210,12 +349,14 @@ mod tests {
         assert!(stopped_with_peer(
             &mut capture,
             &mut held,
+            None,
             &refused("ref.d.capture")
         ));
         let mut held = VecDeque::from([Control::StartCapture]);
         assert!(!stopped_with_peer(
             &mut capture,
             &mut held,
+            None,
             &refused("ref.d.capture")
         ));
     }
@@ -231,18 +372,21 @@ mod tests {
         assert!(!stopped_with_peer(
             &mut capture,
             &mut VecDeque::new(),
+            None,
             &refused("capture.c.w")
         ));
         let other = io::Error::other("ref.c.capture: Connection refused");
         assert!(!stopped_with_peer(
             &mut capture,
             &mut VecDeque::new(),
+            None,
             &other
         ));
         // The Stop is still there to be read: none of those looked.
         assert!(stopped_with_peer(
             &mut capture,
             &mut VecDeque::new(),
+            None,
             &refused("ref.d.capture")
         ));
         for name in ["ref.c.capture", "ref.d.capture", "ref.c.speaker"] {
@@ -299,11 +443,12 @@ mod tests {
         assert!(!stopped_with_peer(
             &mut capture,
             &mut VecDeque::new(),
+            None,
             &other_channel
         ));
         let reset = io::Error::new(io::ErrorKind::ConnectionReset, "ref.c.capture: reset");
         assert_eq!(
-            stopped_with_peer(&mut capture, &mut VecDeque::new(), &reset),
+            stopped_with_peer(&mut capture, &mut VecDeque::new(), None, &reset),
             cfg!(not(target_os = "linux")),
         );
     }
