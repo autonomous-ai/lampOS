@@ -1726,7 +1726,13 @@ decides in code: such a line whose words ask for new agent-shaped work
 summarise, plan, write) has its first chat round forced to call
 `start_agent_task`; a reply or a follow-up about the news is not. The
 rule's verdict is the same either way.
-Test: `the_first_line_after_the_news_is_marked_whatever_it_asks`.
+A line of one word or none that is no reply to the news (a noise cut-in,
+`attention::noise_after_news`) does not take the news's one reply: it is
+judged as any other line, and the next line is still the first thing said
+after the news, told the note and forced as above. A one-word reply
+("Thanks.", "OK", "Great") still takes it, as since #918.
+Tests: `the_first_line_after_the_news_is_marked_whatever_it_asks`,
+`a_one_word_noise_after_the_news_leaves_its_reply_to_the_next_line`.
 
 Without it the rule holds answers only in a busy room. In a room not known
 to be busy, and in a session it trusts, every answer is played, whatever

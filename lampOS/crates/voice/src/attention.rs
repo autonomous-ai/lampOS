@@ -347,6 +347,27 @@ pub const NOT_SPOKEN_TO: &str =
 pub const NEWS_REPLY_US: u64 = 180_000_000;
 pub(crate) const AFTER_NEWS: &str = "the first thing said after the lamp's own news";
 
+/// One-word replies to the lamp's news: such a line still takes the news's
+/// one reply ([`noise_after_news`]).
+const NEWS_ONE_WORD_REPLIES: [&str; 20] = [
+    "thanks", "thx", "cheers", "ok", "okay", "great", "cool", "nice", "wow", "awesome", "perfect",
+    "good", "yes", "yeah", "yep", "no", "nope", "sure", "what", "really",
+];
+
+/// Whether `heard` is a line of one word or none that is no reply to the
+/// news ([`NEWS_ONE_WORD_REPLIES`]): a noise cut-in, which leaves the
+/// news's one reply ([`AFTER_NEWS`]) to the next line (#8701).
+pub(crate) fn noise_after_news(heard: &str) -> bool {
+    let mut words = heard
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty());
+    match (words.next(), words.next()) {
+        (None, _) => true,
+        (Some(word), None) => !NEWS_ONE_WORD_REPLIES.contains(&word.to_lowercase().as_str()),
+        _ => false,
+    }
+}
+
 /// With the switch, a question about the lamp's own work
 /// ([`about_its_work`]) is for it this long after the lamp's news, or after
 /// it started a task, a timer or a reminder.
@@ -3768,7 +3789,14 @@ impl Attention {
         // The lamp's news has one reply: the first thing judged after it,
         // whatever path judges it, takes it (the reviewer on #918 at 07:12:
         // a short "Thanks" judged as a sound had left it for later talk).
-        let news_ago = match (self.spoken_to && !own, self.began_us) {
+        // A line of one word or none that is no reply ([`noise_after_news`])
+        // takes nothing: on lamp-ee17 on 27 Nov a noise cut-in after the
+        // news would have taken the reply, and the new work said next got
+        // no `AFTER_NEWS` (#8701).
+        let news_ago = match (
+            self.spoken_to && !own && !noise_after_news(&self.heard),
+            self.began_us,
+        ) {
             (true, Some(began)) => self
                 .news_us
                 .take()
@@ -6322,6 +6350,54 @@ mod tests {
         attention.heard(ask);
         attention.first_output(22, Room::Quiet, false);
         assert!(!attention.played_after_news());
+    }
+
+    /// #8701, lamp-ee17 on 27 Nov: a noise cut-in of one word or none right
+    /// after the news takes nothing, so the new work said next is still
+    /// the first thing said after it ([`AFTER_NEWS`]); a one-word reply
+    /// ("Thanks.") still takes the news's one reply (#918).
+    #[test]
+    fn a_one_word_noise_after_the_news_leaves_its_reply_to_the_next_line() {
+        const S: u64 = 1_000_000;
+        let ask = "Make me a four week study plan for learning basic Python.";
+        for noise in ["", "Um.", "Hmm", "the"] {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.news_told(100 * S);
+            attention.began_at(22, 4, 110 * S);
+            attention.heard(noise);
+            assert_ne!(
+                attention.first_output(22, Room::Quiet, false),
+                Some(Verdict::Play(AFTER_NEWS)),
+                "{noise:?}"
+            );
+            assert!(!attention.played_after_news(), "{noise:?}");
+            attention.began_at(23, 4, 113 * S);
+            attention.heard(ask);
+            assert_eq!(
+                attention.first_output(23, Room::Quiet, false),
+                Some(Verdict::Play(AFTER_NEWS)),
+                "after {noise:?}"
+            );
+            assert!(attention.played_after_news(), "after {noise:?}");
+        }
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.news_told(100 * S);
+        attention.began_at(22, 4, 110 * S);
+        attention.heard("Thanks.");
+        assert_eq!(
+            attention.first_output(22, Room::Quiet, false),
+            Some(Verdict::Play(AFTER_NEWS))
+        );
+        attention.began_at(23, 4, 113 * S);
+        attention.heard(ask);
+        attention.first_output(23, Room::Quiet, true);
+        assert!(!attention.played_after_news());
+        assert!(noise_after_news(""));
+        assert!(noise_after_news("Um."));
+        assert!(!noise_after_news("Thanks!"));
+        assert!(!noise_after_news("Thank you."));
     }
 
     /// The Second on #1378 (20:29): with `AFTER_NEWS` taken on timing alone,

@@ -6904,14 +6904,21 @@ after a take-over, but now for every turn:
   forced only when both hold:
   - the line is the first after the news: `worker::AFTER_NEWS_NOTE` was
     put among its notes by code (`Heeding::after_news_note_for`), since the
-    lamp's last answer or call. The same words on any other line are asked
-    as before;
+    lamp's last answer or call. A noise cut-in of one word or none before
+    it does not take that place (`attention::noise_after_news`; a one-word
+    reply such as "Thanks." does). The same words on any other line are
+    asked as before;
   - its words ask for new agent-shaped work
     (`agent_tasks::new_work_after_news`): one sentence opens, after only a
     greeting, the lamp's name or the asking ("can you", "I want you to",
     "please", "now"), with a work verb (research, compare, find, search,
     summarise, plan, write, draft, gather, investigate, analyse, outline,
-    list, "look up", "look into"), with at least 5 content words from that
+    list, "look up", "look into", "dig into", "put together", "draw up"),
+    or with make, create or build followed by a thing ("make me a four
+    week study plan …", "build us a reading list …": "me" or "us" at most,
+    then "a" or "an", and no reminder, alarm, timer, note, light, scene or
+    joke, so "make the light warmer" and "make me a reminder …" stay the
+    lamp's own), with at least 5 content words from that
     verb on; and no word ties it back to the news or takes the work back
     ("again", "the rest", "you just", "you said", "it said", "the report",
     "the result", "the answer", "the news", "don't", "not", "never").
