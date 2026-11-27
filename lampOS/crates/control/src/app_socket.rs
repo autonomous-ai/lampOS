@@ -114,15 +114,33 @@ pub struct AppPeer {
     /// The manifest asks `remember`, an app's own grant beside the door's
     /// (`apps.remember`, [`crate::app_remember`]).
     pub remember: bool,
+    /// The manifest's `net`: the app runs in the unit with a way out.
+    pub net: bool,
+    /// Lamp Doctor's grants the manifest asks (`lamp_skills::app_package::DOCTOR_GRANTS`).
+    pub doctor: BTreeSet<String>,
 }
 
 impl AppPeer {
+    /// Whether the app holds a Lamp Doctor grant, at a call.
+    pub fn may(&self, grant: &str) -> Result<(), String> {
+        if !self.doctor.contains(grant) {
+            return Err(format!("not granted: {grant}"));
+        }
+        Ok(())
+    }
+
     /// The grants `hello` says: the door's, then `remember` when asked.
     pub fn said_grants(&self) -> Vec<String> {
         let mut said: Vec<String> = self.grants.iter().map(|grant| grant.wire()).collect();
         if self.remember {
             said.push(lamp_skills::app_package::REMEMBER_GRANT.to_owned());
         }
+        said.extend(
+            lamp_skills::app_package::DOCTOR_GRANTS
+                .iter()
+                .filter(|own| self.doctor.contains(**own))
+                .map(|own| (*own).to_owned()),
+        );
         said
     }
 }
@@ -140,9 +158,20 @@ pub fn peer_for(apps: &Path, name: &str, net_unit: bool) -> Result<AppPeer, Stri
     }
     let mut grants = BTreeSet::new();
     let mut remember = false;
+    let mut doctor = BTreeSet::new();
+    if let Some(why) = lamp_skills::app_package::report_refused(&manifest.grants) {
+        return Err(why.to_owned());
+    }
     for grant in &manifest.grants {
         if grant == lamp_skills::app_package::REMEMBER_GRANT {
             remember = true;
+            continue;
+        }
+        if lamp_skills::app_package::DOCTOR_GRANTS.contains(&grant.as_str()) {
+            if !lamp_skills::app_package::doctor_on(grant) {
+                return Err(format!("a grant this lamp does not know: {grant}"));
+            }
+            doctor.insert(grant.clone());
             continue;
         }
         let grant: Grant = serde_json::from_value(json!(grant))
@@ -159,6 +188,8 @@ pub fn peer_for(apps: &Path, name: &str, net_unit: bool) -> Result<AppPeer, Stri
         client: app_client(name),
         grants,
         remember,
+        net: manifest.net,
+        doctor,
     })
 }
 
@@ -190,7 +221,7 @@ fn refuse(re: u64, code: ErrorCode, why: &str) -> Value {
 pub fn is_app_op(frame: &Map<String, Value>) -> bool {
     matches!(
         frame.get("op").and_then(Value::as_str),
-        Some("app.took" | "app.settings.get" | "app.panel.set" | "app.answer")
+        Some("app.took" | "app.settings.get" | "app.panel.set" | "app.answer" | "log.send")
     )
 }
 
@@ -280,6 +311,9 @@ pub fn answer(
                 Some(settings) => crate::protocol::ok(re, json!({"settings": settings})),
                 None => refuse(re, ErrorCode::Refused, "this app is not installed"),
             }
+        }
+        "log.send" => {
+            crate::app_report::answer(live, place, name, frame, re, crate::app_report::on(), now)
         }
         "app.answer" => {
             crate::app_calls::answer_op(live, name, frame, re, crate::app_calls::on(), now)

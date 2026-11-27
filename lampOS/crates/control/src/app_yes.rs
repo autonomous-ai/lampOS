@@ -232,7 +232,10 @@ pub fn key_of(value: &Value) -> Result<Key, String> {
     };
     let mut grants = Vec::new();
     for grant in listed {
-        let Some(grant) = grant.as_str().filter(|grant| GRANTS.contains(grant)) else {
+        let Some(grant) = grant
+            .as_str()
+            .filter(|grant| GRANTS.contains(grant) && lamp_skills::app_package::doctor_on(grant))
+        else {
             return Err("bad request: a grant is not one of the door's".into());
         };
         grants.push(grant.to_owned());
@@ -240,6 +243,9 @@ pub fn key_of(value: &Value) -> Result<Key, String> {
     // Sorted and de-duplicated here, whatever order they came in.
     grants.sort();
     grants.dedup();
+    if let Some(why) = lamp_skills::app_package::report_refused(&grants) {
+        return Err(format!("bad request: {why}"));
+    }
     if op == "remove" && (!grants.is_empty() || net || logs) {
         return Err("bad request: a remove's grants are none, net and logs false".into());
     }
@@ -334,6 +340,11 @@ pub struct Live {
     /// [`crate::app_context::EVERY`]: kept across its runs. Only a remove
     /// forgets it.
     context_last: BTreeMap<String, Instant>,
+    /// When each app last sent a report (`log.send`), one an hour.
+    report_last: BTreeMap<String, Instant>,
+    /// The lamp's own date and build, set before a `log.send` is answered
+    /// (none while its clock or zone is not known).
+    report_stamp: Option<(String, u32)>,
     /// The apps whose context line the voice may hold now: told one and not
     /// cleared it. Its last connection closing clears it at the voice.
     context_told: std::collections::BTreeSet<String>,
@@ -395,6 +406,29 @@ impl Live {
             }
         }
         self.reads.insert(name.to_owned(), now);
+        Ok(())
+    }
+
+    /// Sets what `log.send` stamps on a report: the lamp's date and build.
+    pub fn set_report_stamp(&mut self, stamp: Option<(String, u32)>) {
+        self.report_stamp = stamp;
+    }
+
+    /// The date and build to stamp on a report, if the lamp knows its date.
+    pub fn report_stamp(&self) -> Option<&(String, u32)> {
+        self.report_stamp.as_ref()
+    }
+
+    /// An app's `log.send` at `now`: allowed, or how long until one may be
+    /// ([`crate::app_report::EVERY`]).
+    pub fn may_report(&mut self, name: &str, now: Instant) -> Result<(), Duration> {
+        if let Some(last) = self.report_last.get(name) {
+            let since = now.saturating_duration_since(*last);
+            if since < crate::app_report::EVERY {
+                return Err(crate::app_report::EVERY - since);
+            }
+        }
+        self.report_last.insert(name.to_owned(), now);
         Ok(())
     }
 

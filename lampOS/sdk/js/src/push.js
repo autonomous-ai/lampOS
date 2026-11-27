@@ -141,7 +141,7 @@ export const APP_PARTS_MAX = 128;
 export const APP_SIGNATURE = 'lamp-skill.sig';
 const APP_NAME = /^[a-z][a-z0-9-]{0,23}$/;
 // The app-only grant a pushed app is never given (`apps.remember`).
-export const APP_ONLY_GRANTS = ['remember'];
+export const APP_ONLY_GRANTS = ['remember', 'turns', 'report'];
 
 // The entries of a plain ustar tar, as [path, bytes]; anything but plain files, or bytes that are no tar (a gzip), is
 // refused.

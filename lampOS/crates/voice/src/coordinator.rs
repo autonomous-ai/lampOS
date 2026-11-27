@@ -4495,6 +4495,13 @@ fn observe_provider_output(
         | ProviderOutput::RequestedAudio { .. } => {}
         // Tied to no turn: taken by the loop (#7418).
         ProviderOutput::MakesUnderWay { .. } => {}
+        // The failed calls of a request, from the second worker, a process of
+        // its own, for the turn's record (#8726).
+        ProviderOutput::Cases {
+            request,
+            failed,
+            proofs,
+        } => crate::turn_ledger::told_cases(*request, failed.clone(), proofs.clone()),
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
         // (#1390), as with news told unasked.
@@ -9458,6 +9465,7 @@ fn conversation_with_gate_inner(
                 // Put on its turn by `observe_provider_output`.
                 ProviderOutput::NewsAnswered { .. }
                 | ProviderOutput::OwnWordsSaid { .. }
+                | ProviderOutput::Cases { .. }
                 | ProviderOutput::MakeWaiting { .. } => {}
                 // Put on its turn by `observe_provider_output` too. A call's
                 // line the slow chat answered with its down line (#5563):
