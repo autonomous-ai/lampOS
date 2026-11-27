@@ -296,12 +296,108 @@ impl LightOutranked {
     }
 }
 
+/// One face's colour and brightness, the person's own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FaceLook {
+    /// The colour, `[r, g, b]` with its brightest channel at 255: the
+    /// colour alone, its brightness being `level`.
+    pub tint: [u8; 3],
+    /// How bright, from 1 to [`Light::STEPS`], as a share of what the face
+    /// shows by default: [`Light::STEPS`] is today's face, the lower steps
+    /// softer, never brighter.
+    pub level: u8,
+}
+
+/// The faces of a turn that the person may colour and soften
+/// (`light/faces/command` and `light/faces/state`), beside the resting
+/// light, which is [`Light`]. A face with none is the lamp's own, as it
+/// was before faces could be set. Only colour and brightness are the
+/// person's: how a face moves is always the lamp's, and the offline
+/// breath, the update and error signals and the privacy light have no
+/// setting here.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LightFaces {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub listening: Option<FaceLook>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<FaceLook>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaking: Option<FaceLook>,
+}
+
+impl LightFaces {
+    pub const TYPE: &str = "lamp_msgs/LightFaces";
+    pub const VERSION: u32 = 1;
+    /// What is asked for, and what is shown.
+    pub const TOPICS: [&str; 2] = ["light/faces/command", "light/faces/state"];
+    /// The faces that can be set, by name.
+    pub const NAMES: [&str; 3] = ["listening", "thinking", "speaking"];
+    /// Each face's own colour, each channel a share of the brightest, in
+    /// the order of [`LightFaces::NAMES`]: what the ring draws when the
+    /// person has set none.
+    pub const DEFAULT_TINTS: [[f32; 3]; 3] =
+        [[0.50, 0.85, 1.0], [1.0, 0.52, 0.04], [1.0, 0.72, 0.30]];
+
+    /// The latest replaces the one before. When it changes, and once a
+    /// second.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+            .every(std::time::Duration::from_secs(1))
+    }
+
+    /// A face's look by name, if it is one of [`LightFaces::NAMES`].
+    pub fn look(&self, name: &str) -> Option<Option<FaceLook>> {
+        match name {
+            "listening" => Some(self.listening),
+            "thinking" => Some(self.thinking),
+            "speaking" => Some(self.speaking),
+            _ => None,
+        }
+    }
+
+    /// This with a face's look replaced (none gives it back to the lamp's
+    /// own), if `name` is a face there is.
+    #[must_use]
+    pub fn with(mut self, name: &str, look: Option<FaceLook>) -> Option<Self> {
+        match name {
+            "listening" => self.listening = look,
+            "thinking" => self.thinking = look,
+            "speaking" => self.speaking = look,
+            _ => return None,
+        }
+        Some(self)
+    }
+
+    /// Every look is a colour and a level there are.
+    pub fn check(&self) -> Result<(), Invalid> {
+        for look in [self.listening, self.thinking, self.speaking]
+            .into_iter()
+            .flatten()
+        {
+            if look.tint.into_iter().max() != Some(255) {
+                return Err(Invalid(
+                    "a face's colour has its brightest channel at 255".into(),
+                ));
+            }
+            if !(1..=Light::STEPS).contains(&look.level) {
+                return Err(Invalid(format!(
+                    "a face's level is from 1 to {}",
+                    Light::STEPS
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// The requests to actuators beside the first topics (#940).
 pub fn arbitration_topics() -> Vec<(&'static str, Declaration)> {
     vec![
         (LightRequest::TOPIC, LightRequest::declaration()),
         (LightReached::TOPIC, LightReached::declaration()),
         (LightOutranked::TOPIC, LightOutranked::declaration()),
+        (LightFaces::TOPICS[0], LightFaces::declaration()),
+        (LightFaces::TOPICS[1], LightFaces::declaration()),
         (RingMark::TOPIC, RingMark::declaration()),
         (RingMarkDrawn::TOPIC, RingMarkDrawn::declaration()),
     ]
@@ -684,6 +780,63 @@ mod tests {
             (declared.type_name.as_str(), declared.kind),
             (LightOutranked::TYPE, Kind::Event)
         );
+    }
+
+    /// The faces the person may set are a message of their own, and one
+    /// with no look is the lamp's own face.
+    #[test]
+    fn the_faces_are_looks_of_a_colour_and_a_level_and_none_is_the_lamps_own() {
+        let none = LightFaces::default();
+        assert_eq!(serde_json::to_string(&none).unwrap(), "{}");
+        let faces = LightFaces {
+            speaking: Some(FaceLook {
+                tint: [255, 140, 0],
+                level: 4,
+            }),
+            ..none
+        };
+        let text = serde_json::to_string(&faces).unwrap();
+        assert_eq!(text, "{\"speaking\":{\"tint\":[255,140,0],\"level\":4}}");
+        assert_eq!(serde_json::from_str::<LightFaces>(&text).unwrap(), faces);
+        assert!(faces.check().is_ok());
+        assert_eq!(faces.look("speaking"), Some(faces.speaking));
+        assert_eq!(faces.look("listening"), Some(None));
+        assert_eq!(faces.look("offline"), None);
+        assert_eq!(faces.with("speaking", None), Some(none));
+        assert_eq!(faces.with("resting", None), None);
+        for look in [
+            FaceLook {
+                tint: [200, 100, 0],
+                level: 4,
+            },
+            FaceLook {
+                tint: [255, 0, 0],
+                level: 0,
+            },
+            FaceLook {
+                tint: [255, 0, 0],
+                level: 11,
+            },
+        ] {
+            let bad = LightFaces {
+                thinking: Some(look),
+                ..none
+            };
+            assert!(bad.check().is_err(), "{look:?}");
+        }
+        for (topic, declaration) in LightFaces::TOPICS.map(|topic| {
+            (
+                topic,
+                crate::declaration_of(topic).expect("a declared topic"),
+            )
+        }) {
+            assert_eq!(declaration.type_name, LightFaces::TYPE, "{topic}");
+            assert_eq!(declaration.kind, Kind::Latest, "{topic}");
+        }
+        // Each default colour is a colour with its brightest channel full.
+        for tint in LightFaces::DEFAULT_TINTS {
+            assert_eq!(tint.iter().copied().fold(0.0_f32, f32::max), 1.0);
+        }
     }
 
     /// docs/control.schema.json's colours and patterns are the lamp's own.

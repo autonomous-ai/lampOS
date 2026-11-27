@@ -1343,13 +1343,30 @@ pub fn tone_topics() -> Vec<(&'static str, Declaration)> {
 
 /// The lamp's own light: what is asked for (`light/command`) and what is
 /// shown (`light/state`).
+///
+/// `colour` and `level` are what every part reads, as they always were: a
+/// colour by name and a level from 1 to [`Light::BRIGHTEST`]. Two optional
+/// fields say more to a part that reads them, and an older part ignores
+/// them: `tint` is the exact colour chosen, and `step` the finer brightness
+/// of [`Light::STEPS`] steps. With a `tint` the ring draws that colour and
+/// `colour` is only the nearest name; with a `step` it draws that step and
+/// `level` is the coarse level at or under it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Light {
     pub on: bool,
-    /// One of [`Light::COLOURS`], by name.
+    /// One of [`Light::COLOURS`] or [`Light::SOFT_COLOURS`], by name.
     pub colour: String,
     /// How bright, from 1, the dimmest, to [`Light::BRIGHTEST`].
     pub level: u8,
+    /// The colour chosen, `[r, g, b]`, scaled so its brightest channel is
+    /// 255: the colour alone, its brightness being `level` or `step`. None
+    /// for a colour that is exactly one of the named ones.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tint: Option<[u8; 3]>,
+    /// How bright, from 1 to [`Light::STEPS`], finer than `level`. None
+    /// for a light asked for at one of the five levels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u8>,
 }
 
 impl Light {
@@ -1357,11 +1374,24 @@ impl Light {
     pub const VERSION: u32 = 1;
     /// What is asked for, and what is shown.
     pub const TOPICS: [&str; 2] = ["light/command", "light/state"];
-    /// The ten colours a light may be.
+    /// The ten colours a light may be, for everything but the person's own
+    /// light: a skill's, a paired computer's and an app's named colour.
     pub const COLOURS: [&str; 10] = [
         "yellow", "red", "green", "blue", "cyan", "purple", "orange", "pink", "white", "warm",
     ];
+    /// Seven soft colours beside the ten, low in saturation, that the
+    /// person's light and its voice may name too, in the order of
+    /// [`Light::SOFT_TINTS`].
+    pub const SOFT_COLOURS: [&str; 7] = [
+        "candle", "amber", "peach", "rose", "lavender", "mint", "sky",
+    ];
     pub const BRIGHTEST: u8 = 5;
+    /// How many steps of brightness the person's light has, finer than the
+    /// five levels, the lowest softer than level 1 ever was.
+    pub const STEPS: u8 = 10;
+    /// The step each of the five levels is, so that a light kept or asked
+    /// for at a level looks exactly as it always did.
+    pub const LEGACY_STEPS: [u8; Self::BRIGHTEST as usize] = [2, 5, 7, 9, 10];
     /// Each colour as the ring draws it, each channel a share of the
     /// brightest, in the order of [`Light::COLOURS`]. The ring's face and
     /// `lamp-cloud`'s answers to the app (`docs/cloud.md`) both read it.
@@ -1380,6 +1410,16 @@ impl Light {
         ("white", [1.0, 0.88, 0.72]),
         ("warm", [1.0, 0.55, 0.0]),
     ];
+    /// The soft colours as the ring draws them, as [`Light::TINTS`].
+    pub const SOFT_TINTS: [(&str, [f32; 3]); 7] = [
+        ("candle", [1.0, 0.58, 0.26]),
+        ("amber", [1.0, 0.78, 0.38]),
+        ("peach", [1.0, 0.68, 0.58]),
+        ("rose", [1.0, 0.55, 0.65]),
+        ("lavender", [0.78, 0.65, 1.0]),
+        ("mint", [0.60, 1.0, 0.78]),
+        ("sky", [0.55, 0.80, 1.0]),
+    ];
 
     /// The light now replaces the one before. When it changes, and once a
     /// second.
@@ -1393,17 +1433,80 @@ impl Light {
             on,
             colour: colour.into(),
             level,
+            tint: None,
+            step: None,
         };
         light.check().map(|()| light)
     }
 
+    /// The ten colours and the seven soft ones.
     pub fn is_colour(name: &str) -> bool {
-        Self::COLOURS.contains(&name)
+        Self::COLOURS.contains(&name) || Self::SOFT_COLOURS.contains(&name)
     }
 
-    /// The colour is one of the ten and the level from 1 to 5, whether the
-    /// light is on or off: a light that is off still has the colour it
-    /// would be.
+    /// A named colour's tint, each channel a share of the brightest.
+    pub fn tint_of(name: &str) -> Option<[f32; 3]> {
+        Self::TINTS
+            .iter()
+            .chain(Self::SOFT_TINTS.iter())
+            .find_map(|(tint, shares)| (*tint == name).then_some(*shares))
+    }
+
+    /// A colour as `[r, g, b]` with its brightest channel at 255: its hue
+    /// alone. Black has none.
+    pub fn scaled(rgb: [u8; 3]) -> Option<[u8; 3]> {
+        let top = rgb.into_iter().max().filter(|top| *top > 0)?;
+        let top = u32::from(top);
+        Some(rgb.map(|channel| ((u32::from(channel) * 255 + top / 2) / top) as u8))
+    }
+
+    /// The named colour nearest to `rgb` in hue, and whether it is exactly
+    /// that colour (the same at 8 bits). None for black.
+    pub fn nearest_name(rgb: [u8; 3]) -> Option<(&'static str, bool)> {
+        let scaled = Self::scaled(rgb)?;
+        let mut best: Option<(&'static str, f32, [u8; 3])> = None;
+        for (name, shares) in Self::TINTS.iter().chain(Self::SOFT_TINTS.iter()) {
+            let named = shares.map(|share| (share * 255.0).round() as u8);
+            let far: f32 = (0..3)
+                .map(|at| (f32::from(scaled[at]) - f32::from(named[at])).powi(2))
+                .sum();
+            if best.is_none_or(|(_, nearest, _)| far < nearest) {
+                best = Some((name, far, named));
+            }
+        }
+        best.map(|(name, _, named)| (name, named == scaled))
+    }
+
+    /// The brightness as a step: its own, or the step of its level.
+    pub fn step_now(&self) -> u8 {
+        self.step.unwrap_or_else(|| {
+            Self::LEGACY_STEPS[usize::from(self.level.clamp(1, Self::BRIGHTEST)) - 1]
+        })
+    }
+
+    /// The coarse level that goes with a step: the highest level that is
+    /// at or under it, and at least 1, so a part that reads levels only
+    /// never shows a light brighter than the person's own.
+    pub fn level_of(step: u8) -> u8 {
+        Self::LEGACY_STEPS
+            .iter()
+            .rposition(|legacy| *legacy <= step)
+            .map_or(1, |at| at as u8 + 1)
+    }
+
+    /// This light at a step, with `level` kept in step with it.
+    #[must_use]
+    pub fn at_step(self, step: u8) -> Self {
+        Self {
+            level: Self::level_of(step),
+            step: Some(step),
+            ..self
+        }
+    }
+
+    /// The colour and the level are ones there are, and the tint and the
+    /// step too when they are given, whether the light is on or off: a
+    /// light that is off still has the colour it would be.
     pub fn check(&self) -> Result<(), Invalid> {
         if !Self::is_colour(&self.colour) {
             return invalid(format!(
@@ -1418,6 +1521,16 @@ impl Light {
                 self.level,
                 Self::BRIGHTEST
             ));
+        }
+        if let Some(step) = self.step
+            && !(1..=Self::STEPS).contains(&step)
+        {
+            return invalid(format!("step {step} is not from 1 to {}", Self::STEPS));
+        }
+        if let Some(tint) = self.tint
+            && tint.into_iter().max() != Some(255)
+        {
+            return invalid("a tint's brightest channel is 255".to_owned());
         }
         Ok(())
     }
@@ -3605,6 +3718,131 @@ mod tests {
             serde_json::from_str::<Light>("{\"on\":true,\"colour\":\"red\",\"level\":300}")
                 .is_err()
         );
+    }
+
+    /// The person's light keeps its own colour and its finer brightness
+    /// on the wire as two optional fields, and a light with neither is the
+    /// message it always was, byte for byte.
+    #[test]
+    fn a_light_may_carry_its_own_tint_and_a_finer_step_that_an_older_part_ignores() {
+        let plain = Light::new(true, "warm", 3).unwrap();
+        assert_eq!(
+            serde_json::to_string(&plain).unwrap(),
+            "{\"on\":true,\"colour\":\"warm\",\"level\":3}"
+        );
+        let own = Light {
+            tint: Some([255, 128, 10]),
+            ..plain.clone().at_step(4)
+        };
+        let text = "{\"on\":true,\"colour\":\"warm\",\"level\":1,\"tint\":[255,128,10],\"step\":4}";
+        round_trip(&own, text);
+        assert!(own.check().is_ok());
+        // A reader before the two fields reads the same light as its colour
+        // and level, which is why they are optional.
+        #[derive(serde::Deserialize)]
+        struct Before {
+            colour: String,
+            level: u8,
+        }
+        let before: Before = serde_json::from_str(text).unwrap();
+        assert_eq!((before.colour.as_str(), before.level), ("warm", 1));
+        for (step, level) in [
+            (1, 1),
+            (2, 1),
+            (4, 1),
+            (5, 2),
+            (6, 2),
+            (7, 3),
+            (8, 3),
+            (9, 4),
+            (10, 5),
+        ] {
+            assert_eq!(Light::level_of(step), level, "step {step}");
+            assert!(plain.clone().at_step(step).check().is_ok());
+        }
+        for step in [0, 11, 255] {
+            let bad = Light {
+                step: Some(step),
+                ..plain.clone()
+            };
+            assert!(bad.check().unwrap_err().0.contains("is not from 1 to 10"));
+        }
+        let dim = Light {
+            tint: Some([200, 100, 0]),
+            ..plain
+        };
+        assert!(
+            dim.check()
+                .unwrap_err()
+                .0
+                .contains("brightest channel is 255")
+        );
+    }
+
+    /// Every level keeps its look: its step is the one the ring always
+    /// drew it at, and the highest step is the highest level.
+    #[test]
+    fn each_level_is_a_step_and_the_top_step_is_the_top_level() {
+        assert_eq!(Light::STEPS, 10);
+        assert_eq!(
+            Light::LEGACY_STEPS[usize::from(Light::BRIGHTEST) - 1],
+            Light::STEPS
+        );
+        for level in 1..=Light::BRIGHTEST {
+            let light = Light::new(true, "warm", level).unwrap();
+            let step = light.step_now();
+            assert_eq!(step, Light::LEGACY_STEPS[usize::from(level) - 1]);
+            assert_eq!(Light::level_of(step), level);
+        }
+        // Below level 1 there are steps of its own.
+        assert!(Light::LEGACY_STEPS[0] > 1);
+    }
+
+    /// Seven soft colours, low in saturation, beside the ten.
+    #[test]
+    fn seven_soft_colours_are_named_beside_the_ten() {
+        assert_eq!(Light::SOFT_TINTS.map(|(name, _)| name), Light::SOFT_COLOURS);
+        for colour in Light::SOFT_COLOURS {
+            assert!(Light::is_colour(colour), "{colour}");
+            assert!(!Light::COLOURS.contains(&colour), "{colour}");
+            let tint = Light::tint_of(colour).unwrap();
+            assert_eq!(
+                tint.iter().copied().fold(0.0_f32, f32::max),
+                1.0,
+                "{colour}"
+            );
+            // Low saturation: the faintest channel is a third of the
+            // brightest or more.
+            let least = tint.iter().copied().fold(1.0_f32, f32::min);
+            assert!(least >= 0.25, "{colour} is too saturated: {tint:?}");
+            for level in 1..=Light::BRIGHTEST {
+                assert!(Light::new(true, colour, level).is_ok(), "{colour} {level}");
+            }
+        }
+        for colour in Light::COLOURS {
+            assert!(Light::tint_of(colour).is_some());
+        }
+        assert_eq!(Light::tint_of("violet"), None);
+    }
+
+    /// The nearest name to any colour, and whether it is that colour.
+    #[test]
+    fn a_colour_is_scaled_to_its_hue_and_named_when_it_is_one_there_is() {
+        assert_eq!(Light::scaled([8, 4, 1]), Some([255, 128, 32]));
+        assert_eq!(Light::scaled([0, 0, 0]), None);
+        assert_eq!(Light::scaled([0, 0, 255]), Some([0, 0, 255]));
+        // A named colour at any brightness is that name, exactly.
+        assert_eq!(Light::nearest_name([255, 140, 0]), Some(("warm", true)));
+        assert_eq!(Light::nearest_name([51, 28, 0]), Some(("warm", true)));
+        assert_eq!(
+            Light::nearest_name([255, 255, 255]).map(|(name, _)| name),
+            Some("white")
+        );
+        // A colour of its own is named by the nearest, and is not exact.
+        let (name, exact) = Light::nearest_name([30, 200, 90]).unwrap();
+        assert!(!exact, "{name}");
+        // A soft colour is named too.
+        assert_eq!(Light::nearest_name([255, 173, 148]), Some(("peach", true)));
     }
 
     /// #2415's P3: a part that stops on purpose says so with one more fact,
