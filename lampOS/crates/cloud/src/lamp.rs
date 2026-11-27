@@ -65,9 +65,9 @@ pub struct Real {
     pub bus: Option<Bus>,
     /// The backend's device id.
     pub device_id: String,
-    /// The installed build when lamp-cloud started, as `version` says it;
-    /// [`Real::build_now`] says the one the lamp runs now.
-    pub build: String,
+    /// The build the lamp runs ([`Running`]): `version` in every reply and
+    /// the ping, the app's About and the reports say [`Real::build_now`].
+    pub build: Running,
     /// The Wi-Fi's name, asked of `iw` within a bound and kept a while.
     pub wifi: Wifi,
     /// The light asked of the ring.
@@ -347,10 +347,12 @@ fn said(sequence: u64, commit: &str) -> String {
 }
 
 /// The build `lamp-update`'s status says the lamp runs, said as [`build`]
-/// says it; none when the status has expired, cannot be read, says a phase
-/// it could not have said, or names no build.
-pub fn running_build(status: &lamp_bus::Message) -> Option<String> {
-    if status.expired {
+/// says it; none when the status was said in another boot, cannot be read,
+/// says a phase it could not have said, or names no build. A status that
+/// has only gone quiet (older than its 180 s) still says what is installed:
+/// only `lamp-update` changes that, and it says each change.
+pub fn running_build(status: &lamp_bus::Message, now: &lamp_bus::Now<'_>) -> Option<String> {
+    if status.header.stamp_clock(now) == lamp_bus::StampClock::OtherBoot {
         return None;
     }
     let status = status.parse::<lamp_msgs::UpdateStatus>().ok()?;
@@ -359,6 +361,54 @@ pub fn running_build(status: &lamp_bus::Message) -> Option<String> {
     }
     let running = status.running?;
     (!running.commit.is_empty()).then(|| said(running.sequence, &running.commit))
+}
+
+/// The build the lamp runs now (#8874, #8884), shared by the identity, the
+/// app's About and the reports: the one `lamp-update` last said on
+/// `update/status` in this boot, so an update shows without a restart of
+/// lamp-cloud. When what is on the bus now cannot be read, the last build
+/// read this boot is kept; before any, the build in `state.json` when
+/// lamp-cloud started. `/run`, where the bus keeps its values, is emptied
+/// at boot.
+#[derive(Clone, Default)]
+pub struct Running {
+    bus: Option<Bus>,
+    started: String,
+    last: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+}
+
+impl Running {
+    pub fn new(bus: Option<Bus>, started: String) -> Self {
+        Self {
+            bus,
+            started,
+            last: Default::default(),
+        }
+    }
+
+    /// The build as `version` says it, `<sequence>+<commit>`.
+    pub fn now(&self) -> String {
+        let said = self.bus.as_ref().and_then(|bus| {
+            let status = bus.latest(lamp_msgs::UpdateStatus::TOPIC).ok().flatten()?;
+            running_build(&status, &bus.now())
+        });
+        let mut last = self
+            .last
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(build) = said {
+            last.replace(build.clone());
+            return build;
+        }
+        last.clone().unwrap_or_else(|| self.started.clone())
+    }
+}
+
+/// A build with no bus to look at: always the one given.
+impl From<&str> for Running {
+    fn from(started: &str) -> Self {
+        Self::new(None, started.to_owned())
+    }
 }
 
 /// Looks at `lamp` again every `every` and sends its [`Real::identity`]
@@ -385,9 +435,9 @@ pub async fn look(
 pub(crate) fn bare(places: Places, bus: Option<Bus>, build: &str) -> Real {
     Real {
         places,
+        build: Running::new(bus.clone(), build.into()),
         bus,
         device_id: "d-42".into(),
-        build: build.into(),
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::default(),
@@ -518,14 +568,9 @@ impl Real {
         }
     }
 
-    /// The build the lamp runs now (#8874): the one `lamp-update` last said
-    /// on `update/status`, so an update shows without a restart of
-    /// lamp-cloud; else, before it says one, when its word has expired or
-    /// cannot be read, the build lamp-cloud started with.
+    /// The build the lamp runs now ([`Running::now`]).
     pub fn build_now(&self) -> String {
-        self.latest(lamp_msgs::UpdateStatus::TOPIC)
-            .and_then(|status| running_build(&status))
-            .unwrap_or_else(|| self.build.clone())
+        self.build.now()
     }
 
     pub fn hostname(&self) -> String {
@@ -675,8 +720,9 @@ struct Level {
 impl Lamp for Real {
     fn versions(&mut self) -> Value {
         // `firmware` is what the app's About reads (Fourth on #1404): the
-        // build, as `build` also says.
-        json!({"firmware": self.build, "build": self.build, "lamp-cloud": env!("CARGO_PKG_VERSION")})
+        // build the lamp runs now, as `build` and the ping also say (#8884).
+        let build = self.build_now();
+        json!({"firmware": build, "build": build, "lamp-cloud": env!("CARGO_PKG_VERSION")})
     }
 
     fn network(&mut self) -> Value {
@@ -1595,7 +1641,7 @@ mod tests {
             places,
             bus: Some(Bus::new(&bus_root).unwrap()),
             device_id: "d-42".into(),
-            build: String::new(),
+            build: Running::default(),
             wifi: Wifi::default(),
             ring: Ring::default(),
             texts: Texts::default(),

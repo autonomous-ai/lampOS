@@ -62,7 +62,7 @@ fn a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_giv
         },
         bus: Some(Bus::new(&bus_root).unwrap()),
         device_id: "d-42".into(),
-        build: String::new(),
+        build: Default::default(),
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::default(),

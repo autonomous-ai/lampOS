@@ -193,6 +193,10 @@ fn main() -> ExitCode {
         Some(root) => lamp_bus::Bus::new(&root).ok(),
         None => lamp_bus::Bus::from_environment().ok(),
     };
+    // The build the lamp runs now, for the ping, the app and the reports
+    // alike (#8874, #8884): lamp-update's word on the bus, the credential's
+    // until it says one.
+    let running = lamp::Running::new(bus.clone(), build);
     // Health and crash reports (#1683): only with LAMP_REPORTS=on too, and
     // then only with the person's yes, read at each send.
     let shared = reports::on_from_environment()
@@ -207,10 +211,11 @@ fn main() -> ExitCode {
                     .counting(counting),
             )
         });
-    let reporting = shared
-        .clone()
-        .map(|shared| (shared, reports::Lamp::new(bus.clone())));
-    let report_build = reports::Build::of(&build);
+    let reporting = shared.clone().map(|shared| {
+        let mut sources = reports::Lamp::new(bus.clone());
+        sources.running = Some(running.clone());
+        (shared, sources)
+    });
     let shared_for_alerts = shared.clone();
     // A rejected login said to the app: only with LAMP_SIGNED_OUT=on, and
     // only with a login to reject. Counted and said on the bus also with
@@ -286,7 +291,7 @@ fn main() -> ExitCode {
         places: Places::default(),
         bus,
         device_id: account.device_id.clone(),
-        build,
+        build: running,
         wifi: Wifi::default(),
         ring: Ring::default(),
         // Skills' lines alone (#1685): only with LAMP_SKILL_MESSAGES=on.
@@ -412,11 +417,9 @@ fn main() -> ExitCode {
         )
     });
     let (identity_tx, me) = watch::channel(lamp.identity());
-    // The bus too, so the ping names the build lamp-update says the lamp
-    // runs now, not only the one it started with (#8874).
     let looking = Real {
         places: lamp.places.clone(),
-        bus: lamp.bus.clone(),
+        bus: None,
         device_id: lamp.device_id.clone(),
         build: lamp.build.clone(),
         wifi: Wifi::default(),
@@ -531,7 +534,7 @@ fn main() -> ExitCode {
         let staying = online::run(accounts, me, ws_url, &mut lamp, &mut said_too, ping::FIRST);
         let reporting = async move {
             match reporting {
-                Some((shared, sources)) => reports::run(shared, sources, report_build).await,
+                Some((shared, sources)) => reports::run(shared, sources).await,
                 None => std::future::pending().await,
             }
         };
