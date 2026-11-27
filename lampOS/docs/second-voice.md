@@ -6916,12 +6916,30 @@ after a take-over, but now for every turn:
     list, "look up", "look into", "dig into", "put together", "draw up"),
     or with make, create or build followed by a thing ("make me a four
     week study plan …", "build us a reading list …": "me" or "us" at most,
-    then "a" or "an", and no reminder, alarm, timer, note, light, scene or
-    joke, so "make the light warmer" and "make me a reminder …" stay the
-    lamp's own), with at least 5 content words from that
+    then "a" or "an", and no reminder, alarm, timer, note, light, scene,
+    joke, cup, coffee, tea or appointment, so "make the light warmer",
+    "make me a reminder …", "make me a cup of coffee" and "make an
+    appointment with the dentist" stay the lamp's own), with at least 5
+    content words from that
     verb on; and no word ties it back to the news or takes the work back
     ("again", "the rest", "you just", "you said", "it said", "the report",
-    "the result", "the answer", "the news", "don't", "not", "never").
+    "the result", "the answer", "the news", "don't", "not", "never");
+    and the line is no quick lookup of the lamp's own
+    (`agent_tasks::own_lookup_after_news`, the Reviewer-lead's P2 on
+    #8809; the start tool's description and the prompt keep the time, the
+    weather and a quick fact the lamp's too): the weather ("weather",
+    "forecast", "temperature", "rain"), the time or the date ("what time",
+    "time in", "the time", "what date", "the date", "what day"), a headline
+    ("headline", "the news"), or a quick fact ("what is", "what's", "who
+    is", "how many", "how far", "how old", "how tall", "capital of",
+    "spell", "define", "meaning of", "convert", "exchange rate"), unless
+    the line also asks for several steps ("summarise", "compare", "list",
+    "write", "draft", "plan", "outline", "research", "analyse",
+    "investigate", "gather", "report", "points", "options"). So "can you
+    look up the weather in Hanoi tomorrow morning?", "find out what time it
+    is in Tokyo right now" and "look up today's top news headline for me"
+    are the model's, while "find this week's main AI news and summarise it
+    in five points" is still forced.
     "What did it say about Spain?", "read me the rest", "did you find
     anything about Spain?", "write that down", "what time is it?" and a
     thanks are the model's, as before. English words only.

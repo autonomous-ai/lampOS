@@ -1487,9 +1487,88 @@ const AFTER_NEWS_MAKES: [&str; 3] = ["make", "create", "build"];
 const AFTER_NEWS_MAKE_FOR: [&str; 2] = ["me", "us"];
 
 /// Things the lamp makes itself, never handed over though made ("make me
-/// a reminder …", "create a timer …"), and a joke the model tells.
-const AFTER_NEWS_OWN_THINGS: [&str; 7] = [
-    "reminder", "alarm", "timer", "note", "light", "scene", "joke",
+/// a reminder …", "create a timer …"), a joke the model tells, and what is
+/// no work for an agent at all ("make me a cup of coffee", "make an
+/// appointment with the dentist": the Reviewer-lead's P3 on #8809).
+const AFTER_NEWS_OWN_THINGS: [&str; 11] = [
+    "reminder",
+    "alarm",
+    "timer",
+    "note",
+    "light",
+    "scene",
+    "joke",
+    "cup",
+    "coffee",
+    "tea",
+    "appointment",
+];
+
+/// Words that ask a quick lookup the lamp answers itself in a few seconds
+/// (the Reviewer-lead's P2 on #8809): the weather, the time or the date, a
+/// headline, a quick fact. The same as the start tool's own list ("time,
+/// weather") and the prompt's ("a quick fact, … the time, the weather"):
+/// "can you look up the weather in Hanoi tomorrow morning?" or "find out
+/// what time it is in Tokyo" stays the model's though it opens with a work
+/// verb ([`own_lookup_after_news`]).
+const AFTER_NEWS_OWN_LOOKUPS: [&[&str]; 32] = [
+    &["weather"],
+    &["forecast"],
+    &["temperature"],
+    &["rain"],
+    &["raining"],
+    &["what", "time"],
+    &["time", "in"],
+    &["the", "time"],
+    &["what", "date"],
+    &["the", "date"],
+    &["what", "day"],
+    &["headline"],
+    &["headlines"],
+    &["the", "news"],
+    &["what", "is"],
+    &["what's"],
+    &["whats"],
+    &["who", "is"],
+    &["who's"],
+    &["how", "many"],
+    &["how", "far"],
+    &["how", "old"],
+    &["how", "tall"],
+    &["capital", "of"],
+    &["spell"],
+    &["spelling"],
+    &["define"],
+    &["definition"],
+    &["meaning", "of"],
+    &["convert"],
+    &["exchange", "rate"],
+    &["exchange", "rates"],
+];
+
+/// Words that ask for several steps or several things, research rather
+/// than a quick lookup: with one of them a line about the lamp's own
+/// lookups ([`AFTER_NEWS_OWN_LOOKUPS`]) is still work ("find this week's
+/// main AI news and summarise it in five points").
+const AFTER_NEWS_SEVERAL_STEPS: [&str; 18] = [
+    "summarise",
+    "summarize",
+    "summary",
+    "compare",
+    "comparison",
+    "list",
+    "write",
+    "draft",
+    "plan",
+    "outline",
+    "research",
+    "analyse",
+    "analyze",
+    "investigate",
+    "gather",
+    "report",
+    "points",
+    "options",
 ];
 
 /// The fewest content words ([`ask_words`]) from the work verb on, so a
@@ -1549,7 +1628,8 @@ const AFTER_NEWS_BACK: [&[&str]; 18] = [
 /// or the asking ([`AFTER_NEWS_OPENERS`], [`AFTER_NEWS_LEADS`]), with at
 /// least [`AFTER_NEWS_FEWEST`] content words from that verb on, and the
 /// line has no word that ties it back to the news or takes the work back
-/// ([`AFTER_NEWS_BACK`]). On lamp-ee17 on 27 Nov, "compare three robot
+/// ([`AFTER_NEWS_BACK`]) and is no quick lookup of the lamp's own
+/// ([`own_lookup_after_news`]). On lamp-ee17 on 27 Nov, "compare three robot
 /// vacuums under 300 dollars and tell me which to buy" and "find this
 /// week's main AI news and summarise it in five points", said after the
 /// news, were answered by the model, once with its own `web_search`. A
@@ -1561,6 +1641,9 @@ pub fn new_work_after_news(said: &str) -> bool {
         .iter()
         .any(|back| words.windows(back.len()).any(|run| run == *back))
     {
+        return false;
+    }
+    if own_lookup_after_news(&words) {
         return false;
     }
     said.split(['.', '!', '?', ';', ':'])
@@ -1579,6 +1662,20 @@ pub fn new_work_after_news(said: &str) -> bool {
                     && ask_words(&sentence[at..].join(" "), false).len() >= AFTER_NEWS_FEWEST
             })
         })
+}
+
+/// Whether `words`, a line's [`plain_words`], ask a quick lookup of the
+/// lamp's own ([`AFTER_NEWS_OWN_LOOKUPS`]) and nothing of several steps
+/// ([`AFTER_NEWS_SEVERAL_STEPS`]): never forced by
+/// [`new_work_after_news`], so the model answers it with its own tools.
+fn own_lookup_after_news(words: &[String]) -> bool {
+    let words: Vec<String> = words.iter().map(|word| word.replace('’', "'")).collect();
+    AFTER_NEWS_OWN_LOOKUPS
+        .iter()
+        .any(|lookup| words.windows(lookup.len()).any(|run| run == *lookup))
+        && !words
+            .iter()
+            .any(|word| AFTER_NEWS_SEVERAL_STEPS.contains(&word.as_str()))
 }
 
 /// Whether `after`, the words after a make verb ([`AFTER_NEWS_MAKES`]),
@@ -7450,6 +7547,10 @@ pub(crate) mod tests {
             "Build me a reading list of ten classic science fiction novels.",
             "Put together a packing list for a week of hiking in Sapa.",
             "Can you draw up a simple meal plan for the next five days?",
+            // A lookup of the lamp's own with several steps is still work.
+            "Find this week's main AI news and summarize it in five points",
+            "Look up the weather in Hanoi, Tokyo and Seoul next week and compare them for me.",
+            "Search what time the museums in Hue open and plan a day of visits for us.",
         ] {
             assert!(super::new_work_after_news(said), "{said}");
         }
@@ -7472,6 +7573,20 @@ pub(crate) mod tests {
             "Create a timer for twenty minutes for my tea and pasta.",
             "Make it a little louder for the rest of the evening please.",
             "Make me a short joke.",
+            // The lamp's own lookups (the Reviewer-lead's P2 on #8809): a
+            // work verb and 5 content words, but a quick answer of its own.
+            "Can you look up the weather in Hanoi tomorrow morning?",
+            "Find out what time it is in Tokyo right now",
+            "Look up today's top news headline for me please",
+            "Search what the capital of Australia is for me please",
+            "Look up the forecast for Da Nang this coming weekend.",
+            "Can you find out the exchange rate from dollars to dong today?",
+            "Search how many people live in Ho Chi Minh City these days.",
+            "Look up who is the president of France at the moment.",
+            "Find out what date the Lunar New Year falls on next year.",
+            // Made things of its own (the Reviewer-lead's P3 on #8809).
+            "Make me a cup of coffee with a little milk please.",
+            "Make an appointment with the dentist for next Tuesday morning.",
         ] {
             assert!(!super::new_work_after_news(said), "{said}");
         }
