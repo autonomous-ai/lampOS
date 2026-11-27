@@ -4294,12 +4294,13 @@ fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
     }
 }
 
-/// #8240 (the first builder's bar): a settled agent's news that has waited
-/// `task_news::WAITS_AT_MOST` is no longer held by a busy room. In a room
-/// still talking it is one short line, said at the first pause of a second
-/// after the lamp's own answer, never over it, and its whole news waits for
-/// the person to answer or ask; in a quiet room it is told whole, as before.
-/// News that has waited less, in the busy room, is held as before.
+/// #8240 (the first builder's bar), #8783: a settled agent's news that has
+/// waited `task_news::WAITS_AT_MOST`, or any news once the lamp answered
+/// someone since it came in (the person's question here), is no longer
+/// held by a busy room. In a room still talking it is one short line, said
+/// at the first pause of a second after the lamp's own answer, never over
+/// it, and its whole news waits for the person to answer or ask; in a
+/// quiet room it is told whole, as before.
 #[test]
 fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one() {
     let _one = super::pilot_faults::one_session();
@@ -4357,14 +4358,12 @@ fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one(
     assert_eq!(written(&run, SHORT), 1, "{}", run.summary());
     assert_eq!(written(&run, NOTE), 0, "{}", run.summary());
     assert!(run.events("task_news").is_empty(), "{}", run.summary());
-    // Not yet past its wait: the busy room holds it, as before.
+    // Not yet past its wait, but the lamp answered the person's question
+    // (#8783): the busy room no longer holds it either, one short line.
     let run = told(30, true);
     run.assert_clean();
-    assert!(
-        run.events("task_news_short").is_empty(),
-        "{}",
-        run.summary()
-    );
+    assert_eq!(run.events("task_news_short").len(), 1, "{}", run.summary());
+    assert_eq!(written(&run, NOTE), 0, "{}", run.summary());
     assert!(run.events("task_news").is_empty(), "{}", run.summary());
     // A quiet room past its wait: the whole news, as before.
     let run = told(61, false);
