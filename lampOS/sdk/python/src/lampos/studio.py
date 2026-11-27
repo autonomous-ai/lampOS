@@ -261,7 +261,7 @@ $('submit').onclick=async()=>{$('submit').disabled=true;$('submitmsg').innerHTML
  canSubmit();apps()};
 async function apps(){const a=await api('apps');if(!a.ok){$('apps').innerHTML='<span class="err">'+esc(a.error)+'</span>';return}
  const list=a.data.data;if(!list.length){$('apps').textContent='None yet.';return}
- $('apps').innerHTML='<table><tr><th>App</th><th>Review</th><th>Shown</th><th></th></tr>'+list.map(x=>'<tr><td>'+esc(x.title||x.name)+' '+esc(x.version)+'<div class="muted">'+esc(x.id)+'</div></td><td>'+esc(x.review_status)+(x.review_note?'<div class="muted">'+esc(x.review_note)+'</div>':'')+'</td><td>'+esc(x.visibility||'hidden')+(x.public_requested?' (public asked)':'')+'</td><td>'+(x.review_status==='approved'&&x.visibility!=='public'&&!x.public_requested?'<button data-id="'+esc(x.id)+'">Ask to go public</button>':'')+'</td></tr>').join('')+'</table>';
+ $('apps').innerHTML='<table><tr><th>App</th><th>Review</th><th>Shown</th><th></th></tr>'+list.map(x=>'<tr><td>'+esc(x.title||x.name)+' '+esc(x.version)+'<div class="muted">'+esc(x.id)+'</div></td><td>'+esc(x.review_status)+(x.review_note?'<div class="muted">'+esc(x.review_note)+'</div>':'')+'</td><td>'+esc(x.visibility||'unlisted')+(x.public_requested?' (public asked)':'')+'</td><td>'+(x.review_status==='approved'&&x.visibility!=='public'&&!x.public_requested?'<button data-id="'+esc(x.id)+'">Ask to go public</button>':'')+'</td></tr>').join('')+'</table>';
  for(const b of $('apps').querySelectorAll('button[data-id]'))b.onclick=async()=>{const r=await api('apps/'+encodeURIComponent(b.dataset.id)+'/request-public',{});if(!r.ok)alert(r.error);apps()}}
 ['icon','cover'].forEach(id=>$(id).onchange=()=>{$('art').textContent=''});
 me();
