@@ -9019,10 +9019,20 @@ fn with_no_sight_a_no_or_another_persons_yes_runs_nothing() {
             (&b, IN_VIEW),
             five,
         );
-        assert!(
-            matches!(other, Taken::NotTheirs),
-            "{name}: another person's yes runs nothing"
-        );
+        // A held `remember` (the correction) another person's yes drops is
+        // `Taken::Nothing`, as stock (`dropped_yes`: a keep's drop is never
+        // told); each forget is `Taken::NotTheirs`, told as not theirs.
+        if name == crate::remember::REMEMBER {
+            assert!(
+                matches!(other, Taken::Nothing),
+                "{name}: another person's yes runs nothing"
+            );
+        } else {
+            assert!(
+                matches!(other, Taken::NotTheirs),
+                "{name}: another person's yes runs nothing"
+            );
+        }
     }
 }
 
