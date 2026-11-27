@@ -107,7 +107,10 @@ pub async fn once(
 /// reply moved to, before it is sent on. `heard` is given each reply, for
 /// its region (`ping::Region`, #6414) and its WSS address (#6256 F9):
 /// neither is part of the account, so neither moves the broker. `login`, with `LAMP_SIGNED_OUT=on`, is told what each
-/// ping's answer says of the login.
+/// ping's answer says of the login. `engines`, the lamp's bus with
+/// `LAMP_BEAT_ENGINES=on` only (#8881), is where each ping reads
+/// lamp-update's kept `update/status` for OpenClaw's, Hermes's and
+/// Harness's versions ([`Payload::with_engines`]).
 #[allow(clippy::too_many_arguments)]
 pub async fn pings(
     accounts: watch::Sender<Option<Account>>,
@@ -118,6 +121,7 @@ pub async fn pings(
     keep: &mut impl FnMut(&Account),
     heard: &mut impl FnMut(&ping::Reply),
     mut login: Option<&mut Login>,
+    engines: Option<lamp_bus::Bus>,
 ) {
     let mut client = match client() {
         Ok(client) => client,
@@ -146,7 +150,10 @@ pub async fn pings(
         if let Some(account) = account
             && let Some(url) = ping::url(&account)
         {
-            let result = once(&client, &url, &key, &Payload::of(&me).with_tls(tls)).await;
+            let payload = Payload::of(&me)
+                .with_tls(tls)
+                .with_engines(engines.is_some(), None);
+            let result = once(&client, &url, &key, &payload).await;
             if let Some(login) = login.as_deref_mut() {
                 let answer = match &result {
                     Ok(body) => Answer::of_body(body),
@@ -291,6 +298,7 @@ mod tests {
                 &mut keep,
                 &mut |_: &ping::Reply| {},
                 None,
+                None,
             )
             .await;
         });
@@ -370,6 +378,7 @@ mod tests {
                 &mut |_: &Account| {},
                 &mut |_: &ping::Reply| {},
                 Some(&mut login),
+                None,
             )
             .await;
         });
@@ -390,5 +399,53 @@ mod tests {
         let said = |words: &str| lines.iter().filter(|line| line.contains(words)).count();
         assert_eq!(said("this lamp is signed out: 12 pings"), 1, "{lines:?}");
         assert_eq!(said("a ping was accepted"), 1, "{lines:?}");
+    }
+
+    /// #8881: with the lamp's bus handed in (`LAMP_BEAT_ENGINES=on`), each
+    /// ping reads lamp-update's kept `update/status` and its body says the
+    /// versions; without it, the body has none.
+    #[tokio::test]
+    async fn the_beat_reads_the_kept_status_from_the_bus_it_is_given() {
+        let (_root, bus, _kept) = ping::said_status(true);
+        let mut bodies = Vec::new();
+        for engines in [Some(bus), None] {
+            let (base, requests) = backend(vec![]).await;
+            let (accounts, watched) = watch::channel(Some(account(&base)));
+            let (_me_tx, me) = watch::channel(Identity::default());
+            let pinging = tokio::spawn(async move {
+                pings(
+                    accounts,
+                    me,
+                    "voice-key".into(),
+                    Duration::from_millis(20),
+                    &mut |_: &str| {},
+                    &mut |_: &Account| {},
+                    &mut |_: &ping::Reply| {},
+                    None,
+                    engines,
+                )
+                .await;
+            });
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while requests.lock().unwrap().is_empty() {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+            })
+            .await
+            .unwrap();
+            drop(watched);
+            pinging.await.unwrap();
+            let first = requests.lock().unwrap()[0].clone();
+            bodies.push(first[first.find("\r\n\r\n").unwrap() + 4..].to_owned());
+        }
+        let on: serde_json::Value = serde_json::from_str(&bodies[0]).unwrap();
+        assert_eq!(on["engines"]["openclaw"]["version"], "2026.11.2", "{on}");
+        assert_eq!(on["engines"]["hermes"]["version"], "0.9.1", "{on}");
+        assert_eq!(on["harness"]["version"], "1.4.0", "{on}");
+        assert_eq!(
+            bodies[1],
+            serde_json::to_string(&Payload::of(&Identity::default())).unwrap(),
+            "without the bus, today's body"
+        );
     }
 }
