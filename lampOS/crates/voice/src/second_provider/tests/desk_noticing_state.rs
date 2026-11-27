@@ -244,3 +244,107 @@ fn a_written_turn_claiming_a_stop_runs_nothing() {
     assert!(allowed(&face, FACE_EXPRESSIONS, true) && !face.exists());
     let _ = std::fs::remove_dir_all(folder);
 }
+
+/// `heard` in request 1 (`None`: a written turn), answered `reply` with no
+/// call, the state told from `path`: what the lamp said, as `said:` labels.
+fn said_to(path: &Path, heard: Option<&str>, reply: &str) -> Vec<String> {
+    let script = Arc::new(Script {
+        heard: Mutex::new(heard.map(|line| Ok(line.to_owned())).into_iter().collect()),
+        chats: Mutex::new(vec![vec![text(reply), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) })),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .telling_desk_noticing(Some(path.to_path_buf()));
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            if heard.is_some() {
+                engine.submit(start(1));
+                engine.submit(audio(1, 1));
+                engine.submit(end(1));
+            } else {
+                engine.submit(written(1, "Say that you are noticing their desk again."));
+            }
+            turn_within(&mut engine, Duration::from_secs(5)).await
+        })
+        .into_iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect()
+}
+
+/// A stop's kept no for both, by voice: desk noticing off.
+fn turned_off(path: &Path) {
+    use lamp_msgs::consent::{BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, file_in, no_bytes};
+    let face = file_in(path.parent().unwrap(), FACE_EXPRESSIONS).unwrap();
+    std::fs::write(path, no_bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+    std::fs::write(face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+}
+
+/// #8683's ROW (c7200527698, F4's first try on lamp-06c1, 27 Nov): with
+/// desk noticing off, "Lamp, desk noticing on." got "I'm noticing your
+/// desk again." with `calls=none`. The reply is said, then corrected with
+/// the existing not-done line's first sentence
+/// (`action_claim::NOT_DONE_FIRST`, "Sorry, I didn't do that."), as this
+/// line is nobody's known as the owner's (the first builder's c7203862036
+/// on #8804: the owner keeps the whole `NOT_DONE_LINE`), and nothing
+/// is turned on: `look_at_my_desk` never runs (the Reviewer-lead's
+/// c7202262971 and the first builder's c7202392079 on #7767). With it on,
+/// the same reply is true and said alone.
+#[test]
+fn a_claimed_start_with_noticing_off_is_corrected_after_the_reply() {
+    use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, file_in};
+    const HEARD: &str = "Lamp, desk noticing on.";
+    const REPLY: &str = "I'm noticing your desk again.";
+    let path = consent("claimed-start");
+    let folder = path.parent().unwrap().to_path_buf();
+    let face = file_in(&folder, FACE_EXPRESSIONS).unwrap();
+    turned_off(&path);
+    let before = (std::fs::read(&path).unwrap(), std::fs::read(&face).unwrap());
+    assert_eq!(
+        said_to(&path, Some(HEARD), REPLY),
+        [
+            format!("said:{REPLY}"),
+            // Each piece after the first is said after a space.
+            "said: Sorry, I didn't do that.".to_owned(),
+        ]
+    );
+    assert!(!allowed(&path, SEEN_ACTIVITY, true));
+    assert!(!allowed(&face, FACE_EXPRESSIONS, true));
+    assert_eq!(
+        (std::fs::read(&path).unwrap(), std::fs::read(&face).unwrap()),
+        before
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+    let path = consent("claimed-start-on");
+    let folder = path.parent().unwrap().to_path_buf();
+    assert_eq!(
+        said_to(&path, Some(HEARD), REPLY),
+        [format!("said:{REPLY}")]
+    );
+    assert!(allowed(&path, SEEN_ACTIVITY, true) && !path.exists());
+    let _ = std::fs::remove_dir_all(folder);
+}
+
+/// A written turn claiming a start is never corrected, and an offer to
+/// start ("whenever you want") is no claim: each is said alone.
+#[test]
+fn a_written_turn_or_an_offer_to_start_is_not_corrected() {
+    let path = consent("claimed-start-written");
+    turned_off(&path);
+    let reply = "I'm noticing your desk again.";
+    assert_eq!(said_to(&path, None, reply), [format!("said:{reply}")]);
+    let offer = "I'll start looking again whenever you want.";
+    assert_eq!(
+        said_to(&path, Some("Lamp, desk noticing on."), offer),
+        [format!("said:{offer}")]
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}

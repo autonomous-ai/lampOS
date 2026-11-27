@@ -5224,6 +5224,9 @@ pub fn serve(
         eprintln!(
             "lamp-voice second: a line naming the looking is told the desk noticing's state, read then (LAMP_NOTICING_BY_DEFAULT)"
         );
+        eprintln!(
+            "lamp-voice second: a reply saying it is looking again with desk noticing off and no start called is said not done after it; nothing is turned on (LAMP_NOTICING_BY_DEFAULT)"
+        );
     }
     engine = engine.telling_desk_noticing(desk_noticing.then(crate::seen_yes::path));
     // The same for a light act told as under way ("Warming that up.";

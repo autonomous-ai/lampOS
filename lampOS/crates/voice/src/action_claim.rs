@@ -294,8 +294,21 @@ pub const LIMIT_NOTE: &str = "(For you to know: your last reply said something w
 /// called": a forget that ran and removed nothing is not to be run again.
 pub const FORGET_NOTE: &str = "(For you to know: your last reply said something was forgotten, but nothing was forgotten in this turn, and those words were not said. If they asked you to forget something and forget has not run in this turn, call forget now; its answer says what to tell them. If it ran and forgot nothing, or you cannot, say plainly that it was not forgotten, as its answer told you, and never that it was.)";
 
+/// [`NOT_DONE_LINE`]'s first sentence, the one text both are built from.
+macro_rules! not_done_first {
+    () => {
+        "Sorry, I didn't do that."
+    };
+}
+
 /// Said when the round asked again claims again with no call.
-pub const NOT_DONE_LINE: &str = "Sorry, I didn't do that. Could you ask me again?";
+pub const NOT_DONE_LINE: &str = concat!(not_done_first!(), " Could you ask me again?");
+
+/// [`NOT_DONE_LINE`]'s first sentence alone, without its "Could you ask me
+/// again?": a claimed desk noticing start corrected for a line not known as
+/// the owner's, whose ask again `look_at_my_desk` would refuse (the first
+/// builder's c7203862036 on #8804).
+pub const NOT_DONE_FIRST: &str = not_done_first!();
 
 /// Told before the round asked again after a made skill said removed,
 /// turned off or on with no `make_skill` that did it ([`Claim::SkillRemoved`],

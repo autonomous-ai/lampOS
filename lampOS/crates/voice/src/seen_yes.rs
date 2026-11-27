@@ -609,6 +609,18 @@ const CLAUSE_BREAKS: [&str; 6] = ["and", "but", "so", "while", "because", "then"
 /// watching your desk" to "Now stop watching the").
 pub fn claims_stopped(reply: &str, heard: Option<&str>) -> bool {
     let asked_to_stop = heard.is_some_and(names_the_looking);
+    reply_claims(reply, &OFFERING_WORDS, |clause, offered| {
+        clause_claims(clause, asked_to_stop, offered)
+    })
+}
+
+/// Whether a clause of `reply` claims, by `claims` (a clause's words, and
+/// whether an earlier clause of its sentence has one of `offers`): the
+/// claim rules [`claims_stopped`] and [`claims_started`] share. A sentence
+/// that is a question (a "?", or an opener such as "should") claims
+/// nothing; a sentence's clauses are cut at its commas, colons and dashes
+/// and at [`CLAUSE_BREAKS`].
+fn reply_claims(reply: &str, offers: &[&str], claims: impl Fn(&[String], bool) -> bool) -> bool {
     reply
         .split_inclusive(['.', '!', '?', ';', '\n'])
         .filter(|sentence| !sentence.trim_end().ends_with('?'))
@@ -622,13 +634,130 @@ pub fn claims_stopped(reply: &str, heard: Option<&str>) -> bool {
                 .split([',', ':', '\u{2014}', '\u{2013}'])
                 .flat_map(|part| clauses(words(part)))
                 .any(|clause| {
-                    let claims = clause_claims(&clause, asked_to_stop, offered);
-                    offered |= clause
-                        .iter()
-                        .any(|word| OFFERING_WORDS.contains(&word.as_str()));
-                    claims
+                    let claimed = claims(&clause, offered);
+                    offered |= clause.iter().any(|word| offers.contains(&word.as_str()));
+                    claimed
                 })
         })
+}
+
+/// The words of a sentence that offer a start rather than say one ("I'll
+/// start looking again whenever you want", "Once you say so, I'm noticing
+/// your desk again"): [`OFFERING_WORDS`] and the times a start would wait
+/// for, which govern as they do in [`claims_stopped`].
+const START_OFFERING: [&str; 9] = [
+    "can", "could", "if", "whenever", "anytime", "any", "once", "when", "until",
+];
+
+/// The words of a promised start ("I'll start looking again", "I'm going
+/// to watch again"): with one of [`START_OFFERING`] after the claim in its
+/// clause, it is offered, not said.
+const START_PROMISED: [&str; 4] = ["i'll", "will", "going", "gonna"];
+
+/// Whether the reply `reply` says the lamp is looking again, where `heard`
+/// is the person's line: the mirror of [`claims_stopped`], by the same
+/// rules ([`reply_claims`]: one clause, no question, the lamp as subject,
+/// a negation cancels it, an offer governs only what comes after it), for
+/// the correction of a claimed start with desk noticing off
+/// ([`ClaimWatch::start_correction`], the Reviewer-lead's c7202262971 on
+/// #7767). In a clause,
+///
+/// - "noticing", "notice", "watching" or "watch", or "looking" or "look"
+///   with "desk" in the clause, then "again" after it, the lamp as subject
+///   ([`LAMP_SUBJECT`] before it, or an "-ing" word first: "Watching
+///   again."), and the desk's looking: "desk" in the clause or a line
+///   naming the noticing ([`names_the_noticing`]): "I'm noticing your desk
+///   again", "I'm looking at your desk again"; never "I'm watching the
+///   timer again" to "Lamp, remind me about the oven." (Twelve's P2 on
+///   #8804, c7203889421);
+/// - "on" after "is", "are", "back", "now" or a "'s", with one of
+///   [`OFF_LOOKING`] before it, none of [`PERSON_WORDS`] in the clause,
+///   only a time word ("now", "again", "already", "still", "too") after
+///   it, and the desk's looking: "desk" in the clause, a line naming the
+///   noticing, or the looking word itself the subject right before
+///   "is"/"are"/"'s": "noticing is on", "my camera's on", "desk noticing is
+///   back on", "Desk noticing is on now"; never "The camera is on the
+///   shelf.";
+/// - "back on" with the lamp before it and no person before it, and a word
+///   of the looking or the desk in the clause, or "it" ("I've turned it
+///   back on") to a line naming the noticing ([`names_the_noticing`]):
+///   never "I've turned the light back on";
+///
+/// each with no negation before it in the clause ([`STOP_NOT_WORDS`]), none
+/// of [`START_OFFERING`] before it in the sentence, and none after a
+/// promise ([`START_PROMISED`]) in its clause. "I'll start looking again
+/// whenever you want" is none. Whole words, any case, English only.
+pub fn claims_started(reply: &str, heard: Option<&str>) -> bool {
+    let named = heard.is_some_and(names_the_noticing);
+    reply_claims(reply, &START_OFFERING, |clause, offered| {
+        clause_claims_start(clause, named, offered)
+    })
+}
+
+/// One clause of [`claims_started`]'s: whether it claims the lamp is
+/// looking again, `named` where the person's line names the noticing,
+/// `offered` where an earlier clause of its sentence has one of
+/// [`START_OFFERING`].
+fn clause_claims_start(words: &[String], named: bool, offered: bool) -> bool {
+    let has = |set: &[&str], word: &str| set.contains(&word);
+    let offer_before =
+        |at: usize| offered || words[..at].iter().any(|word| has(&START_OFFERING, word));
+    let lamp_before = |at: usize| words[..at].iter().any(|word| has(&LAMP_SUBJECT, word));
+    let person_before = |at: usize| words[..at].iter().any(|word| has(&PERSON_WORDS, word));
+    let negated = |at: usize| words[..at].iter().any(|word| has(&STOP_NOT_WORDS, word));
+    let promise_offered = |at: usize| {
+        words[..at].iter().any(|word| has(&START_PROMISED, word))
+            && words[at + 1..]
+                .iter()
+                .any(|word| has(&START_OFFERING, word))
+    };
+    let stands = |at: usize| !offer_before(at) && !negated(at) && !promise_offered(at);
+    let looking_word = |word: &str| has(&OFF_LOOKING, word.strip_suffix("'s").unwrap_or(word));
+    let desk = words.iter().any(|word| word == "desk");
+    let again = (0..words.len()).any(|at| {
+        let word = words[at].as_str();
+        let verb = matches!(word, "noticing" | "notice" | "watching" | "watch")
+            || (matches!(word, "looking" | "look") && desk);
+        // The desk's looking, not a timer's or the oven's (Twelve's P2 on
+        // #8804): the desk named, or a line naming the noticing.
+        verb && (desk || named)
+            && words[at + 1..].iter().any(|word| word == "again")
+            && (lamp_before(at) || (at == 0 && word.ends_with("ing")))
+            && stands(at)
+    });
+    let is_on = !words.iter().any(|word| has(&PERSON_WORDS, word))
+        && (1..words.len()).any(|at| {
+            let before = words[at - 1].as_str();
+            // The looking word itself the subject of the "is/'s on"
+            // ("noticing is on", "my camera's on").
+            let subject = (before.ends_with("'s") && looking_word(before))
+                || (matches!(before, "is" | "are")
+                    && at >= 2
+                    && has(&OFF_LOOKING, words[at - 2].as_str()));
+            words[at] == "on"
+                && (matches!(before, "is" | "are" | "back" | "now") || before.ends_with("'s"))
+                && words[..at].iter().any(|word| looking_word(word))
+                && (desk || named || subject)
+                // "On" as the state, not a place ("the camera is on the
+                // shelf"): only a time word after it in the clause.
+                && words[at + 1..]
+                    .iter()
+                    .all(|word| matches!(word.as_str(), "now" | "again" | "already" | "still" | "too"))
+                && stands(at)
+        });
+    let back_on = (2..words.len()).any(|at| {
+        words[at - 1] == "back"
+            && words[at] == "on"
+            && lamp_before(at)
+            && !person_before(at)
+            && (desk
+                || words
+                    .iter()
+                    .any(|word| looking_word(word) || has(&LOOKING_WORDS, word))
+                || (named && words[at - 2] == "it"))
+            && stands(at)
+    });
+    again || is_on || back_on
 }
 
 /// Whether a sentence's words open as a question ([`QUESTION_OPENERS`]),
@@ -738,6 +867,10 @@ pub struct ClaimWatch {
     said: String,
     ended: bool,
     acted: bool,
+    /// Whether the reply claimed a start ([`claims_started`]), and whether
+    /// its correction was judged already ([`Self::start_correction`]).
+    started: bool,
+    corrected: bool,
 }
 
 impl ClaimWatch {
@@ -776,7 +909,7 @@ impl ClaimWatch {
     }
 
     fn judge(&mut self, path: Option<&Path>, request: u64, heard: Option<&str>) -> bool {
-        let Some(path) = path.filter(|_| !self.acted) else {
+        let Some(path) = path else {
             return false;
         };
         let Some(heard) = heard else {
@@ -791,12 +924,61 @@ impl ClaimWatch {
                 .map_or(0, |at| at + 1);
             &self.said[..ended]
         };
-        if !claims_stopped(judged, Some(heard)) {
+        self.started = self.started || claims_started(judged, Some(heard));
+        if self.acted || !claims_stopped(judged, Some(heard)) {
             return false;
         }
         self.acted = true;
         stop_claimed(path, request)
     }
+
+    /// The reply's turn ended (after [`Self::end`]): with `path` (as
+    /// [`Self::piece`]'s), when the reply claimed a start
+    /// ([`claims_started`]) and desk noticing is still off at `path`, so no
+    /// `look_at_my_desk` turned it on, the line that corrects it, said after
+    /// the reply: for the owner (`owners`, asked only then: the look tool's
+    /// own check, [`owners_spoken_yes`]), [`crate::action_claim::NOT_DONE_LINE`],
+    /// the existing line for a claimed action no call made ("Sorry, I
+    /// didn't do that. Could you ask me again?"), as their ask again runs
+    /// `look_at_my_desk`; for anyone else, or a line not known as the
+    /// owner's, its first sentence alone,
+    /// [`crate::action_claim::NOT_DONE_FIRST`] ("Sorry, I didn't do
+    /// that."), as their ask again is refused ([`OWNER_ONLY`]; the first
+    /// builder's c7203862036 on #8804). It never runs `look_at_my_desk` and
+    /// never turns noticing on (the Reviewer-lead's c7202262971 and the
+    /// first builder's c7202392079 on #7767). Once a turn; `None` for a
+    /// turn nobody spoke, whose claim [`Self::piece`] never judged.
+    pub fn start_correction(
+        &mut self,
+        path: Option<&Path>,
+        request: u64,
+        owners: impl FnOnce() -> bool,
+    ) -> Option<&'static str> {
+        let path =
+            path.filter(|_| self.started && !std::mem::replace(&mut self.corrected, true))?;
+        start_claimed(path, request).then(|| {
+            if owners() {
+                crate::action_claim::NOT_DONE_LINE
+            } else {
+                crate::action_claim::NOT_DONE_FIRST
+            }
+        })
+    }
+}
+
+/// The reply to `request` claimed a start with desk noticing off at
+/// `path`: whether it is still off (seen activity's own rule,
+/// `lamp_msgs::consent::allowed` with the default on), so the claim is
+/// false, with one journal line saying so. Reads only.
+pub fn start_claimed(path: &Path, request: u64) -> bool {
+    use lamp_msgs::consent::{SEEN_ACTIVITY, allowed};
+    if allowed(path, SEEN_ACTIVITY, true) {
+        return false;
+    }
+    eprintln!(
+        "lamp-voice: request {request}: the reply says it is looking again with desk noticing off and no start called; nothing is turned on (LAMP_NOTICING_BY_DEFAULT)"
+    );
+    true
 }
 
 /// The reply to `request` claimed a stop with desk noticing on at `path`
@@ -841,6 +1023,9 @@ pub fn arm_live(on: bool) {
         eprintln!(
             "lamp-voice provider: a reply saying it stopped looking with no stop called runs the stop (LAMP_NOTICING_BY_DEFAULT)"
         );
+        eprintln!(
+            "lamp-voice provider: a reply saying it is looking again with desk noticing off and no start called is journalled; nothing is turned on (LAMP_NOTICING_BY_DEFAULT)"
+        );
     }
 }
 
@@ -878,7 +1063,19 @@ pub fn live_end(request: u64, heard: bool) -> bool {
     };
     let heard = crate::stop_scope::heard_words(request, heard);
     let path = path.clone();
-    claim.end(Some(&path), request, heard.as_deref())
+    let ran = claim.end(Some(&path), request, heard.as_deref());
+    // A claimed start with desk noticing off (#7767): Live says no fixed
+    // line of the lamp's own, so it is journalled only, and nothing is
+    // turned on.
+    if claim
+        .start_correction(Some(&path), request, || false)
+        .is_some()
+    {
+        eprintln!(
+            "lamp-voice provider: request {request}: the claimed start is not corrected on Live: it says no fixed line"
+        );
+    }
+    ran
 }
 
 /// The stop of the desk noticing itself ([`STOP`], with the call's id), for
@@ -1039,7 +1236,7 @@ pub fn turn_began(request: u64) {
 /// owner's own spoken yes: outside the private room, the owner seen saying
 /// it or in their voice; in it, where any heard line is the owner's, their
 /// voice by the judge only. A line not heard is none.
-fn owners_spoken_yes(
+pub(crate) fn owners_spoken_yes(
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
@@ -2407,6 +2604,173 @@ mod tests {
             }
         }
         assert_eq!(without_state_note("(First.) (Last.)"), None);
+    }
+
+    /// The ROW's line (#8683, c7200527698, F4's first try on lamp-06c1, 27
+    /// Nov): with noticing off, "Lamp, desk noticing on." names the
+    /// noticing, so it is told the state, off, and to call the start: the
+    /// note's match has no gap for it, the model did not call.
+    #[test]
+    fn the_rows_desk_noticing_on_is_told_the_state_off() {
+        use lamp_msgs::consent::{BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, no_bytes};
+        let heard = "Lamp, desk noticing on.";
+        assert!(names_the_noticing(heard));
+        let folder = folder("state-note-row");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+        std::fs::write(&face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+        let note = state_note(Some(&path), heard).unwrap();
+        assert!(note.contains("is off") && note.contains(LOOK), "{note}");
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The claimed start's words (the Reviewer-lead's c7202262971 on
+    /// #7767): the ROW's "I'm noticing your desk again." and the lamp's
+    /// other plain starts are claims; a negation, an offer, a question, the
+    /// person's own looking or another thing turned on are not, and nor is
+    /// a stop's offer to undo it.
+    #[test]
+    fn a_claimed_start_is_the_lamps_own_plain_start() {
+        let heard = Some("Lamp, desk noticing on.");
+        for reply in [
+            "I'm noticing your desk again.",
+            "Okay, I'm looking at your desk again.",
+            "Watching again.",
+            "Noticing is on.",
+            "Desk noticing is back on.",
+            "Sure, I've turned it back on.",
+            "My camera's on.",
+            "I'll start noticing again.",
+        ] {
+            assert!(claims_started(reply, heard), "{reply}");
+        }
+        for (reply, heard) in [
+            ("I'll start looking again whenever you want.", heard),
+            ("Once you say so, I'm noticing your desk again.", heard),
+            ("I can start noticing your desk again if you like.", heard),
+            ("I'm not noticing your desk again.", heard),
+            ("I haven't turned it back on.", heard),
+            ("Noticing isn't on.", heard),
+            ("Should I start watching again?", heard),
+            ("Do you want me to start watching again", heard),
+            (
+                "I've stopped watching, but you can turn it back on any time.",
+                heard,
+            ),
+            ("You can watch again after lunch.", heard),
+            ("I've turned the light back on.", Some("Lamp, light on.")),
+            ("Sure, I've turned it back on.", Some("Lamp, music on.")),
+            ("Look again at the second line.", heard),
+            ("Only the lamp's owner can turn that back on.", heard),
+            (crate::action_claim::NOT_DONE_LINE, heard),
+            (crate::action_claim::NOT_DONE_FIRST, heard),
+        ] {
+            assert!(!claims_started(reply, heard), "{reply} to {heard:?}");
+        }
+        // Another thing watched or on, to a line not naming the noticing
+        // (Twelve's P2 on #8804, c7203889421): no desk start, no line.
+        let oven = Some("Lamp, remind me about the oven.");
+        for reply in [
+            "Okay, I'm watching the timer again.",
+            "Sure, I'll watch the oven again.",
+            "I'm noticing the noise again.",
+            "The camera is on the shelf.",
+        ] {
+            assert!(!claims_started(reply, oven), "{reply} to {oven:?}");
+        }
+        // The desk's own looking still claims to that line.
+        for reply in [
+            "Okay, I'm noticing your desk again.",
+            "Desk noticing is on now.",
+            "Noticing is on.",
+            "My camera's on.",
+        ] {
+            assert!(claims_started(reply, oven), "{reply} to {oven:?}");
+        }
+    }
+
+    /// The ROW's turn whole: noticing off, "Lamp, desk noticing on.",
+    /// answered "I'm noticing your desk again." with no call. The reply is
+    /// corrected after it with the existing not-done line, once, and
+    /// nothing is turned on, whoever spoke (the first builder's c7202392079:
+    /// the owner's too). With noticing on, the claim is true: no line.
+    #[test]
+    fn a_claimed_start_with_noticing_off_is_said_not_done_and_turns_nothing_on() {
+        use lamp_msgs::consent::{FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed};
+        let heard = Some("Lamp, desk noticing on.");
+        let reply = "I'm noticing your desk again.";
+        let folder = folder("claimed-start");
+        let path = file_in(&folder);
+        let face = crate::onboarding::face_expressions_beside(&folder.join("room-sounds.json"));
+        // On by default: true, no line, nothing written.
+        let mut watch = ClaimWatch::default();
+        assert!(!watch.piece(Some(&path), 1, reply, heard));
+        watch.end(Some(&path), 1, heard);
+        assert_eq!(watch.start_correction(Some(&path), 1, || true), None);
+        assert!(!path.exists() && !face.exists());
+        // Off (a stop's kept no): the line, once; still off after it.
+        assert!(stop_claimed(&path, 2));
+        let off = std::fs::read(&path).unwrap();
+        let mut watch = ClaimWatch::default();
+        assert!(!watch.piece(Some(&path), 3, reply, heard));
+        watch.end(Some(&path), 3, heard);
+        // The owner's line: the whole not-done line (c7203862036 on #8804).
+        assert_eq!(
+            watch.start_correction(Some(&path), 3, || true),
+            Some(crate::action_claim::NOT_DONE_LINE)
+        );
+        assert_eq!(
+            crate::action_claim::NOT_DONE_LINE,
+            "Sorry, I didn't do that. Could you ask me again?"
+        );
+        assert_eq!(watch.start_correction(Some(&path), 3, || true), None);
+        assert!(!allowed(&path, SEEN_ACTIVITY, true));
+        assert!(!allowed(&face, FACE_EXPRESSIONS, true));
+        assert_eq!(std::fs::read(&path).unwrap(), off);
+        // Its last sentence with no stop of its own is judged at the end.
+        let mut watch = ClaimWatch::default();
+        assert!(!watch.piece(Some(&path), 4, "Okay, watching again", heard));
+        assert_eq!(watch.start_correction(Some(&path), 4, || true), None);
+        let mut watch = ClaimWatch::default();
+        watch.piece(Some(&path), 5, "Okay, watching again", heard);
+        watch.end(Some(&path), 5, heard);
+        // Anyone else's, or a line not known as the owner's: its first
+        // sentence alone.
+        assert_eq!(
+            watch.start_correction(Some(&path), 5, || false),
+            Some("Sorry, I didn't do that.")
+        );
+        // The switch off (no path): nothing judged.
+        let mut watch = ClaimWatch::default();
+        watch.piece(None, 6, reply, heard);
+        watch.end(None, 6, heard);
+        assert_eq!(watch.start_correction(None, 6, || true), None);
+        // An offer is no claim: no line.
+        let mut watch = ClaimWatch::default();
+        watch.piece(
+            Some(&path),
+            7,
+            "I'll start looking again whenever you want.",
+            heard,
+        );
+        watch.end(Some(&path), 7, heard);
+        assert_eq!(watch.start_correction(Some(&path), 7, || true), None);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// A turn nobody spoke (a written turn, a reminder: no heard line) is
+    /// never corrected, as the start call never runs there.
+    #[test]
+    fn a_claimed_start_in_a_turn_nobody_spoke_is_not_corrected() {
+        let folder = folder("claimed-start-unheard");
+        let path = file_in(&folder);
+        assert!(stop_claimed(&path, 1));
+        let mut watch = ClaimWatch::default();
+        watch.piece(Some(&path), 2, "I'm noticing your desk again.", None);
+        watch.end(Some(&path), 2, None);
+        assert_eq!(watch.start_correction(Some(&path), 2, || true), None);
+        let _ = std::fs::remove_dir_all(folder);
     }
 
     /// #7767: only the descriptions of the look and the stop change with
