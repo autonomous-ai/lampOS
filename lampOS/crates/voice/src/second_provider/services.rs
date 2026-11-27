@@ -154,6 +154,10 @@ pub trait Services: Send + Sync + 'static {
 
 /// One open utterance.
 pub trait Listener: Send {
+    /// Opt in to the opening wake's exact sample bounds on this input stream.
+    fn caller_wake_samples(&self) -> Option<super::caller_frame::WakeSamples> {
+        None
+    }
     /// Queue 16 kHz mono samples; nothing waits.
     fn send(&self, samples: &[i16]) -> net::Result<()>;
     /// The final words; empty when nothing was heard.
@@ -183,6 +187,9 @@ pub trait Listener: Send {
 }
 
 impl Listener for SttStream {
+    fn caller_wake_samples(&self) -> Option<super::caller_frame::WakeSamples> {
+        self.watch_caller_wake()
+    }
     fn open(&self) -> bool {
         SttStream::still_open(self)
     }

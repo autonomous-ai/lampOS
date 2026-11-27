@@ -1181,6 +1181,7 @@ pub fn run_write_waiting(folder: &Path) -> Option<crate::run_write_yes::RunWrite
 /// with it what [`waiting_note`] tells (Thirteen's P2 on #5968): after it
 /// the next turn is told nothing of the mail, and "send it" finds nothing.
 pub fn forget_waiting() {
+    crate::second_provider::caller_frame::forgotten();
     // So do the events a calendar read kept (`LAMP_SERVICE_READ_IDS_KEPT`).
     crate::service_read_ids::forget();
     // And an ask with the lamp's agent, its answer never told, and

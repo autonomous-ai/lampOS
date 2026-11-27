@@ -1,0 +1,37 @@
+# Measuring the caller’s voice on short follow-ups
+
+This is sensor 6 on the simple-call base at `0dbbfc95bb`. The base answers an ordinary follow-up that starts in its renewing 20-second window. The sensor runs on its own for measurement. Its output cannot change admission, renewal or confirmation. All product units leave the sensor off. [Sensor issue](https://github.com/autonomous-ai/lampOS/issues/8849) · [Simple call](https://github.com/autonomous-ai/lampOS/pull/8892) · [Tiếng Việt](../../vi/caller-frame_vi.md)
+
+## What the two checks measure
+
+The whole-line comparator uses the product’s CAM++ model. Both captured inputs must reach 24,000 samples (1.5 seconds). It embeds the first 28,800 samples at most (1.8 seconds, including capture pre-roll). Cosines of at least 0.70 indicate the caller, and values below 0.30 indicate another speaker. Intermediate, unavailable and too-short inputs abstain. The replay also emits a separate diagnostic that runs the same model and bands even when the length guard would abstain. [CAM++ provenance](../../same-voice.md)
+
+The frame candidate uses the authors’ published score-conditioned Personal VAD 1.0 ST network and their speaker projection trained on Multilingual LibriSpeech. Its weights and decision thresholds were fixed before these paired runs. It takes 25 ms Hann windows of 16 kHz audio at 10 ms intervals. The opening “Hey Lamp” produces a 256-dimensional enrollment vector. Each follow-up frame has its own caller-similarity score from the current and previous 13 frames. Two unidirectional LSTM layers use that score and 40 log-mel features to predict caller speech, silence and other speech. Enrollment and model outputs stay on the machine. [Personal VAD paper](https://research.google/pubs/personal-vad-speaker-conditioned-voice-activity-detection/) · [Frozen public weights](https://huggingface.co/wq2012/personal-vad-v1-st-ce/tree/56f67ae31897518a994dec0cb3fd283fd9db027e) · [Reference implementation](https://github.com/wq2012/personal_vad/tree/03be700243b1d6241a8903b0ebff6814476d6853)
+
+We fixed the following line rule before viewing the evaluation results. Count frames whose largest posterior is uniquely caller speech or other speech. At least eight speech frames are required. The result is **same** when at least 60% of these frames select the caller, **different** at 40% or less, and **unknown** in between. A missing reference, digital silence, an incomplete capture or a line outside the 3-second reference / 12-second follow-up bounds gives no result. Every abstention still counts as a miss for its ground-truth class.
+
+The development measurements include the per-cell numerators, guarded and unguarded CAM++ results, timings and the reference parity check. [Bench tables and retained data](bench.md)
+
+## Replaying a labelled set
+
+For a prepared corpus, `bash tools/caller-frame-bench/replay.sh lamp-replay "$ARCHIVE" "$NEW_BUNDLE"` retrieves the fixed public model files, runs both methods locally and writes the reports and SHA-256 in a new directory. Use `synthetic-heldout` for the held-out #8907 provider voices. Two optional final arguments accept existing CAM++ and frame-model paths for a fully offline replay with cached build dependencies.
+
+Use a private directory. Keep the original archive, manifests, labels, each derived WAV, model files, raw predictions, frame posteriors and readme. Record SHA-256 for each file. Keep human audio and its private labels on the collecting Mac. Reuse the same two clips, length label and noise condition for both classifiers. Standard input is mono signed 16-bit PCM WAV at 16 kHz. A whole wake followed by a question must be cut to the opener using known word boundaries, or excluded from enrollment.
+
+Download `model.safetensors` and `speaker_subspace.npz` from the frozen model revision to a new directory. The preparer checks both source digests and writes one materialized weight file exactly once. Use the product-pinned CAM++ file with SHA-256 `357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b`. Run the following from `lampOS/` with the three inputs and a fresh output directory set in the shell. [Original model files](https://huggingface.co/wq2012/personal-vad-v1-st-ce/tree/56f67ae31897518a994dec0cb3fd283fd9db027e)
+
+```sh
+ruby tools/caller-frame-bench/prepare-model.rb "$FRAME_MODEL"
+cargo run --release --locked -p lamp-same-voice --example caller_frame_bench -- \
+  "$ARCHIVE/pairs.tsv" "$CAM_MODEL" "$FRAME_MODEL" "$RUN"
+ruby tools/caller-frame-bench/score.rb compare synthetic "$ARCHIVE/pairs.tsv" \
+  "$RUN/whole.tsv" "$RUN/frame.tsv" "$RUN/paired-report"
+```
+
+The case list contains the columns `case_id`, `reference`, `followup`, `label`, `words` and `condition`. `whole.tsv`, `frame.tsv` and `unguarded-cam.tsv` bind to its SHA-256. `posteriors.tsv` retains all three probabilities for every available follow-up frame. Time each paired inference on the host after reading the WAVs and before writing results. Enrollment and follow-up costs are split in `stages.tsv`. Cold model load has its own table. Repeated calls recompute enrollment. Replay gives no lamp readiness timestamp or acoustic response time. [Input, scoring and private #8885 adapter](../../../tools/caller-frame-bench/scoring.md)
+
+With the second route as the sole active voice, the measurement switches are `LAMP_SIMPLE_CALL=on`, `LAMP_CALLER_FRAME_VAD=on` and `LAMP_CALLER_FRAME_MODEL` set to the absolute prepared model directory. A detector-attributed spoken call supplies the two wake words. An isolated “Hey Lamp” can supply its full capture. A longer utterance requires word timing to isolate the opener. A tap or computer-opened turn supplies no voice reference. A bounded model child named `lamp-same-voice` sits beside `lamp-voice`. At PCM end the worker can submit a provisional pair while ASR finishes. The simple verdict establishes whether the result belongs to an ordinary follow-up. The `lamp-voice caller-frame:` journal records the clock, worker epoch and request IDs, last microphone read (`capture_end_us`), model queue and readiness, first simple verdict, class and score. The child can load its weights asynchronously when a valid spoken caller opens the window. An unavailable timestamp stays null. Measure the share ready within 100 ms of annotated acoustic end and before the first simple verdict. The worker’s target is zero waiting for the model on admission and warm inference p95 within 500 ms. An annotated acoustic end is measured separately from the last microphone read. The reference is tied to the opening caller and the active conversation.
+
+## Decision for the combined judge
+
+The quality bar is 95% of same callers kept and 95% of other voices rejected on the agreed physical holdout. For 120 examples in each class that is 114 correct in each. Report the short (1–3 words) and longer lines separately in quiet and noisy conditions, with the whole denominator in each cell. The lead tests the sensor by itself, then compares the played voice set and a real-person session against stable before any addition to the judge. [Evaluation record](https://github.com/autonomous-ai/lampOS/issues/8849) · [Shared reviewer scoring](https://github.com/autonomous-ai/lampOS/pull/8885)

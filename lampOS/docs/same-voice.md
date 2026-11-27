@@ -1,5 +1,7 @@
 # The same voice (#829)
 
+The simple-call sensor trial compares this whole-line model with a caller-conditioned frame model on the same audio. [Measurement and replay](verification/caller-frame-8849/README.md) · [Tiếng Việt](vi/caller-frame_vi.md)
+
 Whether two things said to the lamp are the same voice. The question
 comes from two people at the lamp: when B follows up on A's question
 ("And what about tomorrow?"), or A and B go on talking to each other after

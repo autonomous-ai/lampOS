@@ -73,6 +73,7 @@ pub(crate) fn queued_make_status_for_test() -> serde_json::Value {
     )
 }
 
+pub(crate) mod caller_frame;
 mod held_rename;
 pub mod limit_local;
 pub mod link;
@@ -2306,6 +2307,7 @@ struct Shared {
     /// network is asked once more when the link is back.
     resend: Option<LinkBack>,
     hearing: Option<Hearing>,
+    caller_frame: Option<caller_frame::Shared>,
     /// Told each line's span once it ends, words or none
     /// ([`Engine::telling_lines_heard`]).
     line_heard: Option<LineHeard>,
@@ -5725,6 +5727,7 @@ impl Engine {
                 second_try_journal: None,
                 resend: None,
                 hearing: None,
+                caller_frame: None,
                 line_heard: None,
                 words_back: None,
                 asked: None,
@@ -8013,6 +8016,11 @@ impl Engine {
     /// At each of the worker's ticks: the room told and kept, if this route
     /// keeps it.
     pub fn tick_room(&mut self, now_us: u64) {
+        if let Some(trial) = &self.shared.caller_frame
+            && let Ok(mut trial) = trial.lock()
+        {
+            trial.tick(now_us);
+        }
         if let Some(tick) = self.room_tick.as_mut() {
             tick(now_us);
         }
@@ -8811,6 +8819,23 @@ impl Engine {
                 if over_the_lamps_voice {
                     self.shared.begun_over_the_lamp(request);
                 }
+                if let Some(trial) = &self.shared.caller_frame
+                    && let Ok(mut trial) = trial.lock()
+                {
+                    if after_stop
+                        || previous.is_some_and(|(_, prior_session)| prior_session != session)
+                    {
+                        trial.clear();
+                    }
+                    trial.begin(
+                        request,
+                        !over_the_lamps_voice
+                            && !over_the_wait_sound
+                            && !continues
+                            && !continues_cut_off,
+                        monotonic_us(),
+                    );
+                }
                 if let Some(hearing) = &self.shared.hearing {
                     hearing(
                         request,
@@ -9283,6 +9308,11 @@ impl Engine {
             // Begun in a computer's turn: the rule takes its line as a call,
             // as a tap's, whenever its words are judged.
             ProviderInput::TurnOpened { request, .. } => {
+                if let Some(trial) = &self.shared.caller_frame
+                    && let Ok(mut trial) = trial.lock()
+                {
+                    trial.computer_opened(request);
+                }
                 if let Some(opened) = self.shared.opened.as_ref() {
                     opened(request);
                 }
@@ -9372,6 +9402,11 @@ impl Engine {
                         thread.look_let_go(turn.ask.request);
                     }
                     return;
+                }
+                if let Some(trial) = &self.shared.caller_frame
+                    && let Ok(mut trial) = trial.lock()
+                {
+                    trial.clear();
                 }
                 // A search's own turn: the search a push may end goes on
                 // from now, the walk's looks included (#2904).
@@ -10677,6 +10712,10 @@ async fn spoken(
             return shared.fail(request, FailedStage::InputOpen, &error).await;
         }
     };
+    let wake_samples = shared
+        .caller_frame
+        .as_ref()
+        .and_then(|_| listener.caller_wake_samples());
     // How long the line's sound waited for it, in its 10 ms blocks.
     eprintln!(
         "lamp-voice second: request {request}: speech to text {from} in {} ms, {} ms of the line's sound waiting",
@@ -10740,6 +10779,11 @@ async fn spoken(
                 None => break,
                 Some(LinePart::Sound(samples, fresh, read_completed_at_us)) => {
                     turn.captured |= fresh && !samples.is_empty();
+                    // The sensor sees precisely the samples sent on this stream. A
+                    // replayed/carry-in block invalidates the whole clip.
+                    if let Some(trial) = &shared.caller_frame && let Ok(mut trial) = trial.lock() {
+                        trial.audio(request, &samples, fresh, read_completed_at_us);
+                    }
                     if shared.remember_speaker {
                         // The microphone clock, not STT's delayed queue:
                         // 16 kHz samples, timestamped when the read ended.
@@ -10774,6 +10818,12 @@ async fn spoken(
     }
     let finishing = Instant::now();
     let times = Times::new(finishing);
+    if let Some(trial) = &shared.caller_frame {
+        let began_us = said.lock().map(|span| span.0).unwrap_or(0);
+        if let Ok(mut trial) = trial.lock() {
+            trial.pcm_ended(request, began_us, monotonic_us());
+        }
+    }
     // A line admitted as the room's with the camera allowed (#2807): the
     // known face the cache names as of its end is looked for from the end
     // itself, not once the words are back, which on a lamp is often past the
@@ -10814,6 +10864,15 @@ async fn spoken(
             }
         }
     };
+    if let Some(trial) = &shared.caller_frame
+        && let Ok(mut trial) = trial.lock()
+    {
+        trial.words(
+            request,
+            finished.as_deref().ok(),
+            wake_samples.and_then(|span| span.get().cloned().flatten()),
+        );
+    }
     // The service's fillers were asked for the end's judgement alone
     // (`LAMP_SECOND_UNFINISHED_WAIT`, #3126): nothing after it reads them.
     let finished = if shared.unfinished_words {

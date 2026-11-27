@@ -8,14 +8,14 @@
 use lamp_same_voice::{RATE, Voice, cosine, read_wav};
 use std::{path::Path, process::ExitCode, time::Instant};
 
-const USAGE: &str =
-    "usage: lamp-same-voice pairs MODEL.onnx LIST.tsv\n       lamp-same-voice serve MODEL.onnx";
+const USAGE: &str = "usage: lamp-same-voice pairs MODEL.onnx LIST.tsv\n       lamp-same-voice serve MODEL.onnx\n       lamp-same-voice frame-serve MODEL_DIRECTORY";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let done = match args.as_slice() {
         [command, model, list] if command == "pairs" => pairs(Path::new(model), Path::new(list)),
         [command, model] if command == "serve" => serve(Path::new(model)),
+        [command, model] if command == "frame-serve" => serve_frames(Path::new(model)),
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::FAILURE;
@@ -47,6 +47,23 @@ fn serve(model: &Path) -> Result<(), String> {
         |samples| voice.embedding(samples),
     )
     .map_err(|error| error.to_string())
+}
+
+fn serve_frames(directory: &Path) -> Result<(), String> {
+    use lamp_same_voice::personal_vad::{self, Model, decide};
+    lamp_same_voice::ordinary_priority().map_err(|e| e.to_string())?;
+    let model = Model::load(directory)?;
+    personal_vad::serve(
+        &mut std::io::stdin().lock(),
+        &mut std::io::stdout().lock(),
+        |wake, line| {
+            let frames = model
+                .enroll(wake)
+                .map_or_else(Vec::new, |caller| model.posteriors(&caller, line));
+            decide(&frames)
+        },
+    )
+    .map_err(|e| e.to_string())
 }
 
 fn pairs(model: &Path, list: &Path) -> Result<(), String> {
