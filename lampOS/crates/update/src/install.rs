@@ -808,6 +808,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "07bc294005f1f8a3868eabbafc6c2fef1a4c5119d172124316f7d6eb3ed64360", // #7771: the ring clips under schedule-delivery, the plan at its 64
     "83d28aec76ed1500fd3f600d6356d54382c7564405011b808d4a53c63d8e21b1", // #7771: the voice's "that was weird" copies and sent turns' ids
     "2b668599daeadaaf20562188b169326221e950b0e7da42e173c5866eaa5b787c", // #8708: the offline ring clips, each reminder's words as sound
     "f36f4b63210494cc8848061509c7b085996bfbf3154f2059c58111e0ad623d3c", // #7415: lamp-npu's state folder, its fetched models

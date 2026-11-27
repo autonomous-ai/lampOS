@@ -120,9 +120,10 @@ skills' state `/var/lib/lampos-skills-state` (daily routine claims included),
 the pushed skills and the owner's yes to them `/var/lib/lampOS/skills-dev`, the
 lasting light and volume limits `/var/lib/lampos-output-caps`, schedule `/var/lib/lampos-schedule/store`, voice sessions
 `/var/lib/lampOS/voice/sessions`, reminder delivery
-`/var/lib/lampOS/voice/schedule-delivery`, each reminder's offline clip, its
-words as sound `/var/lib/lampOS/voice/ring-clips` (`LAMP_OFFLINE_RINGS`,
-#8708), the conversation thread
+`/var/lib/lampOS/voice/schedule-delivery`, with each reminder's offline clip,
+its words as sound, inside it at `schedule-delivery/ring-clips`
+(`LAMP_OFFLINE_RINGS`, #8708; no plan path of its own, #7771), the
+conversation thread
 `/run/lampos-voice/thread.json`, the voice's first-output log
 `/var/lib/lampOS/voice/first-output`, what the voice has told of tasks
 `/var/lib/lampOS/voice/tasks-told` (its default, `LAMP_TASKS_TOLD`), the
@@ -502,6 +503,11 @@ only logs a valid reset and `resume-reset` only says whether one is unfinished.
 `crates/setup/fixtures/reset-plan-example.json` is the plan for lamp-4ace's
 paths; the name and Wi-Fi entries are where setup writes them, and the voice's
 key is not in it.
+
+The product plan is at its bound: 64 paths, the most `check` takes and the
+most an older lamp-setup takes (#7771). The next person store needs a slot
+freed (kept inside a folder the plan already wipes, as the ring clips are in
+`schedule-delivery`) or a decision on the plan's format.
 
 While the reset button is held, the voice's ring worker shows the hold
 counting (#5929, ring-choreography.md, "The reset's red"): nothing under 2 s,

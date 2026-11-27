@@ -1075,8 +1075,9 @@ const PERSON_STORES: [&str; 50] = [
     "/var/lib/lampOS/consent/seen-activity-mark.json",
     "/var/lib/lampOS/voice/schedule-delivery",
     // Each reminder's offline clip, its words as sound (`LAMP_OFFLINE_RINGS`,
-    // #8708): `ring_clips::DIR` in crates/voice/src/ring_clips.rs.
-    "/var/lib/lampOS/voice/ring-clips",
+    // #8708): `ring_clips::DIR` in crates/voice/src/ring_clips.rs, inside
+    // the delivery folder above, which the plan wipes (#7771).
+    "/var/lib/lampOS/voice/schedule-delivery/ring-clips",
     "/var/lib/lampOS/voice/first-output",
     "/run/lampos-voice/thread.json",
     // The voice's default for the task news it has told (reviewer, #817):
@@ -1202,8 +1203,9 @@ fn a_product_reset_removes_the_photo_faces_staging_copy() {
 }
 
 /// #8708, the first builder's add 1: the offline ring clips are the
-/// person's reminders as sound, so a product reset takes them all, the
-/// folder emptied and kept, and leaves the speech cache's own lines beside
+/// person's reminders as sound, so a product reset takes them all through
+/// their `schedule-delivery` parent (#7771: no plan slot of their own), and
+/// leaves the speech cache's own lines beside
 /// them (the lamp's fixed lines, nobody's words).
 #[test]
 fn a_product_reset_leaves_no_ring_clips() {
@@ -1212,7 +1214,7 @@ fn a_product_reset_leaves_no_ring_clips() {
     plan.check().unwrap();
     let root = Root::new();
     let voice = root.0.join("var/lib/lampOS/voice");
-    let clips = voice.join("ring-clips");
+    let clips = voice.join("schedule-delivery/ring-clips");
     fs::create_dir_all(&clips).unwrap();
     let store = "0123456789abcdef0123456789abcdef";
     for name in [
@@ -1631,6 +1633,34 @@ fn the_product_plan_fits_the_bound_and_wipes_the_voices_marks() {
         "{} is #8125's fallback, never a plan path",
         kept.display()
     );
+}
+
+/// #7771, Friday's ask: a product reset, run by the real wipe, leaves none
+/// of the voice's "that was weird" copies and no id of a turn sent to the
+/// account, and keeps #8125's `history-forget.json` beside them.
+#[test]
+fn a_product_reset_leaves_no_voice_marks() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    let root = Root::new();
+    let voice = root.0.join("var/lib/lampOS/voice");
+    let marked = voice.join("marked");
+    fs::create_dir_all(&marked).unwrap();
+    fs::write(marked.join("1.json"), b"synthetic: that was weird").unwrap();
+    let marks = voice.join("history-marks.json");
+    fs::write(&marks, b"[\"synthetic-turn-id\"]").unwrap();
+    let kept = voice.join("history-forget.json");
+    fs::write(&kept, b"{}").unwrap();
+    for path in &plan.wipe {
+        reset::wipe(&root.0.join(path.strip_prefix("/").unwrap())).unwrap();
+    }
+    let left: Vec<_> = fs::read_dir(&marked)
+        .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+        .unwrap_or_default();
+    assert!(left.is_empty(), "{left:?}");
+    assert!(fs::symlink_metadata(&marks).is_err(), "history-marks.json");
+    assert!(kept.is_file(), "#8125's fallback is kept");
 }
 
 /// Reset covers the whole private onboarding directory, including unfinished

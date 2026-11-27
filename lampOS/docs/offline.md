@@ -373,7 +373,8 @@ and its gate needs a ready session.
   Schedule consumer renders each reminder (never a timer) into a clip of its
   own, "You have a reminder." and its text, through the second route's
   speech service, on a thread of its own. It is kept at
-  `/var/lib/lampOS/voice/ring-clips/<store_id>-<id>.wav` (0700) with a
+  `/var/lib/lampOS/voice/schedule-delivery/ring-clips/<store_id>-<id>.wav`
+  (0700, inside the consumer's delivery folder) with a
   sidecar of its words' hash and `voice|model|language`, and rendered again
   when either changes. Offline, that clip plays; late ones joined into one
   ring play each clip in turn. Played whole, the reminder is completed as
@@ -401,8 +402,10 @@ and its gate needs a ready session.
   about 82 MB, not the 20 MB first estimated). Past it nothing more is
   rendered, and the journal says so once.
 - **A factory reset takes them** (the first builder's add 1): the clips are
-  the person's reminders as sound, so `/var/lib/lampOS/voice/ring-clips` is
-  in the product reset plan ([setup.md](setup.md)).
+  the person's reminders as sound, kept inside
+  `/var/lib/lampOS/voice/schedule-delivery`, which the product reset plan
+  wipes; they take no plan path of their own, as the plan is at its 64
+  (#7771, [setup.md](setup.md)).
 - **Turned off again, every clip goes (#8894, the Reviewer-lead's P3 2 on
   #8800):** off, every clip goes when the voice or its Schedule consumer
   starts. The consumer's start removes every file in the folder; with

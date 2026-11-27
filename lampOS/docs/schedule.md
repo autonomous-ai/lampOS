@@ -1893,7 +1893,8 @@ and its text, through the second route's speech service
 `tts_cache::built_from_environment`). Its packets to the voice keep carrying
 ids and times only, never words: the pipe's test from #8687 stands
 unchanged. A clip is kept at `ring_clips::DIR`,
-`/var/lib/lampOS/voice/ring-clips/<store_id>-<id>.wav` (0700), with a
+`/var/lib/lampOS/voice/schedule-delivery/ring-clips/<store_id>-<id>.wav`
+(0700, inside the delivery folder, so a reset wipes it with it), with a
 sidecar `<store_id>-<id>.json` of its words' SHA-256 and the
 `voice|model|language` it was rendered in; a change in either renders it
 again. It is keyed by id, so a repeat or a snooze keeps it. At each walk's

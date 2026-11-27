@@ -40,15 +40,19 @@ use std::{
     collections::BTreeSet,
     fs,
     io::{self, Cursor, Write},
-    os::unix::fs::PermissionsExt,
+    os::unix::fs::{DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
     sync::mpsc,
     time::{Duration, Instant},
 };
 
-/// Where the clips are kept: the voice's own state (root's, 0700). A
-/// factory reset wipes it (`crates/setup/fixtures/reset-plan-product.json`).
-pub const DIR: &str = "/var/lib/lampOS/voice/ring-clips";
+/// Where the clips are kept: the voice's own state (root's, 0700), inside
+/// the Schedule consumer's delivery folder (`LAMP_SCHEDULE_DELIVERY_DIR`), so
+/// a factory reset wipes them with it, in no plan slot of their own: the
+/// product plan is at its 64 paths (`crates/setup/fixtures/reset-plan-product.json`,
+/// #7771). The ledger there reads only its own names, and a folder made
+/// here is 0700 as the ledger requires of its own.
+pub const DIR: &str = "/var/lib/lampOS/voice/schedule-delivery/ring-clips";
 
 /// A WAV file's header, as `hound` writes a mono 16-bit one.
 pub const WAV_HEADER_BYTES: u64 = 44;
@@ -244,7 +248,12 @@ impl Clips {
         voice: &str,
         samples: &[i16],
     ) -> io::Result<()> {
-        fs::create_dir_all(&self.dir)?;
+        // The delivery folder too, if the ledger has not made it yet: 0700,
+        // as the ledger makes it and refuses it otherwise.
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&self.dir)?;
         fs::set_permissions(&self.dir, fs::Permissions::from_mode(0o700))?;
         let sidecar = self.sidecar(store_id, id);
         match fs::remove_file(&sidecar) {
