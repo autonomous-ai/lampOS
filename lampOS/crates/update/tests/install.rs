@@ -2821,8 +2821,8 @@ fn the_product_turns_beat_engines_on_only_in_lamp_cloud() {
     }
 }
 
-/// The product owner, 27 Nov 2026: "we just start with a simple 'hey lamp'
-/// + 20s renewing. then we'll slowly add one thing at a time and always make
+/// The product owner, 27 Nov 2026: "we just start with a simple 'hey lamp' +
+/// 20s renewing. then we'll slowly add one thing at a time and always make
 /// sure the quality is good." The product runs the one rule
 /// (`LAMP_SIMPLE_CALL`): a call is "Hey Lamp" in a line's words, and a line
 /// within 20 s of the lamp's last words is answered.
