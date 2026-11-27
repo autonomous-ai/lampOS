@@ -484,3 +484,15 @@ def test_a_stop_group_is_taken_with_no_budget_and_refused_beside_one(tmp_path):
     bad = check(skill(tmp_path / "underscore", rules='version = "1.0.0"\n' + STOP.replace("quiet-ones", "quiet_ones")))
     assert any(line.startswith("skill.toml: stop.group:") for line in bad.errors), bad.errors
 
+
+def test_a_stop_apart_goes_with_a_group_and_is_1s_to_1h_as_the_loader_holds(tmp_path):
+    """The owner, 27 Nov (`[stop] apart`): the Reviewer-lead's P3 on #8868,
+    the loader's range checked here too."""
+    for at, apart in enumerate(["1s", "1m", "1h"]):
+        rules = 'version = "1.0.0"\n' + STOP.replace("group =", f'apart = "{apart}"\ngroup =')
+        assert check(skill(tmp_path / f"fine{at}", rules=rules)).errors == [], apart
+    for at, apart in enumerate(["500ms", "2h"]):
+        rules = 'version = "1.0.0"\n' + STOP.replace("group =", f'apart = "{apart}"\ngroup =')
+        assert "skill.toml: [stop] apart is 1s to 1h" in check(skill(tmp_path / f"bad{at}", rules=rules)).errors, apart
+    alone = STOP.replace('group = "quiet-ones"', 'apart = "1m"')
+    assert "skill.toml: [stop] apart goes with [stop] group" in check(skill(tmp_path / "alone", rules='version = "1.0.0"\n' + alone)).errors

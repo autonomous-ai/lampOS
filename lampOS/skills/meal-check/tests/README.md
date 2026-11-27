@@ -25,6 +25,7 @@ takes no picture is `a_meal_check_names_no_food_and_takes_no_picture` in
 | `not-when-they-went-out-for-lunch` | 11:00, an hour, 45 minutes away, an hour | Pass: nothing: 45 minutes of lunchtime left on return, under 75 |
 | `asks-with-someone-else-in-view` | 11:00, a second face in view from minute 100 to 110 | Pass: asked at 105, with them there (the owner, 27 Nov: others in view are fine) |
 | `asks-at-1315-with-someone-else-there` | 11:00, away an hour, at the desk from 12:00, a second face in view from minute 130 to 158 | Pass: asked at 13:15 (minute 135), with them there |
+| `let-go-when-lunchtime-ends` | 11:00, away an hour, at the desk from 12:00, a conversation from minute 130 to 158 (restored 27 Nov, the Reviewer-lead's P3 on #8868: the voice now holds it, not a second face) | Pass: nothing: due at 13:15 and held by the talk; lunchtime ends at 13:30 while the 30-minute wait still runs (to 13:45), so the window's end is what lets it go |
 | `quiet-between-meals` | 14:00, four hours at the desk | Pass: nothing, outside both windows |
 | `quiet-at-night` | 22:00, 150 minutes at the desk | Pass: nothing at night: no meal window is open then (it has no `[quiet]` since the owner's 27 Nov call; the windows alone keep it silent) |
 | `off-when-asked` | 11:00, `wellbeing_nudges(how = "off")` at a minute, 150 minutes | Pass: nothing (`[stop]`) |

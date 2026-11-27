@@ -7075,8 +7075,10 @@ câu khác) trước khi lời gọi tới lamp-skills, không gọi mô hình l
 - **Không thì, một loại gọi tên lời nhắc**: từ của loại (`KIND_WORDS`, một
   bảng duy nhất: water: "water", "drink", "drinking", "sip"; eyes: "eye",
   "eyes", "screen"; stand-up: "stand", "standing", "stand up"; break:
-  "break", "breaks"; sit-back: "sit back", "lean"; posture: "posture",
-  "slouch"; wind-down:
+  "break", "breaks"; stretch: "stretch", "stretches", "stretch break" (từ
+  27/11; từ của một loại đã đọc thì không đọc lại từ bên trong, nên "the
+  stretch break reminders" chỉ là stretch, không thêm Comfort break);
+  sit-back: "sit back", "lean"; posture: "posture", "slouch"; wind-down:
   "wind down", "bedtime", "evening"; meal: "meal", "eat", "food", "lunch",
   "dinner"; focus: "focus") đứng ngay trước "nudge", "reminder" hay "one"
   (số ít hay số nhiều, `NOUNS`), hoặc trước từ của một loại khác như vậy,
@@ -7149,7 +7151,8 @@ reading out a list"): một khoảng thời gian từ 1 giây tới 1 giờ, ch�
 goes with [stop] group"; ngoài 1s–1h, "[stop] apart is 1s to 1h"). Một thành
 viên của `[stop] group` không bao giờ bắt đầu trong khoảng `apart` lớn nhất
 mà một thành viên bất kỳ của nhóm ghi, tính từ lần bắt đầu của **một thành
-viên khác** (chính nó thì không bị cản). Bị giữ lại như khoảng `gap` của một
+viên khác** có `apart` (chính nó thì không bị cản; thành viên của nhóm
+không ghi `apart`, như Posture, không bị giữ và không giữ ai). Bị giữ lại như khoảng `gap` của một
 nhóm `[budget]` (`Stop::apart_us`, `Engine::apart_ran`): cơ hội của nó được
 giữ và được lấy khi khoảng đó đã qua, nếu trigger vẫn còn giữ. Chỉ lần chạy
 được tính mới đặt và bị cản bởi mốc này (từ của `follows` thì không). Không
@@ -7159,15 +7162,22 @@ khác cách một phút. Không có khóa thì là 0, như trước. Cả chín 
 wellbeing (sip-of-water, comfort-break, stand-up, stretch-break,
 rest-your-eyes, sit-back, wind-down, meal-check, quiet-focus) ghi `group =
 "wellbeing"` và `apart = "1m"`: không lời nào trong vòng một phút sau câu
-của lời khác; lời đến sau chờ phút đó rồi nói.
+của lời khác; lời đến sau chờ phút đó rồi nói. Posture (#8377) cũng ở
+`group = "wellbeing"` nhưng không ghi `apart`, nên không bị giữ.
 
 **Câu không ai nghe của một kỹ năng `[stop] group` không có `[budget]`**
 (`Engine::unsaid`, P2 của Reviewer-lead trên #8868): `cooldown` của trigger
 được trả lại như trước. Với trigger có `for` (lần ngồi của các lời nhắc
 wellbeing, cái nghiêng người của Sit back), cơ hội cũng được giữ: lời nhắc
 đến ở tin nhắn kế tiếp của trigger khi các `[[while]]` của nó đúng, không
-chỉ sau khi người đó rời đi rồi quay lại. Trigger không có `for` (các phản
-ứng với điều thấy được, trên một lần tăng) thì cơ hội đã dùng, như trước.
+chỉ sau khi người đó rời đi rồi quay lại; trigger giữ trên một giá trị
+(`when = "present"`) không có rearm (vùng của Posture) cũng vậy. Nhưng không
+sớm hơn 30 giây sau lần thử không ai nghe (`UNHEARD_RETRY_US`; chủ sở hữu,
+27/11, khoảng 17:15: "Retry no sooner than 30 s"), nên đèn bị tắt tiếng
+không quay sang khuôn mặt mỗi vài giây (kiểm thử
+`a_muted_lamps_unheard_nudge_retries_no_sooner_than_30_s`). Trigger trên một
+lần tăng hoặc có rearm (các phản ứng với điều thấy được) thì cơ hội đã dùng,
+như trước.
 Kiểm thử
 `with_the_switch_an_unsaid_nudge_gives_its_cooldown_back_and_comes_again_while_they_stay`
 (`crates/skills/tests/it/skills.rs`).
