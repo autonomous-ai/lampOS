@@ -5228,11 +5228,10 @@ cho mỗi lần cài xong, không bao giờ cho một lần cập nhật
   nằm trong phán quyết, c7213454550): tiếng nói detector trong 1 s qua
   (`UNDER_WAY_US`), và tiếng nói chưa được giải quyết bởi một bản chép hay
   lúc lượt của nó kết thúc (`Moment::last_resolved_us`) trong 5 s như cũ.
-- **Không bao giờ nói sai chỗ**, như `long_make::may_tell` (c7210755978):
-  không bao giờ trong giờ yên tĩnh, khi phòng đang bận (`room_told`), hay khi
-  có khuôn mặt trong khung hình mà không phải chỉ một mình chủ đèn
-  (`services::owner_sees_alone_now`), dù ngay lập tức hay sau một câu trả
-  lời. Khi không có mặt nào, có ai được nghe thấy là đủ gần (phán quyết:
+- **Không bao giờ nói sai chỗ** (c7210755978): không bao giờ trong giờ yên
+  tĩnh hay khi phòng đang bận (`room_told`), dù ngay lập tức hay sau một câu
+  trả lời. Khuôn mặt không phải của chủ đèn không giữ câu lại: nhận diện
+  khuôn mặt chưa được đo trên người thật (first builder, c7214429444). Khi không có mặt nào, có ai được nghe thấy là đủ gần (phán quyết:
   "khuôn mặt là một cách để biết có người gần, không bao giờ là điều bắt
   buộc").
   Không bao giờ khi keeper tạm dừng đèn, khi đã đăng xuất, trong lúc giữ chăm

@@ -27,10 +27,11 @@
 //!   c7213149798, within the ruling, c7213454550): any detector speech in
 //!   the last [`UNDER_WAY_US`], and speech not resolved yet by a transcript
 //!   or its turn's end ([`Moment::last_resolved_us`]) for the old 5 s.
-//! - **Never to the wrong room**, as `long_make::may_tell` (the
-//!   Reviewer-lead's must-fix, c7210755978): never in the quiet hours, in a
-//!   busy room, or with a face in view that is not the owner alone; with no
-//!   face, someone heard is near enough (the ruling's "a face is one way to
+//! - **Never to the wrong room** (the Reviewer-lead's must-fix,
+//!   c7210755978): never in the quiet hours or in a busy room. A face that
+//!   is not the owner's does not hold it: face ids are not measured on the
+//!   body (the first builder, c7214429444). With no face, someone heard is
+//!   near enough (the ruling's "a face is one way to
 //!   be near, never a need"). Never while private, in the care hold or asleep: the
 //!   coordinator's conversation does not run while the privacy switch is
 //!   closed or the lamp sleeps, and it passes `free` false in the keeper's
@@ -155,9 +156,6 @@ pub struct Moment {
     pub night: bool,
     /// The room is busy (`room_told`): people talking among themselves.
     pub busy: bool,
-    /// A face in view that is not the owner alone
-    /// (`services::owner_sees_alone_now`): a guest, or more than one.
-    pub others_seen: bool,
     /// When the lamp's own words last finished playing.
     pub lamp_words_ended_us: Option<u64>,
     /// When the lamp's last answer to someone (a turn it did not begin
@@ -521,7 +519,7 @@ impl Waits {
                 waiting.mode = Some(Mode::AfterAnswer);
             }
         }
-        if !moment.free || moment.night || moment.busy || moment.others_seen {
+        if !moment.free || moment.night || moment.busy {
             return None;
         }
         let at = self.waiting.iter().position(|waiting| {
@@ -1157,11 +1155,10 @@ mod tests {
     }
 
     #[test]
-    fn never_in_the_quiet_hours_a_busy_room_or_with_a_guest_in_view() {
-        // The Reviewer-lead's must-fix 2 (c7210755978), as
-        // `long_make::may_tell`: the quiet hours and a busy room hold it, and
-        // a face in view that is not the owner alone; with no face, someone
-        // heard is near enough (the first builder's ruling, c7209938102).
+    fn never_in_the_quiet_hours_or_a_busy_room() {
+        // The Reviewer-lead's must-fix 2 (c7210755978): the quiet hours and
+        // a busy room hold it. A face that is not the owner's does not: face
+        // ids are not measured on the body (the first builder, c7214429444).
         for held in [
             Moment {
                 night: true,
@@ -1169,10 +1166,6 @@ mod tests {
             },
             Moment {
                 busy: true,
-                ..Moment::default()
-            },
-            Moment {
-                others_seen: true,
                 ..Moment::default()
             },
         ] {
@@ -1198,7 +1191,6 @@ mod tests {
             let free = Moment {
                 night: false,
                 busy: false,
-                others_seen: false,
                 ..after
             };
             assert!(waits.next(&free).is_some(), "{free:?}");

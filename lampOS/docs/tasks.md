@@ -813,10 +813,10 @@ alone, checked, and keeps it across a sleep or a mute.
   c7213454550): detector speech in the last 1 s (`UNDER_WAY_US`), and
   speech not yet resolved by a transcript or its turn's end
   (`Moment::last_resolved_us`) for the old 5 s.
-- **Never to the wrong room**, as `long_make::may_tell` (c7210755978):
-  never in the quiet hours, in a busy room (`room_told`), or with a face in
-  view that is not the owner alone (`services::owner_sees_alone_now`), at
-  once or after an answer. With no face, someone heard is near enough (the
+- **Never to the wrong room** (c7210755978): never in the quiet hours or in
+  a busy room (`room_told`), at once or after an answer. A face that is not
+  the owner's does not hold it: face ids are not measured on the body (the
+  first builder, c7214429444). With no face, someone heard is near enough (the
   ruling's "a face is one way to be near, never a need"). Never
   while the keeper pauses the lamp, signed out, in the care hold, while a
   reminder waits or anything is owed, under way or being said; the

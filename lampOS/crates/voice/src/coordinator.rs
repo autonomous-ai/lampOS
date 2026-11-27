@@ -15066,10 +15066,6 @@ fn conversation_with_gate_inner(
                 last_resolved_us,
                 night: crate::run_write_yes::quiet_hours_now(),
                 busy: room.busy(),
-                others_seen: presence
-                    .as_ref()
-                    .is_some_and(|presence| presence.present(clock))
-                    && !crate::services::owner_sees_alone_now(),
                 lamp_words_ended_us,
                 answered_at_us,
                 free: !reminder_waiting
