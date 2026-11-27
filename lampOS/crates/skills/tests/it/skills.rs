@@ -3923,7 +3923,10 @@ fn posture_reads_the_posture_alone_and_names_a_region_never_a_condition() {
             trigger["equals"].as_str().unwrap()
         })
         .collect();
-    assert_eq!(regions, ["neck", "trunk", "upper_arm", "lower_arm", "none"]);
+    assert_eq!(
+        regions,
+        ["neck", "trunk", "upper_arm", "lower_arm", "general"]
+    );
     let whiles = toml["while"].as_array().unwrap();
     let on_posture = |field: &str| {
         whiles
@@ -17750,4 +17753,49 @@ fn music_sway_follows_the_energy_level_and_level_one_is_as_written() {
         why.contains("twenty-minutes-of-one-playlist") && why.contains("made 1 calls, 4 expected"),
         "{why}"
     );
+}
+
+/// The Reviewer-lead's HOLD on #8377 (06c1, 27 Nov 15:49: a posture line
+/// let go unsaid, `no_audio_answer`): Posture's line never heard gives its
+/// cooldown back and keeps its chance, so it comes at the next
+/// `humans/posture` (every 30 s) while the window stays bad, not only once
+/// it has come good. Heard, the next waits its 15 minutes.
+#[test]
+fn an_unsaid_posture_line_comes_again_at_the_next_reading_while_still_bad() {
+    for unheard in [true, false] {
+        let skill = lamp_skills::load(&skills_root().join("posture")).unwrap();
+        let mut engine = Engine::new(vec![skill], true);
+        // 10:00 local at 0 s.
+        engine.clock(0, 0, 36_000_000);
+        let mut runs: Vec<u64> = Vec::new();
+        for second in 0..=20 * 60u64 {
+            let now = second * 1_000_000;
+            engine.observe("voice/state", now, br#"{"state":"resting"}"#, None);
+            if second == 0 || second % 30 != 0 {
+                continue;
+            }
+            for run in engine.observe(
+                "humans/posture",
+                now,
+                br#"{"window_s":60,"bad_share":1.0,"region":"neck"}"#,
+                None,
+            ) {
+                if run
+                    .calls
+                    .iter()
+                    .any(|call| matches!(call, Call::Say(_) | Call::Words(_)))
+                {
+                    runs.push(second);
+                    if unheard && runs.len() == 1 {
+                        assert_eq!(engine.unsaid(&run.skill, now), None);
+                    }
+                }
+            }
+        }
+        if unheard {
+            assert_eq!(runs, [30, 60, 960], "let go at 30 s, said at 60 s");
+        } else {
+            assert_eq!(runs, [30, 930], "heard, it waits its 15 minutes");
+        }
+    }
 }

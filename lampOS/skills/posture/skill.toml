@@ -44,8 +44,9 @@ body = true
 
 # One trigger for each region `humans/posture` names (lamp_msgs
 # PostureRegion: V1's regions, wrist left out since the server fixes it at
-# 1), and `none` for a bad window with no region standing out (V1's "empty /
-# mixed" row). No `rearm`: a window still bad is told again once the
+# 1), and `general` for a window bad by the overall RULA risk with no one
+# region standing out (V1's "empty / mixed" row; `none` until the owner's
+# call of 27 Nov, read as nothing wrong). No `rearm`: a window still bad is told again once the
 # cooldown is past: 15 minutes (the owner, 27 Nov: "only 15m cooldown, not
 # 60m"), each region on its own: a slump that moves from the neck to the
 # back is told again at once (the owner, 27 Nov: "neck slump and back slump
@@ -79,10 +80,10 @@ equals = "lower_arm"
 cooldown = "15m"
 
 [[trigger]]
-name = "mixed"
+name = "general"
 topic = "humans/posture"
 field = "region"
-equals = "none"
+equals = "general"
 cooldown = "15m"
 
 [[while]]                 # V1's POSE_BAD_RATIO: at least 0.6 of the window's samples bad
@@ -154,6 +155,6 @@ body = { look_at = "face" }
 say = "They have sat a while with their forearms at an awkward angle. In one short, kind line, the way a friend would, suggest adjusting the keyboard so the elbows rest comfortably. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
 
 [[do]]
-on = "mixed"
+on = "general"
 body = { look_at = "face" }
 say = "They have sat a while in one tense position. In one short, kind line, the way a friend would, suggest standing up for a short stretch. Say only 'a while', never a number; name no condition or illness, and never mention a camera."

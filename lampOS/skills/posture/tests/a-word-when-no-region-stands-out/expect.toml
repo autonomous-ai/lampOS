@@ -1,4 +1,4 @@
-# 11:00, both checks bad and region none (bad by the RULA risk alone, no region high)
+# 11:00, both checks bad and region general (bad by the RULA risk alone, no region high)
 # to 10 minutes: V1's empty or mixed row, a word to stand up for a short stretch at 30 s.
 clock = "11:00"
 
