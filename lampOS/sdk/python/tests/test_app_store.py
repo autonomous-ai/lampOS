@@ -126,7 +126,7 @@ class FakeStore:
                         "version": manifest["version"],
                         "review_status": "pending",
                         "review_note": None,
-                        "visibility": "hidden",
+                        "visibility": "unlisted",
                         "public_requested": False,
                         "fields": sorted(parts),
                     }
@@ -309,7 +309,7 @@ def test_submit_uploads_and_status_follows_the_review(fake, tmp_path, capsys):
     code = main(["app", "submit", str(folder), "--icon", str(icon), "--cover", str(cover), "--title", "Gym coach", "--category", "health", *fake.args()])
     assert code == 0, capsys.readouterr()
     out = capsys.readouterr().out
-    assert "1\tgym-coach 1.0.0\tpending\thidden" in out
+    assert "1\tgym-coach 1.0.0\tpending\tunlisted" in out
     assert fake.apps["1"]["fields"] == ["category", "cover", "file", "icon", "title"]
     assert main(["app", "status", *fake.args()]) == 0
     assert "gym-coach 1.0.0\tpending" in capsys.readouterr().out
