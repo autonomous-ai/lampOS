@@ -10868,7 +10868,7 @@ impl Heeding {
         });
         if attention.judged_own() {
             Verdict::Play("the lamp began this turn itself")
-        } else if attention.tapped() {
+        } else if attention.head_was_tapped() {
             Verdict::Play(SIMPLE_CALLED)
         } else if !heard.chars().any(char::is_alphanumeric) {
             Verdict::Hold(crate::second_provider::SIMPLE_NO_WORDS)

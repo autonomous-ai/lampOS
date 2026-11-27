@@ -2648,6 +2648,12 @@ impl Attention {
         self.tapped || self.opened
     }
 
+    /// Whether the lamp's head was tapped for the request in hand, and only
+    /// that: a turn a computer opened is not counted (`LAMP_SIMPLE_CALL`).
+    pub fn head_was_tapped(&self) -> bool {
+        self.tapped
+    }
+
     /// Whether the words heard of the request in hand call the lamp by name
     /// ("Lamp.", "Hey Lamp, …"), not someone else.
     pub fn called_in_its_words(&self) -> bool {

@@ -366,7 +366,8 @@ fn simple_call_a_computers_turn_is_no_call_and_a_tap_is() {
     );
     let mut heeding = self::heeding(true, None);
     let now = monotonic_us();
-    heeding.attention.head_tapped(now + 100_000);
+    // A tap counts for a line it came just before (`TAPPED_BEFORE_US`).
+    heeding.attention.head_tapped(now.saturating_sub(100_000));
     assert_eq!(
         judged(
             &mut heeding,
