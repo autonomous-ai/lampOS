@@ -2,10 +2,10 @@
 //! (a)): on a lamp that installed Quiet focus its word stands in for its
 //! whole `[budget]` group (`stands_in_for_group`). Since the owner's 27 Nov
 //! "there should be no shared budget" the wellbeing nudges are in no budget
-//! group, so the word holds none of them back; the mechanism is held here
-//! with a Rest your eyes copy put in Quiet focus's `[budget]` group
-//! ([`grouped`]). Replayed from Quiet focus's own case, through the real
-//! loader and engine.
+//! group, and Quiet focus no longer stands in (it is in no budget either);
+//! the mechanism is held here with Quiet focus and Rest your eyes copies put
+//! back in the `[budget]` group "wellbeing" ([`focus`], [`grouped`]).
+//! Replayed from Quiet focus's own case, through the real loader and engine.
 use lamp_skills::{
     Call, Engine, Pushed, Recorded, Skill, load_each_with, load_with, read_recordings,
 };
@@ -109,10 +109,36 @@ fn grouped(root: &Path) -> PathBuf {
         root,
         "rest-your-eyes",
         &[(
-            "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\n",
-            "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"\n",
+            "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\napart = \"1m\"",
+            "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"",
         )],
     )
+}
+
+/// Quiet focus's `skill.toml` as it was before the owner's 27 Nov call: in
+/// the `[budget]` group "wellbeing", its word standing in for the group.
+fn focus_toml() -> String {
+    let toml =
+        std::fs::read_to_string(skills_root().join("quiet-focus").join("skill.toml")).unwrap();
+    let edits = [
+        (
+            "follows = { trigger = \"focused\", within = \"10m\" }\n",
+            "follows = { trigger = \"focused\", within = \"10m\" }\nstands_in_for_group = true\n",
+        ),
+        (
+            "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\napart = \"1m\"\n",
+            "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"\n",
+        ),
+    ];
+    edits.iter().fold(toml, |toml, (was, now)| {
+        assert!(toml.contains(was), "quiet-focus: {was:?}");
+        toml.replace(was, now)
+    })
+}
+
+/// [`focus_toml`], written to `root`.
+fn focus(root: &Path) -> PathBuf {
+    copy_text(root, "quiet-focus", &focus_toml(), &[])
 }
 
 /// Head down from 3 minutes, the focus due at 48, a look up at 50: with
@@ -124,10 +150,7 @@ fn grouped(root: &Path) -> PathBuf {
 fn quiet_focus_word_stands_in_for_a_member_of_its_group() {
     let dir = tempfile::tempdir().unwrap();
     let said = says_of(
-        vec![
-            loaded(&skills_root().join("quiet-focus")),
-            loaded(&grouped(dir.path())),
-        ],
+        vec![loaded(&focus(dir.path())), loaded(&grouped(dir.path()))],
         &case(),
     );
     assert_eq!(
@@ -163,10 +186,34 @@ fn wellbeing_present() -> Vec<Skill> {
         .collect()
 }
 
+/// [`case`] with the look up at 50 lasting till they go at 60 (the eyes'
+/// `head_down` from 52 read `at_desk`): long enough for three lines a
+/// minute apart.
+fn a_long_look_up() -> Vec<Recorded> {
+    let first_us = case().first().map_or(0, |message| message.header.at_us);
+    case()
+        .into_iter()
+        .map(|mut message| {
+            if message.header.topic == "room/activity"
+                && message.header.at_us - first_us >= 50 * 60_000_000
+            {
+                let mut value: Value = serde_json::from_slice(&message.payload).unwrap();
+                if value["state"] == "head_down" {
+                    value["state"] = "at_desk".into();
+                }
+                message.payload = serde_json::to_vec(&value).unwrap();
+            }
+            message
+        })
+        .collect()
+}
+
 /// The replay on lamp-9adf (7 Nov) with the product's `[present]`: Sip of
 /// water and Rest your eyes came due at the same look up. In no budget (the
 /// owner, 27 Nov) nothing is refused and nothing held for the word: Quiet
-/// focus's word and the nudges all speak when they look up.
+/// focus's word and the nudges all speak once they look up, each a minute
+/// after the one before (`[stop] apart`, the owner's 27 Nov call: never a
+/// list read out), the look up lasting till they go ([`a_long_look_up`]).
 #[test]
 fn with_every_wellbeing_nudge_present_the_word_and_the_nudges_speak_at_the_look_up() {
     let skills = wellbeing_present();
@@ -174,14 +221,23 @@ fn with_every_wellbeing_nudge_present_the_word_and_the_nudges_speak_at_the_look_
     for name in ["quiet-focus", "rest-your-eyes", "sip-of-water"] {
         assert!(names.contains(&name), "{names:?}");
     }
-    let said = says_of(skills, &case());
+    let said = says_of(skills, &a_long_look_up());
     let at_look_up: Vec<_> = said
         .iter()
-        .filter(|(_, at_s)| (50 * 60..51 * 60).contains(at_s))
-        .map(|(skill, _)| skill.as_str())
+        .filter(|(_, at_s)| (50 * 60..55 * 60).contains(at_s))
         .collect();
     for name in ["quiet-focus", "rest-your-eyes", "sip-of-water"] {
-        assert!(at_look_up.contains(&name), "{name}: {said:?}");
+        assert!(
+            at_look_up.iter().any(|(skill, _)| skill == name),
+            "{name}: {said:?}"
+        );
+    }
+    // Never two different nudges within a minute.
+    for pair in said.windows(2) {
+        assert!(
+            pair[0].0 == pair[1].0 || pair[1].1 - pair[0].1 >= 60,
+            "{said:?}"
+        );
     }
     // Head down from 3 to 50: no nudge before they look up.
     assert!(said.iter().all(|(_, at_s)| *at_s >= 50 * 60), "{said:?}");
@@ -196,15 +252,15 @@ fn with_every_wellbeing_nudge_present_the_word_and_the_nudges_speak_at_the_look_
 #[test]
 fn a_word_that_never_comes_holds_the_group_once_at_most() {
     let dir = tempfile::tempdir().unwrap();
-    let toml =
-        std::fs::read_to_string(skills_root().join("quiet-focus").join("skill.toml")).unwrap();
+    let toml = focus_toml();
     let start = toml.find("[[trigger]]\nname = \"focused\"").unwrap();
     let end = start + toml[start..].find("\n\n").unwrap();
     let again = "[[trigger]]\nname = \"focused\"\ntopic = \"humans/faces/tracked\"\n\
                  when = \"present\"\nfor = \"1m\"\ngap = \"2m\"\ncooldown = \"5m\"";
-    let never = copy(
+    let never = copy_text(
         dir.path(),
         "quiet-focus",
+        &toml,
         &[
             (&toml[start..end], again),
             ("equals = \"at_desk\"", "equals = \"never\""),
@@ -266,15 +322,12 @@ fn no_wait_line_while_the_held_skills_while_does_not_hold() {
         dir.path(),
         "rest-your-eyes",
         &[(
-            "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\n",
+            "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\napart = \"1m\"",
             "[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"never\"\n\n\
              [budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"\n",
         )],
     );
-    let runs = runs_of(
-        vec![loaded(&skills_root().join("quiet-focus")), loaded(&never)],
-        &case(),
-    );
+    let runs = runs_of(vec![loaded(&focus(dir.path())), loaded(&never)], &case());
     let waits: Vec<_> = runs
         .iter()
         .flat_map(|(run, at_s)| run.events.iter().map(move |event| (event, at_s)))
@@ -296,7 +349,7 @@ fn no_wait_line_while_the_held_skills_while_does_not_hold() {
 fn stands_in_for_group_goes_with_follows_and_a_budget_group() {
     let dir = tempfile::tempdir().unwrap();
     let from = skills_root().join("quiet-focus");
-    let toml = std::fs::read_to_string(from.join("skill.toml")).unwrap();
+    let toml = focus_toml();
     let with = |text: &str| {
         let folder = dir.path().join("quiet-focus");
         std::fs::create_dir_all(&folder).unwrap();
@@ -306,8 +359,7 @@ fn stands_in_for_group_goes_with_follows_and_a_budget_group() {
     };
     assert!(with(&toml).is_ok());
     assert!(!toml.contains("stands_in_for ="), "the old key");
-    let no_group = toml[..toml.find("[present.budget]").unwrap()]
-        .replace("[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n", "");
+    let no_group = toml.replace("[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n", "");
     assert!(
         with(&no_group)
             .unwrap_err()
@@ -330,11 +382,17 @@ fn stands_in_for_group_goes_with_follows_and_a_budget_group() {
 /// A copy of the skill `name` in `root`, its `skill.toml` with each
 /// `(from, to)` replaced (each must be there).
 fn copy(root: &Path, name: &str, edits: &[(&str, &str)]) -> PathBuf {
+    let toml = std::fs::read_to_string(skills_root().join(name).join("skill.toml")).unwrap();
+    copy_text(root, name, &toml, edits)
+}
+
+/// [`copy`], from `toml` in place of the skill's own `skill.toml`.
+fn copy_text(root: &Path, name: &str, toml: &str, edits: &[(&str, &str)]) -> PathBuf {
     let from = skills_root().join(name);
     let folder = root.join(name);
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::copy(from.join("SKILL.md"), folder.join("SKILL.md")).unwrap();
-    let mut toml = std::fs::read_to_string(from.join("skill.toml")).unwrap();
+    let mut toml = toml.to_owned();
     for (was, now) in edits {
         assert!(toml.contains(was), "{name}: {was:?}");
         toml = toml.replace(was, now);
@@ -346,9 +404,10 @@ fn copy(root: &Path, name: &str, edits: &[(&str, &str)]) -> PathBuf {
 /// The reviewer's decoy (P1 on #5704): Quiet focus in the `[budget]` group
 /// `group`.
 fn decoy(root: &Path, group: &str) -> PathBuf {
-    copy(
+    copy_text(
         root,
         "quiet-focus",
+        &focus_toml(),
         &[("group = \"wellbeing\"", &format!("group = \"{group}\""))],
     )
 }
@@ -379,15 +438,12 @@ fn a_word_holds_no_warning_of_its_group() {
         &[
             ("policy = \"nudge\"", "policy = \"warning\""),
             (
-                "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\n",
-                "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"\n",
+                "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\napart = \"1m\"",
+                "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"",
             ),
         ],
     );
-    let said = says_of(
-        vec![loaded(&skills_root().join("quiet-focus")), loaded(&warning)],
-        &case(),
-    );
+    let said = says_of(vec![loaded(&focus(dir.path())), loaded(&warning)], &case());
     assert!(rest_spoke(&said), "{said:?}");
 }
 

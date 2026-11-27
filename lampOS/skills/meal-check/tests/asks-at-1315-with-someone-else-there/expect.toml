@@ -1,0 +1,16 @@
+# 11:00, away an hour, then at the desk from 12:00 (minute 60), a second face in view from
+# minute 130 to 158: due at 13:15 (minute 135) and asked then, with them there (the owner,
+# 27 Nov). Before, it was held and lunchtime's end let it go.
+clock = "11:00"
+
+[[expect]]
+at = "135m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "135m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk through most of lunchtime. Ask them once, warmly and in a few words, the way a friend would, whether they've had lunch yet. One open question: suggest no food, no menu and no place, and say nothing about health." }

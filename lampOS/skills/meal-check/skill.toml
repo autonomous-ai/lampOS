@@ -3,8 +3,8 @@
 # reminder, which the owner asked to bring back (#3504, the lead's list,
 # 27 Oct), shaped like the wellbeing nudges (#1685) and A comfort break. One
 # open, caring question, never a menu or a food; it reads only the faces and
-# the voice's state, never a picture, and it waits while anyone else is in
-# view. Written to lamp-skills' schema (docs/skills.md, "The schema, as
+# the voice's state, never a picture; others in view or not (the owner, 27
+# Nov). Written to lamp-skills' schema (docs/skills.md, "The schema, as
 # lamp-skills reads it").
 needs = ["eyes", "body", "voice"]
 # Installable: its owner chooses it (`lamp-skills install`), and it is not in
@@ -14,9 +14,11 @@ kind = "installable"
 # Store's package lets an installed lamp see it; 1.0.0 had none.
 # 1.1.0: the `[[while]]` on humans/doing below (#6543), a new topic read and
 # the `seen` use, so the Store's package reaches a lamp with 1.0.1.
-version = "1.1.0"
-# Once at lunch and once at dinner, counted from the local midnight.
-most_a_day = 2
+# 1.2.0: no daily most, others-in-view rule, quiet hours, `[rest]` or shared
+# `[budget]` (the owner, 27 Nov), so the Store's package reaches a lamp with 1.1.0.
+version = "1.2.0"
+# Once at lunch and once at dinner by its windows and cooldown; no daily most
+# (the owner, 27 Nov: "drop all the max-per-day").
 
 # What it may read and use, and nothing more: the faces, the voice's state,
 # the eyes' head-down reading, and a turn toward the face. One short
@@ -37,7 +39,7 @@ for = "75m"               # through most of the two hours, not out to eat
 gap = "2m"                # looking away or leaning out of view does not end it
 rearm = "leaves"
 cooldown = "120m"         # once a window, even if they leave and come back in it
-wait = "30m"              # someone else in view, or a talk: once they go, while lunchtime lasts
+wait = "30m"              # a talk: once it ends, while lunchtime lasts
 during = { from = "11:30", to = "13:30" }
 
 # Dinnertime, 18:30 to 20:30, the same way.
@@ -53,16 +55,11 @@ cooldown = "120m"
 wait = "30m"
 during = { from = "18:30", to = "20:30" }
 
-[[while]]                 # nobody else in view: never asked in front of others, held
-topic = "humans/faces/tracked"  # until they have been gone a minute (the trigger's wait keeps it)
-faces_at_most = 1
-for = "1m"
-
-[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+[[while]]                 # the lamp itself has not spoken for 10 s, as Posture waits (the owner, 27 Nov): not on top of its own last words
 topic = "voice/state"
 field = "state"
 not_equals = "speaking"
-for = "30s"
+for = "10s"
 
 [[while]]                 # never in the middle of a conversation
 topic = "voice/state"
@@ -81,23 +78,16 @@ field = "ate_s_ago"       # from the desk arrival when it saw nothing, so it hol
 above = 4499              # does. Without lamp-seen, or with it gone quiet, the topic is never said
 unknown = "holds_stale"   # or has run out, and it runs as before.
 
-[quiet]                   # never at night
-from = "22:00"
-to = "08:00"
+# No quiet hours (its windows are its own), no `[rest]` after nudges nobody
+# noticed and no budget shared with the other nudges (the owner, 27 Nov).
 
-# One nudge an hour between the wellbeing skills.
-[budget]
-group = "wellbeing"
-per_hour = 1
-
-# Two questions nobody noticed in a row, and it rests until tomorrow morning.
-[rest]
-after_ignored = 2
-
-# The wellbeing skills' one function (#1685): it stops the one that came
-# last, or with all, every one.
+# The wellbeing skills' one function (#1685), shared by `[stop] group`: it
+# stops the one that came last, or with all, every one; never a minute
+# after another wellbeing nudge's line (`apart`, the owner, 27 Nov).
 [stop]
 tool = "wellbeing_nudges"
+group = "wellbeing"
+apart = "1m"
 kind = "meal"
 about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word for a short break, a mealtime question, a word to sit back, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
 # In short, with LAMP_USE_SKILL_SUMMARY on (#6218); the same in every
@@ -116,12 +106,3 @@ say = "They have been at the desk through most of lunchtime. Ask them once, warm
 on = "dinner"
 body = { look_at = "face" }
 say = "They have been at the desk through most of dinnertime. Ask them once, warmly and in a few words, the way a friend would, whether they've had dinner yet. One open question: suggest no food, no menu and no place, and say nothing about health."
-
-# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
-# group's two an hour, never within 30 minutes of each other, which
-# Sip of water and Comfort break name too (a group keeps its quietest).
-[present.budget]
-group = "wellbeing"
-per_hour = 2
-gap = "30m"
-give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
