@@ -1843,7 +1843,8 @@ reminder's line. Tests: `an_offer_without_timer_is_a_reminders_and_sent_as_befor
 named for a due timer (the third pins that a run of plain 429s rings none:
 only the relay's `usage_limit` 429 does).
 
-With no link (`LAMP_OFFLINE_RINGS`, #8632, off unless exactly `on`), a due
+With no link (`LAMP_OFFLINE_RINGS`, #8632, off unless exactly `on`; on in
+the product's lamp-voice since #8708's switch-on), a due
 timer or reminder rings on time. Before, a ring was only ever a model turn,
 and its gate needs a ready cloud session (`unasked_session`), so with the
 link down nothing passed it: on lamp-06c1 on 25 Nov a 4-minute timer set
