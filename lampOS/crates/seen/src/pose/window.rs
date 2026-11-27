@@ -1,6 +1,8 @@
-//! Posture's rolling window (#6543 phase 3): the samples of the last
-//! [`WINDOW_US`], each reduced at once to whether it was bad and which
-//! regions scored high, by V1's rules (`pose.py` `_aggregate`, `hal/config.py`
+//! Posture's rolling window (#6543 phase 3): the last [`MIN_SAMPLES`]
+//! samples, a minute of posture checks (the owner's call on #8377, 27 Nov:
+//! "we should tell user when they slump for like 1m (two posture check
+//! right?)"), each reduced at once to whether it was bad and which regions
+//! scored high, by V1's rules (`pose.py` `_aggregate`, `hal/config.py`
 //! `POSE_*`):
 //!
 //! - a sample is **bad** when its RULA `risk_level` is 2 or more, or any
@@ -14,9 +16,14 @@
 //!   shoulder line, so neither `risk_level` nor any other region makes it
 //!   bad, and its only region is neck. An answer with no `partial` field
 //!   (an older server) is full, judged as before;
+//! - each sample stands for the 30 s of its check ([`super::EVERY_US`]), so
+//!   two samples are a full window: `window_s` is the oldest sample's age
+//!   and those 30 s, at most [`WINDOW_US`]; a sample older than
+//!   [`KEPT_US`] (a check or two missed, the server busy or no body found)
+//!   no longer counts;
 //! - under [`MIN_SAMPLES`] samples the window says nothing at all: no
-//!   value, so a `bad_share` of 0 is said only over at least three samples
-//!   (V1 said a share of 0 there; `humans/posture` holds back instead).
+//!   value, so a `bad_share` of 0 is said only over two samples (V1 said a
+//!   share of 0 there; `humans/posture` holds back instead).
 //!
 //! Nothing of the frame or the answer is kept: a sample is its time, one
 //! flag and four bits, and the window lives in memory only for one sitting
@@ -27,10 +34,16 @@ use crate::wire::Ergo;
 use lamp_msgs::{HumanPosture, PostureRegion};
 use std::collections::VecDeque;
 
-/// V1's window, `POSE_WINDOW_DURATION_S`: the last ten minutes.
-pub const WINDOW_US: u64 = 600_000_000;
-/// V1's `POSE_WINDOW_MIN_SAMPLES`.
-pub const MIN_SAMPLES: usize = 3;
+/// The window: a minute (the owner, #8377; V1's production
+/// `POSE_WINDOW_DURATION_S` was an hour, V2 had ten minutes).
+pub const WINDOW_US: u64 = 60_000_000;
+/// Two checks, the window's samples: the newest two are kept, and fewer
+/// say nothing (V1's `POSE_WINDOW_MIN_SAMPLES` was 3).
+pub const MIN_SAMPLES: usize = 2;
+/// The oldest a sample still counts: two of the slowest spacing between
+/// checks (a hot board's one a minute, [`crate::heat`]), so one missed
+/// check still pairs with the one before.
+pub const KEPT_US: u64 = 120_000_000;
 /// V1's `POSE_REGION_HIGH_SUBSCORE`.
 pub const HIGH_SUBSCORE: i64 = 4;
 /// V1's bad `risk_level` (RULA score 3 or more).
@@ -141,10 +154,11 @@ impl Window {
     }
 
     fn prune(&mut self, now_us: u64) {
-        while self
-            .samples
-            .front()
-            .is_some_and(|sample| now_us.saturating_sub(sample.at_us) > WINDOW_US)
+        while self.samples.len() > MIN_SAMPLES
+            || self
+                .samples
+                .front()
+                .is_some_and(|sample| now_us.saturating_sub(sample.at_us) > KEPT_US)
         {
             self.samples.pop_front();
         }
@@ -161,13 +175,19 @@ impl Window {
     /// The window at `now_us`, as `humans/posture` says it; none before the
     /// sitting begins or while it holds fewer than [`MIN_SAMPLES`] samples.
     pub fn summary(&mut self, now_us: u64) -> Option<HumanPosture> {
-        let started = self.started_us?;
+        self.started_us?;
         self.prune(now_us);
-        let window_s = (now_us.saturating_sub(started).min(WINDOW_US) / 1_000_000) as u32;
-        let window_s = window_s.min(HumanPosture::LONGEST_WINDOW_S);
         if self.samples.len() < MIN_SAMPLES {
             return None;
         }
+        // Each sample stands for its check's 30 s: two 30 s apart are a
+        // minute, the window full.
+        let oldest = self.samples.front()?.at_us;
+        let covered = now_us
+            .saturating_sub(oldest)
+            .saturating_add(super::EVERY_US);
+        let window_s = (covered.min(WINDOW_US) / 1_000_000) as u32;
+        let window_s = window_s.min(HumanPosture::LONGEST_WINDOW_S);
         let bad: Vec<&Sample> = self.samples.iter().filter(|sample| sample.bad).collect();
         let bad_share = (bad.len() as f32 / self.samples.len() as f32).clamp(0.0, 1.0);
         let mut counts = [0usize; REGIONS.len()];
@@ -225,6 +245,21 @@ mod tests {
 
     fn neck() -> Ergo {
         ergo(1, json!({"body_scores": {"neck": 4}}), json!({}))
+    }
+
+    /// The owner's call (#8377, 27 Nov): a minute of bad posture is two
+    /// checks, so two bad samples 30 s apart are a full window, all bad.
+    #[test]
+    fn two_bad_samples_30_s_apart_are_a_full_window() {
+        let mut window = Window::default();
+        window.add(0, &neck());
+        assert_eq!(window.summary(0), None, "one check is not a minute");
+        window.add(30 * S, &neck());
+        let full = window.summary(30 * S).unwrap();
+        assert_eq!(full.window_s, 60, "full: the skill's window_s above 59");
+        assert_eq!(full.bad_share, 1.0);
+        assert_eq!(full.region, PostureRegion::Neck);
+        full.check().unwrap();
     }
 
     #[test]
@@ -297,61 +332,89 @@ mod tests {
         let slumped = partial(json!({"body_scores": {"neck": 4, "upper_arm": 4}}));
         let arms = partial(json!({"body_scores": {"upper_arm": 4, "trunk": 4}}));
         window.add(0, &arms);
-        window.add(S, &arms);
-        window.add(2 * S, &arms);
-        let none = window.summary(2 * S).unwrap();
+        window.add(30 * S, &arms);
+        let none = window.summary(30 * S).unwrap();
         assert_eq!(none.bad_share, 0.0);
         assert_eq!(none.region, PostureRegion::Nothing);
-        window.add(3 * S, &slumped);
-        let neck = window.summary(3 * S).unwrap();
-        assert!((neck.bad_share - 0.25).abs() < 1e-6);
+        window.add(60 * S, &slumped);
+        let neck = window.summary(60 * S).unwrap();
+        assert_eq!(neck.bad_share, 0.5);
         assert_eq!(neck.region, PostureRegion::Neck);
     }
 
     #[test]
-    fn nothing_is_said_before_the_sitting_nor_under_three_samples() {
+    fn nothing_is_said_before_the_sitting_nor_under_two_samples() {
         let mut window = Window::default();
         assert_eq!(window.summary(5 * S), None);
         window.begin(10 * S);
         assert_eq!(window.summary(10 * S), None, "no sample: nothing");
-        // Two bad samples are not yet a share: V1's three at least, and
-        // no fresh 0 said for them either.
+        // One bad sample is not yet a share, and no fresh 0 said for it.
         window.add(20 * S, &neck());
         assert_eq!(window.summary(20 * S), None);
-        window.add(50 * S, &neck());
-        assert_eq!(window.summary(55 * S), None);
-        window.add(80 * S, &good());
-        let three = window.summary(80 * S).unwrap();
-        assert_eq!(three.window_s, 70);
-        assert!((three.bad_share - 2.0 / 3.0).abs() < 1e-6);
-        assert_eq!(three.region, PostureRegion::Neck);
-        three.check().unwrap();
+        assert_eq!(window.summary(45 * S), None);
+        window.add(50 * S, &good());
+        let two = window.summary(50 * S).unwrap();
+        assert_eq!(two.window_s, 60);
+        assert_eq!(two.bad_share, 0.5);
+        assert_eq!(two.region, PostureRegion::Neck);
+        two.check().unwrap();
     }
 
     #[test]
-    fn the_share_and_region_over_the_last_ten_minutes() {
+    fn the_share_and_region_over_the_last_two_checks() {
         let mut window = Window::default();
         window.begin(0);
-        // 20 samples 30 s apart: the first 10 slumped (trunk), then sitting well.
+        // Checks 30 s apart: slumped (trunk) to 120 s, then sitting well.
         let trunk = ergo(1, json!({"body_scores": {"trunk": 5}}), json!({}));
         let well = good();
-        for index in 0..20u64 {
+        let mut said = Vec::new();
+        for index in 0..8u64 {
             let at = index * 30 * S;
-            window.add(at, if index < 10 { &trunk } else { &well });
+            window.add(at, if index < 5 { &trunk } else { &well });
+            said.push(
+                window
+                    .summary(at)
+                    .map(|p| (p.window_s, p.bad_share, p.region)),
+            );
+            assert!(window.len() <= MIN_SAMPLES, "two kept at most");
         }
-        let at = 19 * 30 * S;
-        let all = window.summary(at).unwrap();
-        assert_eq!(all.window_s, 570);
-        assert_eq!(window.len(), 20);
-        assert!((all.bad_share - 0.5).abs() < 1e-6);
-        assert_eq!(all.region, PostureRegion::Trunk);
-        // Five minutes on: the slumped half has aged out of the ten minutes.
-        let later = at + 301 * S;
-        let well = window.summary(later).unwrap();
-        assert_eq!(well.window_s, 600, "held at the window's length");
-        assert_eq!(window.len(), 10);
-        assert_eq!(well.bad_share, 0.0);
-        assert_eq!(well.region, PostureRegion::Nothing);
+        let trunk_bad = Some((60, 1.0, PostureRegion::Trunk));
+        assert_eq!(
+            said,
+            [
+                None,
+                trunk_bad,
+                trunk_bad,
+                trunk_bad,
+                trunk_bad,
+                Some((60, 0.5, PostureRegion::Trunk)),
+                Some((60, 0.0, PostureRegion::Nothing)),
+                Some((60, 0.0, PostureRegion::Nothing)),
+            ]
+        );
+        // Between checks the window stays full; a check missed still pairs
+        // with the one before, two missed do not.
+        let last = 7 * 30 * S;
+        assert_eq!(window.summary(last + 29 * S).unwrap().window_s, 60);
+        assert_eq!(window.summary(last + 60 * S).unwrap().window_s, 60);
+        assert_eq!(
+            window.summary(last + 91 * S),
+            None,
+            "the older past KEPT_US"
+        );
+    }
+
+    /// A hot board's one check a minute (`crate::heat`): two checks a
+    /// minute apart are a full window too.
+    #[test]
+    fn a_check_a_minute_apart_still_fills_the_window() {
+        let mut window = Window::default();
+        window.add(0, &neck());
+        window.add(60 * S, &neck());
+        let full = window.summary(60 * S).unwrap();
+        assert_eq!((full.window_s, full.bad_share), (60, 1.0));
+        window.add(120 * S, &good());
+        assert_eq!(window.summary(120 * S).unwrap().bad_share, 0.5);
     }
 
     #[test]
@@ -359,12 +422,17 @@ mod tests {
         let mut window = Window::default();
         let upper = ergo(1, json!({"body_scores": {"upper_arm": 4}}), json!({}));
         window.add(0, &upper);
-        window.add(S, &neck());
-        window.add(2 * S, &good());
-        assert_eq!(window.summary(2 * S).unwrap().region, PostureRegion::Neck);
-        window.add(3 * S, &upper);
+        window.add(30 * S, &neck());
+        assert_eq!(window.summary(30 * S).unwrap().region, PostureRegion::Neck);
+        window.add(60 * S, &upper);
         assert_eq!(
-            window.summary(3 * S).unwrap().region,
+            window.summary(60 * S).unwrap().region,
+            PostureRegion::Neck,
+            "neck and upper arm once each: neck first"
+        );
+        window.add(90 * S, &upper);
+        assert_eq!(
+            window.summary(90 * S).unwrap().region,
             PostureRegion::UpperArm
         );
     }

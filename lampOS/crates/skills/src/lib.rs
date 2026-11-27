@@ -453,8 +453,10 @@ pub struct Stop {
     /// `[stop.done]`: its own way, beside [`STOP_WAYS`].
     pub done: Option<StopDone>,
     /// `[stop] group` (#7401): the skills under the skills folder that name
-    /// it share the function as a `[budget]` group's do, in a skill with no
-    /// `[budget]` (the seen reactions, with no limit of their own).
+    /// it share the function as a `[budget]` group's do (the seen
+    /// reactions, with no limit of their own), and with the skills of the
+    /// `[budget]` group of that name (#8377: Posture keeps the wellbeing
+    /// nudges' stop without their hour, in a `[budget]` group of its own).
     pub group: Option<String>,
     /// The word a call of a shared stop may name this skill by, beside its
     /// name, as [`STOP_KIND`] (#6543): "drinks" for "stop telling me about
@@ -1275,10 +1277,6 @@ pub const SAY_TABLE_KEYS: [&str; 6] = [
 /// How the voice's `unsaid` outcome is written in a run's outcome
 /// ([`ended_unsaid`]).
 pub const UNSAID: &str = "say: unsaid";
-
-/// Before a `[stop] group`'s name where the loader keeps what a function is
-/// shared by: never in a `[budget]` group's name, so the two never meet.
-const STOP_GROUP_MARK: &str = "[stop] ";
 
 /// The `[stop] group` of `skill`, in no `[budget]` group (#7401).
 fn stop_group(skill: &Skill) -> Option<&str> {
@@ -5282,18 +5280,12 @@ fn manifest(
                     })
                 }
             };
-            if let Some(group) = &stop.group {
-                if budget.is_some() {
-                    return Err(
-                        "[stop] group is for a skill in no [budget] group: its group shares it already"
-                            .into(),
-                    );
-                }
-                if !plain_name(group) || group.contains('_') {
-                    return Err(format!(
-                        "[stop] group {group:?}: lowercase letters, digits and hyphens"
-                    ));
-                }
+            if let Some(group) = &stop.group
+                && (!plain_name(group) || group.contains('_'))
+            {
+                return Err(format!(
+                    "[stop] group {group:?}: lowercase letters, digits and hyphens"
+                ));
             }
             Some(Stop {
                 tool: stop.tool,
@@ -7104,13 +7096,11 @@ pub fn load_each_with(
                 continue;
             }
             let group = skill.budget.as_ref().map(|(group, _)| group.clone());
-            // Or a `[stop] group`'s (#7401), apart from the `[budget]`
-            // groups' names; a pushed skill's never, so it shares nothing.
+            // Or a `[stop] group`'s (#7401), shared with the `[budget]`
+            // group of that name too (#8377, Posture's with the wellbeing
+            // nudges'); a pushed skill's never, so it shares nothing.
             let stop_shared = match skill.stop.as_ref().and_then(|stop| stop.group.as_ref()) {
-                Some(named) => skill
-                    .pushed_by
-                    .is_none()
-                    .then(|| format!("{STOP_GROUP_MARK}{named}")),
+                Some(named) => skill.pushed_by.is_none().then(|| named.clone()),
                 None => group.clone(),
             };
             let functions: Vec<(String, Option<String>)> = skill
@@ -8810,10 +8800,10 @@ impl Engine {
             .find(|skill| skill.name == sharing[0])
             .and_then(|skill| {
                 skill
-                    .budget
+                    .stop
                     .as_ref()
-                    .map(|(group, _)| group.as_str())
-                    .or_else(|| stop_group(skill))
+                    .and_then(|stop| stop.group.as_deref())
+                    .or_else(|| skill.budget.as_ref().map(|(group, _)| group.as_str()))
             })
             .map(str::to_owned);
         let last = sharing

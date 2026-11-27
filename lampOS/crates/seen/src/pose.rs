@@ -32,7 +32,8 @@
 //!   row or any failure pause 60 s doubling to 10 min with jitter, and
 //!   `diagnostics` says `warn` until an answer.
 //! - **The window** ([`window`]): the share of bad samples and the region
-//!   most often bad over the last ten minutes, by V1's thresholds. It is
+//!   most often bad over the last two checks, a minute (the owner, #8377),
+//!   by V1's thresholds. It is
 //!   forgotten at once on `room/stood_up` and when the gate closes for the
 //!   privacy slide, sleep, the opt-in off or a forget
 //!   ([`crate::keep::Hard`]); a stranger, a second face or a misread
@@ -48,8 +49,8 @@
 //!   the opt-in off does not clear the journal ([`said_line`]).
 //! - **Said** on `humans/posture` ([`HumanPosture`]) every 30 s while the
 //!   gate is open and the window holds at least [`window::MIN_SAMPLES`]
-//!   samples: from the third sample of a sitting. The gate closed, nothing
-//!   is said, so no old sample is said under the privacy. Under three
+//!   samples: from the second sample of a sitting. The gate closed, nothing
+//!   is said, so no old sample is said under the privacy. Under two
 //!   samples (frames not going out, the server busy, no body found, a
 //!   wipe, or the sitting just begun), nothing is said either: the topic
 //!   runs out, and a skill holding on it runs as it did.
@@ -483,7 +484,7 @@ impl Pose {
         }
         if gate.is_ok() {
             if self.open_at_us.is_none() {
-                // A new sitting: due at once, said with its third sample.
+                // A new sitting: due at once, said with its second sample.
                 self.next_said_us = now_us;
             }
             self.window.begin(now_us);
@@ -495,11 +496,11 @@ impl Pose {
         if !sitting || now_us < self.next_said_us {
             return None;
         }
-        // Not said while the window holds fewer than three samples (frames
+        // Not said while the window holds fewer than two samples (frames
         // not going out, the server busy or failing, no body found, just
         // wiped or just begun): the topic runs out and a skill holding on it
         // runs as it did, as doing.rs's "a `bad_share` of 0 is said only
-        // over samples" reads. Still due, so the third sample is said as
+        // over samples" reads. Still due, so the second sample is said as
         // soon as it lands.
         let posture = self.window.summary(now_us)?;
         self.next_said_us = now_us.saturating_add(us(HumanPosture::EVERY));
@@ -520,7 +521,7 @@ impl Pose {
 
     /// One step at `now_us` while the gate is closed for a while `serve` keeps
     /// ([`crate::keep`]): the window kept, in memory only (its samples
-    /// still age out of its ten minutes when it is next read); the running
+    /// still age out past [`window::KEPT_US`] when it is next read); the running
     /// request stopped and its answer dropped; no frame taken and nothing
     /// said.
     pub fn hold(&mut self, now_us: u64) {
