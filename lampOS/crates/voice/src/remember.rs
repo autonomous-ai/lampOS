@@ -34380,6 +34380,7 @@ mod tests {
                 forgotten: 0,
                 observe_forgets: 0,
                 keeper: None,
+                guest: false,
             };
             let queue = &client.jobs;
             queue.try_send(exchange("zero", vec![], vec![])).unwrap();
