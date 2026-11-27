@@ -835,14 +835,16 @@ impl Onboarding {
         // own lines; its first line is the step's note, as before.
         if self.near.v2 && !sentence && self.near.last.is_some() {
             let accepted = self.desired.near_call_tries.len();
-            return Some(super::own_line(match self.near.last {
-                Some(true) => super::walk_v2::near_countdown(accepted).to_owned(),
-                _ => super::walk_v2::near_coach(
-                    self.near.miss.unwrap_or(super::walk_v2::Miss::Other),
-                    self.near.missed,
-                )
+            return Some(super::own_line(
+                match self.near.last {
+                    Some(true) => super::walk_v2::near_countdown(accepted),
+                    _ => super::walk_v2::near_coach(
+                        self.near.miss.unwrap_or(super::walk_v2::Miss::Other),
+                        self.near.missed,
+                    ),
+                }
                 .to_owned(),
-            }));
+            ));
         }
         let note = Some(
             match (sentence, prompt, self.near.short) {

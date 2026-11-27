@@ -299,10 +299,15 @@ pub(crate) fn coach(step: Step, times: u8) -> Option<&'static str> {
 }
 
 /// The quiet before a step is asked again the `times`th time: 15 s, then
-/// doubling, at most 2 minutes, so the re-asks are spaced and Lamp never
-/// talks on alone.
+/// 25, 40 and at most 60 s (the owner: never stuck more than ~30 s at
+/// first, spaced so Lamp never talks on alone).
 pub(crate) fn reask_gap_us(times: u8) -> u64 {
-    (15_000_000u64 << u32::from(times.saturating_sub(1).min(3))).min(120_000_000)
+    match times {
+        0 | 1 => 15_000_000,
+        2 => 25_000_000,
+        3 => 40_000_000,
+        _ => 60_000_000,
+    }
 }
 
 /// Why a call try was missed (#8871 phase 2), for its coaching.
@@ -332,16 +337,18 @@ impl Miss {
 
 /// Call Lamp's lines (#8871 phase 2, the owner's), the walk's own words.
 pub(crate) const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Say 'Hey Lamp' three times, so I learn your voice from your seat and never miss you.\")";
-const NEAR_TWO_MORE: &str = "Got it, two more.";
-const NEAR_ONE_MORE: &str = "One more.";
+const NEAR_TWO_MORE: &str = "(Say only this, nothing before or after it: \"Got it, two more.\")";
+const NEAR_ONE_MORE: &str = "(Say only this, nothing before or after it: \"One more.\")";
 pub(crate) const NEAR_DONE: &str = "(Say only this, nothing before or after it: \"That's me! Say 'Hey Lamp' whenever you need me.\")";
-const NEAR_MISSED: &str = "I didn't catch that. Try again when I stop talking.";
-const NEAR_OVER: &str = "Wait till I finish, then say it.";
-const NEAR_LOUDER: &str = "Say 'Hey Lamp' a bit louder.";
-const NEAR_CLOSER: &str = "Come a little closer.";
+const NEAR_MISSED: &str = "(Say only this, nothing before or after it: \"I didn't catch that. Try again when I stop talking.\")";
+const NEAR_OVER: &str =
+    "(Say only this, nothing before or after it: \"Wait till I finish, then say it.\")";
+const NEAR_LOUDER: &str =
+    "(Say only this, nothing before or after it: \"Say 'Hey Lamp' a bit louder.\")";
+const NEAR_CLOSER: &str = "(Say only this, nothing before or after it: \"Come a little closer.\")";
 /// After [`NEAR_JUST_AFTER`] misses: plainly the call, never "Just say
 /// 'Lamp'" (#8892: only "Hey Lamp" calls count).
-const NEAR_JUST: &str = "Just say 'Hey Lamp'.";
+const NEAR_JUST: &str = "(Say only this, nothing before or after it: \"Just say 'Hey Lamp'.\")";
 const NEAR_JUST_AFTER: u8 = 6;
 
 /// The line after an accepted call, with `accepted` counted.
@@ -405,7 +412,8 @@ pub(crate) fn not_available_line(step: Step) -> Option<&'static str> {
 pub(crate) const TOUCH_NOT_AVAILABLE: &str = "(Say only this, nothing before or after it: \"My head pads aren't working right now, so we'll skip touch.\")";
 pub(crate) const SIT_NOT_AVAILABLE: &str = "(Say only this, nothing before or after it: \"My camera's off, so I'll learn where you sit later.\")";
 
-/// Every coached and not-available line, for the language tests.
+/// Every coached, not-available and Call Lamp line, for the language
+/// tests.
 #[cfg(test)]
 pub(crate) fn coached_notes() -> Vec<&'static str> {
     SIT_COACH
@@ -415,6 +423,17 @@ pub(crate) fn coached_notes() -> Vec<&'static str> {
         .chain(&MAKE_COACH)
         .copied()
         .chain([TOUCH_NOT_AVAILABLE, SIT_NOT_AVAILABLE])
+        .chain([
+            NEAR_FIRST,
+            NEAR_TWO_MORE,
+            NEAR_ONE_MORE,
+            NEAR_DONE,
+            NEAR_MISSED,
+            NEAR_OVER,
+            NEAR_LOUDER,
+            NEAR_CLOSER,
+            NEAR_JUST,
+        ])
         .collect()
 }
 
@@ -1657,20 +1676,17 @@ mod tests {
         assert!(!hey_lamp_first("Okay hey lamp"));
         set_on_for_test(false);
         assert!(!hey_lamp_first("Hey Lamp, what time is it?"));
-        assert_eq!(
-            near_coach(Miss::Over, 1),
-            "Wait till I finish, then say it."
-        );
-        assert_eq!(near_coach(Miss::Quiet, 1), "Say 'Hey Lamp' a bit louder.");
-        assert_eq!(near_coach(Miss::Far, 2), "Come a little closer.");
+        assert!(near_coach(Miss::Over, 1).contains("Wait till I finish, then say it."));
+        assert!(near_coach(Miss::Quiet, 1).contains("Say 'Hey Lamp' a bit louder."));
+        assert!(near_coach(Miss::Far, 2).contains("Come a little closer."));
         assert_eq!(near_coach(Miss::Far, 3), NEAR_MISSED);
-        assert_eq!(near_coach(Miss::Quiet, 6), "Just say 'Hey Lamp'.");
-        assert_eq!(near_countdown(1), "Got it, two more.");
-        assert_eq!(near_countdown(2), "One more.");
+        assert!(near_coach(Miss::Quiet, 6).contains("Just say 'Hey Lamp'."));
+        assert!(near_countdown(1).contains("Got it, two more."));
+        assert!(near_countdown(2).contains("One more."));
     }
 
     /// The coached asks rotate, never the same twice in a row, and are
-    /// spaced: 15 s, then longer, at most 2 minutes.
+    /// spaced: 15 s, then gently longer, at most a minute.
     #[test]
     fn a_step_asked_again_is_coached_with_a_new_line_each_time() {
         for step in [
@@ -1686,8 +1702,9 @@ mod tests {
         assert!(TOUCH_COACH[0].contains("Pet the top of my head, right here."));
         assert_eq!(coach(Step::WhoYouAre, 1), None);
         assert_eq!(reask_gap_us(1), 15_000_000);
-        assert_eq!(reask_gap_us(2), 30_000_000);
-        assert_eq!(reask_gap_us(9), 120_000_000);
+        assert_eq!(reask_gap_us(2), 25_000_000);
+        assert_eq!(reask_gap_us(3), 40_000_000);
+        assert_eq!(reask_gap_us(9), 60_000_000);
         for line in coached_notes() {
             assert!(
                 line.starts_with("(Say only this, nothing before or after it: \""),

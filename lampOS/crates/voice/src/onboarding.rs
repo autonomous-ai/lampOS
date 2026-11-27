@@ -4205,6 +4205,50 @@ impl Onboarding {
             );
             return None;
         }
+        // The walk Lamp leads by voice (#8871 phase 2, the owner): never
+        // stuck in silence. Nothing said since the step's ask, its last
+        // reminder or the lamp's latest words, it is asked again with a
+        // coached line after a gap that grows gently (15, 25, 40, then 60
+        // s), never a long silent give-up first. Its evidence (a touch, a
+        // face, a light) still ends it at any time.
+        if self.walk_v2
+            && walk_v2::WALK.contains(&step)
+            && !led.words
+            && !led.touched
+            && !touched
+            && can_speak
+            && !(step == Step::WhoYouAre && (led.heard.name || led.heard.save_held_us.is_some()))
+        {
+            let times = self
+                .coached
+                .get(&step)
+                .copied()
+                .unwrap_or(0)
+                .saturating_add(1);
+            let gap = walk_v2::reask_gap_us(times);
+            let since = asked_us
+                .max(led.guided_us.unwrap_or(0))
+                .max(led.lamp_said_us.unwrap_or(0));
+            if now_us.saturating_sub(since) >= gap && quiet_us >= gap.min(walk_v2::REMIND_QUIET_US)
+            {
+                led.asked_us = Some(now_us);
+                led.guided_us = Some(now_us);
+                self.coached.insert(step, times);
+                self.records
+                    .push(json!({"kind":"onboarding_asked_again","step":step.name(),
+                    "not":"silence","times":times,"at_us":now_us}));
+                eprintln!(
+                    "lamp-voice: onboarding: {}: nothing said in {} s: asked again, coached, time {times}",
+                    step.name(),
+                    gap / 1_000_000
+                );
+                return Some(
+                    walk_v2::coach(step, times)
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| self.step_note(step, true, false)),
+                );
+            }
+        }
         if step == Step::Touch {
             // Done only by a touch Controls felt; one reminder, then failed.
             // Either end is said before the next step is asked (#3769).
@@ -4212,14 +4256,16 @@ impl Onboarding {
                 self.finish(step, Outcome::Done, None, now_us);
                 self.owed = self.definition.words.touch_done.clone();
                 self.pet_response_until_us = Some(now_us + PET_RESPONSE_US);
-            } else if now_us.saturating_sub(asked_us)
-                >= match led.guided_us.filter(|&at| at != asked_us) {
-                    // Reminded: 60 s, or the remind heard out, within 70 s.
-                    Some(reminded) => (reminded.saturating_sub(asked_us) + TOUCH_REMIND_HEARD_US)
-                        .clamp(TOUCH_GIVE_UP_US, TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US),
-                    // Never reminded (the room never quiet): 70 s.
-                    None => TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US,
-                }
+            } else if !self.walk_v2
+                && now_us.saturating_sub(asked_us)
+                    >= match led.guided_us.filter(|&at| at != asked_us) {
+                        // Reminded: 60 s, or the remind heard out, within 70 s.
+                        Some(reminded) => (reminded.saturating_sub(asked_us)
+                            + TOUCH_REMIND_HEARD_US)
+                            .clamp(TOUCH_GIVE_UP_US, TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US),
+                        // Never reminded (the room never quiet): 70 s.
+                        None => TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US,
+                    }
             {
                 // No touch felt after the one reminder: failed, said, and the
                 // walk moves on (#4080, the lead's rule; it was `later`, #3996).
@@ -4237,6 +4283,9 @@ impl Onboarding {
                 && led.guided_us == Some(asked_us)
                 && now_us.saturating_sub(asked_us)
                     <= TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US - TOUCH_REMIND_HEARD_US
+                // Asked again, coached (#8871 phase 2): the coaching is its
+                // reminder.
+                && !self.coached.contains_key(&step)
             {
                 led.guided_us = Some(now_us);
                 self.records
@@ -4341,6 +4390,7 @@ impl Onboarding {
                 && can_speak
                 && quiet_us >= walk_v2::REMIND_QUIET_US
                 && now_us.saturating_sub(asked_us) >= walk_v2::REMIND_QUIET_US
+                && !self.coached.contains_key(&step)
                 && let Some(line) = walk_v2::remind(step)
             {
                 led.guided_us = Some(now_us);
@@ -7517,6 +7567,18 @@ mod tests {
 
         fn wait(&mut self, for_us: u64, face: Option<Framing>) -> Vec<String> {
             self.wait_played(for_us, face, Delivery::Whole)
+        }
+
+        /// As [`Self::wait`], a second at a time: each note with when it
+        /// was said, in whole seconds of the room's clock.
+        fn wait_timed(&mut self, for_us: u64, face: Option<Framing>) -> Vec<(u64, String)> {
+            let mut notes = Vec::new();
+            let until = self.at + for_us;
+            while self.at < until {
+                let at = self.at / S;
+                notes.extend(self.wait(S, face).into_iter().map(|note| (at, note)));
+            }
+            notes
         }
 
         /// As [`Self::wait`], each note's turn played as `delivery` says.
@@ -15141,49 +15203,41 @@ mod tests {
         );
     }
 
-    /// Silence: one simpler reminder after 10 s of quiet, asked once more
-    /// after the give-up; then never later (#8871 phase 2): asked again,
-    /// coached, each time a new line and a longer quiet between; done on
-    /// its evidence at last.
+    /// Silence (#8871 phase 2, the owner): one simpler reminder after 10 s
+    /// of quiet, then asked again, coached, a new line each time, the gaps
+    /// growing gently (15, 25, 40, then 60 s): never stuck more than 30 s
+    /// at first, never left for later.
     #[test]
     fn a_silent_try_is_reminded_then_coached_again_never_left_for_later() {
         let mut room = walk_v2_room("v2-silent");
         walked_to_try(&mut room, Outcome::Skipped);
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
-        assert_eq!(room.wait(11 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_REMIND]);
-        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE);
-        let notes = room.wait(STEP_GIVE_UP_US + 25 * S, Some(NEAR_MIDDLE));
+        let said = room.wait_timed(5 * 60 * S, Some(NEAR_MIDDLE));
+        let lines: Vec<&str> = said.iter().map(|(_, note)| note.as_str()).collect();
+        assert_eq!(lines[0], walk_v2::TRY_REMIND, "{said:?}");
         assert_eq!(
-            notes,
-            [walk_v2::TRY_FIRST, walk_v2::TRY_REMIND],
-            "{notes:?}"
-        );
-        let mut said = Vec::new();
-        for _ in 0..3 {
-            said.extend(room.wait(STEP_GIVE_UP_US + 3 * 60 * S, Some(NEAR_MIDDLE)));
-        }
-        assert_eq!(room.outcome(Step::TrySkill), None, "{said:?}");
-        assert!(
-            !said.contains(&room.walk.later_line(Step::TrySkill)),
+            lines[1],
+            walk_v2::coach(Step::TrySkill, 1).unwrap(),
             "{said:?}"
         );
-        assert!(
-            !said.iter().any(|note| note == walk_v2::MAKE_FIRST),
+        assert_eq!(
+            lines[2],
+            walk_v2::coach(Step::TrySkill, 2).unwrap(),
             "{said:?}"
         );
+        let gaps: Vec<u64> = said.windows(2).map(|two| two[1].0 - two[0].0).collect();
+        // The first gaps are short; none is ever over a minute, and they grow.
+        assert!(gaps[0] <= 16 && gaps[1] <= 26, "{gaps:?} {said:?}");
+        assert!(gaps.iter().all(|gap| *gap <= 61), "{gaps:?}");
+        assert!(gaps.windows(2).all(|two| two[1] + 1 >= two[0]), "{gaps:?}");
+        assert_eq!(room.outcome(Step::TrySkill), None);
+        assert!(!lines.contains(&room.walk.later_line(Step::TrySkill).as_str()));
+        assert!(!lines.contains(&walk_v2::MAKE_FIRST));
         assert!(
-            said.contains(&walk_v2::coach(Step::TrySkill, 1).unwrap().to_owned()),
-            "{said:?}"
-        );
-        assert!(
-            said.contains(&walk_v2::coach(Step::TrySkill, 2).unwrap().to_owned()),
-            "{said:?}"
-        );
-        // No line said more than twice in a row.
-        assert!(
-            said.windows(3)
+            lines
+                .windows(3)
                 .all(|three| !(three[0] == three[1] && three[1] == three[2])),
-            "{said:?}"
+            "{lines:?}"
         );
         assert!(
             !room
@@ -15377,16 +15431,24 @@ mod tests {
             .publisher_declared(TouchEvent::TOPIC, &TouchEvent::declaration(), "controls")
             .unwrap();
         walked_to_touch(&mut room);
-        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)).len(), 1);
+        let asked = room.wait_timed(4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(asked.len(), 1);
+        let asked_at = asked[0].0;
         assert_eq!(
             room.walk.led.as_ref().map(|led| led.step),
             Some(Step::Touch)
         );
-        let mut said = Vec::new();
-        for _ in 0..8 {
-            said.extend(room.wait(60 * S, Some(NEAR_MIDDLE)));
-        }
+        let timed = room.wait_timed(8 * 60 * S, Some(NEAR_MIDDLE));
+        let said: Vec<String> = timed.iter().map(|(_, note)| note.clone()).collect();
         assert_eq!(room.outcome(Step::Touch), None, "{said:?}");
+        // Re-asked ~15 s after the ask, then gently longer, never a long
+        // silent give-up first (the kit fails 30 s stuck).
+        assert!(timed[0].0 - asked_at <= 16, "{asked_at} {timed:?}");
+        let gaps: Vec<u64> = timed.windows(2).map(|two| two[1].0 - two[0].0).collect();
+        assert!(
+            gaps[0] <= 26 && gaps.iter().all(|gap| *gap <= 61),
+            "{gaps:?}"
+        );
         let first = walk_v2::coach(Step::Touch, 1).unwrap().to_owned();
         let second = walk_v2::coach(Step::Touch, 2).unwrap().to_owned();
         assert!(said.contains(&first) && said.contains(&second), "{said:?}");
@@ -15399,8 +15461,6 @@ mod tests {
                 .all(|three| !(three[0] == three[1] && three[1] == three[2])),
             "{said:?}"
         );
-        // Spaced: never more than one line a 15 s.
-        assert!(said.len() <= 8 * 60 / 15, "{said:?}");
         let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
         // A touch counts once the step is asked again.
         let since = std::time::Instant::now();
