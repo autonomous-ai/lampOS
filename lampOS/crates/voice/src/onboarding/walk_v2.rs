@@ -256,6 +256,79 @@ pub(crate) fn refused_again() -> bool {
     }
 }
 
+/// The coached asks for a walk step asked again (#8871, the owner: a
+/// different short line each time, never the same twice in a row), the
+/// walk's own lines. None for a step asked with its own note again (who
+/// you are: the model reads the name back; how you sound: its own prompts).
+const SIT_COACH: [&str; 3] = [
+    "(Say only this, nothing before or after it: \"I can't see you yet. Sit in front of me and look my way.\")",
+    "(Say only this, nothing before or after it: \"Come sit where you usually do, facing me.\")",
+    "(Say only this, nothing before or after it: \"Just look at me from your seat for a moment.\")",
+];
+const TOUCH_COACH: [&str; 3] = [
+    "(Say only this, nothing before or after it: \"Pet the top of my head, right here.\")",
+    "(Say only this, nothing before or after it: \"Just a light tap on top.\")",
+    "(Say only this, nothing before or after it: \"Touch the top of my head, gently.\")",
+];
+const TRY_COACH: [&str; 3] = [
+    "(Say only this, nothing before or after it: \"Try it: Hey Lamp, turn blue.\")",
+    "(Say only this, nothing before or after it: \"Say 'Hey Lamp, turn blue', and watch my light.\")",
+    "(Say only this, nothing before or after it: \"Just ask me for a colour, like blue.\")",
+];
+const MAKE_COACH: [&str; 3] = [
+    "(Say only this, nothing before or after it: \"Try: remind me to drink water every 30 minutes.\")",
+    "(Say only this, nothing before or after it: \"Tell me one thing to do for you, like a reminder.\")",
+    "(Say only this, nothing before or after it: \"Or: turn the light warm at 8 pm, or tell me to stand up every hour.\")",
+];
+
+/// The coached line for `step` asked again the `times`th time.
+pub(crate) fn coach(step: Step, times: u8) -> Option<&'static str> {
+    let lines = match step {
+        Step::WhereYouSit => &SIT_COACH,
+        Step::Touch => &TOUCH_COACH,
+        Step::TrySkill => &TRY_COACH,
+        Step::MakeSkill => &MAKE_COACH,
+        _ => return None,
+    };
+    Some(lines[usize::from(times.saturating_sub(1)) % lines.len()])
+}
+
+/// The quiet before a step is asked again the `times`th time: 15 s, then
+/// doubling, at most 2 minutes, so the re-asks are spaced and Lamp never
+/// talks on alone.
+pub(crate) fn reask_gap_us(times: u8) -> u64 {
+    (15_000_000u64 << u32::from(times.saturating_sub(1).min(3))).min(120_000_000)
+}
+
+/// The model's answer when it reports a walk step skipped (#8871 phase
+/// 2): no step is skipped, the person is pleaded with, the step asked again.
+pub(crate) const SKIP_REFUSED: &str = "This setup step can't be skipped: every step is needed. Say warmly, in one short line: \"This one's needed. Let's try once more.\" Then ask the step once more, in a few words. Never call setup_step to skip it.";
+
+/// The line a walk step this lamp's body can't do completes with (#8871,
+/// the first builder's change 2): setup never waits on missing hardware.
+pub(crate) fn not_available_line(step: Step) -> Option<&'static str> {
+    match step {
+        Step::Touch => Some(TOUCH_NOT_AVAILABLE),
+        Step::WhereYouSit => Some(SIT_NOT_AVAILABLE),
+        _ => None,
+    }
+}
+pub(crate) const TOUCH_NOT_AVAILABLE: &str = "(Say only this, nothing before or after it: \"My head pads aren't working right now, so we'll skip touch.\")";
+pub(crate) const SIT_NOT_AVAILABLE: &str = "(Say only this, nothing before or after it: \"My camera's off, so I'll learn where you sit later.\")";
+
+/// Every coached and not-available line, for the language tests.
+#[cfg(test)]
+pub(crate) fn coached_notes() -> Vec<&'static str> {
+    SIT_COACH
+        .iter()
+        .chain(&TOUCH_COACH)
+        .chain(&TRY_COACH)
+        .chain(&MAKE_COACH)
+        .copied()
+        .chain([TOUCH_NOT_AVAILABLE, SIT_NOT_AVAILABLE])
+        .collect()
+}
+
 /// The reminder said once after a quiet ask (#8871: silence for 10 s, the
 /// ask again more simply; for "make a skill", other simple ideas).
 pub(crate) fn remind(step: Step) -> Option<&'static str> {
@@ -1443,6 +1516,34 @@ mod tests {
         assert!(!refused_again());
         assert!(refused_again());
         assert!(!refused_again());
+    }
+
+    /// The coached asks rotate, never the same twice in a row, and are
+    /// spaced: 15 s, then longer, at most 2 minutes.
+    #[test]
+    fn a_step_asked_again_is_coached_with_a_new_line_each_time() {
+        for step in [
+            Step::WhereYouSit,
+            Step::Touch,
+            Step::TrySkill,
+            Step::MakeSkill,
+        ] {
+            let said: Vec<_> = (1..=7).map(|times| coach(step, times).unwrap()).collect();
+            assert!(said.windows(2).all(|two| two[0] != two[1]), "{said:?}");
+        }
+        assert_eq!(coach(Step::Touch, 1), Some(TOUCH_COACH[0]));
+        assert!(TOUCH_COACH[0].contains("Pet the top of my head, right here."));
+        assert_eq!(coach(Step::WhoYouAre, 1), None);
+        assert_eq!(reask_gap_us(1), 15_000_000);
+        assert_eq!(reask_gap_us(2), 30_000_000);
+        assert_eq!(reask_gap_us(9), 120_000_000);
+        for line in coached_notes() {
+            assert!(
+                line.starts_with("(Say only this, nothing before or after it: \""),
+                "{line}"
+            );
+            assert!(!line.contains("No worries"), "{line}");
+        }
     }
 
     /// #8871 phase 2: impatience gets a pleading line with the real count
