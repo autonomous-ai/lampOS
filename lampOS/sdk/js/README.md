@@ -456,8 +456,11 @@ asking only `speak`. What a push needs:
 live on production; this SDK has been run only against a fake Store so far.
 An app (format 2, [docs/apps.md](../../docs/apps.md)) goes to the Skills
 Store; a skill goes on through the lamp. Check and pack the app with the
-Python SDK (`lamp app check DIR`, `lamp app pack DIR`); sign in with
-`lamp login` there or here, then:
+Python SDK (`lamp app check DIR`, `lamp app pack DIR`), which also holds the
+optional `first_run: {"say": "..."}` (the line Lamp says when the owner
+installs it: at most 140 characters, one line, no markup or quotes, at most
+one question; [docs/apps.md](../../docs/apps.md), "The first-run line");
+sign in with `lamp login` there or here, then:
 
 ```js
 import { readFileSync } from 'node:fs';

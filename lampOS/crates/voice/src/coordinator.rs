@@ -7098,6 +7098,10 @@ fn conversation_with_gate_inner(
     // when: someone was there then.
     let mut said_turn: Option<u64> = None;
     let mut said_at_us: Option<u64> = None;
+    // When the lamp last answered someone's line (a turn it did not begin
+    // itself, heard with audio): "Hey Lamp, ..." while task news waits
+    // tells it right after (#8783).
+    let mut answered_at_us: Option<u64> = None;
     // The overdue reminder last said to be waiting for someone.
     let mut overdue_wait = crate::reminders::OverdueWait::default();
     // The late reminder waiting for a pause in the talk (29e7, 2 Nov).
@@ -7250,6 +7254,13 @@ fn conversation_with_gate_inner(
     // `LAMP_MAKE_MAY_RUN_ON=on`): none with the switch off.
     let mut long_makes = if lifetime.continuous() {
         crate::long_make::Tells::from_environment()
+    } else {
+        None
+    };
+    // An installed item's first-run line (#7814, `LAMP_INSTALL_FIRST_RUN=on`):
+    // none with the switch off.
+    let first_runs = if lifetime.continuous() {
+        crate::install_told::Tells::from_environment()
     } else {
         None
     };
@@ -12659,6 +12670,11 @@ fn conversation_with_gate_inner(
             let turn = current.owner.turn();
             if current.had_audio {
                 lamp_words_ended_us = Some(monotonic_us());
+                if current.local_only.is_none()
+                    && own_turn().load(std::sync::atomic::Ordering::Acquire) != turn
+                {
+                    answered_at_us = lamp_words_ended_us;
+                }
             }
             owner.complete_turn(now(), current.owner)?;
             current.complete_requested_audio(monotonic_us());
@@ -15010,6 +15026,53 @@ fn conversation_with_gate_inner(
                 .as_ref()
                 .zip(crate::long_make::key_of(&note))
                 .map(|(current, key)| (current.owner.turn(), key.to_owned()));
+            last_publish = monotonic_us();
+        }
+        // An item the owner installed from the Store says its first-run
+        // line (#7814, `crate::install_told`): at once with someone near,
+        // else right after Lamp's next answer; never into people's talk,
+        // and never paused, signed out or in the care hold (the privacy
+        // switch closed or asleep, this loop does not run). Looked for
+        // first, so the moment is read only with an install waiting.
+        if let Some(tells) = first_runs.as_ref()
+            && tells.has_news()
+            && let Some(telling) = tells.next(&crate::install_told::Moment {
+                now_us: clock,
+                face: presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock)),
+                last_speech_us,
+                lamp_words_ended_us,
+                answered_at_us,
+                free: !reminder_waiting
+                    && !care_holds
+                    && reply.is_none()
+                    && provider_queue.is_empty()
+                    && !admission.owns_stream()
+                    && !submission_draining
+                    && snapshot.listening_ready(now())
+                    && unasked_session(&cloud, unasked_paused).is_some(),
+            })
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+        {
+            eprintln!("{}", telling.journal());
+            record(
+                trace,
+                json!({"kind":"first_run_told","at_us":clock,"item":telling.item,"name":telling.name,
+                    "after_answer":telling.after_answer,"after_finish_ms":telling.after_finish_ms}),
+            )?;
+            snapshot = commit_written_turn(
+                owner,
+                reply,
+                &mut provider_queue,
+                &telling.note,
+                false,
+                crate::install_told::BASIS,
+                provider_session,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )?;
             last_publish = monotonic_us();
         }
         // News whose turn was cut short since the last tick: with

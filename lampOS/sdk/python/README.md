@@ -420,6 +420,16 @@ An app's folder holds `app.json` (the manifest without `format`, `kind` and
 companion skills). `name` defaults to the folder's; `skills` and `assets` to
 what is there.
 
+An optional `first_run` is the line Lamp says when the owner installs the
+app ([docs/apps.md](../../docs/apps.md), "The first-run line"):
+`"first_run": {"say": "Gym coach is ready. Want to set your first plan?"}`,
+plain text of at most 140 characters, one line, no markup or quotes, at most
+one question and no other key. `lamp app check` and `pack` hold the Store's
+checks; without it Lamp says only "*title* is ready.". A Store skill's
+`skill.toml` takes the same as `[first_run] say = "..."`, checked by
+`lamp skill check`. A lamp older than the field refuses it, so set
+`min_build` to a build that reads it.
+
 ```sh
 lamp app check gym-coach            # as the Store's reader checks it, less the signature
 lamp app pack gym-coach             # gym-coach-1.0.0.tar, unsigned: the Store signs it at approval

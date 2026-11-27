@@ -5178,6 +5178,50 @@ do là cổng đầu tiên đóng: `reminder_waiting`, `agent_wording`,
 `turn_open`, `not_ready`); tin được kể (`task news told: task N, X ms after
 it landed`); và một câu ngắn được kể.
 
+### Câu đầu tiên của một món vừa cài (#7814, `LAMP_INSTALL_FIRST_RUN`, tắt trừ khi bật)
+
+Yêu cầu của chủ sản phẩm, được first builder chốt trên #7814 (comment
+7209938102): khi chủ đèn cài một app hay một kỹ năng từ Store, Lamp nói câu
+đầu tiên của món đó ngay, như cách kể tin công việc
+(`lamp_voice::install_told`). `lamp-cloud` đặt một `store/installed` lên bus
+cho mỗi lần cài xong, không bao giờ cho một lần cập nhật
+([apps.md](../apps.md), "The first-run line"); giọng nói chỉ nhận từ
+`cloud`, đã kiểm tra, và giữ nó qua lúc ngủ hay lúc tắt tiếng.
+
+- **Câu nói** là `first_run.say` của chính món đó (tối đa 140 ký tự, một câu
+  hỏi), hoặc "*Tên* is ready." khi không có. Nó được nói như một lượt viết
+  của chính đèn (basis `first_run_told`), đúng từng chữ, bằng ngôn ngữ của
+  cuộc trò chuyện; nó nằm trong cuộc trò chuyện, nên câu trả lời của người
+  trong cửa sổ 20 s là một câu nối tiếp như mọi câu khác và có các tool của
+  app (`LAMP_FOLLOW_UPS`).
+- **Ngay lập tức**, khi có ai được nghe thấy trong một phút qua
+  (`install_told::HEARD_WITHIN_US`) hoặc có một khuôn mặt trong khung hình
+  lúc tin đến: nói ở lúc rảnh đầu tiên, trong vòng 2 s sau khi cài xong nếu
+  phòng không đang nói chuyện. Cảm biến chỉ giúp đèn nói: khuôn mặt là một
+  cách để biết có người gần, không bao giờ là điều bắt buộc. Tin được xem lần
+  đầu hơn 10 s sau khi cài xong (đèn đang ngủ hay riêng tư) đã qua lúc "ngay".
+- **Nếu không**, và khi không còn ai gần (không có mặt, không ai được nghe
+  thấy trong một phút), nó chờ câu trả lời tiếp theo của Lamp cho một người
+  và đến 1 s sau khi lời của câu trả lời kết thúc mà không ai bắt đầu nói:
+  "By the way, Gym Coach is ready." (`install_told::by_the_way`), như #8812
+  kể tin công việc. Một khuôn mặt thấy sau đó không bao giờ khiến nó được kể:
+  không có lần "đến nơi" do camera đoán.
+- **Không bao giờ chen vào lời người nói:** ngoài lúc vừa trả lời, chỉ sau
+  5 s không ai được nghe thấy (`TALK_PAUSE_US`) và 3 s sau lời của chính đèn.
+  Không bao giờ khi keeper tạm dừng đèn, khi đã đăng xuất, trong lúc giữ chăm
+  sóc (care hold), khi một nhắc nhở đang chờ hay có gì đang nợ, đang chạy hay
+  đang được nói; cuộc trò chuyện không chạy khi công tắc riêng tư đóng hay
+  khi đèn ngủ, nên lúc đó không nói gì.
+- **Một lần cho mỗi lần cài:** lấy khỏi hàng đợi khi lượt của nó được giao
+  cho giọng nói; cùng một lần cài nghe hai lần chỉ lấy một lần; tối đa 4 cái
+  chờ, cái cũ nhất bị bỏ trước; cái nào chưa nói sau 12 h thì bỏ, không kể.
+- **Nhật ký** ghi `lamp-voice: the owner installed app gym-coach: its
+  first-run line handed to speech N ms after its install finished, at once`
+  (hoặc `right after Lamp's answer`), không bao giờ ghi câu nói, và trace ghi
+  `first_run_told` với `after_finish_ms`: ROW đo 2 s từ đó. Dòng của
+  `lamp-cloud` là `the owner installed app gym-coach: told on
+  store/installed (first-run line: its own)`.
+
 ## Đóng harness của chính đèn khi việc xong, chờ kể tin tối đa một phút (#6530)
 
 Với `serve --close-told` (bật trong unit của sản phẩm), lamp-tasks đóng

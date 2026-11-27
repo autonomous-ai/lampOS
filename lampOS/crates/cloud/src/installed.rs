@@ -10,7 +10,7 @@
 //!
 //! Nothing here waits: the bus is a local socket write, and a lamp with no
 //! bus, or a voice not listening, tells nobody and changes nothing else.
-use lamp_msgs::installed::Installed;
+use lamp_msgs::installed::{APP, FirstRun, Installed, OWNER, SKILL};
 use serde_json::Value;
 use std::sync::Mutex;
 
@@ -19,15 +19,19 @@ static BUS: Mutex<Option<lamp_bus::Bus>> = Mutex::new(None);
 
 /// The bus the events go on; none tells nobody.
 pub fn switch(bus: Option<lamp_bus::Bus>) {
-    let _ = bus;
+    if let Ok(mut kept) = BUS.lock() {
+        *kept = bus;
+    }
 }
 
 /// An app's install from its manifest (`lamp-skill.json`), finished at
 /// `finished_us`: its name, title and first-run line as the package says
 /// them. None when they are not an app's.
 pub fn of_app(manifest: &Value, finished_us: u64) -> Option<Installed> {
-    let _ = (manifest, finished_us);
-    None
+    let name = manifest["name"].as_str()?;
+    let title = manifest["title"].as_str().unwrap_or(name);
+    let first_run = manifest["first_run"]["say"].as_str().map(str::to_owned);
+    of(APP, name, title, first_run, finished_us)
 }
 
 /// A skill's install, finished at `finished_us`.
@@ -37,14 +41,69 @@ pub fn of_skill(
     first_run: Option<String>,
     finished_us: u64,
 ) -> Option<Installed> {
-    let _ = (name, title, first_run, finished_us);
-    None
+    of(SKILL, name, title, first_run, finished_us)
+}
+
+fn of(
+    item: &str,
+    name: &str,
+    title: &str,
+    first_run: Option<String>,
+    finished_us: u64,
+) -> Option<Installed> {
+    let event = Installed {
+        item: item.to_owned(),
+        name: name.to_owned(),
+        title: title.trim().to_owned(),
+        by: OWNER.to_owned(),
+        // A line that isn't right is left out, and the lamp says only the
+        // name ready: the package's own reader refused it already.
+        first_run: first_run
+            .map(|say| FirstRun { say })
+            .filter(|first_run| first_run.check().is_ok()),
+        finished_us,
+    };
+    event.check().is_ok().then_some(event)
 }
 
 /// `event` on `store/installed`; the journal says what and whether it has a
 /// first-run line, never the line itself.
 pub fn tell(event: &Installed) {
-    let _ = event;
+    let Ok(kept) = BUS.lock() else {
+        return;
+    };
+    let Some(bus) = kept.as_ref() else {
+        return;
+    };
+    let told = bus
+        .publisher_declared(
+            Installed::TOPIC,
+            &Installed::declaration(),
+            crate::lamp::SOURCE,
+        )
+        .and_then(|mut out| {
+            out.publish_json(lamp_ipc::monotonic_us(), event)
+                .map(|_| ())
+        });
+    match told {
+        Ok(()) => eprintln!(
+            "lamp-cloud: the owner installed {} {}: told on {} (first-run line: {}) (#7814)",
+            event.item,
+            event.name,
+            Installed::TOPIC,
+            if event.declares_first_run() {
+                "its own"
+            } else {
+                "none, its name ready"
+            }
+        ),
+        Err(error) => eprintln!(
+            "lamp-cloud: the owner installed {} {}, not told on {}: {error} (#7814)",
+            event.item,
+            event.name,
+            Installed::TOPIC
+        ),
+    }
 }
 
 #[cfg(test)]

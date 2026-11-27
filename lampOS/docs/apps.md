@@ -69,6 +69,7 @@ english-lessons/skills/english-tutor/skill.toml
   "triggers": ["start my english lesson", "begin the english lesson"],
   "help": { "en": "Say start my english lesson. Answer each question aloud; say stop the lesson to end.",
             "vi": "Nói start my english lesson. Trả lời từng câu hỏi; nói stop the lesson để dừng." },
+  "first_run": { "say": "English lessons is ready. Want to start with a short one?" },
   "settings": [
     { "key": "level", "type": "choice", "label": "Level",
       "options": [{ "value": "a1", "label": "A1" }, { "value": "a2", "label": "A2" }],
@@ -99,6 +100,7 @@ english-lessons/skills/english-tutor/skill.toml
 | `phrases` | at most 16; each at most 64 bytes (the socket's `phrases.set` counts characters) with at least 8 letters, no repeats; needs `hear` |
 | `triggers` | required (may be `[]`); at most 8, the same per-phrase rule; needs `hear`; matched whenever the app runs and **not** part of the 16 phrases. A trigger may also be a phrase: a heard line is delivered once, as the trigger |
 | `help` | optional; how the app is used, one to three plain sentences, by language: `{"en": …, "vi": …}`. The production Store's rules exactly (#7415 comment 7033402561, `lamp_msgs::app_help::help_ok`), so a Store-approved app always installs: `en` is required when `help` is given; at most 8 languages, keys like `en`, `vi`, `pt-br` (lower case, BCP-47-like); each value 1 to 300 bytes, at most 3 lines, no other control character; refused, not tidied: ``< > ` * [ ] { } " “ ”`` and links (`://` or a `www.` word). Apostrophes pass. The refusals are the Store's words (`help: en is required when help is given`, `help.en: no quotes, markup or links (found "<")`). The voice tells the help in the lamp's language when it is there, else English; a language the lamp doesn't speak is carried and never read. Help holding a backslash, a zero-width or a bidi character installs but is never told to the voice. A lamp older than this field refuses the manifest with "unknown field", so an app with `help` sets `min_build` to a build that reads it |
+| `first_run` | optional; the line Lamp says when the owner installs the app from the Store (#7814, "The first-run line" below): `{"say": …}` and no other key; `say` is plain text of 1 to 140 characters (not bytes) with no space at either end, one line (no control character), no markup or quotes (``< > ` * [ ] { } " “ ” \``), and at most one question (`?`). The lamp, the SDK and the Store hold the same checks (`lamp_msgs::installed::say_ok`; the Store's, Backend3 on #7814, c7209987429); the refusals are `first_run.say: 1 to 140 characters of plain text, no space at either end`, `first_run.say: one line, no control characters`, `first_run.say: no markup or quotes (found '<')` and `first_run.say: at most one question`. Without it, Lamp says only "*title* is ready.", never a line made up from the Store's description. A lamp older than this field refuses the manifest with "unknown field", so an app with `first_run` sets `min_build` to a build that reads it |
 | `settings` | at most 16, below |
 | `skills` | the companion skills: exactly the folders under `skills/`, each holding a `skill.toml`; installed, updated and removed with the app, never listed on their own |
 | `assets` | exactly the files under `assets/`, each ending `.wav`, at most 20; each a WAV of 16-bit mono PCM at 24 kHz, 1 to 240,000 frames (10 s), within the lamp's loudness limits (no sample past −12 dBFS, no 10 ms louder than −30 dBFS RMS: the voice's own `decode_sound_with_limit`) |
@@ -242,6 +244,31 @@ fingerprint and the package's SHA-256 (the Store's catalogue names it so).
 The installer checks, beyond it, `min_build` against the lamp and the
 companion skills against the existing skill checks, and takes the owner's yes
 before it writes anything.
+
+## The first-run line (#7814)
+
+The product owner's ask, ruled by the first builder on #7814 (comment
+7209938102): an item's onboarding starts at its install.
+
+- **One event.** When a Store install finishes, `lamp-cloud` puts one
+  `store/installed` on the bus (`lamp_msgs::Installed`, `crate::installed`):
+  `item` (`app`), `name`, `title`, `by: "owner"` (never a person's name),
+  `first_run` (`{"say"}`, only when the manifest declares one) and
+  `finished_us`. It is told when the manage helper answers the install done
+  (`apps::install_and_tell`); an install the helper answered late
+  (`installing`) is told when the watcher next sees it installed from that
+  package (`apps::finished_late`, within 15 s), and let go after 10 minutes.
+  An update (the app was installed already) is told nothing; a refused
+  install nothing. A Store skill is told the same way
+  (`skills::installed_event`: the helper's `installed NAME`, never
+  `replaced NAME`).
+- **What Lamp says** is the voice's, with `LAMP_INSTALL_FIRST_RUN=on`
+  ([tasks.md](tasks.md), "An installed item's first-run line"): the line, or
+  "*title* is ready.", once: within 2 s of the finish when someone was heard
+  in the last minute or a face is in view and the room isn't talking, else
+  right after Lamp's next answer to a person ("By the way, …"). The person's
+  answer in the 20 s that follow is a follow-up like any other, with the
+  app's tools (`LAMP_FOLLOW_UPS`).
 
 ## On the lamp
 

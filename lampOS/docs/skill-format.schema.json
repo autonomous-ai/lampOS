@@ -690,6 +690,19 @@
       "$ref": "#/$defs/core_table",
       "description": "The startle's move; needs the startle core grant; checked by lamp-expression."
     },
+    "first_run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["say"],
+      "properties": {
+        "say": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "description": "The line the lamp says when the owner installs the skill from the Store: plain text, one line, no markup or quotes, at most one question (lamp_msgs::installed::say_ok)."
+        }
+      }
+    },
     "do": {
       "type": "array",
       "items": {

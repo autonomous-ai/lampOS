@@ -490,6 +490,11 @@ pub fn check_manifest_switched(manifest: &AppManifest, tools: bool) -> Result<()
         ));
     }
     lamp_msgs::app_help::help_ok(&manifest.help).map_err(|why| format!("{MANIFEST}: {why}"))?;
+    if let Some(first_run) = &manifest.first_run {
+        first_run
+            .check()
+            .map_err(|why| format!("{MANIFEST}: {why}"))?;
+    }
     if manifest.settings.len() > MOST_SETTINGS {
         return Err(format!("{MANIFEST}: at most {MOST_SETTINGS} settings"));
     }

@@ -201,6 +201,9 @@ fn main() -> ExitCode {
         Some(root) => lamp_bus::Bus::new(&root).ok(),
         None => lamp_bus::Bus::from_environment().ok(),
     };
+    // A Store install that finished, told to the voice for its first-run
+    // line (`store/installed`, #7814).
+    lamp_cloud::installed::switch(bus.clone());
     // Health and crash reports (#1683): only with LAMP_REPORTS=on too, and
     // then only with the person's yes, read at each send.
     let shared = reports::on_from_environment()

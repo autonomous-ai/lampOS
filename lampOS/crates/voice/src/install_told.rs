@@ -183,8 +183,17 @@ impl Telling {
 /// "By the way, " and the line, its first letter small unless it begins
 /// with the item's name or "I".
 pub fn by_the_way(line: &str, title: &str) -> String {
-    let _ = title;
-    line.to_owned()
+    let keeps = line.starts_with(title)
+        || line == "I"
+        || line.starts_with("I ")
+        || line.starts_with("I'")
+        || line.starts_with("I’");
+    let mut letters = line.chars();
+    let rest = match letters.next() {
+        Some(first) if !keeps => format!("{}{}", first.to_lowercase(), letters.as_str()),
+        _ => line.to_owned(),
+    };
+    format!("By the way, {rest}")
 }
 
 /// The written turn's note for `line`.
@@ -244,8 +253,57 @@ impl Waits {
     /// decided at its first look: at once if someone is near and it is
     /// fresh, else after the next answer.
     pub fn next(&mut self, moment: &Moment) -> Option<Telling> {
-        let _ = moment;
-        None
+        let now = moment.now_us;
+        let most_us = WAITS_AT_MOST.as_micros() as u64;
+        self.waiting.retain(|waiting| {
+            let keep = now.saturating_sub(waiting.event.finished_us) < most_us;
+            if !keep {
+                eprintln!(
+                    "lamp-voice: {} {}'s first-run line let go untold: nobody answered within {} h ({ENVIRONMENT})",
+                    waiting.event.item,
+                    waiting.event.name,
+                    WAITS_AT_MOST.as_secs() / 3_600
+                );
+            }
+            keep
+        });
+        for waiting in &mut self.waiting {
+            if waiting.mode.is_none() {
+                let fresh = now.saturating_sub(waiting.event.finished_us) <= AT_ONCE_LATEST_US;
+                waiting.mode = Some(if fresh && moment.someone_near() {
+                    Mode::AtOnce
+                } else {
+                    Mode::AfterAnswer
+                });
+            }
+            // Near no longer: no face and nobody heard for a minute. It
+            // waits for an answer, never for a face to come back.
+            if waiting.mode == Some(Mode::AtOnce) && !moment.someone_near() {
+                waiting.mode = Some(Mode::AfterAnswer);
+            }
+        }
+        if !moment.free {
+            return None;
+        }
+        let at = self.waiting.iter().position(|waiting| {
+            moment.just_answered(waiting.event.finished_us)
+                || (waiting.mode == Some(Mode::AtOnce) && moment.talk_paused())
+        })?;
+        let waiting = self.waiting.remove(at)?;
+        let after_answer = moment.just_answered(waiting.event.finished_us);
+        let line = waiting.event.line();
+        let line = if after_answer {
+            by_the_way(&line, &waiting.event.title)
+        } else {
+            line
+        };
+        Some(Telling {
+            note: note(&waiting.event, &line),
+            item: waiting.event.item.clone(),
+            name: waiting.event.name.clone(),
+            after_answer,
+            after_finish_ms: now.saturating_sub(waiting.event.finished_us) / 1_000,
+        })
     }
 }
 
@@ -293,8 +351,12 @@ impl Tells {
 
 /// The install `message` tells: only from `lamp-cloud`, only checked.
 pub fn taken(message: &lamp_bus::Message) -> Option<Installed> {
-    let _ = message;
-    None
+    if message.header.source != CLOUD {
+        return None;
+    }
+    let event: Installed = message.parse().ok()?;
+    event.check().ok()?;
+    Some(event)
 }
 
 /// The listener, once a process: each install taken is kept for the

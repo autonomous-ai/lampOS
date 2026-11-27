@@ -4464,8 +4464,15 @@ pub fn present_on() -> bool {
 /// `skill.toml` has none, can't be read, or holds one that isn't right.
 /// Read by `lamp-cloud` once a Store install finishes (#7814).
 pub fn first_run_of(dir: &Path) -> Option<String> {
-    let _ = dir;
-    None
+    #[derive(Deserialize)]
+    struct Only {
+        first_run: Option<lamp_msgs::installed::FirstRun>,
+    }
+    let text = std::fs::read_to_string(dir.join("skill.toml")).ok()?;
+    let only: Only = toml::from_str(&text).ok()?;
+    only.first_run
+        .filter(|first_run| first_run.check().is_ok())
+        .map(|first_run| first_run.say)
 }
 
 pub fn load(dir: &Path) -> Result<Skill, String> {
@@ -6157,6 +6164,11 @@ fn manifest(
             .iter()
             .any(|(_, step)| matches!(step, Step::Call(Call::SayFrom(from, _)) if *from == source))
     };
+    if let Some(first_run) = &file.first_run {
+        first_run
+            .check()
+            .map_err(|why| format!("[first_run] {why}"))?;
+    }
     if let Some(news) = file.news {
         if !says_from(Source::Tasks) {
             return Err(

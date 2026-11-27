@@ -3136,6 +3136,22 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 `app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`, và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
+### Câu đầu tiên khi cài từ Store (`[first_run]`, #7814)
+
+`skill.toml` có thể có `[first_run]` với đúng một khóa `say`: câu Lamp nói
+khi chủ đèn cài kỹ năng từ Store (first builder chốt trên #7814, comment
+c7209938102; [tasks_vi.md](tasks_vi.md), "Câu đầu tiên của một món vừa cài").
+`say` là chữ thường từ 1 đến 140 ký tự, không có khoảng trắng ở hai đầu, một
+dòng, không markup hay dấu ngoặc kép (``< > ` * [ ] { } " “ ” \``) và tối
+đa một câu hỏi: đúng các kiểm tra của Store (`lamp_msgs::installed::say_ok`,
+như `first_run` của một app, [apps.md](../apps.md)). Được kiểm tra khi nạp
+(`[first_run] first_run.say: at most one question`, và các lỗi khác cùng
+cách viết) và bởi `lamp skill check`; `lamp-cloud` đọc nó từ `skill.toml` đã
+cài khi một lần cài từ Store (không phải thay thế) xong
+(`lamp_skills::first_run_of`) và đặt nó lên `store/installed`. Không có nó,
+Lamp chỉ nói "*title* is ready.". Một lamp-skills cũ hơn từ chối kỹ năng có
+khóa này, như mọi khóa nó không biết.
+
 ### Dịch vụ đã liên kết thành task cho agent của đèn (`LAMP_AGENT_SERVICES=on`, bật trong sản phẩm)
 
 Yêu cầu của chủ, 12/11; bật trong cả năm unit sản phẩm từ 13/11. Với

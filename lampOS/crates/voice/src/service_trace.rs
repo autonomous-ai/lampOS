@@ -170,6 +170,7 @@ impl SharedMetadata {
                             "photo_face_ask",
                             "run_write_read_back",
                             "long_make_told",
+                            "first_run_told",
                             "schedule_reminder",
                             "fixture_at_ms",
                             "head_wake_cue",

@@ -10,8 +10,8 @@ An app's folder, as a developer keeps it:
       skills/gym-tips/SKILL.md, skill.toml, ...
 
 `app.json` holds the manifest's own fields (name, title, version,
-min_build, runtime, grants, net, logs, npu, phrases, triggers, settings,
-skills, assets). `name` may be left out (the folder's), and so may `skills`
+min_build, runtime, grants, net, logs, npu, phrases, triggers, first_run,
+settings, skills, assets). `name` may be left out (the folder's), and so may `skills`
 and `assets` (the folders under skills/ and the WAV files under assets/).
 `pack` adds `format`, `kind` and `files` and writes the tar the Store
 takes: `lamp-skill.json` first, then every file as `NAME/path`, sorted,
@@ -43,6 +43,7 @@ from .errors import LampError
 from .push import MANIFEST, _entry
 from .skillcheck import Report
 from .skillcheck import check as check_skill
+from .skillcheck import first_run_errors
 
 SOURCE = "app.json"
 SIGNATURE = "lamp-skill.sig"
@@ -73,7 +74,7 @@ ASSET_WINDOW = 240
 # The manifest's fields, in the order `pack` writes them.
 FIELDS = (
     "format", "kind", "name", "title", "version", "min_build", "runtime", "grants", "net", "logs",
-    "npu", "phrases", "triggers", "settings", "skills", "assets", "files",
+    "npu", "phrases", "triggers", "first_run", "settings", "skills", "assets", "files",
 )
 REQUIRED = ("format", "kind", "name", "title", "version", "min_build", "runtime", "grants", "triggers", "files")
 TOPS = ("src", "assets", "skills")
@@ -261,6 +262,8 @@ def manifest_errors(manifest: object) -> list[str]:
     errors.extend(f"{MANIFEST}: {why}" for why in _phrases("triggers", triggers, MOST_TRIGGERS))
     if (phrases or triggers) and "hear" not in held:
         say("phrases and triggers need the hear grant")
+    if "first_run" in manifest:
+        errors.extend(f"{MANIFEST}: {why}" for why in first_run_errors(manifest["first_run"]))
     settings = manifest.get("settings", [])
     if not isinstance(settings, list) or len(settings) > MOST_SETTINGS:
         say(f"settings: a list of at most {MOST_SETTINGS}")

@@ -55,7 +55,23 @@ fn markup(c: char) -> bool {
 /// control character (so one line), no markup, and at most
 /// [`MOST_QUESTIONS`] question. The refusals are what the SDK prints.
 pub fn say_ok(say: &str) -> Result<(), String> {
-    let _ = say;
+    let chars = say.chars().count();
+    if chars == 0 || chars > MOST_SAY_CHARS || say.trim() != say {
+        return Err(format!(
+            "first_run.say: 1 to {MOST_SAY_CHARS} characters of plain text, no space at either end"
+        ));
+    }
+    if say.chars().any(char::is_control) {
+        return Err("first_run.say: one line, no control characters".into());
+    }
+    if let Some(found) = say.chars().find(|c| markup(*c)) {
+        return Err(format!(
+            "first_run.say: no markup or quotes (found {found:?})"
+        ));
+    }
+    if say.chars().filter(|c| matches!(c, '?' | '？')).count() > MOST_QUESTIONS {
+        return Err("first_run.say: at most one question".into());
+    }
     Ok(())
 }
 
@@ -108,15 +124,53 @@ impl Installed {
 
     /// Whether it declares a first-run line.
     pub fn declares_first_run(&self) -> bool {
-        false
+        self.first_run.is_some()
     }
 
     /// The line the lamp says first: its own, or "<Title> is ready.".
     pub fn line(&self) -> String {
-        String::new()
+        match &self.first_run {
+            Some(first_run) => first_run.say.clone(),
+            None => ready_line(&self.title),
+        }
     }
 
     pub fn check(&self) -> Result<(), Invalid> {
+        if !matches!(self.item.as_str(), APP | SKILL) {
+            return Err(Invalid("an install is of an app or a skill".into()));
+        }
+        if self.name.is_empty()
+            || self.name.len() > 64
+            || !self
+                .name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        {
+            return Err(Invalid(
+                "an installed item's name is 1 to 64 lowercase letters, digits and hyphens".into(),
+            ));
+        }
+        let title = self.title.chars().count();
+        if title == 0
+            || title > Self::MOST_TITLE_CHARS
+            || self.title.trim() != self.title
+            || self.title.chars().any(char::is_control)
+        {
+            return Err(Invalid(
+                "an installed item's title is 1 to 64 characters on one line".into(),
+            ));
+        }
+        if self.by != OWNER {
+            return Err(Invalid(
+                "an install is the owner's: by is \"owner\", never a name".into(),
+            ));
+        }
+        if let Some(first_run) = &self.first_run {
+            first_run.check().map_err(Invalid)?;
+        }
+        if self.finished_us == 0 {
+            return Err(Invalid("an install says when it finished".into()));
+        }
         Ok(())
     }
 }
