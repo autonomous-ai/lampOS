@@ -387,7 +387,7 @@ fn get_body_and_volume_validate_against_the_schema() {
                     {"name": "elbow", "min": 1967, "max": 2680, "folded": 2047, "stand": 2600},
                     {"name": "head_roll", "min": 2014, "max": 2074, "home": 2044},
                     {"name": "head_pitch", "min": 1955, "max": 2015, "home": 2000}],
-                "speed": 50.0, "acceleration": 400.0, "force": null, "heat_stop": 62, "stands": true}),
+                "speed": 50.0, "acceleration": 400.0, "force": null, "heat_stop": 69, "stands": true}),
         S,
     );
     watch.take(
