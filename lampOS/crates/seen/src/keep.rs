@@ -39,7 +39,7 @@
 //!   the same place within 4 s, alone in view, is carried, which the first
 //!   builder took for a timer on #6543. Past [`KEEP_US`] closed, both are
 //!   wiped as before.
-//!   The posture window's samples older than its ten minutes still age out.
+//!   The posture window's samples older than its `KEPT_US` (2 min) still age out.
 //! - **Timers only.** The keep holds posture's window and the sitting's
 //!   timers (break, drink, eating, desk time and the counts), never a
 //!   name, an identity, a memory or a record about a person. Only an

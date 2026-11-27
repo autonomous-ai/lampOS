@@ -1,0 +1,27 @@
+# 11:00, bad neck to 8 minutes, then bad back to 25: the neck's word at 30 s, nothing at
+# the change to the back (the skill's own 15-minute gap between words), the back's at 15m30.
+clock = "11:00"
+
+[[expect]]
+at = "30s"
+within = "30s"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "30s"
+within = "30s"
+call = "say"
+args = { note = "They have sat a while with their head forward of their shoulders. In one short, kind line, the way a friend would, suggest gently bringing the head back over the shoulders. Say only 'a while', never a number; name no condition or illness, and never mention a camera." }
+
+[[expect]]
+at = "930s"
+within = "30s"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "930s"
+within = "30s"
+call = "say"
+args = { note = "They have sat a while leaning forward over the desk. In one short, kind line, the way a friend would, suggest sitting back and letting the chair support the back. Say only 'a while', never a number; name no condition or illness, and never mention a camera." }
