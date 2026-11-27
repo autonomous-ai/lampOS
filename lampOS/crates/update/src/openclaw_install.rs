@@ -2145,11 +2145,19 @@ fn steps(
             // Looked at again after `settled`'s wait (up to SETTLE_AT_MOST):
             // a switch meanwhile, or Hermes's gateway not down (a round
             // holding OpenClaw's start behind it), and it is not restarted.
+            // Under hermes_gateway::START_LOCK, never waited for: lamp-update
+            // starting Hermes's gateway this instant holds it.
+            let start = hermes_gateway::start_lock(records);
             if wanted() != Gateway::Wanted {
                 say(&format!(
                     "{UNIT} not restarted: OpenClaw is no longer the lamp's agent; lamp-update starts it once it is"
                 ));
-            } else if !hermes_down(run) {
+            } else if start.is_none() {
+                say(&format!(
+                    "{UNIT} not restarted: lamp-update is starting {} this moment, and one agent gateway runs at a time; lamp-update starts it once OpenClaw is the lamp's agent",
+                    hermes_gateway::UNIT
+                ));
+            } else if !hermes_down(run) || hermes_gateway::enabled(root) {
                 say(&format!(
                     "{UNIT} not restarted: {} is not down, and one agent gateway runs at a time; lamp-update starts it once it is",
                     hermes_gateway::UNIT

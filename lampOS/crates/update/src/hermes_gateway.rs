@@ -86,6 +86,28 @@ pub const SWITCH: &str = "LAMP_HERMES_GATEWAY";
 pub const UNIT: &str = "lamp-hermes-gateway.service";
 /// What `systemctl enable` makes of the unit's `WantedBy`.
 pub const WANTS: &str = "/etc/systemd/system/multi-user.target.wants/lamp-hermes-gateway.service";
+/// The lock taken around "the other agent gateway is down, so this one is
+/// started", in lamp-update's records folder, the one folder both lamp-update
+/// and its one-shot (crate::harness_install) can write: by Hermes's start
+/// here ([`gateway_on`]) and by OpenClaw's restart in the one-shot, a
+/// separate process outside main's gateway lock. Never waited for: held,
+/// the start is left to the next look, so one never starts in the instant
+/// after the other's check (#8693).
+pub const START_LOCK: &str = "agent-gateway-start.lock";
+
+/// [`START_LOCK`] in `records`, taken without waiting: `None` while the
+/// other process holds it.
+pub fn start_lock(records: &Path) -> Option<fs::File> {
+    hermes_install::lock_named(records, START_LOCK, "agent gateway start").ok()
+}
+
+/// Whether Hermes's gateway is enabled ([`WANTS`] there): a start by
+/// [`gateway_on`] makes it before the start, so OpenClaw's one-shot, with
+/// [`START_LOCK`] held, sees a start that systemd has not begun yet.
+pub fn enabled(root: &Path) -> bool {
+    fs::symlink_metadata(on(root, WANTS)).is_ok()
+}
+
 /// The gateway's namespace script: [`ns_text`], root's, 0755, written by
 /// Harness's one-shot beside Hermes's own.
 pub const NS: &str = "/usr/local/lib/lampos/hermes-gateway-ns";
@@ -531,6 +553,26 @@ fn gateway_on(root: &Path, systemd: &mut dyn Systemd, round: bool, say: &mut dyn
             Err(why) => say(&format!("{UNIT} failed, and not reset-failed: {why}")),
         },
         _ => return,
+    }
+    // OpenClaw's one-shot restarts its gateway outside main's lock: the
+    // check that OpenClaw's is down and this start are made under
+    // START_LOCK, as the one-shot's check and restart are.
+    let records = on(root, crate::install::RECORDS);
+    let Some(_start) = start_lock(&records) else {
+        say(&format!(
+            "{UNIT} not started yet: OpenClaw's one-shot is restarting its gateway, and one agent gateway runs at a time; tried again at the next look"
+        ));
+        return;
+    };
+    let openclaw_unit = root
+        .join(crate::writer_unit::FOLDER)
+        .join(openclaw_install::UNIT);
+    if fs::symlink_metadata(openclaw_unit).is_ok() && !openclaw_install::gateway_down(systemd) {
+        say(&format!(
+            "{UNIT} not started yet: {} still runs, and one agent gateway runs at a time; tried again at the next look",
+            openclaw_install::UNIT
+        ));
+        return;
     }
     match systemd.start_added(UNIT) {
         Ok(()) => say(&format!("{UNIT} started: Hermes is the lamp's agent")),
