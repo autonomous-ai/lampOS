@@ -12003,7 +12003,8 @@ fn value_asked(words: &str) -> Option<String> {
 /// for no value (El's P3s on #8732): one a negation governs in its own
 /// sentence ("don't tell me how many emails, just say good morning", "no
 /// need to say what time it is", "đừng nói mấy giờ"), within its four
-/// words before; or "the time" or "the date" after a word that makes it a
+/// words before, but never one of forgetting ("don't forget", "without
+/// fail", "đừng quên", El's P2 on #8822); or "the time" or "the date" after a word that makes it a
 /// when, not a value ("all the time", "by the time", "at the time").
 fn value_ask_not_meant(ask: &str, before: &str) -> bool {
     let sentence = before
@@ -12017,10 +12018,16 @@ fn value_ask_not_meant(ask: &str, before: &str) -> bool {
     let near = &near[near.len().saturating_sub(4)..];
     let negated = near.iter().enumerate().any(|(at, word)| {
         let next = near.get(at + 1).copied().unwrap_or_default();
-        matches!(
+        // "Don't forget", "never miss", "without fail", "đừng quên": a
+        // negation of forgetting asks all the more (El's P2 on #8822).
+        let forgets = |next: &str| matches!(next, "forget" | "fail" | "miss" | "quên");
+        (matches!(
             *word,
             "don't" | "don’t" | "dont" | "never" | "without" | "đừng"
-        ) || (*word == "do" && next == "not")
+        ) && !forgets(next))
+            || (*word == "do"
+                && next == "not"
+                && !forgets(near.get(at + 2).copied().unwrap_or_default()))
             || (*word == "no" && next == "need")
             || (*word == "không" && next == "cần")
     });

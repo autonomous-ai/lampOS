@@ -4306,7 +4306,8 @@ Dù đèn chạy agent nào (OpenClaw hay Hermes; không chỗ nào ở đây g�
   phải là hỏi giá trị; một cụm có lời phủ định trong bốn từ trước nó, cùng
   câu ("don't", "do not", "never", "without", "no need", "đừng", "không
   cần": "don't tell me how many emails, just say good morning") cũng
-  không; "the time" hay "the date" sau "all", "by", "at", "on", "from",
+  không, trừ lời phủ định của việc quên ("don't forget", "never miss",
+  "without fail", "đừng quên"), vốn càng là hỏi giá trị; "the time" hay "the date" sau "all", "by", "at", "on", "from",
   "since", "until", "till" hay "same" ("all the time") cũng không), và mọi
   câu `say` cố định của kỹ năng hẹn giờ đều không có chữ số và không lặp
   lại cụm đó. Agent được báo phần lời yêu cầu từ cụm đó tới hết câu, làm
