@@ -333,7 +333,10 @@ volume on the bus (`lamp_msgs::SpeakerVolume`, `{volume, muted}`, latest)
 once it starts, from one read, and after any call or check that read a
 different level: the voice's, the app's or a computer's (`volume_out.rs`).
 Nothing is read for it; it says what the last call read. lamp-control makes
-`volume.changed` from it, so a computer hears the person's own changes.
+`volume.changed` from it, so a computer hears the person's own changes. The
+voice's ring reads it after `speaker/state`, which reads the mixer each
+second, to show a speaker muted or at 0 in teal (`LAMP_RING_SPEAKER_MUTED`,
+on in the product; [ring-choreography.md](ring-choreography.md#the-speaker-muted-or-at-0)).
 
 ## What was taken from V1, and what was not
 

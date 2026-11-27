@@ -3,6 +3,7 @@ use crate::{
     ring_face::{Face, Lit, Mood},
     ring_light::RingLight,
     ring_sight::RingSight,
+    ring_speaker::Tried,
     ring_wire::{RingBlankReason, RingFeedback, RingFrame, RingPhase, RingRejection},
     transport::WorkerChannels,
     wire::{Control, WorkerEvent},
@@ -85,6 +86,9 @@ pub struct Senses {
     /// A computer seeing or hearing through the lamp (`light/mark`): its
     /// mark over every frame drawn ([`crate::ring_mark`]).
     pub marks: Option<crate::ring_mark::Marks>,
+    /// The speaker muted or at 0, and the lamp's name heard, for the muted
+    /// face (`LAMP_RING_SPEAKER_MUTED=on`, [`crate::ring_speaker`]).
+    pub speaker: Option<crate::ring_speaker::RingSpeaker>,
 }
 
 /// The shutdown's warning while the primary button is held in its window
@@ -333,6 +337,20 @@ pub fn run_continuous(
             }
         }
     });
+    // Only with the switch on, which the voice hands this worker. A speaker
+    // that cannot be read is said once, and the ring runs as before.
+    let speaker = bus_root
+        .filter(|_| crate::ring_speaker::enabled())
+        .and_then(|root| {
+            match boot_clock().and_then(|clock| crate::ring_speaker::RingSpeaker::on(root, &clock))
+            {
+                Ok(speaker) => Some(speaker),
+                Err(error) => {
+                    eprintln!("lamp-voice ring: the speaker's mute is not shown: {error}");
+                    None
+                }
+            }
+        });
     let senses = Senses {
         caps,
         unplug,
@@ -341,6 +359,7 @@ pub fn run_continuous(
         button,
         reset,
         marks,
+        speaker,
         light,
         eye,
         eye_strong,
@@ -645,6 +664,7 @@ fn service(
         mut button,
         mut reset,
         mut marks,
+        mut speaker,
     } = senses;
     let mut light = light.map(|(light, begins)| {
         face.light(begins);
@@ -711,6 +731,20 @@ fn service(
         // only a bounded few at a time (#849 review).
         if let Some(head) = head.as_mut() {
             face.hand(head.tick(at));
+        }
+        // So is the speaker: what its thread last found, read after them too.
+        // It shapes faces and decides no write.
+        if let Some(speaker) = speaker.as_mut() {
+            let (said, heard) = speaker.tick(at);
+            let own_light = light.as_ref().is_none_or(RingLight::persons_own);
+            face.speaker_muted(crate::ring_speaker::shown(said, own_light));
+            // Taken, and told to the journal only once a frame with its
+            // swell is written, or as not drawn (#8934's review).
+            if let Some((heard_at, score)) = heard
+                && face.heard(heard_at)
+            {
+                speaker.swell_taken(score, heard_at);
+            }
         }
         if at.saturating_sub(peak_said_at) >= RING_SAID_WINDOW_US {
             peak_said_at = at;
@@ -791,6 +825,7 @@ fn service(
                         reject(link, frame, RingRejection::ExpiredState)?;
                     } else if let Err(reason) = guard.check(now(), frame.permit, OutputKind::Light)
                     {
+                        swell_tried(&mut speaker, Tried::Held(refused(&reason)));
                         reject(link, frame, reason.into())?;
                     } else {
                         let ceiling = ChannelCeiling::new(frame.ceiling.min(cap_ceiling))
@@ -820,8 +855,21 @@ fn service(
                                 pixels
                             }
                         });
+                        // What the frame has in place of the face, if
+                        // anything: a hearing's swell is told as drawn only
+                        // from a frame written with it.
+                        let instead = if warning.is_some() {
+                            Some("a warning")
+                        } else {
+                            presentation.as_ref().map(|_| "the unplug picture")
+                        };
                         match ring.show(&pixels, ceiling, frame.permit) {
                             Ok(write) => {
+                                if let Some(instead) = instead {
+                                    swell_tried(&mut speaker, Tried::Held(instead));
+                                } else if face.swelled() {
+                                    swell_tried(&mut speaker, Tried::Drawn);
+                                }
                                 // The mark was in a frame shown: its askers
                                 // are told, and only now.
                                 if marked
@@ -853,6 +901,7 @@ fn service(
                                     // A deadline can cross the final device check.
                                     // GuardedRing reconciles it; no fabricated
                                     // successful blank/write timestamp is emitted.
+                                    swell_tried(&mut speaker, Tried::Held(refused(&reason)));
                                     reject(link, frame, reason.into())?;
                                 }
                                 _ => return Err(io::Error::other(error)),
@@ -922,8 +971,11 @@ fn service(
                 .and_then(|unplug| unplug.prepare(at));
             if let RestWins::Warning(pixels) = rest_wins(warning, presentation.is_some()) {
                 rested = false;
-                ring.show_resting(&pixels, ceiling)
-                    .map_err(io::Error::other)?;
+                let written = ring
+                    .show_resting(&pixels, ceiling)
+                    .map_err(io::Error::other)?
+                    .is_some();
+                swell_tried(&mut speaker, in_place(written, "a warning", &guard));
             } else if let (Some(unplug), Some(presentation)) =
                 (unplug.as_mut(), presentation.as_ref())
             {
@@ -934,10 +986,14 @@ fn service(
                 } else {
                     presentation.pixels
                 };
-                if let Some(receipt) = ring
+                let written = ring
                     .show_resting(&pixels, ceiling)
-                    .map_err(io::Error::other)?
-                {
+                    .map_err(io::Error::other)?;
+                swell_tried(
+                    &mut speaker,
+                    in_place(written.is_some(), "the unplug picture", &guard),
+                );
+                if let Some(receipt) = written {
                     unplug.drew(receipt.finished_at().as_micros(), presentation)?;
                     if marked
                         && crate::ring_mark::visible(&pixels, ceiling)
@@ -976,12 +1032,87 @@ fn service(
                 {
                     marks.drew(at);
                 }
+                // A hearing's swell is told as drawn only from a frame the
+                // ring wrote with it: never under a computer's own pixels,
+                // never under a refusal (#8934's review).
+                if let Some(tried) = rested_swell(
+                    face.draws_own_pixels(),
+                    face.swelled(),
+                    share,
+                    painted,
+                    || refused_at_rest(&guard),
+                ) {
+                    swell_tried(&mut speaker, tried);
+                }
             }
         }
         stall_pass.done();
         if let Some(wait) = TICK_US.checked_sub(monotonic_us().saturating_sub(tick)) {
             std::thread::sleep(Duration::from_micros(wait));
         }
+    }
+}
+
+/// What a frame tried while a hearing's swell may be due came to, for the
+/// speaker's journal: a swell is told as drawn only from a frame written
+/// with it (#8934's review).
+fn swell_tried(speaker: &mut Option<crate::ring_speaker::RingSpeaker>, tried: Tried) {
+    if let Some(speaker) = speaker.as_mut() {
+        speaker.swell_tried(tried);
+    }
+}
+
+/// Why the ring refused a frame, in the journal's words: the privacy switch
+/// closed, or else refused (a lease lapsed, a turn's owner changed).
+fn refused(error: &AuthorityError) -> &'static str {
+    if matches!(error, AuthorityError::PrivacyClosed) {
+        "privacy"
+    } else {
+        "refused"
+    }
+}
+
+/// Why the ring refused a resting frame, which it does without a reason:
+/// the privacy switch, as the authority installed says, or else refused.
+fn refused_at_rest(guard: &BoundaryGuard) -> &'static str {
+    let closed = guard
+        .state()
+        .is_some_and(|state| state.microphone_permission() != lamp_turn_owner::Permission::Allowed);
+    if closed { "privacy" } else { "refused" }
+}
+
+/// What a resting frame drawn in place of the face (`what`) came to for a
+/// hearing's swell: not drawn because of it when the ring wrote it, else
+/// because the ring refused.
+fn in_place(written: bool, what: &'static str, guard: &BoundaryGuard) -> Tried {
+    Tried::Held(if written {
+        what
+    } else {
+        refused_at_rest(guard)
+    })
+}
+
+/// What a resting frame of the face came to for a hearing's swell, or
+/// `None` with no swell in it to tell. `own_pixels`: the face drew a
+/// computer's own pixels, which have none; `asleep`: the night's share over
+/// the face; `painted`: whether the ring wrote it; `refused`: why not.
+fn rested_swell(
+    own_pixels: bool,
+    swelled: bool,
+    asleep: f32,
+    painted: bool,
+    refused: impl FnOnce() -> &'static str,
+) -> Option<Tried> {
+    if !own_pixels && !swelled {
+        None
+    } else if !painted {
+        Some(Tried::Held(refused()))
+    } else if own_pixels {
+        Some(Tried::Held("a computer's pixels"))
+    } else if asleep >= 1.0 {
+        Some(Tried::Held("the night's asleep face"))
+    } else {
+        Some(Tried::Drawn)
     }
 }
 
@@ -1229,6 +1360,23 @@ mod drawn_tests {
     }
 
     fn ring_with(permission: Permission, turn: bool) -> GuardedRing<Sink> {
+        let (boot, snapshot) = authority(permission, turn);
+        let mut ring = GuardedRing::new(Sink(0), boot).unwrap();
+        ring.install_authority(snapshot).unwrap();
+        ring
+    }
+
+    /// The worker's own guard with such an authority installed, no turn.
+    fn ring_guard(permission: Permission) -> BoundaryGuard {
+        let (boot, snapshot) = authority(permission, false);
+        let mut guard = BoundaryGuard::new(boot, now());
+        guard.install(now(), snapshot).unwrap();
+        guard
+    }
+
+    /// An authority whose microphone is `permission`, with a turn owning
+    /// the lamp when `turn`.
+    fn authority(permission: Permission, turn: bool) -> (BootId, lamp_turn_owner::Snapshot) {
         let boot = crate::process::new_boot().unwrap();
         let mut controller = Controller::new(boot, now());
         controller
@@ -1251,10 +1399,7 @@ mod drawn_tests {
         controller
             .set_microphone_permission(now(), permission)
             .unwrap();
-        let mut ring = GuardedRing::new(Sink(0), boot).unwrap();
-        ring.install_authority(controller.snapshot(now()).unwrap())
-            .unwrap();
-        ring
+        (boot, controller.snapshot(now()).unwrap())
     }
 
     /// A frame of a new turn's waiting phase, the hum's when `listening`.
@@ -1376,6 +1521,81 @@ mod drawn_tests {
         assert!(owned.show_resting(&pixels, ceiling).unwrap().is_none());
         let mut open = ring_with(Permission::Allowed, false);
         assert!(open.show_resting(&pixels, ceiling).unwrap().is_some());
+    }
+
+    /// The speaker's muted face and its swell are the face's: with the
+    /// privacy switch closed (the privacy worker's breath is the one shown
+    /// then, and it never reads the speaker) or a turn owning the lamp, the
+    /// ring writes nothing of them at rest; open, they are drawn.
+    #[test]
+    fn the_muted_face_and_its_swell_are_never_drawn_over_privacy_or_a_turn() {
+        let mut face = Face::default();
+        face.speaker_muted(crate::ring_face::Muted::AtRest);
+        assert!(face.heard(1_000_000));
+        let pixels = (0..10)
+            .map(|frame| face.render(Mood::Resting, 0, 1_000_000 + frame * 20_000, 60))
+            .last()
+            .unwrap();
+        assert!(
+            pixels
+                .iter()
+                .all(|pixel| pixel.red == 0 && pixel.green >= pixel.blue)
+                && pixels.iter().any(|pixel| pixel.green > 0)
+        );
+        let ceiling = ChannelCeiling::new(60).unwrap();
+        let mut closed = ring_with(Permission::Denied, false);
+        assert!(closed.show_resting(&pixels, ceiling).unwrap().is_none());
+        let mut owned = ring_with(Permission::Allowed, true);
+        assert!(owned.show_resting(&pixels, ceiling).unwrap().is_none());
+        let mut open = ring_with(Permission::Allowed, false);
+        assert!(open.show_resting(&pixels, ceiling).unwrap().is_some());
+    }
+
+    /// #8934's review: a resting frame tells a hearing's swell drawn only
+    /// when the ring wrote it with the swell in it and the night's asleep
+    /// face did not cover it; else why not, a refusal first.
+    #[test]
+    fn a_resting_frame_tells_a_swell_drawn_only_as_written_with_it() {
+        let privacy = || "privacy";
+        assert_eq!(rested_swell(false, false, 0.0, true, privacy), None);
+        assert_eq!(
+            rested_swell(false, true, 0.0, true, privacy),
+            Some(Tried::Drawn)
+        );
+        assert_eq!(
+            rested_swell(false, true, 0.9, true, privacy),
+            Some(Tried::Drawn),
+            "through a night still easing in"
+        );
+        assert_eq!(
+            rested_swell(false, true, 1.0, true, privacy),
+            Some(Tried::Held("the night's asleep face"))
+        );
+        assert_eq!(
+            rested_swell(true, false, 0.0, true, privacy),
+            Some(Tried::Held("a computer's pixels"))
+        );
+        for (own_pixels, swelled) in [(false, true), (true, false)] {
+            assert_eq!(
+                rested_swell(own_pixels, swelled, 0.0, false, privacy),
+                Some(Tried::Held("privacy"))
+            );
+        }
+        // Why refused: the privacy switch by name, anything else refused.
+        assert_eq!(refused(&AuthorityError::PrivacyClosed), "privacy");
+        assert_eq!(refused(&AuthorityError::ExpiredState), "refused");
+        assert_eq!(refused_at_rest(&ring_guard(Permission::Denied)), "privacy");
+        assert_eq!(refused_at_rest(&ring_guard(Permission::Allowed)), "refused");
+        // A warning or the unplug picture in the face's place: it, when
+        // written, else the refusal.
+        assert_eq!(
+            in_place(true, "a warning", &ring_guard(Permission::Allowed)),
+            Tried::Held("a warning")
+        );
+        assert_eq!(
+            in_place(false, "a warning", &ring_guard(Permission::Denied)),
+            Tried::Held("privacy")
+        );
     }
 
     /// #4521's camera mark over a computer's pixels (#4943's fourth before

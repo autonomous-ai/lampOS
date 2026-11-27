@@ -350,6 +350,10 @@ Environment=LAMP_OFFLINE_VOICE=on
 # LAMP_OUTAGE_LINE_AGAIN: with LAMP_OFFLINE_VOICE, its why and rules are its row in docs/switches.md (#8235).
 Environment=LAMP_OUTAGE_LINE_AGAIN=on
 Environment=LAMP_RING_ASLEEP=on
+# LAMP_RING_SPEAKER_MUTED: the speaker muted or at 0 shows on the ring in teal, the speaking face, one swell when the
+# name is heard and the rest in the dim first light (the product owner, 27 Nov: "so people know"); its row in
+# docs/switches.md.
+Environment=LAMP_RING_SPEAKER_MUTED=on
 # LAMP_LIGHT_KEEP: the person's light kept in /var/lib/lampOS/light across a restart, so sleep keeps following the
 # app's "Keep a light on while resting" switch after one (#8634, #1464); its row in docs/switches.md.
 Environment=LAMP_LIGHT_KEEP=on

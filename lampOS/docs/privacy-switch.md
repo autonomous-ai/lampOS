@@ -670,7 +670,11 @@ LOW: while the switch cannot be read (#795), as when Controls is lost, the
 voice stays up with its microphones closed and the ring is dark, not red, as
 the ring crate requires of unknown evidence. That is the decision: the first
 builder's 13:50 on #795 took "stays up, closed" as the answer to their 10:08
-ask, and the red breath means only a switch read closed. The existing active
+ask, and the red breath means only a switch read closed. The speaker's own
+mute, a volume of 0, is another thing: its teal is the conversation ring's,
+drawn only while the lamp can hear, so the red breath always wins and this
+worker never reads the speaker ([ring-choreography.md](ring-choreography.md#the-speaker-muted-or-at-0)).
+The existing active
 ring
 must have stopped first; a shutdown black-write receipt **and** process exit
 are required before its replacement starts. SPI stays outside the privacy and
