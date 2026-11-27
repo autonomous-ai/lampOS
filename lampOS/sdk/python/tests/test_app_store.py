@@ -485,3 +485,85 @@ def test_plain_http_elsewhere_is_refused_before_any_call(env, url, monkeypatch, 
     monkeypatch.setenv("LAMP_STORE_TOKEN", TOKEN)
     assert main(["app", "status"]) == 1
     assert fake.requests == []
+
+
+# an app's tools (#8386): the reader's `tools` field and its one file at the folder's top
+
+
+def _tar(manifest: dict, files: dict[str, bytes]) -> bytes:
+    """A package's tar as `pack` writes it, from a manifest and its files as given."""
+    from lampos.push import _entry
+
+    name = manifest["name"]
+    return b"".join(
+        [
+            _entry("lamp-skill.json", (json.dumps(manifest, indent=2) + "\n").encode()),
+            *(_entry(f"{name}/{path}", body) for path, body in sorted(files.items())),
+            bytes(1024),
+        ]
+    )
+
+
+TOOLS = json.dumps({"tools": [{"name": "start_workout", "description": "Start a workout.", "parameters": {"type": "object", "properties": {}}}]})
+
+
+def test_a_manifest_naming_tools_json_at_the_top_checks_and_packs_it(tmp_path):
+    folder = make_app(tmp_path, tools="tools.json")
+    (folder / "tools.json").write_text(TOOLS)
+    report = apps.check(folder)
+    assert report.ok, report.errors
+    assert not any("tools.json" in w for w in report.warnings), report.warnings
+    package = apps.pack(folder)
+    with tarfile.open(fileobj=io.BytesIO(package.data)) as tar:
+        names = tar.getnames()
+        manifest = json.load(tar.extractfile("lamp-skill.json"))
+        assert tar.extractfile("gym-coach/tools.json").read() == TOOLS.encode()
+    assert "gym-coach/tools.json" in names
+    assert manifest["tools"] == "tools.json"
+    assert "tools.json" in [entry["path"] for entry in manifest["files"]]
+    out = tmp_path / "gym.tar"
+    out.write_bytes(package.data)
+    assert apps.check(out).ok, apps.check(out).errors
+
+
+def test_a_tools_file_under_src_checks(tmp_path):
+    folder = make_app(tmp_path, tools="src/gym_coach/tools.json")
+    (folder / "src" / "gym_coach" / "tools.json").write_text(TOOLS)
+    report = apps.check(folder)
+    assert report.ok, report.errors
+    with tarfile.open(fileobj=io.BytesIO(apps.pack(folder).data)) as tar:
+        assert json.load(tar.extractfile("lamp-skill.json"))["tools"] == "src/gym_coach/tools.json"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["other.json", "../tools.json", "/tools.json", "src/tools.txt", "src/.json", "src/.hidden.json", "assets/tools.json", "src", "", 5],
+)
+def test_a_tools_path_the_reader_refuses_is_refused(tmp_path, path):
+    report = apps.check(make_app(tmp_path, tools=path))
+    assert any("lamp-skill.json: tools " in line and "is not tools.json or a .json file under src/" in line for line in report.errors), report.errors
+
+
+def test_tools_json_at_the_top_without_the_manifest_naming_it_is_refused(tmp_path):
+    folder = make_app(tmp_path, tools="tools.json")
+    (folder / "tools.json").write_text(TOOLS)
+    manifest = apps.pack(folder).manifest
+    files = {entry["path"]: (folder / entry["path"]).read_bytes() for entry in manifest["files"]}
+    for named in (None, "src/gym_coach/tools.json"):
+        changed = {k: v for k, v in manifest.items() if k != "tools"}
+        if named:
+            changed["tools"] = named
+        out = tmp_path / f"{named is None}.tar"
+        out.write_bytes(_tar(changed, files))
+        errors = apps.check(out).errors
+        assert "tools.json: an app's files are under src/, assets/ and skills/" in errors, errors
+
+
+def test_a_folders_tools_json_is_not_packed_unless_the_manifest_names_it(tmp_path):
+    folder = make_app(tmp_path)
+    (folder / "tools.json").write_text(TOOLS)
+    report = apps.check(folder)
+    assert report.ok, report.errors
+    assert any(w.startswith("tools.json: not packed") for w in report.warnings), report.warnings
+    with tarfile.open(fileobj=io.BytesIO(apps.pack(folder).data)) as tar:
+        assert "gym-coach/tools.json" not in tar.getnames()
