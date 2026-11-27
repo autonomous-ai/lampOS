@@ -5400,12 +5400,19 @@ là mười phút, không phải một, và:
   của giọng nói cho tin (1 s, 3 s sau lời của đèn): "By the way, the work you
   handed over is done." (`BY_THE_WAY_DONE`, `BY_THE_WAY_ASKING`,
   `BY_THE_WAY_STOPPED`) cho một phòng vẫn đang nói, tin đầy đủ cho một phòng
-  yên. Sau một câu ngắn, tin đầy đủ theo sau khi đèn trả lời ai đó lần nữa,
-  không phải ở câu kế tiếp của bất kỳ ai.
-- Mọi tin chỉ được kể khi có người ở đó lúc này: một khuôn mặt trong tầm
-  nhìn, hoặc bất kỳ ai được nghe nói trong khoảng 15 s
+  yên. Sau một câu ngắn, tin đầy đủ chỉ theo sau khi đèn trả lời ai đó lần
+  nữa, không phải ở câu kế tiếp của bất kỳ ai, cũng không ở quãng ngừng dài
+  kế tiếp của một phòng yên (`TaskNews::short_unanswered`).
+- Mọi tin (trừ tin đăng nhập, thứ người dùng vừa hỏi và có thể đang gõ
+  trong im lặng) chỉ được kể khi có người ở đó lúc này: một khuôn mặt trong
+  tầm nhìn, hoặc bất kỳ ai được nghe nói trong khoảng 15 s
   (`task_news::someone_there`, `HEARD_WITHIN_US`). Nếu không, nó chờ, chưa
-  kể, cho tới khi có người. Lời nhắc và lần ghi bị giữ của một skill vẫn giữ
+  kể, cho tới khi có người. Một phòng bận vì người khác đang nói chỉ giữ tin
+  cho tới khi cuộc nói chuyện xong, 10 s không ai được nghe nói và không có
+  lượt nào (`task_news::TALK_OVER_US`, `talk_over`): bản thân phòng vẫn bận
+  30 s, lâu hơn 15 s mà người nói được tính là còn ở đó, nên tin sau một cuộc
+  nói chuyện không có khuôn mặt trong tầm nhìn sẽ phải chờ giọng nói kế tiếp.
+  Lời nhắc và lần ghi bị giữ của một skill vẫn giữ
   hai phút của chúng (`reminders::HEARD_WITHIN_US`).
 
 | Giới hạn | Giá trị | Ở đâu |
@@ -5414,6 +5421,7 @@ là mười phút, không phải một, và:
 | Quãng ngừng trong lời nói để kể | 5 s không ai được nghe nói và không có lượt nào (1 s trước #8783) | `task_news::LONG_PAUSE_US` |
 | Quãng ngừng sau khi đèn trả lời ai đó | 1 s không ai được nghe nói, lượt đã xong cũng lâu như vậy | `task_news::PAUSE_US` (không đổi) |
 | Có người ở đó | một khuôn mặt, hoặc bất kỳ ai được nghe trong 15 s (2 phút trước #8783) | `task_news::HEARD_WITHIN_US` |
+| Cuộc nói chuyện của phòng bận đã xong | 10 s không ai được nghe nói và không có lượt nào | `task_news::TALK_OVER_US` |
 | Sau lời của chính đèn | 3 s không ai bắt đầu | `task_news::AFTER_LAMP_US` (không đổi) |
 | Câu trả lời đã là một câu ngắn | tối đa 80 ký tự, nguyên vẹn | `task_news::SHORT_FITS_CHARS` |
 | Số câu ngắn được nói | một cho mỗi tin, một lần | `TaskNews::short_told` |
