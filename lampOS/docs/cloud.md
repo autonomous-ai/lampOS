@@ -2973,7 +2973,10 @@ As each step of the setup walk ends, the app is told, once. Behind
   lamp-cloud's and a half), so the phone leaves "updating" before Lamp
   speaks (lamp-9adf, 16492: 16 s with the opening said and the phone
   still waiting). Kept in `onboarding-step` with `"asked": "asked"`, so an
-  ask and an end at the same moment are two events.
+  ask and an end at the same moment are two events. For `how_you_sound`
+  (phase 2) the event also has `tries_ok` and `tries_need` (calls accepted
+  and needed, 3), told again on each accepted call (a new `at`), so the
+  app shows how many are left; added fields only.
 - **Will it come.** `system.info`'s `onboarding_step_supported: true` beside
   `onboarding_done_supported`, with the switch on.
 

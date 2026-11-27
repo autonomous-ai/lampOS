@@ -2484,3 +2484,99 @@ fn the_lamps_own_name_over_a_gapped_prompt_does_not_replay_it() {
     assert_eq!(walk.kept().near_call_prompts, 1);
     assert_eq!(next_words(&mut walk, 20 * S), NEAR_MISSED);
 }
+
+/// [`play`] for Call Lamp in the walk Lamp leads by voice: any line.
+fn play_v2(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
+    let token = offer(walk, now);
+    let words = walk.take_invitation(token, now).unwrap();
+    let boot = BootId::new([3; 16]).unwrap();
+    assert!(walk.bind_invitation(token, boot, turn));
+    walk.near_seen(Seen::Speaking {
+        at_ms: unix_ms - 2_000,
+        speaking: true,
+    });
+    set_clock(unix_ms);
+    walk.invitation_finished(boot, turn, Delivery::Whole, now);
+    walk.near_seen(Seen::Speaking {
+        at_ms: unix_ms + 20,
+        speaking: false,
+    });
+    Prompt {
+        token,
+        words,
+        ended_us: now,
+        ended_ms: unix_ms,
+    }
+}
+
+/// #8871 phase 2, the owner: Call Lamp is asked until three calls count,
+/// never ended by its prompts; each miss coached, "Just say 'Hey Lamp'."
+/// after six, the count told to the app; three accepted are done.
+#[test]
+fn with_the_walk_v2_call_lamp_keeps_asking_after_misses_and_is_done_on_three() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    walk.set_walk_v2();
+    // The walk's first ask waits for the app to be told (ASKED_LEAD_US).
+    for at in [S, 3 * S, 5 * S] {
+        walk.tick(at, START_QUIET_US, true, false, face(), true);
+        walk.drain_storage_for_test(at);
+    }
+    let mut said = Vec::new();
+    let mut turn = 0;
+    let mut try_at = |walk: &mut Onboarding, heard: bool, said: &mut Vec<String>| {
+        turn += 1;
+        let at = turn * 20 * S;
+        let prompt = play_v2(walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        said.push(prompt.words.clone());
+        room(walk, &prompt, 2_400, 21.0);
+        if heard {
+            name(walk, &prompt, 2_000, 0.98);
+        }
+        judge(walk, &prompt)["accepted"] == heard
+    };
+    for _ in 0..7 {
+        assert!(try_at(&mut walk, false, &mut said));
+        assert_eq!(outcome(&walk), None, "{said:?}");
+    }
+    // Still asking after seven misses, its kept count in bounds.
+    assert!(usize::from(walk.kept().near_call_prompts) <= lamp_near_call::MOST_PROMPTS);
+    assert!(said[0].contains("Say 'Hey Lamp' three times"), "{said:?}");
+    assert!(
+        said[1..].iter().all(|line| !line.contains("Got it")),
+        "{said:?}"
+    );
+    assert!(
+        said.iter()
+            .any(|line| line.contains("Just say 'Hey Lamp'.")),
+        "{said:?}"
+    );
+    assert!(
+        said.iter().all(|line| !line.contains("Just say 'Lamp'")),
+        "{said:?}"
+    );
+    assert!(
+        said.windows(3)
+            .all(|three| !(three[0] == three[1] && three[1] == three[2])),
+        "{said:?}"
+    );
+    for count in 1..=3 {
+        assert!(try_at(&mut walk, true, &mut said));
+        let tries = walk.pending().asking.and_then(|asked| asked.tries);
+        if count < 3 {
+            assert_eq!(
+                tries,
+                Some(lamp_msgs::OnboardingTries { ok: count, need: 3 })
+            );
+        }
+    }
+    assert!(said[8].contains("Got it, two more."), "{said:?}");
+    assert!(said[9].contains("One more."), "{said:?}");
+    let notes = settle(&mut walk, 400 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Done), "{notes:?}");
+    assert!(
+        notes.iter().any(|note| note.contains("That's me!")),
+        "{notes:?}"
+    );
+    assert_eq!(walk.kept().near_call_tries.len(), 3);
+}

@@ -158,11 +158,13 @@ mod tests {
                 step: "touch".into(),
                 outcome: "later".into(),
                 at: 3,
+                tries: None,
             },
             lamp_msgs::OnboardingStepEnded {
                 step: "make_skill".into(),
                 outcome: "done".into(),
                 at: 4,
+                tries: None,
             },
         ];
         assert_eq!(data(9), json!({"at": 9}));

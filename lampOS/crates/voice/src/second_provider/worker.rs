@@ -13915,8 +13915,22 @@ impl Heeding {
         attention.one_person_present(one_person);
         let (heard, busy, lamp_asked, turned) =
             (seen.heard.as_str(), seen.busy, seen.lamp_asked, seen.turned);
-        let mut verdict =
-            attention.first_output_busy(request, seen.room, seen.going_on, self.strict, turned);
+        // The walk Lamp leads by voice (#8871): while its ask waits, the
+        // person's plain answer is the walk's own conversation going on,
+        // however long after the lamp's words; another voice's is not.
+        let walk_holds = crate::onboarding::walk_v2::holds_answer(seen.other_voice);
+        if walk_holds && !seen.going_on {
+            eprintln!(
+                "lamp-voice second: request {request}: the setup walk's ask waits for its answer: taken as said to the lamp"
+            );
+        }
+        let mut verdict = attention.first_output_busy(
+            request,
+            seen.room,
+            seen.going_on || walk_holds,
+            self.strict,
+            turned,
+        );
         if attention.news_reply_held() {
             eprintln!(
                 "lamp-voice second: request {request}: {}, but said_to_me held it: not a reply (LAMP_NEWS_REPLY_HEEDS_HELD)",

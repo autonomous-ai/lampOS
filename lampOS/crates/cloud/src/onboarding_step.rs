@@ -42,12 +42,19 @@ pub const FOR: u64 = 120_000;
 
 /// The reply's `data`.
 pub fn data(walk_id: u64, ended: &OnboardingStepEnded) -> Value {
-    json!({
+    let mut data = json!({
         "step": ended.step,
         "outcome": ended.outcome,
         "at": ended.at,
         "walk_id": walk_id,
-    })
+    });
+    // "How you sound"'s calls counted (#8871 phase 2): added fields, so an
+    // older app reads the rest as before.
+    if let Some(tries) = ended.tries {
+        data["tries_ok"] = json!(tries.ok);
+        data["tries_need"] = json!(tries.need);
+    }
+    data
 }
 
 /// The heartbeat's walk with the step asked (#8871) after its ends, as
@@ -61,6 +68,7 @@ pub fn with_asked(
         step: asked.step,
         outcome: ASKED.into(),
         at: asked.at,
+        tries: asked.tries,
     }));
     Some((walk_id, ended))
 }
@@ -201,6 +209,7 @@ mod tests {
         let asked = lamp_msgs::OnboardingStepAsked {
             step: "where_you_sit".into(),
             at: WALK + 10,
+            tries: None,
         };
         let now = Instant::now();
         let walk = || with_asked(Some((WALK, Vec::new())), Some(asked.clone()));
@@ -229,6 +238,41 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// #8871 phase 2: "how you sound" asked carries its calls counted, and
+    /// each accepted call (a new `at`) is told again.
+    #[test]
+    fn how_you_sound_asked_tells_its_calls_counted() {
+        let dir =
+            std::env::temp_dir().join(format!("onboarding-step-tries-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut steps = Steps::new(dir.join("onboarding-done"));
+        let asked = |ok: u8, at: u64| lamp_msgs::OnboardingStepAsked {
+            step: "how_you_sound".into(),
+            at,
+            tries: Some(lamp_msgs::OnboardingTries { ok, need: 3 }),
+        };
+        let now = Instant::now();
+        let (_, due) = steps
+            .due(now, WALK + 20, || {
+                with_asked(Some((WALK, Vec::new())), Some(asked(0, WALK + 10)))
+            })
+            .unwrap();
+        assert_eq!(
+            data(WALK, &due[0]),
+            json!({"step": "how_you_sound", "outcome": "asked", "at": WALK + 10, "walk_id": WALK,
+                "tries_ok": 0, "tries_need": 3})
+        );
+        steps.tried(&due[0], true);
+        let (_, due) = steps
+            .due(now + EVERY, WALK + 40, || {
+                with_asked(Some((WALK, Vec::new())), Some(asked(1, WALK + 30)))
+            })
+            .unwrap();
+        assert_eq!(data(WALK, &due[0])["tries_ok"], 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     const WALK: u64 = 1_762_675_100_000;
 
     fn ended(step: &str, outcome: &str, at: u64) -> OnboardingStepEnded {
@@ -236,6 +280,7 @@ mod tests {
             step: step.into(),
             outcome: outcome.into(),
             at,
+            tries: None,
         }
     }
 

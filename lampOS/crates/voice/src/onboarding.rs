@@ -1232,11 +1232,26 @@ pub struct Onboarding {
     /// is offered only then.
     make_on: bool,
     /// The state lines last set ([`walk_v2::set_state`]), by what they say.
-    state_key: Option<(Step, usize, usize)>,
+    state_key: Option<(Step, usize, usize, bool, bool)>,
     /// The walk step told to the app as asked (#8871), with when in Unix
     /// ms ([`lamp_msgs::OnboardingPending::asking`]), and since when the
     /// walk's first line is held for it ([`ASKED_LEAD_US`]).
     asked_told: Option<(Step, u64)>,
+    /// The person paused the walk by voice (#8871 phase 2, `{"walk":
+    /// "pause"}` from the worker after its one confirm): nothing is asked
+    /// until they carry on. Since when nobody has been in view while
+    /// paused, and whether the one offer to carry on was made since.
+    voice_paused: bool,
+    /// Every walk step is needed (#8871, the owner): a step tried and not
+    /// done is asked again, coached, never ended `later`. How many times
+    /// each was asked again, the step asked again next and from when
+    /// ([`walk_v2::reask_gap_us`]), and the step just asked again, whose
+    /// failed or later line is never said.
+    coached: std::collections::BTreeMap<Step, u8>,
+    reask: Option<(Step, u64)>,
+    reasked: Option<Step>,
+    paused_gone_since_us: Option<u64>,
+    paused_offered: bool,
     asked_held_us: Option<u64>,
     /// Whether the walk's first ask was held for the app once already.
     asked_lead_done: bool,
@@ -1758,6 +1773,10 @@ impl Onboarding {
         walk_v2::extend(&mut definition);
         self.definition = Arc::new(definition);
         self.walk_v2 = true;
+        // Call Lamp merged (#8871 phase 2): three calls counted, no
+        // sentence part.
+        self.near.three_calls = true;
+        self.near.v2 = true;
     }
 
     pub(crate) fn with_definition(
@@ -1831,6 +1850,12 @@ impl Onboarding {
             make_on: false,
             state_key: None,
             asked_told: None,
+            voice_paused: false,
+            coached: std::collections::BTreeMap::new(),
+            reask: None,
+            reasked: None,
+            paused_gone_since_us: None,
+            paused_offered: false,
             asked_held_us: None,
             asked_lead_done: false,
             harness_line: false,
@@ -2839,6 +2864,11 @@ impl Onboarding {
                 .map(|(step, at)| lamp_msgs::OnboardingStepAsked {
                     step: step.name().to_owned(),
                     at,
+                    // "How you sound"'s calls counted (#8871 phase 2).
+                    tries: (step == Step::HowYouSound).then(|| lamp_msgs::OnboardingTries {
+                        ok: u8::try_from(self.desired.near_call_tries.len()).unwrap_or(u8::MAX),
+                        need: lamp_near_call::TRIES as u8,
+                    }),
                 });
         }
         pending
@@ -2898,6 +2928,7 @@ impl Onboarding {
                         .as_str()?
                         .to_owned(),
                     at: kept.ended_at_unix_ms?,
+                    tries: None,
                 })
             })
             .collect();
@@ -3739,7 +3770,15 @@ impl Onboarding {
         still: bool,
     ) -> Option<String> {
         if self.walk_v2 {
-            self.publish_state();
+            // A step just asked again says no failed or later line.
+            if self.reasked.take().is_some() {
+                self.owed = None;
+                self.owed_after = None;
+            }
+            self.publish_state(paused || self.voice_paused);
+            if self.voice_paused {
+                return self.tick_voice_paused(now_us, quiet_us, can_speak, face);
+            }
         }
         // "Preferences"' hello: once the model has answered the quiet hours
         // (its words came), or [`HELLO_WAIT_US`] after them if it says
@@ -3794,7 +3833,13 @@ impl Onboarding {
     /// The state lines for where the walk stands now (#8871), set for the
     /// second route's worker as they change: the step led, else the next
     /// one, while the walk is under way; none once it is over.
-    fn publish_state(&mut self) {
+    fn publish_state(&mut self, paused: bool) {
+        // The ask waits for an answer: led and asked, the walk not paused.
+        let waits = !paused
+            && self
+                .led
+                .as_ref()
+                .is_some_and(|led| led.asked_us.is_some() && walk_v2::WALK.contains(&led.step));
         let step = self
             .led
             .as_ref()
@@ -3805,15 +3850,53 @@ impl Onboarding {
         let key = step.and_then(|step| {
             let offered = self.walk_steps();
             let at = offered.iter().position(|name| name == step.name())?;
-            Some((step, at + 2, offered.len() + 1))
+            Some((step, at + 2, offered.len() + 1, waits, self.voice_paused))
         });
         if key == self.state_key {
             return;
         }
         self.state_key = key;
         walk_v2::set_state(
-            key.map(|(step, at, of)| walk_v2::state_lines(step, at, of, self.language)),
+            key.map(|(step, at, of, waits, paused)| walk_v2::StateLines {
+                waits,
+                paused,
+                ..walk_v2::state_lines(step, at, of, self.language)
+            }),
         );
+    }
+
+    /// The walk paused by voice (#8871 phase 2): nothing asked, the step
+    /// kept to carry on at. When the person comes back into view after
+    /// [`GONE_US`] away, one offer to carry on, then quiet again.
+    fn tick_voice_paused(
+        &mut self,
+        now_us: u64,
+        quiet_us: u64,
+        can_speak: bool,
+        face: Option<Framing>,
+    ) -> Option<String> {
+        if self.drop_led().is_some() {
+            self.records
+                .push(json!({"kind":"onboarding_stopped","why":"paused_by_voice","at_us":now_us}));
+        }
+        if face.is_none() {
+            self.paused_gone_since_us.get_or_insert(now_us);
+            return None;
+        }
+        let back = self
+            .paused_gone_since_us
+            .take()
+            .is_some_and(|since| now_us.saturating_sub(since) >= GONE_US);
+        if !back || self.paused_offered || !can_speak || quiet_us < START_QUIET_US {
+            return None;
+        }
+        let step = self
+            .next_step()
+            .filter(|step| walk_v2::WALK.contains(step))?;
+        self.paused_offered = true;
+        self.records
+            .push(json!({"kind":"onboarding_carry_on_offered","step":step.name(),"at_us":now_us}));
+        Some(walk_v2::carry_on_offer(step, self.language))
     }
 
     fn tick_led(
@@ -3929,6 +4012,13 @@ impl Onboarding {
         }
         if !self.step_available(step) {
             self.finish(step, Outcome::NotAvailable, None, now_us);
+            // Never stuck on missing hardware (#8871, the first builder's
+            // change 2): the walk says so in one line and goes on.
+            if self.walk_v2
+                && let Some(line) = walk_v2::not_available_line(step)
+            {
+                self.owed = Some(line.to_owned());
+            }
             return None;
         }
         // The walk Lamp leads by voice (#8871): the app is told the step
@@ -4036,6 +4126,16 @@ impl Onboarding {
         let gone = self
             .seen_us
             .is_none_or(|seen| now_us.saturating_sub(seen) >= GONE_US);
+        // Asked again after a miss (#8871): its gap first, then its coached
+        // line in place of the first note.
+        let coach = if self.led.as_ref().is_some_and(|led| led.asked_us.is_none()) {
+            match self.coach_due(step, now_us) {
+                Some(None) => return None,
+                coach => coach.flatten(),
+            }
+        } else {
+            None
+        };
         let led = self.led.as_mut()?;
         let Some(asked_us) = led.asked_us else {
             // With the nudge on, the walk's first ask waits for someone
@@ -4064,6 +4164,10 @@ impl Onboarding {
                     json!({"kind":"onboarding_step","step":step.name(),"state":"asked",
                         "offered_again":again.is_some(),"at_us":now_us}),
                 );
+                if let Some(coach) = coach {
+                    self.save();
+                    return Some(coach);
+                }
                 if again.is_some() {
                     self.save();
                     self.owed = Some(self.step_note(step, true, true));
@@ -4101,6 +4205,50 @@ impl Onboarding {
             );
             return None;
         }
+        // The walk Lamp leads by voice (#8871 phase 2, the owner): never
+        // stuck in silence. Nothing said since the step's ask, its last
+        // reminder or the lamp's latest words, it is asked again with a
+        // coached line after a gap that grows gently (15, 25, 40, then 60
+        // s), never a long silent give-up first. Its evidence (a touch, a
+        // face, a light) still ends it at any time.
+        if self.walk_v2
+            && walk_v2::WALK.contains(&step)
+            && !led.words
+            && !led.touched
+            && !touched
+            && can_speak
+            && !(step == Step::WhoYouAre && (led.heard.name || led.heard.save_held_us.is_some()))
+        {
+            let times = self
+                .coached
+                .get(&step)
+                .copied()
+                .unwrap_or(0)
+                .saturating_add(1);
+            let gap = walk_v2::reask_gap_us(times);
+            let since = asked_us
+                .max(led.guided_us.unwrap_or(0))
+                .max(led.lamp_said_us.unwrap_or(0));
+            if now_us.saturating_sub(since) >= gap && quiet_us >= gap.min(walk_v2::REMIND_QUIET_US)
+            {
+                led.asked_us = Some(now_us);
+                led.guided_us = Some(now_us);
+                self.coached.insert(step, times);
+                self.records
+                    .push(json!({"kind":"onboarding_asked_again","step":step.name(),
+                    "not":"silence","times":times,"at_us":now_us}));
+                eprintln!(
+                    "lamp-voice: onboarding: {}: nothing said in {} s: asked again, coached, time {times}",
+                    step.name(),
+                    gap / 1_000_000
+                );
+                return Some(
+                    walk_v2::coach(step, times)
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| self.step_note(step, true, false)),
+                );
+            }
+        }
         if step == Step::Touch {
             // Done only by a touch Controls felt; one reminder, then failed.
             // Either end is said before the next step is asked (#3769).
@@ -4108,14 +4256,16 @@ impl Onboarding {
                 self.finish(step, Outcome::Done, None, now_us);
                 self.owed = self.definition.words.touch_done.clone();
                 self.pet_response_until_us = Some(now_us + PET_RESPONSE_US);
-            } else if now_us.saturating_sub(asked_us)
-                >= match led.guided_us.filter(|&at| at != asked_us) {
-                    // Reminded: 60 s, or the remind heard out, within 70 s.
-                    Some(reminded) => (reminded.saturating_sub(asked_us) + TOUCH_REMIND_HEARD_US)
-                        .clamp(TOUCH_GIVE_UP_US, TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US),
-                    // Never reminded (the room never quiet): 70 s.
-                    None => TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US,
-                }
+            } else if !self.walk_v2
+                && now_us.saturating_sub(asked_us)
+                    >= match led.guided_us.filter(|&at| at != asked_us) {
+                        // Reminded: 60 s, or the remind heard out, within 70 s.
+                        Some(reminded) => (reminded.saturating_sub(asked_us)
+                            + TOUCH_REMIND_HEARD_US)
+                            .clamp(TOUCH_GIVE_UP_US, TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US),
+                        // Never reminded (the room never quiet): 70 s.
+                        None => TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US,
+                    }
             {
                 // No touch felt after the one reminder: failed, said, and the
                 // walk moves on (#4080, the lead's rule; it was `later`, #3996).
@@ -4133,6 +4283,9 @@ impl Onboarding {
                 && led.guided_us == Some(asked_us)
                 && now_us.saturating_sub(asked_us)
                     <= TOUCH_GIVE_UP_US + TOUCH_REMIND_GRACE_US - TOUCH_REMIND_HEARD_US
+                // Asked again, coached (#8871 phase 2): the coaching is its
+                // reminder.
+                && !self.coached.contains_key(&step)
             {
                 led.guided_us = Some(now_us);
                 self.records
@@ -4237,6 +4390,7 @@ impl Onboarding {
                 && can_speak
                 && quiet_us >= walk_v2::REMIND_QUIET_US
                 && now_us.saturating_sub(asked_us) >= walk_v2::REMIND_QUIET_US
+                && !self.coached.contains_key(&step)
                 && let Some(line) = walk_v2::remind(step)
             {
                 led.guided_us = Some(now_us);
@@ -4764,6 +4918,16 @@ impl Onboarding {
     }
 
     fn finish(&mut self, step: Step, outcome: Outcome, framing: Option<Framing>, now_us: u64) {
+        // Every walk step is needed (#8871, the owner): tried and not done,
+        // skipped or left for later, it is asked again, coached, after a
+        // quiet gap; only done (or no hardware) ends it.
+        if self.walk_v2
+            && walk_v2::WALK.contains(&step)
+            && matches!(outcome, Outcome::Failed | Outcome::Later | Outcome::Skipped)
+        {
+            self.ask_again(step, outcome, now_us);
+            return;
+        }
         // A step that fails or goes unsaid while the model service refuses
         // is no answer of the person's (#4265): held as `later`, never failed
         // on it, and offered again by `next_step`'s `later` rules.
@@ -4895,6 +5059,72 @@ impl Onboarding {
         );
         self.park_out_of_order(at_unix_s, now_us);
         self.save();
+    }
+
+    /// A walk step not done, asked again (#8871): its led state let go,
+    /// its failed or later line not said ([`Self::reasked`]), and its next
+    /// ask a coached line after [`walk_v2::reask_gap_us`].
+    fn ask_again(&mut self, step: Step, outcome: Outcome, now_us: u64) {
+        let times = self.coached.entry(step).or_insert(0);
+        *times = times.saturating_add(1);
+        let times = *times;
+        eprintln!(
+            "lamp-voice: onboarding: {} not done ({}): asked again, coached, time {times}: every walk step is needed",
+            step.name(),
+            serde_json::to_value(outcome)
+                .ok()
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .unwrap_or_default()
+        );
+        self.records
+            .push(json!({"kind":"onboarding_asked_again","step":step.name(),
+            "not":outcome,"times":times,"at_us":now_us}));
+        if self.led.as_ref().is_some_and(|led| led.step == step) {
+            self.led = None;
+        }
+        let after = now_us.saturating_add(walk_v2::reask_gap_us(times));
+        if step == Step::HowYouSound {
+            // Its calls start anew: a bar that couldn't be made from them
+            // is no start for the next.
+            self.invalidate_near();
+            self.desired.near_call_tries.clear();
+            self.desired.near_call_prompts = 0;
+            self.desired.sentence_prompts = 0;
+            self.desired.near_call_unheard = 0;
+            self.desired.sentence_unheard = 0;
+            self.desired.near_call_given_back = false;
+            self.desired.sentence_given_back = false;
+            self.forget_near();
+            self.near.missed = 0;
+            self.near.miss = None;
+            self.near.retry_after_us = after;
+            self.save();
+        }
+        self.reask = Some((step, after));
+        self.reasked = Some(step);
+        self.owed = None;
+        self.owed_after = None;
+    }
+
+    /// The coached ask for `step` when it is asked again, once its gap is
+    /// over: `Some(None)` while it waits, `Some(Some(line))` when due (the
+    /// coached line, or none for a step asked with its own note again),
+    /// `None` when it isn't being asked again.
+    fn coach_due(&mut self, step: Step, now_us: u64) -> Option<Option<String>> {
+        let (again, after) = self.reask?;
+        if again != step {
+            return None;
+        }
+        if now_us < after {
+            return Some(None);
+        }
+        self.reask = None;
+        let times = self.coached.get(&step).copied().unwrap_or(1);
+        Some(Some(
+            walk_v2::coach(step, times)
+                .map(str::to_owned)
+                .unwrap_or_else(|| self.step_note(step, true, false)),
+        ))
     }
 
     /// The closing owed, as said now: "All done, {Name}!" with the owner
@@ -5295,6 +5525,30 @@ impl Onboarding {
             let Ok(told) = serde_json::from_str::<Value>(line) else {
                 continue;
             };
+            // The walk paused or carried on by voice (#8871 phase 2): the
+            // worker's, after the person's own words.
+            if self.walk_v2
+                && let Some(walk) = told.get("walk").and_then(Value::as_str)
+            {
+                match walk {
+                    "pause" => {
+                        eprintln!(
+                            "lamp-voice: onboarding: paused by voice: nothing asked until they carry on"
+                        );
+                        self.voice_paused = true;
+                        self.paused_offered = false;
+                        self.paused_gone_since_us = None;
+                    }
+                    "resume" => {
+                        eprintln!("lamp-voice: onboarding: carried on by voice");
+                        self.voice_paused = false;
+                    }
+                    _ => {}
+                }
+                self.records
+                    .push(json!({"kind":"onboarding_voice","walk":walk,"at_us":now_us}));
+                continue;
+            }
             // A face forgotten ([`face_forgotten`]): one saved earlier no
             // longer answers "who you are", and the owner mark goes, whoever's
             // face it was, so a later face saved under that name is never
@@ -6765,18 +7019,38 @@ fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool)
         // step, which reopened every step (#3754).
         REDO => match call.args.get("step").and_then(Value::as_str) {
             Some(REDO_ALL) => json!({"redo": true}),
+            // The walk Lamp leads by voice (#8871, lamp-9adf at 16443:
+            // "redo the whole setup, from the start" refused twice): words
+            // for the whole walk are the whole walk.
+            Some(said) if walk_v2::on() && walk_v2::whole_walk(said) => json!({"redo": true}),
             Some(said) => match Step::spoken(said) {
                 Some(step) => match redo_one(step, order) {
                     Ok(line) => line,
                     Err(error) => return (error, true),
                 },
+                None if walk_v2::on() && walk_v2::refused_again() => json!({"redo": true}),
                 None => return refuse_redo(order),
             },
+            // With the walk Lamp leads by voice, never refused twice in a
+            // row: the second ask with no step is the whole walk.
+            None if walk_v2::on() && walk_v2::refused_again() => json!({"redo": true}),
             None => return refuse_redo(order),
         },
         STEP => {
             let step = call.args.get("step").and_then(Value::as_str);
             let outcome = call.args.get("outcome").and_then(Value::as_str);
+            // Every walk step is needed (#8871 phase 2, the owner): with
+            // the walk Lamp leads by voice, a skip is never taken, and the
+            // model says so warmly and asks once more.
+            if walk_v2::on()
+                && outcome.and_then(Outcome::named) == Some(Outcome::Skipped)
+                && step
+                    .filter(|step| !step.is_empty())
+                    .map(Step::named)
+                    .is_none_or(|step| step.is_some_and(|step| walk_v2::WALK.contains(&step)))
+            {
+                return (json!({"error": walk_v2::SKIP_REFUSED}), true);
+            }
             // No step named: the step the runner leads now, which only it
             // knows (#5499). It takes it only for that step, as it may end.
             if step.is_none_or(str::is_empty) && outcome.and_then(Outcome::named).is_some() {
@@ -7293,6 +7567,18 @@ mod tests {
 
         fn wait(&mut self, for_us: u64, face: Option<Framing>) -> Vec<String> {
             self.wait_played(for_us, face, Delivery::Whole)
+        }
+
+        /// As [`Self::wait`], a second at a time: each note with when it
+        /// was said, in whole seconds of the room's clock.
+        fn wait_timed(&mut self, for_us: u64, face: Option<Framing>) -> Vec<(u64, String)> {
+            let mut notes = Vec::new();
+            let until = self.at + for_us;
+            while self.at < until {
+                let at = self.at / S;
+                notes.extend(self.wait(S, face).into_iter().map(|note| (at, note)));
+            }
+            notes
         }
 
         /// As [`Self::wait`], each note's turn played as `delivery` says.
@@ -14726,6 +15012,26 @@ mod tests {
         room
     }
 
+    /// The walk's first two steps done, kept as committed: touch is next.
+    fn walked_to_touch(room: &mut Room) {
+        let now = unix_ms() / 1_000;
+        for step in [Step::WhereYouSit, Step::WhoYouAre] {
+            room.walk.desired.steps.insert(
+                step.name().into(),
+                Kept {
+                    outcome: Outcome::Done,
+                    at_unix_s: now,
+                    framing: None,
+                    offered_at_unix_s: None,
+                    later_offers: 0,
+                    ended_at_unix_ms: Some(unix_ms()),
+                },
+            );
+        }
+        room.walk.save();
+        room.walk.drain_storage_for_test(room.at);
+    }
+
     /// The walk's first four steps ended `outcome`, kept as committed.
     fn walked_to_try(room: &mut Room, outcome: Outcome) {
         let now = unix_ms() / 1_000;
@@ -14883,63 +15189,71 @@ mod tests {
         room.walk.apply_mailbox("{\"outcome\":\"done\"}\n", room.at);
         room.wait(2 * S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::TrySkill), None);
-        // A skip is the model's to report, said in the walk's words.
+        // A skip ends nothing (#8871 phase 2): every walk step is needed,
+        // so it is asked again, coached, after a quiet gap; no skip line.
         report(&room.walk, "try_skill", "skipped");
-        let notes = room.wait(5 * S, Some(NEAR_MIDDLE));
-        assert_eq!(room.outcome(Step::TrySkill), Some(Outcome::Skipped));
-        assert!(
-            notes[0].contains("Okay, we'll skip trying a skill for now."),
+        let notes = room.wait(10 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::TrySkill), None);
+        assert!(notes.iter().all(|note| !note.contains("skip")), "{notes:?}");
+        let notes = room.wait(10 * S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            notes,
+            [walk_v2::coach(Step::TrySkill, 1).unwrap()],
             "{notes:?}"
         );
     }
 
-    /// Silence: one simpler reminder after 10 s of quiet, asked once more
-    /// after the give-up, then later, said so; the done line drops what
-    /// wasn't learned.
+    /// Silence (#8871 phase 2, the owner): one simpler reminder after 10 s
+    /// of quiet, then asked again, coached, a new line each time, the gaps
+    /// growing gently (15, 25, 40, then 60 s): never stuck more than 30 s
+    /// at first, never left for later.
     #[test]
-    fn a_silent_try_is_reminded_once_then_left_for_later() {
+    fn a_silent_try_is_reminded_then_coached_again_never_left_for_later() {
         let mut room = walk_v2_room("v2-silent");
         walked_to_try(&mut room, Outcome::Skipped);
         assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
-        assert_eq!(room.wait(11 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_REMIND]);
-        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE);
-        let notes = room.wait(STEP_GIVE_UP_US + 25 * S, Some(NEAR_MIDDLE));
+        let said = room.wait_timed(5 * 60 * S, Some(NEAR_MIDDLE));
+        let lines: Vec<&str> = said.iter().map(|(_, note)| note.as_str()).collect();
+        assert_eq!(lines[0], walk_v2::TRY_REMIND, "{said:?}");
         assert_eq!(
-            notes,
-            [walk_v2::TRY_FIRST, walk_v2::TRY_REMIND],
-            "{notes:?}"
+            lines[1],
+            walk_v2::coach(Step::TrySkill, 1).unwrap(),
+            "{said:?}"
         );
-        let notes = room.wait(STEP_GIVE_UP_US + 25 * S, Some(NEAR_MIDDLE));
-        assert_eq!(notes[0], room.walk.later_line(Step::TrySkill), "{notes:?}");
-        assert_eq!(notes[1], walk_v2::MAKE_FIRST, "{notes:?}");
-        assert_eq!(room.outcome(Step::TrySkill), Some(Outcome::Later));
-        // In the heartbeat a later step says so, for the app.
-        let pending = room.walk.pending();
+        assert_eq!(
+            lines[2],
+            walk_v2::coach(Step::TrySkill, 2).unwrap(),
+            "{said:?}"
+        );
+        let gaps: Vec<u64> = said.windows(2).map(|two| two[1].0 - two[0].0).collect();
+        // The first gaps are short; none is ever over a minute, and they grow.
+        assert!(gaps[0] <= 16 && gaps[1] <= 26, "{gaps:?} {said:?}");
+        assert!(gaps.iter().all(|gap| *gap <= 61), "{gaps:?}");
+        assert!(gaps.windows(2).all(|two| two[1] + 1 >= two[0]), "{gaps:?}");
+        assert_eq!(room.outcome(Step::TrySkill), None);
+        assert!(!lines.contains(&room.walk.later_line(Step::TrySkill).as_str()));
+        assert!(!lines.contains(&walk_v2::MAKE_FIRST));
         assert!(
-            pending
+            lines
+                .windows(3)
+                .all(|three| !(three[0] == three[1] && three[1] == three[2])),
+            "{lines:?}"
+        );
+        assert!(
+            !room
+                .walk
+                .pending()
                 .steps_ended
                 .iter()
-                .any(|e| e.step == "try_skill" && e.outcome == "later"),
-            "{:?}",
-            pending.steps_ended
-        );
-        // Make a skill skipped: the done line knows nothing it didn't learn.
-        report(&room.walk, "make_skill", "skipped");
-        let notes = room.wait(6 * S, Some(NEAR_MIDDLE));
-        assert_eq!(
-            notes.last().map(String::as_str),
-            Some(
-                "(Say only this, nothing before or after it: \"All set! Thanks for your patience. Find more skills in the Store, in the app.\")"
-            ),
-            "{notes:?}"
+                .any(|e| e.outcome == "later")
         );
     }
 
     /// The owner's rule: with the walk Lamp leads by voice, a step tried
-    /// and not done is offered again as one nobody tried; without it,
-    /// failed as before.
+    /// and not done, or left for later, is asked again; without it, failed
+    /// or later as before.
     #[test]
-    fn with_the_walk_v2_a_failed_step_is_kept_for_later_only_with_its_switch() {
+    fn with_the_walk_v2_a_step_not_done_is_asked_again_only_with_its_switch() {
         for v2 in [false, true] {
             let mut room = if v2 {
                 walk_v2_room("v2-failed")
@@ -14950,13 +15264,19 @@ mod tests {
                 .finish(Step::Touch, Outcome::Failed, None, room.at);
             room.walk
                 .finish(Step::WhereYouSit, Outcome::Failed, None, room.at);
+            room.walk
+                .finish(Step::MakeSkill, Outcome::Later, None, room.at);
             room.walk.save();
             room.walk.drain_storage_for_test(room.at);
+            // Phase 2: every walk step is needed, so none ends failed or
+            // later; each is asked again.
+            let ended = (!v2).then_some(Outcome::Failed);
+            assert_eq!(room.outcome(Step::Touch), ended);
+            assert_eq!(room.outcome(Step::WhereYouSit), ended);
             assert_eq!(
-                room.outcome(Step::Touch),
-                Some(if v2 { Outcome::Later } else { Outcome::Failed })
+                room.outcome(Step::MakeSkill),
+                (!v2).then_some(Outcome::Later)
             );
-            assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Failed));
         }
     }
 
@@ -15014,8 +15334,11 @@ mod tests {
                 "Five more, about three minutes. Right now, Where you sit: sit where you usually do and look at me."
             )
         );
+        // Its ask waits for the answer: the walk's own conversation.
+        assert!(walk_v2::state().is_some_and(|lines| lines.waits));
         // Nobody there: the step is dropped, and the state still says it.
         room.wait(GONE_US + S, None);
+        assert!(walk_v2::state().is_some_and(|lines| !lines.waits));
         assert_eq!(
             walk_v2::state_words("What were we doing?").as_deref(),
             Some("We're on step 2 of 6, Where you sit: sit where you usually do and look at me.")
@@ -15061,6 +15384,187 @@ mod tests {
         let mut off = Room::new("v2-asked-off");
         off.wait(4 * S, Some(NEAR_MIDDLE));
         assert!(off.walk.pending().asking.is_none());
+    }
+
+    /// #8871 phase 2: with the switch on, the model can't skip a walk
+    /// step; it is told to plead and ask again. Off, a skip is as before.
+    #[test]
+    fn with_the_walk_v2_a_models_skip_is_refused_warmly() {
+        let file = std::env::temp_dir().join(format!("lvo-skip-{}", std::process::id()));
+        let call = |step: Option<&str>| ToolCall {
+            id: "c".into(),
+            name: STEP.into(),
+            args: match step {
+                Some(step) => json!({"step": step, "outcome": "skipped"}),
+                None => json!({"outcome": "skipped"}),
+            },
+        };
+        walk_v2::set_on_for_test(true);
+        for step in [Some("touch"), Some("try_skill"), None] {
+            let (answer, _) = answer(&file, &call(step), None);
+            assert_eq!(answer["error"], walk_v2::SKIP_REFUSED, "{step:?}");
+        }
+        assert!(!file.exists(), "nothing posted");
+        walk_v2::set_on_for_test(false);
+        let (answer, _) = answer(&file, &call(Some("touch")), None);
+        assert!(answer.get("error").is_none(), "{answer}");
+        let _ = std::fs::remove_file(file);
+    }
+
+    /// #8871 phase 2, the owner: touch never ends later or failed with the
+    /// walk Lamp leads by voice; no touch felt, it is asked again with a
+    /// coached line, a new one each time, quiet between; a touch then is
+    /// done.
+    #[test]
+    fn with_the_walk_v2_touch_is_coached_until_felt_never_left_for_later() {
+        use lamp_msgs::TouchEvent;
+        let root = PathBuf::from(format!("/tmp/lvon-v2t-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut room = walk_v2_room("v2-touch");
+        room.walk.touches = Some(
+            bus.subscribe_typed(TouchEvent::TOPIC, SUBSCRIBER, TouchEvent::TYPE)
+                .unwrap(),
+        );
+        let mut says = bus
+            .publisher_declared(TouchEvent::TOPIC, &TouchEvent::declaration(), "controls")
+            .unwrap();
+        walked_to_touch(&mut room);
+        let asked = room.wait_timed(4 * S, Some(NEAR_MIDDLE));
+        assert_eq!(asked.len(), 1);
+        let asked_at = asked[0].0;
+        assert_eq!(
+            room.walk.led.as_ref().map(|led| led.step),
+            Some(Step::Touch)
+        );
+        let timed = room.wait_timed(8 * 60 * S, Some(NEAR_MIDDLE));
+        let said: Vec<String> = timed.iter().map(|(_, note)| note.clone()).collect();
+        assert_eq!(room.outcome(Step::Touch), None, "{said:?}");
+        // Re-asked ~15 s after the ask, then gently longer, never a long
+        // silent give-up first (the kit fails 30 s stuck).
+        assert!(timed[0].0 - asked_at <= 16, "{asked_at} {timed:?}");
+        let gaps: Vec<u64> = timed.windows(2).map(|two| two[1].0 - two[0].0).collect();
+        assert!(
+            gaps[0] <= 26 && gaps.iter().all(|gap| *gap <= 61),
+            "{gaps:?}"
+        );
+        let first = walk_v2::coach(Step::Touch, 1).unwrap().to_owned();
+        let second = walk_v2::coach(Step::Touch, 2).unwrap().to_owned();
+        assert!(said.contains(&first) && said.contains(&second), "{said:?}");
+        assert!(
+            said.iter().all(|note| !note.contains("No worries")),
+            "{said:?}"
+        );
+        assert!(
+            said.windows(3)
+                .all(|three| !(three[0] == three[1] && three[1] == three[2])),
+            "{said:?}"
+        );
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        // A touch counts once the step is asked again.
+        let since = std::time::Instant::now();
+        while room
+            .walk
+            .led
+            .as_ref()
+            .is_none_or(|led| led.asked_us.is_none())
+            && since.elapsed() < std::time::Duration::from_secs(2)
+        {
+            room.wait(5 * S, Some(NEAR_MIDDLE));
+        }
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        until_touch_ends(&mut room);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// The first builder's change 2: a step this lamp's body can't do
+    /// completes itself with one line saying so; setup never waits on it.
+    #[test]
+    fn with_the_walk_v2_a_step_without_its_hardware_completes_with_one_line() {
+        let mut room = walk_v2_room("v2-no-pads");
+        walked_to_touch(&mut room);
+        // No touch pads on this lamp (no Controls' touches).
+        assert!(room.walk.touches.is_none());
+        let mut said = Vec::new();
+        for _ in 0..3 {
+            said.extend(room.wait(4 * S, Some(NEAR_MIDDLE)));
+        }
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::NotAvailable));
+        assert_eq!(
+            said.iter()
+                .filter(|note| note.as_str() == walk_v2::TOUCH_NOT_AVAILABLE)
+                .count(),
+            1,
+            "{said:?}"
+        );
+    }
+
+    /// #8871 phase 2: paused by voice, nothing is asked and the step is
+    /// kept; back in view after being away, one offer to carry on, then
+    /// quiet; carried on, the same step is asked again.
+    #[test]
+    fn a_walk_paused_by_voice_offers_once_and_carries_on_at_the_same_step() {
+        let mut room = walk_v2_room("v2-paused");
+        walked_to_try(&mut room, Outcome::Done);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
+        room.walk.apply_mailbox("{\"walk\":\"pause\"}\n", room.at);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(walk_v2::state().is_some_and(|lines| lines.paused && !lines.waits));
+        assert_eq!(room.outcome(Step::TrySkill), None);
+        // Away, then back: one offer.
+        assert_eq!(room.wait(GONE_US + S, None), NONE);
+        assert_eq!(
+            room.wait(6 * S, Some(NEAR_MIDDLE)),
+            [
+                "(Say only this, nothing before or after it: \"Shall we carry on? We were at Try a skill.\")"
+            ]
+        );
+        room.wait(GONE_US + S, None);
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            NONE,
+            "offered once a pause"
+        );
+        room.walk.apply_mailbox("{\"walk\":\"resume\"}\n", room.at);
+        assert_eq!(room.wait(6 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
+    }
+
+    /// lamp-9adf at 16443: "Hey Lamp, redo the whole setup, from the
+    /// start." reached `redo_setup` with no step, refused twice. With the
+    /// walk Lamp leads by voice, the whole walk's words redo it, and a
+    /// second ask with no step is never refused; without it, as before.
+    #[test]
+    fn a_whole_setup_redo_is_never_refused_twice_with_the_walk_v2() {
+        let room = Room::new("v2-redo");
+        let redo = |step: Value| ToolCall {
+            id: "r".into(),
+            name: REDO.into(),
+            args: json!({ "step": step }),
+        };
+        let refused = |answer: &Value| {
+            answer["error"]
+                .as_str()
+                .is_some_and(|error| error.starts_with("Nothing was redone."))
+        };
+        walk_v2::set_on_for_test(false);
+        let (first, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        let (second, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        assert!(refused(&first) && refused(&second));
+        walk_v2::set_on_for_test(true);
+        let (whole, _) = run_in(&room.walk.file, &redo(json!("the whole setup")), None);
+        assert!(!refused(&whole) && whole.get("error").is_none(), "{whole}");
+        let (first, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        let (second, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        assert!(refused(&first), "{first}");
+        assert!(
+            !refused(&second) && second.get("error").is_none(),
+            "{second}"
+        );
+        walk_v2::set_on_for_test(false);
     }
 
     /// With the switch off nothing changes: no new steps, no state lines,

@@ -284,7 +284,7 @@ pub(crate) struct NearFlow {
     pub(super) generation: u64,
     offer: Option<Offer>,
     listening: Option<Listening>,
-    retry_after_us: u64,
+    pub(super) retry_after_us: u64,
     /// Decided: the bar to keep, or none. Waits for idle storage.
     finishing: Option<Option<Calibrated>>,
     flight: Option<(storage::Tag, Outcome)>,
@@ -319,6 +319,14 @@ pub(crate) struct NearFlow {
     /// PARKED (#4080): the three-call bar and the sentence part, as
     /// [`THREE_CALLS`] says; off, the step only teaches the call.
     pub(super) three_calls: bool,
+    /// Call Lamp with the walk Lamp leads by voice (#8871 phase 2): three
+    /// accepted calls counted down, no sentence part, never ended by its
+    /// prompts; each miss coached by its cause.
+    pub(super) v2: bool,
+    /// The calls missed in this step, memory only ([`walk_v2::near_coach`]).
+    pub(super) missed: u8,
+    /// Why the last call try was missed.
+    pub(super) miss: Option<super::walk_v2::Miss>,
 }
 
 impl NearFlow {
@@ -823,6 +831,21 @@ impl Onboarding {
         offer.ready = false;
         let (sentence, prompt) = (offer.sentence, offer.prompt);
         self.near.answers = false;
+        // Call Lamp counted down and coached (#8871 phase 2), the walk's
+        // own lines; its first line is the step's note, as before.
+        if self.near.v2 && !sentence && self.near.last.is_some() {
+            let accepted = self.desired.near_call_tries.len();
+            return Some(super::own_line(
+                match self.near.last {
+                    Some(true) => super::walk_v2::near_countdown(accepted),
+                    _ => super::walk_v2::near_coach(
+                        self.near.miss.unwrap_or(super::walk_v2::Miss::Other),
+                        self.near.missed,
+                    ),
+                }
+                .to_owned(),
+            ));
+        }
         let note = Some(
             match (sentence, prompt, self.near.short) {
                 // Each call prompt answers the last try (#3702).
@@ -1307,6 +1330,7 @@ impl Onboarding {
         // Whether the call was heard surely and refused only for what the
         // person can't help (#5563, `MOST_HEARD_ASKS`).
         let mut heard_refused = false;
+        let mut miss = super::walk_v2::Miss::Other;
         let judged = if (self.unix_clock)().abs_diff(expected_ms) > CLOCK_SLACK_MS {
             Err("the clock jumped".to_owned())
         } else if let Some(why) = spoiled {
@@ -1314,6 +1338,8 @@ impl Onboarding {
         } else if early && !slow {
             self.near.heard_refused = self.near.heard_refused.saturating_add(1);
             self.near.last = Some(false);
+            self.near.miss = Some(super::walk_v2::Miss::Over);
+            self.near.missed = self.near.missed.saturating_add(1);
             let again = self.offer_again(false, listening.prompt);
             self.note_try(json!({"kind":"onboarding_near_try",
                 "prompt":listening.prompt,"accepted":false,"why":"answered_early",
@@ -1326,6 +1352,7 @@ impl Onboarding {
                         why,
                         Rejected::TwoHearings | Rejected::LampSpoke | Rejected::NoLevel
                     );
+                    miss = super::walk_v2::Miss::of(&why);
                     why.to_string()
                 },
             )
@@ -1346,9 +1373,18 @@ impl Onboarding {
             .map(|span| (from_end(span.began_ms), span.ended_ms.map(from_end)))
             .collect();
         self.near.last = Some(judged.is_ok());
+        if judged.is_err() {
+            self.near.miss = Some(miss);
+            self.near.missed = self.near.missed.saturating_add(1);
+        }
         match judged {
             Ok(done) => {
                 self.desired.near_call_tries.push(done);
+                // Each call counted is told to the app (#8871 phase 2):
+                // a new `at` with the count.
+                if self.near.v2 {
+                    self.asked_told = Some((Step::HowYouSound, super::unix_ms()));
+                }
                 self.save();
                 self.note_try(
                     json!({"kind":"onboarding_near_try","prompt":listening.prompt,
@@ -1431,8 +1467,26 @@ impl Onboarding {
             self.teach_finished(now_us);
             return;
         }
+        // Call Lamp in the walk Lamp leads by voice (#8871 phase 2): no
+        // sentence part; the three calls' bar stored ends the step.
+        if sentence && self.near.v2 {
+            let outcome = self.near.named.unwrap_or(Outcome::Failed);
+            let line = self.owed.take();
+            self.finish(Step::HowYouSound, outcome, None, now_us);
+            if outcome == Outcome::Done {
+                self.owed_after = std::mem::replace(&mut self.owed, line);
+            }
+            return;
+        }
+        if now_us < self.near.retry_after_us {
+            return;
+        }
+        let v2 = self.near.v2;
         let again = |prompts: u8, accepted: usize, three: bool| {
-            if three {
+            if v2 {
+                // Never ended by its prompts: asked until three count.
+                accepted < lamp_near_call::TRIES
+            } else if three {
                 asks_again(usize::from(prompts), accepted)
             } else {
                 accepted == 0 && prompts < TEACH_PROMPTS
@@ -1451,7 +1505,7 @@ impl Onboarding {
                 prompts,
                 self.desired.near_call_tries.len(),
                 self.near.three_calls,
-            ) || self.near.heard_refused > MOST_HEARD_ASKS)
+            ) || (!v2 && self.near.heard_refused > MOST_HEARD_ASKS))
         {
             let at_unix_s = (self.unix_clock)() / 1_000;
             self.near.finishing = Some(Calibrated::of(
@@ -1523,6 +1577,17 @@ impl Onboarding {
         }
         let Ok(token) = fresh_token() else {
             return;
+        };
+        // Never ended by its prompts (#8871 phase 2): the count kept is
+        // held under the progress's bound by starting it again from the
+        // calls accepted; the misses are counted in memory.
+        let prompts = if v2 && !sentence && usize::from(prompts) >= MOST_PROMPTS {
+            let kept = u8::try_from(self.desired.near_call_tries.len()).unwrap_or(0);
+            *self.prompts(false) = kept;
+            *self.unheard(false) = 0;
+            kept
+        } else {
+            prompts
         };
         let prompt = prompts.saturating_add(1);
         debug_assert!(sentence || usize::from(prompt) <= MOST_PROMPTS);
