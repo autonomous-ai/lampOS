@@ -24,6 +24,8 @@
 #   HEYLAMP_TALK_SCALE=F     long talk to train against: 10.5 h times F (1)
 #   HEYLAMP_CALLS=N          examples made of each training call (2)
 #   HEYLAMP_HARD=N           examples made of each not-call other than plain talk (2)
+#   HEYLAMP_PARTIAL=F        the share of those placed so their first inputs hear the word
+#                            unfinished, as negatives (heylamp.py place_at) (0: October's placement)
 #   HEYLAMP_CHANNEL=FILE     a measured channel.npz (channel.py analyse) to put voices through
 #   HEYLAMP_NOTCALL_SHARE=F  the share of not-calls aligned (1); the rest are placed anywhere
 #   HEYLAMP_TRUTH=FILE       known name ends (the dry run's), to check the alignment against
@@ -103,7 +105,8 @@ if want inputs; then
   for what in words talk check check-talk; do
     log "4/7 inputs: $what"
     three "$sets/inputs-$what" heylamp.py inputs "$set" "$what" --talk-scale "${HEYLAMP_TALK_SCALE:-1}" \
-      --calls "${HEYLAMP_CALLS:-2}" --hard "${HEYLAMP_HARD:-2}" ${HEYLAMP_CHANNEL:+--channel "$HEYLAMP_CHANNEL"}
+      --calls "${HEYLAMP_CALLS:-2}" --hard "${HEYLAMP_HARD:-2}" --partial "${HEYLAMP_PARTIAL:-0}" \
+      ${HEYLAMP_CHANNEL:+--channel "$HEYLAMP_CHANNEL"}
   done
   du -sh "$sets/inputs"
 fi

@@ -12,8 +12,8 @@ below; a manifest's own label is checked against it.
         Speech Commands v0.02 read as it downloads, its SHA-256 checked on the stream; keeps only
         its six noise recordings, its split lists and a few clips of each word.
     python heylamp.py public
-        The shared public sets as clip stores: LibriSpeech dev (to train against) and test
-        (held out), Speech Commands noise and words.
+        Speech Commands' noise and words as clip stores; LibriSpeech dev (to train against) and
+        test (held out) are read from their parquet files when wanted.
     python heylamp.py unpack TAR --sha256 HEX [--manifest TSV] [--set NAME] [--extra-providers A,B]
         Backend's tar: its SHA-256 checked, the manifest read (`file provider voice style text
         label`, and `split` or a voices.tsv), every WAV made 16 kHz mono, split by the voice's
@@ -24,14 +24,18 @@ below; a manifest's own label is checked against it.
     python heylamp.py align NAME [--part I/K | --merge] [--truth TRUTH.tsv]
         Where the name ends in each call, and where the word a not-call could be taken for it ends
         ("Lamp" in "OK Lamp", "man" in "Hey man", "lamp" in "turn off the lamp"): forced alignment
-        (training/stop/align.py, wav2vec 2.0), the end moved on to where the sound fades.
+        (training/stop/align.py, wav2vec 2.0), the end moved on to where the sound fades
+        (`word_end`). Only what is placed: calls with an ask, and training not-calls.
     python heylamp.py inputs NAME words|talk|check|check-talk [--part I/K] [--channel CH.npz]
+                     [--partial P]
         The training inputs, as `lamp-name` gives them to the model, in training/stop/train.py's
-        format: volume (-30 to 0 dB from -12 dBFS), the lamp's channel (microphone.py's lost
-        onset and loudspeaker, a room, and a measured channel.npz when given) and noise or talk.
+        format (compressed): volume (-30 to 0 dB from -12 dBFS), the lamp's channel
+        (microphone.py's lost onset and loudspeaker, a room, and a measured channel.npz when
+        given) and noise or talk around.
     python heylamp.py evaluate NAME MODEL... [--names A,B,...] [--part I/K] [--every N] [--only ...]
         Every model on the same held-out sound, as `lamp-name` runs it: the product's rule
-        (`--least 0.9 --step-ms 10 --wake 0.03`) and the plain 80 ms rule, at each bar.
+        (`--least 0.9 --step-ms 10 --wake 0.03`) and the plain 80 ms rule, at each bar; the
+        test set and the extra slice apart.
     python heylamp.py report NAME [EVAL.json...]
         The tables: calls caught, not-calls woken by kind, false wakes an hour, the trade-off.
     python heylamp.py synth OUT_DIR [--count N]
@@ -39,7 +43,8 @@ below; a manifest's own label is checked against it.
         others and the Cori and LJ Speech voices held out), in the same format, for a dry run.
 
 heylamp.sh runs them in order. Every step runs at the lowest priority (run.sh), with the threads
-OMP_NUM_THREADS gives, and refuses to start a step that would leave under 10 GiB free.
+OMP_NUM_THREADS gives; one that writes 512 MiB or more refuses to start if it would leave under
+10 GiB free, a smaller one under 2 GiB (`room_for`).
 """
 
 from __future__ import annotations
@@ -798,19 +803,27 @@ def held_out_reader(meta: dict) -> bool:
 # inputs
 
 
-def place_at(clip: np.ndarray, anchor: float | None, rng) -> tuple[int, float | None]:
+def place_at(clip: np.ndarray, anchor: float | None, rng, unfinished: bool = False) -> tuple[int, float | None]:
     """Where a clip starts in an example so that its word ends 0.02 to 0.10 s before the end of
     what the first input sees (October's placement), never cutting the clip's start; and where
-    that word then ends. Anywhere, with no word to place."""
+    that word then ends. Anywhere, with no word to place. `unfinished`: the word ends up to 0.35 s
+    after the first input's end instead, so the first inputs hear it unfinished ("Hey La..." of
+    "Hey Lan"). A call's inputs that hear its name unfinished are left out (labels), so without
+    these no input that hears a word unfinished is ever labelled, and a model may wake on "Hey
+    La..." of anything (the dry run's first model woke on every "Hey Lan", "Hey lamb", "Hey Lâm")."""
     if anchor is None:
         return int(rng.integers(-len(clip) // 2, LENGTH - len(clip) // 2)), None
-    end_at = SEEN_UNTIL[0] - rng.uniform(0.02, 0.10)
+    if unfinished:
+        end_at = SEEN_UNTIL[0] + rng.uniform(0.0, 0.35)
+    else:
+        end_at = SEEN_UNTIL[0] - rng.uniform(0.02, 0.10)
     end_at = max(end_at, anchor + 0.05)
     return int(round((end_at - anchor) * RATE)), end_at
 
 
-def make_example(clip, anchor, is_call, follow, talk, noise, channel, rng):
-    at, end_at = place_at(clip, anchor, rng)
+def make_example(clip, anchor, is_call, follow, talk, noise, channel, rng, partial: float = 0.0):
+    unfinished = not is_call and partial > 0 and rng.random() < partial
+    at, end_at = place_at(clip, anchor, rng, unfinished=unfinished)
     person = place(clip, at, LENGTH)
     if follow is not None:
         start = at + len(clip) + int(rng.uniform(0.05, 0.35) * RATE)
@@ -898,7 +911,7 @@ def inputs(a) -> None:
             follow = None
             if kind in ("alone", "bare", "lookalike", "word") and rng.random() < 0.5:
                 follow = after.stretch(rng, int(rng.uniform(0.6, 1.5) * RATE))
-            sound, y, relative = make_example(clip, anchor, what == "call", follow, talk, noise, channel, rng)
+            sound, y, relative = make_example(clip, anchor, what == "call", follow, talk, noise, channel, rng, a.partial if what == "not" else 0.0)
             x = stacks(front.of(sound))
             assert len(x) == INPUTS, len(x)
             keep = y >= 0
@@ -1660,6 +1673,8 @@ def main() -> None:
     s.add_argument("--calls", type=int, default=2, help="examples made of each training call")
     s.add_argument("--hard", type=int, default=2, help="examples made of each not-call that is not plain talk")
     s.add_argument("--talk-scale", type=float, default=1.0, help="10.5 h of long talk times this")
+    s.add_argument("--partial", type=float, default=0.0,
+                   help="share of the placed not-calls whose first inputs hear their word unfinished (place_at)")
     s = sub.add_parser("evaluate")
     s.add_argument("set")
     s.add_argument("models", nargs="+")
