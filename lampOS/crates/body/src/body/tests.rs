@@ -22912,3 +22912,68 @@ fn a_dev_lamps_reach_is_withdrawn_at_once_for_a_safety_fold_or_an_ending_run() {
     // Off, nothing is withdrawn (there is nothing to withdraw).
     assert!(!dev_reach_withdrawn(&Limits::FOLDED, true, true, true));
 }
+
+/// #8648 P1: a small held look (-8 degrees, 91 counts down from home) stays small through the dev reach, even while a second asker is
+/// present: every other poll is the other page's (no look, not held), as when two pages share the lease. The goal never goes past the ask
+/// by more than a few degrees, and the dev reach comes out as today's.
+#[test]
+fn a_small_held_look_stays_small_through_the_dev_reach_with_a_second_asker_present() {
+    let run_with = |limits: Limits| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(25));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let time = clock.time.clone();
+        let seen_at = clock.time.clone();
+        let mut polls = 0u32;
+        let mut seen: Vec<(Duration, f32, u16)> = Vec::new();
+        run_alive(
+            &mut lamp,
+            &mut clock,
+            limits,
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Listening, 100)),
+            move || {
+                polls += 1;
+                let mine = time.get() >= Duration::from_secs(12) && polls % 2 == 0;
+                Asked {
+                    held: mine,
+                    aim: mine.then(|| {
+                        let steps =
+                            ((time.get().as_millis() as f32 - 12_000.0) / 200.0).floor() + 1.0;
+                        [0.0, (steps * 11.4).clamp(0.0, 91.0)]
+                    }),
+                    aim_from_home: mine,
+                    ..Asked::default()
+                }
+            },
+            |glimpse| seen.push((seen_at.get(), glimpse.stand, glimpse.goals[0])),
+        );
+        seen
+    };
+    let peak = |seen: &[(Duration, f32, u16)]| {
+        seen.iter()
+            .filter(|s| s.1 >= 1.0)
+            .map(|s| s.2)
+            .max()
+            .unwrap()
+    };
+    let stock = run_with(gesture_limits());
+    let dev = run_with(Limits {
+        dev_pitch_down: Some(512.0),
+        ..gesture_limits()
+    });
+    // Three degrees is 34 counts.
+    assert!(
+        peak(&dev) <= peak(&stock) + 34,
+        "dev peak {} stock peak {}",
+        peak(&dev),
+        peak(&stock)
+    );
+    assert!(
+        peak(&dev) <= HOME[0] + 91 + 34,
+        "dev peak {} is past the -8 ask",
+        peak(&dev)
+    );
+}
