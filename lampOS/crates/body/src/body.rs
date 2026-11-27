@@ -1419,6 +1419,10 @@ pub struct Limits {
     /// hardware's ([`APP_REACH`]); needs `own_ranges`. Off: as before.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub app_reach: bool,
+    /// `LAMP_BODY_REACH_MAP=shadow` (#7513): the lamp's own reach map, read at start; the body only says when the pose it is about to
+    /// write is outside it ([`crate::reach_map::Shadow`]). Nothing is held. `None` is the body as before.
+    #[serde(skip)]
+    pub reach_map: Option<&'static crate::reach_map::ReachMap>,
     /// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501), with its bounds; `None`
     /// is the body as before.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1632,6 +1636,7 @@ impl Limits {
         own_ranges: false,
         yaw_unset: false,
         app_reach: false,
+        reach_map: None,
         strain_guard: None,
         energy: false,
         presence: false,
@@ -7393,6 +7398,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // glance took the head out of rest. The glance is laid on that, and
     // the head goes back to it; the base is left as it is.
     let mut glance_from: Option<[f32; 3]> = None;
+    // The reach-map shadow's memory (`LAMP_BODY_REACH_MAP=shadow`): it speaks on a change.
+    let mut reach_shadow = crate::reach_map::Shadow::default();
     // Whether Expression asked a glance on the last step.
     let mut glanced = false;
     // Steps the head has been led up while below its way without coming
@@ -9525,6 +9532,35 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         } else {
             still_steps.saturating_add(1)
         };
+        // Under `LAMP_BODY_REACH_MAP=shadow`: say, once per change, that the pose about to be written is outside the lamp's own map
+        // (only at full height: the folded pose and the way up are not the map's, and not on a step that lets go again, which writes
+        // nothing). Nothing is held.
+        if let Some(map) = limits.reach_map
+            && slump_again.is_none()
+            && standing.is_some()
+            && stand >= 1.0
+            && let Some(went_outside) = reach_shadow.judge(
+                map,
+                crate::reach_map::Pose {
+                    shoulder: f64::from(arm_goals[0]),
+                    elbow: f64::from(arm_goals[1]),
+                    pitch: f64::from(goals[0]),
+                },
+            )
+        {
+            eprintln!(
+                "lamp-body: step {}: reach map (shadow): the pose to write (shoulder {}, elbow {}, pitch {}) is {} the lamp's map; nothing is held",
+                report.steps,
+                arm_goals[0],
+                arm_goals[1],
+                goals[0],
+                if went_outside {
+                    "OUTSIDE"
+                } else {
+                    "back inside"
+                }
+            );
+        }
         // A step that lets go again (a hand stopped the lamp coming up)
         // asks nothing new of the joints first: from a stand older than
         // the slump, the arm would be sent up into the hand.
