@@ -1670,23 +1670,34 @@ impl Run<'_, '_> {
                 writes.extend(these);
             }
         }
-        // The image's files only with the switch on: off, neither the
-        // hardware profile nor any of them is read. On, one that can't be
-        // read is said, and the rest of the build goes on without them.
-        // With the switch off only the journal's files are asked for
-        // (#7254, `manifest::JOURNAL_FILES`).
+        // The image's files only with the switch on: off, none is written
+        // and the hardware profile is not read, except that a build
+        // carrying one of the journal's files (#7254,
+        // `manifest::JOURNAL_FILES`) has those asked for alone, and the
+        // profile read for them. On, one that can't be read is said, and
+        // the rest of the build goes on without them.
         let journal_only = !self.config.image
             && manifest
                 .image
                 .iter()
                 .any(|file| manifest::JOURNAL_FILES.contains(&file.path.as_str()));
-        if !manifest.image.is_empty() && !self.config.image && !journal_only {
+        let others = manifest
+            .image
+            .iter()
+            .any(|file| !manifest::JOURNAL_FILES.contains(&file.path.as_str()));
+        if !manifest.image.is_empty() && !self.config.image && (!journal_only || others) {
             self.say(&format!(
-                "build {}'s image files are not written: {}=on is not set",
+                "build {}'s image files {}are not written: {}=on is not set",
                 manifest.sequence,
+                if journal_only {
+                    "but the journal's "
+                } else {
+                    ""
+                },
                 image::SWITCH
             ));
-        } else if !manifest.image.is_empty() {
+        }
+        if !manifest.image.is_empty() && (self.config.image || journal_only) {
             let steps = match image::variant(&self.config.root) {
                 Ok(Some(variant)) => {
                     let (mut files, shipped) = image::for_variant(&manifest.image, &variant);

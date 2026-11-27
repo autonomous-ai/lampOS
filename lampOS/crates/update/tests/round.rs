@@ -5883,6 +5883,51 @@ fn with_image_off_a_round_writes_the_journal_files_and_no_other_image_file() {
     assert_eq!(lamp.read(JOURNAL), "journal 2");
 }
 
+const FAULT_KEEP: &str = "/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf";
+
+/// #7254 part 3b: the voice's fault keep (#8713) is absent on a lamp that
+/// never had it, and a plain round writes it, with the other journal files
+/// and no other image file.
+#[test]
+fn with_image_off_a_round_writes_the_fault_keep_where_the_lamp_had_none() {
+    let (mut lamp, _ran) = lamp_with_image();
+    lamp.config.image = false;
+    assert!(!lamp.exists(FAULT_KEEP));
+    publish_image(
+        &mut lamp,
+        2,
+        vec![
+            image_file(ASOUND, "asound 2", &["asound 1", "asound 2"]),
+            image_file(JOURNAL, "journal 2", &["journal 1", "journal 2"]),
+            image_file(FAULT_KEEP, "fault 1", &["fault 1"]),
+        ],
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::Switched(2) | Outcome::UpToDate(2)),
+        "{outcome:?} {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read(FAULT_KEEP), "fault 1");
+    assert_eq!(lamp.read(JOURNAL), "journal 2");
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service"),
+        "{:?}",
+        lamp.calls()
+    );
+    // The mixed build says the rest is not written (Fifth's P3, #8723).
+    assert!(
+        lamp.said.iter().any(|line| line.contains("but the journal's")
+            && line.contains("LAMP_UPDATE_IMAGE=on")),
+        "{:?}",
+        lamp.said
+    );
+}
+
 /// #7254, the first builder 10:42: a round that fails after the journal's
 /// files were written puts them back, so a half-written drop-in never waits
 /// for the next boot.
