@@ -509,8 +509,8 @@ fn renew(controller: &mut Controller) {
 /// are the same expiry: the snapshot and the permit are issued together,
 /// each for 250 ms, and the guard checks the snapshot first, so which one
 /// the ring names is only the order of the checks and of the microseconds
-/// between the two issues. Any other event, or a blank before the expiry,
-/// fails.
+/// between the two issues. Events other than a blank are passed over; a
+/// blank for any other reason, or one before the expiry, fails.
 fn wait_expiry(rig: &Rig, shown: RingFrame, name: &str) {
     let expires = shown
         .permit
@@ -532,10 +532,14 @@ fn wait_expiry(rig: &Rig, shown: RingFrame, name: &str) {
                         ..
                     },
             }) if write_started_at_us >= expires => break,
-            Some(event) => {
+            Some(
+                event @ WorkerEvent::Ring {
+                    report: RingFeedback::Blanked { .. },
+                },
+            ) => {
                 panic!("waiting for {name}'s expiry blank at {expires} us, the ring said {event:?}")
             }
-            None => {}
+            Some(_) | None => {}
         }
         assert!(
             Instant::now() < deadline,
@@ -640,11 +644,13 @@ fn held_up(rig: &Rig, clock: &TestClock, from_us: u64, to_us: u64) -> Option<Str
 }
 
 /// A [`dim_attempt`] whose latched frame was not dimmed before its permit
-/// ended: what it saw, and the hold-up inside that permit, if either thread
-/// had one.
+/// ended: what it saw, the hold-up inside that permit, if either thread had
+/// one, and that latched frame, whose expiry blank the retry waits for.
 struct Undimmed {
     said: String,
     held: Option<String>,
+    /// Boxed: a frame is large beside the rest.
+    original: Box<RingFrame>,
 }
 
 /// A cap tightened from 30 to 12 dims the latched turn frame before its
@@ -666,8 +672,13 @@ fn caps_dim_latched(case: DimCase) -> Result<usize, String> {
     let mut revision = 1;
     let mut held = Vec::new();
     let mut ended = None;
+    // The held-up attempt's latched frame, whose expiry blank the next
+    // attempt waits for before it starts: drained before that blank came,
+    // the next present would read it (#8466).
+    let mut missed: Option<Box<RingFrame>> = None;
     for attempt in 1..=HELD_UP_ATTEMPTS {
-        if attempt > 1 {
+        if let Some(original) = missed.take() {
+            wait_expiry(&rig, *original, "the held-up attempt's latched turn frame");
             // Back to the first attempt's start: the cap at 30, eased up.
             renew(&mut controller);
             revision += 1;
@@ -696,11 +707,15 @@ fn caps_dim_latched(case: DimCase) -> Result<usize, String> {
             Err(Undimmed {
                 said,
                 held: Some(why),
+                original,
             }) => {
                 eprintln!("retry {attempt}: {why}");
                 held.push(format!("{said} ({why})"));
+                missed = Some(original);
             }
-            Err(Undimmed { said, held: None }) => {
+            Err(Undimmed {
+                said, held: None, ..
+            }) => {
                 ended = Some(Err(said));
                 break;
             }
@@ -763,14 +778,19 @@ fn dim_attempt(
     } else if case.late_cap_drop {
         clock.sleep(STALL);
     }
+    // Armed before the cap drop is sent, so a test thread taken between the
+    // two cannot let the worker dim first and the held-up attempt pass.
+    if case.worker_stall {
+        rig.stall_next_control(STALL);
+    }
     if !case.keep_cap {
         *revision += 1;
+        // The time inside `publish_cap` is not counted as a test-thread
+        // gap (`mark` follows it): a slow publish ends in a false fail,
+        // never a hidden one.
         clock.send();
         publish_cap(publisher, *revision, 12);
         clock.mark();
-    }
-    if case.worker_stall {
-        rig.stall_next_control(STALL);
     }
     // The latched frame is dimmed toward the cap with no new turn frame,
     // and never blanked: the cap eases (#8615).
@@ -800,6 +820,7 @@ fn dim_attempt(
                         .collect::<Vec<_>>()
                 ),
                 held: held_up(rig, &clock, issued, expires),
+                original: Box::new(original),
             });
         }
         thread::sleep(Duration::from_millis(1));
