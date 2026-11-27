@@ -195,7 +195,7 @@ pub const PILOTS: [Pilot; 11] = [
     Pilot {
         name: "posture",
         group: Group::Nudges,
-        fire: "the posture reading has read most of the last ten minutes at the desk as bad",
+        fire: "the posture reading has read the last minute at the desk, two checks, as bad",
         says: THIS_TASKS_LINE,
         tasks: &[
             Task {

@@ -215,6 +215,10 @@ pub enum PostureRegion {
     /// Bad by the overall RULA risk (`risk_level` 2 or more) with no one
     /// region high (the neck's subscore 3 or more, any other's 4 or more), or no bad sample yet: `general`, never
     /// `none`, which the owner read as nothing wrong (27 Nov, #8377).
+    /// `none` is still read as `general`, so a value said by a build
+    /// before that call (a retained packet across an update) keeps its
+    /// meaning; it is never written.
+    #[serde(alias = "none")]
     General,
 }
 
@@ -251,6 +255,10 @@ impl HumanPosture {
     pub const LASTS: Duration = Duration::from_secs(90);
     /// The longest window said.
     pub const LONGEST_WINDOW_S: u32 = 3600;
+    /// The window lamp-seen says when it is full: its newest two samples,
+    /// checked 30 s apart, a minute (the owner, #8377). The posture
+    /// pilot's brief names this length (`lamp_skills::core_agent`).
+    pub const SAID_WINDOW_S: u32 = 60;
 
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
@@ -497,6 +505,16 @@ mod tests {
                 "{region}"
             );
         }
+        // `none`, said before the owner's call of 27 Nov (#8377), reads as
+        // `general` and is written as `general`.
+        let old: HumanPosture =
+            serde_json::from_str(r#"{"window_s":60,"bad_share":1.0,"region":"none"}"#).unwrap();
+        assert_eq!(old.region, PostureRegion::General);
+        assert!(
+            serde_json::to_string(&old)
+                .unwrap()
+                .contains(r#""region":"general""#)
+        );
         // The wrist is fixed at 1 server-side, so it is never a region.
         assert!(serde_json::from_str::<HumanPosture>(&text.replace("upper_arm", "wrist")).is_err());
         assert!(
