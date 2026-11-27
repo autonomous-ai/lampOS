@@ -1001,9 +1001,13 @@ fn fresh_folder(work: &Path, name: &str) -> std::io::Result<MadeFolder> {
 /// name is a duplicate key, and Hermes refuses the whole file (exit 2,
 /// c0a4, 14 Nov). Any other is a block of its own.
 fn make_config(services: bool) -> std::io::Result<String> {
-    let mut config =
-        crate::hermes_config::merge_config_for("", crate::runtime::HERMES_FORWARDER_PORT, services)
-            .map_err(|_| std::io::Error::other("the provider config was not made"))?;
+    let mut config = crate::hermes_config::merge_config_for(
+        "",
+        crate::runtime::HERMES_FORWARDER_PORT,
+        services,
+        false,
+    )
+    .map_err(|_| std::io::Error::other("the provider config was not made"))?;
     for (key, value) in MAKE_CONFIG {
         let (block, name) = key.split_once('.').unwrap_or(("", key));
         let head = format!("{block}:\n");

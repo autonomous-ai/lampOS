@@ -3254,7 +3254,7 @@ voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
 
 ## Hermes' settings on the lamp (#5978, `hermes_config`)
 
-`lamp_tasks::hermes_config::write(HERMES_HOME, port, token)` merges what
+`lamp_tasks::hermes_config::write(HERMES_HOME, port, token, search_token)` merges what
 Hermes on the lamp needs into its own two files, and nothing else. Nothing
 calls it yet: the lamp as a target (#5978, part 3) runs it before a Hermes
 task, with lamp-cloud's forwarder port (7741) and its local token
@@ -3275,6 +3275,26 @@ forwarded on the lamp").
   token, never the relay's key. Provider keys are taken out
   (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
   `AUTONOMOUS_API_KEY`, `OPENROUTER_API_KEY`); every other line kept.
+- **Web search, the lamp's first:** with lamp-cloud's search-only token in
+  `/var/lib/lampos-cloud/search-token` (beside `hermes-token`), `.env` also
+  gets `SEARXNG_URL=http://127.0.0.1:7741/v1/search/<search-token>`
+  (lamp-cloud's SearXNG-shaped search route, so Hermes's bundled `searxng`
+  provider asks it) and `config.yaml` a `web:` block:
+  `search_backend: "searxng"`, `extract_backend: "exa"`,
+  `keyless_fallback: true`, `keyless_rescue: true`. Page reads stay on
+  Hermes's keyless pool (Exa with no key, then Parallel, Firecrawl and
+  Keenable): at v0.22.2, a set `SEARXNG_URL` would otherwise make Hermes's
+  autodetect send `web_extract` to the search-only SearXNG too. A search the
+  lamp's route fails is served once by the keyless pool (`keyless_rescue`),
+  and the next one asks the lamp's route again. A person's own
+  `SEARXNG_URL` is kept and ours not added. Without the token file nothing
+  of this is added (a `SEARXNG_URL` of ours is taken out) and Hermes
+  searches through its keyless pool alone, as before; lamp-tasks' start line
+  says which (`web search through the lamp first` or `web search keyless
+  only (no search token)`). An existing lamp gains it on its next start.
+  Hermes's "Could not reach SearXNG at <url>" error names the URL, so the
+  model may see the token when lamp-cloud is down: it is search-only and
+  the route answers on loopback only.
 - **Who:** it must run as Hermes' own user (`lampos`), so both files stay
   Hermes'. lamp-tasks (also `lampos`) reads the token from
   `/var/lib/lampos-cloud/hermes-token`. Neither file is read through a link

@@ -4764,6 +4764,29 @@ gì về: `harness: home moved to XDG (<sign>): lampOS paths need
 `.local/share/harness/.harness-root`, `.harness/runtime is a link` hoặc
 `.harness/cli is a link`.
 
+## Tìm kiếm web của Hermes trên đèn (`hermes_config`)
+
+`lamp_tasks::hermes_config::write(HERMES_HOME, port, token, search_token)`
+lúc lamp-tasks khởi động: khi có token chỉ-dùng-để-tìm-kiếm của lamp-cloud
+ở `/var/lib/lampos-cloud/search-token` (cạnh `hermes-token`), `.env` của
+Hermes có thêm `SEARXNG_URL=http://127.0.0.1:7741/v1/search/<search-token>`
+(đường tìm kiếm dạng SearXNG của lamp-cloud, nên provider `searxng` có sẵn
+của Hermes hỏi nó) và `config.yaml` có khối `web:`:
+`search_backend: "searxng"`, `extract_backend: "exa"`,
+`keyless_fallback: true`, `keyless_rescue: true`. Việc đọc trang vẫn ở nhóm
+không cần khóa của Hermes (Exa không khóa, rồi Parallel, Firecrawl và
+Keenable): ở v0.22.2, nếu đặt `SEARXNG_URL` mà không ghim, cơ chế tự dò của
+Hermes cũng gửi `web_extract` sang SearXNG vốn chỉ tìm kiếm. Một lần tìm mà
+đường của đèn lỗi thì được nhóm không cần khóa phục vụ một lần
+(`keyless_rescue`), lần sau lại hỏi đường của đèn. `SEARXNG_URL` riêng của
+người dùng được giữ và của ta không được thêm. Không có file token thì không
+thêm gì (một `SEARXNG_URL` của ta bị bỏ đi) và Hermes tìm qua nhóm không cần
+khóa như trước; dòng khởi động của lamp-tasks nói rõ (`web search through
+the lamp first` hoặc `web search keyless only (no search token)`). Một đèn
+đang chạy có nó ở lần khởi động sau. Lỗi "Could not reach SearXNG at <url>"
+của Hermes có ghi URL, nên model có thể thấy token khi lamp-cloud không
+chạy: token chỉ dùng để tìm kiếm và đường đó chỉ trả lời trên loopback.
+
 ## Cài đặt của OpenClaw trên đèn (#6226)
 
 Khi `LAMP_OPENCLAW_ON_LAMP` bật, lamp-tasks lúc khởi động gộp những gì

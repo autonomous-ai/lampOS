@@ -4111,9 +4111,11 @@ pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool, v1: bool) ->
 
 /// `LAMP_HERMES_ON_LAMP` (#5978): Hermes' settings written at the part's
 /// start ([`crate::hermes_config::write`]) under `hermes_home`, for
-/// lamp-cloud's forwarder, with its local token read from `token_path`.
+/// lamp-cloud's forwarder, with its local token read from `token_path` and
+/// its search-only token from `search_token_path` (web search through the
+/// lamp first; none yet, Hermes's keyless pool alone, said in the line).
 /// Run as `lampos`, Hermes' own user (`hermes_config`). One journal line, never the token: a missing token skips it.
-pub fn set_up_hermes(hermes_home: &Path, token_path: &Path) -> String {
+pub fn set_up_hermes(hermes_home: &Path, token_path: &Path, search_token_path: &Path) -> String {
     let token = match fs::read_to_string(token_path) {
         Ok(token) => token,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
@@ -4123,9 +4125,18 @@ pub fn set_up_hermes(hermes_home: &Path, token_path: &Path) -> String {
             return format!("tasks: Hermes' settings not written: the token not read ({error})");
         }
     };
-    match crate::hermes_config::write(hermes_home, HERMES_FORWARDER_PORT, token.trim()) {
+    let search = fs::read_to_string(search_token_path)
+        .ok()
+        .map(|search| search.trim().to_owned())
+        .filter(|search| crate::hermes_config::token_is_plain(search));
+    match crate::hermes_config::write(
+        hermes_home,
+        HERMES_FORWARDER_PORT,
+        token.trim(),
+        search.as_deref(),
+    ) {
         Ok(written) => format!(
-            "tasks: Hermes' settings for the lamp's DeepSeek: config {}, env {}",
+            "tasks: Hermes' settings for the lamp's DeepSeek: config {}, env {}, web search {}",
             if written.config_changed {
                 "written"
             } else {
@@ -4135,6 +4146,11 @@ pub fn set_up_hermes(hermes_home: &Path, token_path: &Path) -> String {
                 "written"
             } else {
                 "unchanged"
+            },
+            if search.is_some() {
+                "through the lamp first"
+            } else {
+                "keyless only (no search token)"
             }
         ),
         Err(error) => format!("tasks: Hermes' settings not written: {error}"),
@@ -5627,7 +5643,8 @@ pub fn serve<C: Clock>(
             "{}",
             set_up_hermes(
                 Path::new(HERMES_HOME),
-                Path::new(crate::hermes_config::TOKEN_PATH)
+                Path::new(crate::hermes_config::TOKEN_PATH),
+                Path::new(crate::hermes_config::SEARCH_TOKEN_PATH)
             )
         );
     }
@@ -7515,7 +7532,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let hermes = dir.path().join(".hermes");
         let token = dir.path().join("hermes-token");
-        let said = set_up_hermes(&hermes, &token);
+        let search = dir.path().join("search-token");
+        let said = set_up_hermes(&hermes, &token, &search);
         assert_eq!(
             said,
             "tasks: Hermes' settings not written: no forwarder token yet"
@@ -7529,10 +7547,10 @@ mod tests {
             "hooks:\n  on_session_start: harness\n",
         )
         .unwrap();
-        let said = set_up_hermes(&hermes, &token);
+        let said = set_up_hermes(&hermes, &token, &search);
         assert_eq!(
             said,
-            "tasks: Hermes' settings for the lamp's DeepSeek: config written, env written"
+            "tasks: Hermes' settings for the lamp's DeepSeek: config written, env written, web search keyless only (no search token)"
         );
         assert!(!said.contains(&secret));
         let config = fs::read_to_string(hermes.join("config.yaml")).unwrap();
@@ -7550,7 +7568,31 @@ mod tests {
                 .unwrap()
                 .contains(&secret)
         );
-        assert!(set_up_hermes(&hermes, &token).ends_with("config unchanged, env unchanged"));
+        assert!(
+            set_up_hermes(&hermes, &token, &search).contains("config unchanged, env unchanged")
+        );
+        // lamp-cloud's search token later: search through the lamp first,
+        // on the same start's write, and never the token in the line.
+        let found = "fedcba9876543210".repeat(4);
+        fs::write(&search, format!("{found}\n")).unwrap();
+        let said = set_up_hermes(&hermes, &token, &search);
+        assert_eq!(
+            said,
+            "tasks: Hermes' settings for the lamp's DeepSeek: config written, env written, web search through the lamp first"
+        );
+        assert!(!said.contains(&found));
+        let env = fs::read_to_string(hermes.join(".env")).unwrap();
+        assert!(
+            env.contains(&format!(
+                "SEARXNG_URL=http://127.0.0.1:7741/v1/search/{found}\n"
+            )),
+            "{env}"
+        );
+        let config = fs::read_to_string(hermes.join("config.yaml")).unwrap();
+        assert!(
+            config.contains("  search_backend: \"searxng\"\n"),
+            "{config}"
+        );
     }
 
     #[test]
