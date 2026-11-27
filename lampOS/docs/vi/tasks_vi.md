@@ -2450,8 +2450,16 @@ skill-start (`crates/tasks/src/skill_start.rs`), không bao giờ qua một file
   giới hạn; lần thử thứ hai thành công được ghi journal ("tasks: the
   OpenClaw Gateway's allow-list add for /usr/local/lib/lampos/skill-start
   succeeded on its second try in 61200 ms (the first: exit 1)", hoặc "killed at its
-  60 s bound") và lần khởi động được giữ. Cả hai lần đều nằm trong giới
-  hạn chờ gateway của chính lần chạy. Lệnh thêm thất bại cả hai lần được ghi
+  60 s bound") và lần khởi động được giữ. Cả hai lần kết thúc trước mốc
+  muộn hơn giữa giới hạn chờ gateway của chính lần chạy và 60 s kể từ khi
+  lệnh thêm bắt đầu: lần xem của một lần giao việc bị giữ (25 s) đã dùng
+  13 đến 18 s cho lần đọc trên lamp-ee17 (27/11), và riêng phần còn lại
+  đã giết mọi lệnh thêm ("the first: stopped, the second: past the run's
+  bound"), nên lần khởi động không bao giờ được giữ và mọi lần giao việc
+  đều bị giữ trọn một lần xem. Lệnh thêm gồm một lần khởi động CLI Node,
+  một `exec.approvals.get`, và một `exec.approvals.set` khi chưa có mục
+  (mỗi RPC theo timeout mặc định 30 s của CLI); trên lamp-c0a4 lệnh thêm
+  mất 10,5 đến 19,3 s. Lệnh thêm thất bại cả hai lần được ghi
   journal ("tasks: the OpenClaw Gateway's allow-list add for
   /usr/local/lib/lampos/skill-start did not succeed in 120000 ms (the
   first: …, the second: …); the next run tries again") và không giữ lần chạy lại, nhưng lần khởi động không được giữ,
