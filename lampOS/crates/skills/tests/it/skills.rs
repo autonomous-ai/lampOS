@@ -13720,8 +13720,15 @@ fn the_wellbeing_nudges_have_no_budget_cap_hours_or_others_in_view() {
                 "{name}: active"
             );
         }
-        assert!(!file.contains("faces_at_most"), "{name}");
-        assert!(!file.contains("for = \"30s\""), "{name}");
+        // Read the rules only, never a comment: Posture's (#8377) names
+        // `faces_at_most` to say it has none.
+        let rules: String = file
+            .lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(!rules.contains("faces_at_most"), "{name}");
+        assert!(!rules.contains("for = \"30s\""), "{name}");
     }
     // Every wellbeing skill loads beside the others: the nudges' `[stop]
     // group` shares the function with A meal check's and Quiet focus's
