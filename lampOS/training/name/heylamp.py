@@ -14,10 +14,13 @@ below; a manifest's own label is checked against it.
     python heylamp.py public
         The shared public sets as clip stores: LibriSpeech dev (to train against) and test
         (held out), Speech Commands noise and words.
-    python heylamp.py unpack TAR --sha256 HEX [--manifest TSV] [--set NAME]
+    python heylamp.py unpack TAR --sha256 HEX [--manifest TSV] [--set NAME] [--extra-providers A,B]
         Backend's tar: its SHA-256 checked, the manifest read (`file provider voice style text
         label`, and `split` or a voices.tsv), every WAV made 16 kHz mono, split by the voice's
         mark: `test` voices held out; of the `train` voices about a tenth kept for validation.
+        Clips of the --extra-providers (OpenAI's, the product owner 27 Nov 21:5x: no more of
+        them, and those already made are kept) are an extra held-out slice, whatever their
+        mark: never trained on, and reported apart from the test set.
     python heylamp.py align NAME [--part I/K | --merge] [--truth TRUTH.tsv]
         Where the name ends in each call, and where the word a not-call could be taken for it ends
         ("Lamp" in "OK Lamp", "man" in "Hey man", "lamp" in "turn off the lamp"): forced alignment
@@ -97,6 +100,8 @@ FIRST_SEEN = 31_712 / RATE
 VOICE_DB = -20.0
 CALL_CONDITIONS = ["clean", "mixed", "far"]
 NOTCALL_CONDITIONS = ["clean", "mixed"]
+# The name the report gives the extra held-out slice (unpack --extra-providers).
+EXTRA_SLICE = "extra slice (OpenAI voices)"
 
 # ---------------------------------------------------------------------------------------------
 # What is a call.
@@ -524,7 +529,8 @@ def unpack(a) -> None:
             if done % 5000 == 0:
                 print(f"unpack: {done}/{len(keyed)}", flush=True)
             split = r.get("split") or split_of.get((r["provider"], r["voice"])) or split_of.get(("", r["voice"]))
-            if split not in ("train", "test"):
+            extra = any(p and p in r["provider"].lower() for p in a.extra_providers.lower().split(","))
+            if split not in ("train", "test") and not extra:
                 why[f"no train/test mark ({split})"] += 1
                 continue
             j = judge(r["text"], known)
@@ -539,7 +545,9 @@ def unpack(a) -> None:
                 why["shorter than 0.2 s"] += 1
                 continue
             voice_key = f"{r['provider']}/{r['voice']}"
-            if split == "train" and hash_share(voice_key) < a.check_share:
+            if extra:
+                split = "extra"
+            elif split == "train" and hash_share(voice_key) < a.check_share:
                 split = "check"
             style = r["style"]
             # Backend, 27 Nov 20:12: "whispered" whispers only on Gemini; on ElevenLabs and OpenAI
@@ -555,9 +563,10 @@ def unpack(a) -> None:
             }
             if plain:
                 meta.update(offset=members[key].offset_data, size=members[key].size)
-            for extra in r:
-                if extra not in meta and extra not in ("split",):
-                    meta[extra] = r[extra]
+            meta["manifest_split"] = r.get("split", "")
+            for column in r:
+                if column not in meta:
+                    meta[column] = r[column]
             clips, metas = sets[split]
             if not plain:
                 clips.append(x)
@@ -1023,6 +1032,14 @@ def stream_scores(front: FrontEnd, models: Models, sound: np.ndarray, within: tu
     if within is not None:
         t = seen_until(np.arange(n) + 1)  # a later grid's step m is given at the first grid's m + 1
         used &= ((t >= within[0]) & (t <= within[1]))[None, :]
+        # A model whose first grid already reached the top bar in the window is over every bar
+        # there whatever the later grids say; they are worked out only for the others. (Its
+        # best score is then the first grid's, and its first hearing may be up to a step late.)
+        t0 = seen_until(np.arange(n))
+        inside = (t0 >= within[0]) & (t0 <= within[1])
+        for k in range(len(s0)):
+            if inside.any() and s0[k][inside].max() >= LEASTS[-1]:
+                used[k] = False
     need = used.any(axis=0)
     need[-1] = False  # a later grid's step n-1 would go into step n, which is not there
     for first, last in runs_of(need):
@@ -1158,16 +1175,18 @@ def evaluate(a) -> None:
     stores = stores_of(a.set)
     found = alignment(a.set)
     talk, noise = Talk(), Noise(held_out=True)
-    result = {"set": a.set, "part": a.part, "every": a.every,
+    result = {"set": a.set, "part": a.part, "every": a.every, "notcall_every": a.notcall_every or a.every,
               "models": [{"name": n, "path": str(p), "sha256": models.sha[n]} for n, p in zip(names, paths)],
               "calls": [], "notcalls": [], "streams": {}, "desk": []}
-    item = 0
+    counts = Counter()
     t0 = time.time()
 
-    def mine() -> bool:
-        nonlocal item
-        item += 1
-        return (item - 1) % (parts * a.every) == part * a.every
+    def mine(kind: str = "item", every: int | None = None) -> bool:
+        """Whether this part takes the next item of a kind: every `every`th of them (the same
+        items for every model), dealt in turn to the parts."""
+        every = every or a.every
+        counts[kind] += 1
+        return (counts[kind] - 1) % (parts * every) == part * every
 
     def best(s, sel) -> list:
         return [round(float(s[k][sel].max()), 4) if sel.any() else 0.0 for k in range(len(s))]
@@ -1180,17 +1199,24 @@ def evaluate(a) -> None:
         return out
 
     test = stores.get("test")
-    if test is not None and ("calls" in only or "notcalls" in only):
-        for i, m in enumerate(test.meta):
+    # The held-out test voices, and the extra slice (unpack --extra-providers: OpenAI's), each line
+    # tagged with its slice so the report keeps the two apart.
+    held = [(s, stores[s]) for s in ("test", "extra") if s in stores]
+    for slice_name, store in held:
+        if "calls" not in only and "notcalls" not in only:
+            break
+        for i, m in enumerate(store.meta):
             is_call = m["label"] == "call"
-            if (is_call and "calls" not in only) or (not is_call and "notcalls" not in only) or not mine():
+            if (is_call and "calls" not in only) or (not is_call and "notcalls" not in only):
                 continue
-            clip = test.audio(i)
-            anchor, how = anchor_of(m, found.get(f"test/{i}"))
+            if not (mine("call") if is_call else mine("not-call", a.notcall_every)):
+                continue
+            clip = store.audio(i)
+            anchor, how = anchor_of(m, found.get(f"{slice_name}/{i}"))
             if anchor is None:
                 anchor, how = sounding_end(clip), "line end"
             row = {k: m.get(k) for k in ("file", "provider", "voice", "style", "kind", "opening", "text")}
-            row.update(name_end=round(anchor, 3), end_from=how, max={}, first={})
+            row.update(slice=slice_name, name_end=round(anchor, 3), end_from=how, max={}, first={})
             # A call is caught by a hearing that begins from the line's start to 1 s after the name
             # ends; a not-call wakes the lamp with any hearing from its start to 1.5 s after it.
             window = (2.0, 2.0 + anchor + 1.0) if is_call else (2.0, 2.0 + len(clip) / RATE + 1.5)
@@ -1229,32 +1255,35 @@ def evaluate(a) -> None:
             parts_ += [c * gain_for(active_level(c), VOICE_DB), np.zeros(int(0.3 * RATE), np.float32)]
         return mixture(np.concatenate(parts_), None)
 
-    if test is not None and "tts" in only:
+    for slice_name, store in held:
+        if "tts" not in only:
+            break
+        who = "held-out voices" if slice_name == "test" else EXTRA_SLICE
         by_voice = defaultdict(list)
-        for i, m in enumerate(test.meta):
+        for i, m in enumerate(store.meta):
             if m["label"] == "not-call":
                 by_voice[m["speaker"]].append(i)
         for voice in sorted(by_voice):
-            if not mine():
+            if not mine("stream", 1):
                 continue
             idx = by_voice[voice]
-            add_stream("held-out voices, every not-call line", voiced([test.audio(i) for i in idx]))
-            talk_idx = [i for i in idx if test.meta[i]["kind"] == "talk"]
+            add_stream(f"{who}, every not-call line", voiced([store.audio(i) for i in idx]))
+            talk_idx = [i for i in idx if store.meta[i]["kind"] == "talk"]
             if talk_idx:
-                add_stream("held-out voices, everyday talk lines", voiced([test.audio(i) for i in talk_idx]))
-        print(f"evaluate part {part}: held-out voices' streams ({time.time() - t0:.0f} s)", flush=True)
+                add_stream(f"{who}, everyday talk lines", voiced([store.audio(i) for i in talk_idx]))
+        print(f"evaluate part {part}: {who}' streams ({time.time() - t0:.0f} s)", flush=True)
     if "libri" in only:
         readers = libri("test")
         by_reader = defaultdict(list)
         for i, m in enumerate(readers.meta):
             by_reader[m["speaker"]].append(i)
         for reader in sorted(by_reader)[:: a.libri_every]:
-            if mine():
+            if mine("stream", 1):
                 add_stream("LibriSpeech test readers", voiced([readers.audio(i) for i in by_reader[reader]]))
         print(f"evaluate part {part}: LibriSpeech ({time.time() - t0:.0f} s)", flush=True)
     if "ami" in only:
         for meeting in AMI_MEETINGS[: a.ami_meetings]:
-            if not mine():
+            if not mine("stream", 1):
                 continue
             x = ami_meeting(meeting)
             if a.ami_minutes:
@@ -1267,7 +1296,7 @@ def evaluate(a) -> None:
         # The lamp's own mic2 in the office (lamp-mic/, recorded by the first builder): real
         # office hours. Not labelled, so any real call in it counts as a hearing too.
         for path in sorted((DATA_HOME / "lamp-mic").glob("*/*.wav")):
-            if not mine():
+            if not mine("stream", 1):
                 continue
             x, rate = sf.read(path, dtype="float32", always_2d=True)
             if rate != RATE:
@@ -1283,7 +1312,7 @@ def evaluate(a) -> None:
                 continue
             lid, voice, kind, text = line.split("\t")[:4]
             path = DESK_KIT / "wav" / f"{lid}.wav"
-            if not path.exists() or not mine():
+            if not path.exists() or not mine("desk", 1):
                 continue
             plain = re.sub(r"\{[0-9.]+\}", " ", text)
             j = judge(plain, known)
@@ -1340,7 +1369,14 @@ def report(a) -> None:
     say("Models: " + "; ".join(f"`{m['name']}` ({m['sha256'][:12]}…, {m['path']})" for m in merged["models"]))
     say(f"\nRule: `{rule}` = " + ("the product's `--step-ms 10 --wake 0.03`" if rule == "10w" else "one 80 ms grid")
         + f"; bar {bar} for one step (said.rs). Held-out voices only (the manifest's `test`).\n")
-    calls, nots = merged["calls"], merged["notcalls"]
+    # The test set is the held-out voices of the providers trained on; the extra slice (OpenAI's
+    # voices) is reported on its own, at the end, and is in no other table.
+    calls = [r for r in merged["calls"] if r.get("slice", "test") == "test"]
+    nots = [r for r in merged["notcalls"] if r.get("slice", "test") == "test"]
+    extra_calls = [r for r in merged["calls"] if r.get("slice") == "extra"]
+    extra_nots = [r for r in merged["notcalls"] if r.get("slice") == "extra"]
+    extra_streams = {g: v for g, v in merged["streams"].items() if g.startswith(EXTRA_SLICE)}
+    streams = {g: v for g, v in merged["streams"].items() if not g.startswith(EXTRA_SLICE)}
 
     def caught(rows, cond, k, least, r=rule):
         sel = [row for row in rows if cond in row["max"]]
@@ -1363,12 +1399,16 @@ def report(a) -> None:
     sel = [r for r in nots if r["opening"] == "OK Lamp"]
     if sel:
         say(f"| Woken by OK/Okay Lamp, clean | " + " | ".join(pct(*caught(sel, 'clean', k, bar)) for k in range(len(names))) + " |")
-    for g, v in sorted(merged["streams"].items()):
-        cells = []
-        for n in names:
-            c = v["hearings"][n][rule][str(bar)]
-            cells.append(f"{c / max(v['hours'], 1e-9):.2f} ({c} in {v['hours']:.1f} h)")
-        say(f"| False wakes an hour: {g} | " + " | ".join(cells) + " |")
+
+    def stream_lines(groups: dict) -> None:
+        for g, v in sorted(groups.items()):
+            cells = []
+            for n in names:
+                c = v["hearings"][n][rule][str(bar)]
+                cells.append(f"{c / max(v['hours'], 1e-9):.2f} ({c} in {v['hours']:.1f} h)")
+            say(f"| False wakes an hour: {g} | " + " | ".join(cells) + " |")
+
+    stream_lines(streams)
     say("")
     say(f"## Calls caught, by opening, provider and style (mixed condition, {bar}, {rule})\n")
     say(head)
@@ -1390,9 +1430,10 @@ def report(a) -> None:
                 cells.append(f"{100 * got / n:.0f} %" if n else "–")
         say(f"| {opening} | {len(sel)} | " + " | ".join(cells) + " |")
     say("")
-    say(f"## The trade-off (rule {rule}): calls caught (mixed), look-alikes and bare \"Lamp\" woken (clean), false wakes an hour\n")
-    groups = sorted(merged["streams"])
-    say("| Model | Bar | Calls, mixed | Calls, clean | Calls, far | Look-alikes woken | Bare/OK Lamp woken | Lamp in talk woken | " + " | ".join(groups) + " |")
+    say(f"## The trade-off (rule {rule}): calls caught, look-alikes and bare \"Lamp\" woken (clean), false wakes an hour\n")
+    groups = sorted(streams)
+    say("| Model | Bar | " + " | ".join(f"Calls, {c}" for c in CALL_CONDITIONS)
+        + " | Look-alikes woken | Bare/OK Lamp woken | Lamp in talk woken | " + " | ".join(groups) + " |")
     say("|---|---:|" + "---:|" * (6 + len(groups)))
     look = [r for r in nots if r["kind"].startswith("lookalike")]
     bare = [r for r in nots if r["kind"].startswith("bare")]
@@ -1402,7 +1443,7 @@ def report(a) -> None:
             cells = [pct(*caught(calls, c, k, least)) for c in CALL_CONDITIONS]
             cells += [pct(*caught(s, "clean", k, least)) for s in (look, bare, lit)]
             for g in groups:
-                v = merged["streams"][g]
+                v = streams[g]
                 c = v["hearings"][n][rule][str(least)]
                 cells.append(f"{c / max(v['hours'], 1e-9):.2f}")
             say(f"| `{n}` | {least} | " + " | ".join(cells) + " |")
@@ -1432,8 +1473,21 @@ def report(a) -> None:
                 verb = "caught" if label == "call" else "woken"
                 say(f"| {label}s {verb} ({len(sel)}) | " + " | ".join(pct(*caught(sel, 'clean', k, bar)) for k in range(len(names))) + " |")
         say("")
+    if extra_calls or extra_nots or extra_streams:
+        say(f"## The {EXTRA_SLICE}: never trained on, not in the tables above ({bar}, {rule})\n")
+        say(head)
+        say(rule_line)
+        for cond in CALL_CONDITIONS:
+            say(f"| Calls caught, {cond} | " + " | ".join(pct(*caught(extra_calls, cond, k, bar)) for k in range(len(names))) + " |")
+        for kind in ["bare", "bare-with-ask", "lookalike", "lookalike-with-ask", "lamp-in-talk", "talk"]:
+            sel = [r for r in extra_nots if r["kind"] == kind]
+            if sel:
+                say(f"| Woken by {kind}, clean | " + " | ".join(pct(*caught(sel, 'clean', k, bar)) for k in range(len(names))) + " |")
+        stream_lines(extra_streams)
+        say("")
     ends = Counter(r["end_from"] for r in calls)
-    say(f"Calls: {len(calls)}, name end from {dict(ends)}. Not-calls: {len(nots)}.")
+    say(f"Test set: {len(calls)} calls (name end from {dict(ends)}), {len(nots)} not-calls. "
+        f"Extra slice: {len(extra_calls)} calls, {len(extra_nots)} not-calls.")
     text = "\n".join(lines)
     print(text)
     out = set_dir(merged["set"]) / "runs" / f"report-{rule}.md"
@@ -1590,6 +1644,8 @@ def main() -> None:
     s.add_argument("--manifest")
     s.add_argument("--set", default="heylamp-1")
     s.add_argument("--check-share", type=float, default=0.1, help="share of the train voices kept for validation")
+    s.add_argument("--extra-providers", default="openai,chatgpt",
+                   help="providers whose clips are only an extra held-out slice, reported apart (never trained on)")
     s = sub.add_parser("align")
     s.add_argument("set")
     s.add_argument("--part", default="0/1")
@@ -1609,7 +1665,8 @@ def main() -> None:
     s.add_argument("models", nargs="+")
     s.add_argument("--names")
     s.add_argument("--part", default="0/1")
-    s.add_argument("--every", type=int, default=1)
+    s.add_argument("--every", type=int, default=1, help="every Nth held-out call (and stream, desk line)")
+    s.add_argument("--notcall-every", type=int, default=0, help="every Nth held-out not-call (0: as --every)")
     s.add_argument("--only", default="calls,notcalls,tts,libri,ami,office,desk")
     s.add_argument("--channel")
     s.add_argument("--ami-minutes", type=float, default=0.0, help="only the first minutes of each meeting (0: all)")

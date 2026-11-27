@@ -12,7 +12,11 @@
 #
 # Every step runs at the lowest priority with at most six threads: three processes of two, or
 # one of three to train. Knobs, from the environment:
-#   HEYLAMP_EVERY=N          evaluate every Nth held-out item (1: all)
+#   HEYLAMP_EVERY=N          evaluate every Nth held-out call (1: all)
+#   HEYLAMP_NOTCALL_EVERY=N  every Nth held-out not-call (0: as HEYLAMP_EVERY)
+#   HEYLAMP_EXTRA_PROVIDERS  providers whose clips are only an extra held-out slice, reported
+#                            apart and never trained on (openai,chatgpt: the product owner,
+#                            27 Nov 21:5x, no more OpenAI voices; those made are kept)
 #   HEYLAMP_AMI=N            the first N of October's 34 AMI meetings (34)
 #   HEYLAMP_AMI_MINUTES=M    only the first M minutes of each (0: all)
 #   HEYLAMP_LIBRI_EVERY=N    every Nth of the 73 LibriSpeech test readers (1: all, 10.7 h)
@@ -75,7 +79,7 @@ http://* | https://*)
     nice -n 19 curl -sSL --fail --retry 5 -C - -o "$tar.part" "$src"
     mv "$tar.part" "$tar"
   fi
-  [ -n "$sha" ] && echo "$sha  $(basename "$tar")" > "$tar.sha256"
+  if [ -n "$sha" ]; then echo "$sha  $(basename "$tar")" > "$tar.sha256"; fi
   ;;
 *) tar=$src ;;
 esac
@@ -87,7 +91,8 @@ if want public; then
 fi
 if want unpack; then
   log "2/7 unpack $tar"
-  sh run.sh heylamp.py unpack "$tar" ${sha:+--sha256 "$sha"} --set "$set"
+  sh run.sh heylamp.py unpack "$tar" ${sha:+--sha256 "$sha"} --set "$set" \
+    --extra-providers "${HEYLAMP_EXTRA_PROVIDERS:-openai,chatgpt}"
 fi
 if want align; then
   log "3/7 align: where the name ends in each call (and the word a not-call could be taken for)"
@@ -120,7 +125,7 @@ if want evaluate; then
   fi
   # shellcheck disable=SC2086
   three "$sets/eval" heylamp.py evaluate "$set" $models --names "$names" --every "${HEYLAMP_EVERY:-1}" \
-    --ami-meetings "${HEYLAMP_AMI:-34}" --ami-minutes "${HEYLAMP_AMI_MINUTES:-0}" \
+    --notcall-every "${HEYLAMP_NOTCALL_EVERY:-0}" --ami-meetings "${HEYLAMP_AMI:-34}" --ami-minutes "${HEYLAMP_AMI_MINUTES:-0}" \
     --libri-every "${HEYLAMP_LIBRI_EVERY:-1}" ${HEYLAMP_CHANNEL:+--channel "$HEYLAMP_CHANNEL"}
 fi
 if want report; then
@@ -132,7 +137,7 @@ if want report; then
   mkdir -p "$keep/models" "$keep/scores/$set"
   cp "$sets/runs/heylamp.onnx" "$keep/models/$set-heylamp.onnx"
   cp "$sets/runs/"report-*.md "$sets/runs/"eval-part-*.json "$sets/unpack.json" "$sets/train.log" "$keep/scores/$set/"
-  [ -f "$sets/align.json" ] && cp "$sets/align.json" "$keep/scores/$set/"
+  if [ -f "$sets/align.json" ]; then cp "$sets/align.json" "$keep/scores/$set/"; fi
   shasum -a 256 "$keep/models/$set-heylamp.onnx"
   log "done: $keep/models/$set-heylamp.onnx, $keep/scores/$set/report-10w.md"
 fi
