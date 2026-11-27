@@ -142,9 +142,21 @@ The Python SDK checks and packs an app, and submits it to the Store
 `submitApp`, `submissions`, `requestPublic`). The developer's folder holds
 `app.json` (the manifest above without `format`, `kind` and `files`) beside
 `src/`, `assets/` and `skills/`; `pack` adds those three and writes the tar
-unsigned, and the Store signs it at approval. The SDK READMEs' "Publish your
-app" has the commands and the Store's refusals. Staged: tested against a fake
-Store only so far.
+unsigned, and the Store signs it at approval. **Live on production** since
+20 Nov (#7415): the CLI's default hosts are production's
+(`apiv2.autonomous.ai` for the sign-in, `campaign-api.autonomous.ai` for the
+Store), and apps have been submitted from it. Every SDK app goes to the Store
+this way: `lamp login` (the developer's Autonomous account, an emailed code;
+the token kept 0600 in `~/.config/lampos/store.json`), `lamp app check`,
+`lamp app pack`, `lamp app submit`, `lamp app status`,
+`lamp app request-public`. A submitted app waits for review, unlisted; a
+reviewer approves it and the Store signs it then; it goes public only when
+staff say yes to the developer's ask, after a test on a lamp. A new version
+raises `version` above the one listed, and `min_build` (above) is the lowest
+lamp build it installs on. The Python SDK README's
+[Publish your app](../sdk/python/README.md#publish-your-app) has every
+command, the review states, the Store's refusals with what to do about each,
+and a first app's walkthrough from `lamp app pack` to listed.
 
 ## An app from your own computer (`app.push`, #8351)
 

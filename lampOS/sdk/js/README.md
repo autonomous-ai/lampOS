@@ -451,13 +451,16 @@ asking only `speak`. What a push needs:
 
 ## Publish your app
 
-**Staged:** built against the Store's developer API as Backend3 specified it on
+**Live:** the Store's developer upload has been on in production since
 20 Nov ([#7415](https://github.com/autonomous-ai/lampOS/issues/7415#issuecomment-7035102128)),
-live on production; this SDK has been run only against a fake Store so far.
-An app (format 2, [docs/apps.md](../../docs/apps.md)) goes to the Skills
-Store; a skill goes on through the lamp. Check and pack the app with the
-Python SDK (`lamp app check DIR`, `lamp app pack DIR`); sign in with
-`lamp login` there or here, then:
+and production is this SDK's default: nothing to set. It signs in at
+`https://apiv2.autonomous.ai/api/v1/customers` and uploads to
+`https://campaign-api.autonomous.ai/api/v1/skills-store/developer`
+(`PRODUCTION` in `src/store.js`). An app (format 2,
+[docs/apps.md](../../docs/apps.md)) goes to the Skills Store; a skill goes on
+through the lamp. Check and pack the app with the Python SDK
+(`lamp app check DIR`, `lamp app pack DIR`); sign in with `lamp login` there
+or here, then:
 
 ```js
 import { readFileSync } from 'node:fs';
@@ -466,12 +469,12 @@ import { sendLoginCode, signIn, submitApp, submissions, requestPublic } from 'la
 await sendLoginCode('you@example.com');           // the account emails a code
 await signIn('you@example.com', '123456');         // the code; never a password. Kept, 0600
 const app = await submitApp(readFileSync('gym-coach-1.0.0.tar'), {
-  title: 'Gym coach', category: 'health',
+  title: 'Gym coach',                              // optional, as are description and category
   icon: readFileSync('icon.png'), cover: readFileSync('cover.png'),
 });
-console.log(app.id, app.review_status);            // pending: hidden until approved
+console.log(app.id, app.review_status);            // pending: waiting for review, unlisted
 const { data, total } = await submissions();       // your apps; submissions(id) for one
-await requestPublic(app.id);                       // only once approved; the reviewers decide
+await requestPublic(app.id);                       // only once approved; staff decide
 ```
 
 - The token is kept in `~/.config/lampos/store.json` (`$LAMPOS_HOME`), the
@@ -493,7 +496,23 @@ await requestPublic(app.id);                       // only once approved; the re
   `device_key_refused` (sign in again), `app_not_found`, `app_not_approved`,
   `app_already_public`, and the day's limits `developer_daily_limit` (10
   accepted uploads), `developer_attempt_limit` (30 attempts) and
-  `developer_public_limit` (3 public asks).
+  `developer_public_limit` (3 public asks): try again tomorrow. `store` or
+  `unreachable`: the Store is busy, temporarily off or out of reach, so try
+  again later. What to do about each is in the Python SDK's
+  [The Store's refusals](../python/README.md#the-stores-refusals).
+- **Signed at approval:** the tar you send is unsigned; a reviewer approves
+  it and the Store signs it then, never the developer. Until then it is
+  `pending` and `unlisted`; a new icon or cover waits for review too. An
+  app's `review_status` is `pending`, `approved` or `rejected` (with
+  `review_note`), its `visibility` `unlisted` or `public`, and
+  `public_requested` says whether going public was asked for.
+- **Going public:** `requestPublic` works only for an approved app, tells
+  staff and changes nothing by itself. Staff decide, after a test on a lamp
+  and the first builder's yes.
+- **A new version** raises `version` in `app.json` above the one listed and
+  is submitted again; `min_build` is the lowest lamp build the app installs
+  on. The walkthrough from `lamp app pack` to listed is the Python SDK's
+  [Your first app, from pack to listed](../python/README.md#your-first-app-from-pack-to-listed).
 
 ### Push it to your own lamp
 
@@ -761,9 +780,9 @@ and send it again. Without `retryMs`, it is a held part, as above.
 |---|---|
 | `sendLoginCode(email, opts)` | the account emails a sign-in code |
 | `signIn(email, code, opts)` | the account's token; kept for `lamp` unless `{ keep: false }` |
-| `submitApp(tarBytes, { icon, cover, title, description, category, filename, ...opts })` | an unsigned format-2 tar; the app, `review_status` `pending`, hidden |
+| `submitApp(tarBytes, { icon, cover, title, description, category, filename, ...opts })` | an unsigned format-2 tar; the app, `review_status` `pending`, `unlisted` until approved and made public |
 | `submissions(id, { page, limit, ...opts })` | one app of yours, or `{ data, total }` |
-| `requestPublic(id, opts)` | an approved app's ask to go public |
+| `requestPublic(id, opts)` | an approved app's ask to go public; staff decide |
 | `saveToken`, `keptToken`, `forgetToken`, `endpoints` | the kept sign-in, and where the Store is |
 
 `opts` is `{ token, where }` or `{ token, staging, store, account }`.

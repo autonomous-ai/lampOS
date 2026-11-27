@@ -216,12 +216,15 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
 
 ## Publishing an app to the Store
 
-An app (format 2) goes to the Skills Store, not through the lamp:
+An app (format 2) goes to the Skills Store, not through the lamp, on
+production by default (live since 20 Nov):
 `lamp app check DIR`, `lamp app pack DIR`, `lamp login` (the account's
 emailed code; never ask for or handle a password), `lamp app submit DIR`,
 `lamp app status [ID]`, `lamp app request-public ID`, or the page
-`lamp app studio`. `lamp logout` forgets the sign-in. The SDK README's
-"Publish your app" has the folder's shape and every refusal.
+`lamp app studio`. `lamp logout` forgets the sign-in. The package is
+unsigned: the Store signs it when a reviewer approves it, and staff decide
+on going public. The SDK README's "Publish your app" has the folder's
+shape, every refusal and a first app's walkthrough.
 
 ## Patterns
 
