@@ -4295,6 +4295,7 @@ fn gesture_run_full(
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -4431,6 +4432,7 @@ fn expression_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -4608,6 +4610,7 @@ fn speaking_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -5328,6 +5331,7 @@ fn rest_glances_watched(
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -6411,6 +6415,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -6489,6 +6494,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             asleep: false,
             woken: false,
             replace: false,
+            queue: false,
             lively: false,
             energy: 0,
             present: false,
@@ -6585,6 +6591,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -7371,6 +7378,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     asleep: false,
                     woken: false,
                     replace: false,
+                    queue: false,
                     lively: false,
                     energy: 0,
                     present: false,
@@ -7462,6 +7470,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -7558,6 +7567,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 night_woke: false,
                 aim_from_home: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -10571,6 +10581,7 @@ fn called_run(
                 asleep: false,
                 woken: false,
                 replace: false,
+                queue: false,
                 lively: false,
                 energy: 0,
                 present: false,
@@ -22845,5 +22856,288 @@ fn a_gesture_under_way_ends_as_the_lamp_begins_to_keep_still() {
     assert!(
         fates.contains(&("laugh", crate::body::QUIET_HELD)),
         "{fates:?}"
+    );
+}
+
+/// A paired computer's move as lamp-control sends it (`replace`, at `skill`), when, from which computer, and whether it is
+/// queued (`"queue": true`).
+type QueueAsk = (Duration, &'static Clip, &'static str, bool);
+
+/// One step of a queue run: when, the gesture it makes, whether that began on this step, and the head's goals.
+type QueueStep = (Duration, Option<&'static str>, bool, [u16; 3]);
+
+/// Two computer moves, both named as lamp-control names every one (`parts::MOVE_NAME`), each 1 s at a 50 ms step: the first
+/// lifts the head's pitch 40 counts and back, the second lowers it 40 and back, so the pitch crosses the stand at speed where
+/// they meet (the fixture's roll reach is 15 counts, too little to see); and a third, a nod of pitch.
+static QUEUE_FIRST: Clip = Clip {
+    name: "control",
+    step_ms: 50,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [-4, 0, 0, 0, 0],
+        [-8, 0, 0, 0, 0],
+        [-12, 0, 0, 0, 0],
+        [-16, 0, 0, 0, 0],
+        [-20, 0, 0, 0, 0],
+        [-24, 0, 0, 0, 0],
+        [-28, 0, 0, 0, 0],
+        [-32, 0, 0, 0, 0],
+        [-36, 0, 0, 0, 0],
+        [-40, 0, 0, 0, 0],
+        [-36, 0, 0, 0, 0],
+        [-32, 0, 0, 0, 0],
+        [-28, 0, 0, 0, 0],
+        [-24, 0, 0, 0, 0],
+        [-20, 0, 0, 0, 0],
+        [-16, 0, 0, 0, 0],
+        [-12, 0, 0, 0, 0],
+        [-8, 0, 0, 0, 0],
+        [-4, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+static QUEUE_SECOND: Clip = Clip {
+    name: "control",
+    step_ms: 50,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [4, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [12, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [20, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [28, 0, 0, 0, 0],
+        [32, 0, 0, 0, 0],
+        [36, 0, 0, 0, 0],
+        [40, 0, 0, 0, 0],
+        [36, 0, 0, 0, 0],
+        [32, 0, 0, 0, 0],
+        [28, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [20, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [12, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [4, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+static QUEUE_THIRD: Clip = Clip {
+    name: "control",
+    step_ms: 50,
+    frames: &[
+        [0, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [24, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [8, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ],
+};
+
+/// A standing lamp reading, asked `asks` with `LAMP_BODY_MOVE_QUEUE` on or off: the report, the fates said and each step.
+fn queue_run(
+    move_queue: bool,
+    asks: Vec<QueueAsk>,
+    seconds: u64,
+) -> (BodyReport, Fated, Vec<QueueStep>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        move_queue,
+        ..gesture_limits()
+    };
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut asks = VecDeque::from(asks);
+    let (mut fates, mut seen) = (Vec::new(), Vec::new());
+    let report = run_told(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Reading, 60)),
+        move || match asks.front() {
+            Some((at, clip, source, queue)) if time.get() >= *at => {
+                let asked = Asked {
+                    gesture: Some(*clip),
+                    replace: true,
+                    queue: *queue,
+                    ..Asked::default()
+                };
+                let told = (asked, Priority::Skill, Source::new(source));
+                asks.pop_front();
+                told
+            }
+            _ => (Asked::default(), Priority::Conversation, None),
+        },
+        |glimpse| {
+            fates.extend(glimpse.gesture_fates);
+            seen.push((
+                seen_at.get(),
+                glimpse.gesture,
+                glimpse.gesture_began,
+                glimpse.goals,
+            ));
+        },
+    );
+    (report, fates, seen)
+}
+
+/// The steps a gesture began on, by when.
+fn began_at(seen: &[QueueStep]) -> Vec<Duration> {
+    seen.iter()
+        .filter(|step| step.2)
+        .map(|step| step.0)
+        .collect()
+}
+
+/// A computer's move queued behind its own move playing starts on the step that one ends: no step between them makes no
+/// gesture, nothing eases back to the stand, and the head's pitch, crossing the stand at speed where they meet, moves on every
+/// step of the join, never still and never back. Each is said begun, though both are named alike.
+#[test]
+fn a_queued_move_starts_on_the_step_the_one_before_it_ends() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run(true, asks, 14);
+    assert_eq!(report.gestures, 2, "{fates:?}");
+    assert_eq!(
+        fates,
+        [
+            ("control", "taken: it plays"),
+            ("control", "taken: it plays")
+        ]
+    );
+    let began = began_at(&seen);
+    assert_eq!(began.len(), 2, "{began:?}");
+    let (first, second) = (
+        seen.iter().position(|step| step.0 == began[0]).unwrap(),
+        seen.iter().position(|step| step.0 == began[1]).unwrap(),
+    );
+    // The second begins one second (the first's length) after the first, to the step.
+    assert!(
+        began[1] - began[0] >= ms(1_000) && began[1] - began[0] <= ms(1_000) + TICK,
+        "{began:?}"
+    );
+    assert!(
+        seen[first..second + 40]
+            .iter()
+            .all(|step| step.1 == Some("control"))
+    );
+    // Around the join the pitch's goal goes down every step (more counts): from the first's way back into the second's way
+    // down, never still and never back.
+    let pitches: Vec<u16> = seen[second - 8..second + 8]
+        .iter()
+        .map(|step| step.3[0])
+        .collect();
+    assert!(
+        pitches.windows(2).all(|pair| pair[1] > pair[0]),
+        "{pitches:?}"
+    );
+}
+
+/// The queue off, a queued move is asked as before: as a replace, it ends the move playing, which eases back to the stand,
+/// and plays after it.
+#[test]
+fn with_the_queue_off_a_queued_move_replaces_as_before() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run(false, asks, 14);
+    assert_eq!(report.gestures, 2, "{fates:?}");
+    assert!(
+        fates.contains(&("control", crate::moves::REPLACED)),
+        "{fates:?}"
+    );
+    let began = began_at(&seen);
+    let gap = seen
+        .iter()
+        .filter(|step| step.0 > began[0] && step.0 < began[1] && step.1.is_none())
+        .count();
+    assert!(gap > 0, "the first eases back with no gesture: {began:?}");
+}
+
+/// Queued behind another computer's move, a move is asked as if unqueued: as a replace, it ends that one.
+#[test]
+fn a_move_queued_behind_another_askers_move_replaces_it_as_before() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_2", true),
+    ];
+    let (_, fates, _) = queue_run(true, asks, 14);
+    assert!(
+        fates.contains(&("control", crate::moves::REPLACED)),
+        "{fates:?}"
+    );
+}
+
+/// A move waiting for one that is ended early (here a replace from the same computer, unqueued) is dropped, said why, and
+/// never plays.
+#[test]
+fn a_queued_move_is_dropped_when_the_one_before_it_does_not_play_out() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+        (ms(8_500), &QUEUE_THIRD, "control:c_1", false),
+    ];
+    let (report, fates, _) = queue_run(true, asks, 14);
+    assert!(
+        fates.contains(&("control", crate::moves::QUEUED_FIRST_ENDED)),
+        "{fates:?}"
+    );
+    assert!(
+        fates.contains(&("control", crate::moves::REPLACED)),
+        "{fates:?}"
+    );
+    // The first and the third played; the queued one never did.
+    assert_eq!(report.gestures, 2, "{fates:?}");
+}
+
+/// One move waits at a time: a second queued one takes the first's place, which is said dropped, and plays after the move
+/// playing.
+#[test]
+fn a_second_queued_move_takes_the_place_of_the_first() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+        (ms(8_500), &QUEUE_THIRD, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run(true, asks, 14);
+    assert!(
+        fates.contains(&("control", "dropped: another was asked after it")),
+        "{fates:?}"
+    );
+    assert_eq!(report.gestures, 2, "{fates:?}");
+    let began = began_at(&seen);
+    assert!(
+        began.len() == 2 && began[1] - began[0] <= ms(1_000) + TICK,
+        "{began:?}"
     );
 }

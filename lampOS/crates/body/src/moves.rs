@@ -212,6 +212,21 @@ pub fn from_control(source: &str) -> bool {
     source.starts_with("control:") || source.starts_with("lamp-control/control:")
 }
 
+/// `LAMP_BODY_MOVE_QUEUE`: `on` lets a paired computer's move wait for its
+/// own move playing and start on the step it ends (`"queue": true`,
+/// [`crate::body::Limits::move_queue`]); anything else, or unset, is off.
+pub const MOVE_QUEUE: &str = "LAMP_BODY_MOVE_QUEUE";
+
+/// Whether a value of [`MOVE_QUEUE`] turns the queue on.
+pub fn move_queue_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// Why a queued move was dropped: the move it waited for ended before it
+/// played out (a hand, a stop, a higher ask, the lease, a sit-down), or
+/// was not the one playing when its turn came.
+pub const QUEUED_FIRST_ENDED: &str = "dropped: the move it waited for did not play out";
+
 /// Why a gesture playing was ended for a `replace` one: it eases out from
 /// where it is, and the new one plays after.
 pub const REPLACED: &str = "ended: replaced by a newer motion";
@@ -280,6 +295,10 @@ pub struct Asker {
     /// `"replace": true`: ends the motion playing, if it is `skill` or
     /// lower ([`crate::body::Asked::replace`]). Absent, false.
     pub replace: bool,
+    /// `"queue": true`: waits for the motion playing, if it is this asker's,
+    /// and starts on the step it ends ([`crate::body::Asked::queue`], under
+    /// [`MOVE_QUEUE`]). Absent, false.
+    pub queue: bool,
     /// `"lively": true`: started of itself only above energy level 1,
     /// dropped while lamp-control holds the body
     /// ([`crate::body::Asked::lively`]). Absent, false.
@@ -309,6 +328,8 @@ fn asked(datagram: &[u8]) -> Option<(serde_json::Value, Asker)> {
         #[serde(default)]
         replace: bool,
         #[serde(default)]
+        queue: bool,
+        #[serde(default)]
         lively: bool,
     }
     let message: Message = serde_json::from_slice(datagram).ok()?;
@@ -316,6 +337,7 @@ fn asked(datagram: &[u8]) -> Option<(serde_json::Value, Asker)> {
         source: message.source,
         priority: message.priority,
         replace: message.replace,
+        queue: message.queue,
         lively: message.lively,
     };
     Some((message.sent, asker))
@@ -639,6 +661,38 @@ fn keep(file: Move) -> &'static Clip {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A move's `"queue": true` is read as the asker's; absent, it is false; and the product unit never turns the queue on
+    /// (off until its row, the first builder on #7814, 27 Nov).
+    #[test]
+    fn a_move_says_whether_it_waits_and_the_product_never_turns_the_queue_on() {
+        let move_of = |extra: &str| {
+            format!(
+                r#"{{"move":{{"name":"wave","step_ms":50,"frames":[[0,0,0,0,0],[40,0,0,0,0],{}[0,0,0,0,0]]}},"source":"control:c_1","replace":true{extra}}}"#,
+                "[40,0,0,0,0],".repeat(30)
+            )
+        };
+        let mut sent = Sent::default();
+        let (_, queued) = sent
+            .take_asked(move_of(r#","queue":true"#).as_bytes())
+            .unwrap();
+        assert!(queued.queue && queued.replace);
+        let (_, plain) = sent.take_asked(move_of("").as_bytes()).unwrap();
+        assert!(!plain.queue);
+        assert!(
+            sent.take_asked(move_of(r#","queue":"yes""#).as_bytes())
+                .is_none()
+        );
+        assert!(move_queue_from(Some("on")));
+        for off in [None, Some("off"), Some("1"), Some("ON")] {
+            assert!(!move_queue_from(off), "{off:?}");
+        }
+        let unit = include_str!("../../../deploy/product/lamp-body.service");
+        assert!(
+            !unit.contains(MOVE_QUEUE),
+            "the product unit sets {MOVE_QUEUE}"
+        );
+    }
 
     /// The fifth on #940: an asker's name comes off a socket, so one longer
     /// than 64 bytes, empty or with a control character is not kept.
