@@ -24,6 +24,11 @@ path = "src/bin/seems_measure.rs"
 name = "glance_replay"
 test = true
 
+# Offline measurements only; no camera, bus, voice policy or product switch.
+[[example]]
+name = "head_direction_compare"
+test = true
+
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true
