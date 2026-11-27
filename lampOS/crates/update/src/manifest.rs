@@ -137,10 +137,10 @@ pub const IMAGE_FILES: &[&str] = &[
     "/usr/local/libexec/lamp-ramlog-postrotate",
 ];
 /// The image's files a round asks for with `LAMP_UPDATE_IMAGE` off (#7254):
-/// the journal's size and the clean-shutdown keep. The fault keep's own
-/// drop-in (#8713) joins this list, with a test, once it is one of
-/// [`IMAGE_FILES`]. Each is one of [`IMAGE_FILES`].
+/// the journal's size, the clean-shutdown keep and the fault keep's drop-in
+/// (#8713). Each is one of [`IMAGE_FILES`].
 pub const JOURNAL_FILES: &[&str] = &[
+    "/etc/systemd/system/lamp-voice.service.d/lamp-fault-keep.conf",
     "/etc/systemd/journald.conf.d/zz-lamp-journal.conf",
     "/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf",
     "/usr/local/libexec/lamp-journal-keep",
