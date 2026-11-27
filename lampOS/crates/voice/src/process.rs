@@ -3340,6 +3340,7 @@ fn second_route_worker_environment(
         // One simple rule: "Hey Lamp" and 20 s renewing (the product owner,
         // 27 Nov).
         crate::second_provider::SIMPLE_CALL_ENVIRONMENT,
+        crate::second_provider::SIMPLE_CALL_HEARD_ENVIRONMENT,
         // The lamp's own news gets the conversation's 20 s (the same day).
         crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
         // Short replies carry in a conversation (#8772).
@@ -3861,6 +3862,7 @@ mod tests {
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
             crate::second_provider::SIMPLE_CALL_ENVIRONMENT,
+            crate::second_provider::SIMPLE_CALL_HEARD_ENVIRONMENT,
             crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
             crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
@@ -5176,6 +5178,7 @@ mod tests {
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT
                     || name == crate::second_provider::SIMPLE_CALL_ENVIRONMENT
+                    || name == crate::second_provider::SIMPLE_CALL_HEARD_ENVIRONMENT
                     || name == crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT
                     || name == crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT

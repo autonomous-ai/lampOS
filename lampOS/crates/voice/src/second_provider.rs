@@ -1126,6 +1126,16 @@ pub const NAME_HEY_ONLY_ENVIRONMENT: &str = "LAMP_NAME_HEY_ONLY";
 /// decline.
 pub const SIMPLE_CALL_ENVIRONMENT: &str = "LAMP_SIMPLE_CALL";
 
+/// `on` exactly, off unless set, inert without [`SIMPLE_CALL_ENVIRONMENT`]
+/// and in no product unit: with it, a line also calls when its words open
+/// with one of the lamp's language's greetings, past one filler, whatever
+/// word follows, and lamp-name's hearing for that line's own sound began
+/// within its start and scored [`crate::attention::NEAR_SCORE`] (0.95) or
+/// more ([`worker::Heeding::taking_simple_calls_heard`]). On lamp-dbda on 27
+/// Nov, strict words held 10 of 10 calls written "Hey, Lynn.", "Hello,
+/// ma'am." or "Hey, man." while lamp-name heard 8 of 9 at 0.92 to 1.00.
+pub const SIMPLE_CALL_HEARD_ENVIRONMENT: &str = "LAMP_SIMPLE_CALL_HEARD";
+
 /// Why a line is held with [`SIMPLE_CALL_ENVIRONMENT`] on: no call and no
 /// conversation going on.
 pub(crate) const SIMPLE_HELD: &str =
