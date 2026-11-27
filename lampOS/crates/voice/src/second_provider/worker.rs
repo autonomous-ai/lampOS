@@ -2922,6 +2922,9 @@ pub fn serve(
     for line in lines {
         eprintln!("lamp-voice second: {line}");
     }
+    // An installed item's first-run line is said from the speech cache the
+    // voice keeps, in this voice only (#7814).
+    crate::install_told::speaks_as(crate::say::tts_cache::identity_of(&config));
     // A skill made by the lamp's own model asks this worker's chat.
     if files.tools.make_skill {
         crate::make_skill_local::set_config(config.clone());

@@ -30,10 +30,12 @@ use std::{
 /// Where the rendered lines are kept: the voice's own state (root's, 0700).
 pub const DIR: &str = "/var/lib/lampOS/voice/tts-cache";
 /// At most this many lines are kept; past it the oldest go first, never the
-/// owner's current lines (#4883, [`TtsCache::make_room`]). Only the lamp's
-/// own fixed lines come here: [`WARM`] and the fixed lines in the owner's
-/// language (#4473 (c), 45 since #5999's skill lines), with room for a change
-/// of voice or language and the lines asked since.
+/// owner's current lines (#4883, [`TtsCache::make_room`]): [`WARM`] and the
+/// fixed lines in the owner's language (#4473 (c), 45 since #5999's skill
+/// lines), with room for a change of voice or language and the lines asked
+/// since. An installed item's first-run line adds two files of the Store's
+/// text per install (`crate::install_told::arrived`, #7814), kept after it
+/// is said; they are never among the protected lines, so they go first.
 pub const MOST_FILES: usize = 64;
 /// The longest line kept: 20 s at the speaker's rate.
 pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
@@ -297,14 +299,11 @@ impl TtsCache {
 
     /// The file name's stem: hex SHA-256 of `voice|model|language|text`.
     pub fn key(&self, text: &str) -> String {
-        Sha256::digest(format!("{}|{text}", self.identity))
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect()
+        key_of(&self.identity, text)
     }
 
     fn path(&self, text: &str) -> PathBuf {
-        self.dir.join(format!("{}.wav", self.key(text)))
+        path_in(&self.dir, &self.identity, text)
     }
 
     /// `text`'s samples: from the cache, or rendered once and kept, in the
@@ -332,6 +331,13 @@ impl TtsCache {
     }
 
     /// [`Self::samples`] in this cache's own voice only.
+    ///
+    /// `rendering` is held across the render, network included (up to
+    /// [`render_within`]), so one line is rendered once: another uncached
+    /// caller waits behind it, e.g. a cached `say` behind an install's
+    /// first-run render on its listener thread (`crate::install_told`).
+    /// Never the coordinator's loop, which only reads kept lines
+    /// ([`Self::kept`]).
     fn samples_here(&self, text: &str) -> Result<Vec<i16>, String> {
         let path = self.path(text);
         if let Some(samples) = read(&path) {
@@ -600,6 +606,50 @@ fn spec() -> hound::WavSpec {
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     }
+}
+
+/// The file name's stem of `text` under `identity` ([`TtsCache::key`]).
+fn key_of(identity: &str, text: &str) -> String {
+    Sha256::digest(format!("{identity}|{text}"))
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn path_in(dir: &Path, identity: &str, text: &str) -> PathBuf {
+    dir.join(format!("{}.wav", key_of(identity, text)))
+}
+
+/// `text`'s samples if a cache in `dir` keeps them under `identity`
+/// (`voice|model|language`, [`TtsCache::identity`]), never rendered: for the
+/// second route's worker, which keeps no cache of its own and says an
+/// installed item's first-run line from here (`crate::install_told`).
+pub fn kept_under(dir: &Path, identity: &str, text: &str) -> Option<Vec<i16>> {
+    read(&path_in(dir, identity, text))
+}
+
+/// The identity `config` speaks as (`voice|model|language`), as the cache
+/// [`built_from_environment`] is keyed: the person's own voice
+/// ([`own_voice`], #8367) when the lamp's is kept apart from it, else the
+/// lamp's. The second route's worker reads a line kept by the voice with it
+/// ([`kept_under`]).
+pub fn identity_of(config: &crate::second_config::SecondConfig) -> String {
+    use crate::second_provider::net::{default_model, voice_name};
+    let lamps = lamps_config(config);
+    let voice = if config.hosted.lamps_voice.is_some() {
+        own_voice(
+            voice_name(config.tts_provider, config.tts_voice.as_deref()),
+            Some(&config.tts_base_url),
+        )
+    } else {
+        voice_name(lamps.tts_provider, lamps.tts_voice.as_deref()).to_owned()
+    };
+    let model = lamps
+        .tts_model
+        .clone()
+        .unwrap_or_else(|| default_model(lamps.tts_provider).to_owned());
+    let language = lamps.stt_language.clone().unwrap_or_default();
+    format!("{voice}|{model}|{language}")
 }
 
 /// A kept line, or none: missing or not one of ours is a miss.

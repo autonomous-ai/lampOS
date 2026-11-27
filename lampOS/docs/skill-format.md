@@ -161,6 +161,7 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[search]` | `{ looks 1–8, give_up, found, note, walk, looked }` | a search a person asked for, its looks and what the model is told past the last (look-for-things) |
 | `[history]` | `{ topic = "room/presence", within, words }` | the room's presence over the last hours, for the model (who-was-here) |
 | `[watch]` | `{ every, asked_within, if_heard, most, mark, words }` | a watch the skill's tool turns on and off, with a faint `mark` light while on (guard-mode). Needs `light`, `messages` and `known_faces`; no trigger and no steps |
+| `[first_run]` | `{ say }` | the line Lamp says when the owner installs the skill from the Store: 1 to 140 characters of plain text, one line, no markup or quotes, at most one question; without it Lamp says "*title* is ready." (#7814, [apps.md](apps.md), "The first-run line") |
 | `[[do]]` | list | the steps |
 
 A skill needs a trigger or a tool, and at least one step. It says, sounds

@@ -778,6 +778,7 @@ const BUS_TOPICS: &[&str] = &[
     "speaker/volume",
     "speaker1/play",
     "stop/heard",
+    "store/installed",
     "tasks/status",
     "tasks/step",
     "update/check",

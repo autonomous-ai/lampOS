@@ -384,6 +384,37 @@ def _permissions(rules: dict[str, Any], report: Report) -> None:
         )
 
 
+# A first-run line (#7814), as lamp_msgs::installed::say_ok and the Store hold it.
+FIRST_RUN_MOST_CHARS = 140
+FIRST_RUN_MARKUP = set('<>`*[]{}"“”\\()（）')
+
+
+def first_run_errors(first_run: object) -> list[str]:
+    """`first_run: {say}`: plain text of 1 to 140 characters with no space at either end, one line (no
+    control character), no markup or quotes, at most one question, and no other key. Each line is one
+    refusal, in lamp_msgs::installed::say_ok's words."""
+    if not isinstance(first_run, dict) or set(first_run) != {"say"}:
+        return ["first_run: {say} and no other key"]
+    say = first_run["say"]
+    if not isinstance(say, str) or not 1 <= len(say) <= FIRST_RUN_MOST_CHARS or say.strip() != say:
+        return [f"first_run.say: 1 to {FIRST_RUN_MOST_CHARS} characters of plain text, no space at either end"]
+    # Rust's char::is_control: the C0 and C1 controls and DEL.
+    if any(ord(c) < 32 or 127 <= ord(c) < 160 for c in say):
+        return ["first_run.say: one line, no control characters"]
+    found = next((c for c in say if c in FIRST_RUN_MARKUP), None)
+    if found is not None:
+        return [f"first_run.say: no markup or quotes (found {found!r})"]
+    if sum(c in "?\uff1f" for c in say) > 1:
+        return ["first_run.say: at most one question"]
+    return []
+
+
+def _first_run(rules: dict[str, Any], report: Report) -> None:
+    """`[first_run] say`, as lamp-skills' load holds it."""
+    if "first_run" in rules:
+        report.errors.extend(f"skill.toml: [first_run] {why}" for why in first_run_errors(rules["first_run"]))
+
+
 def _stop(rules: dict[str, Any], report: Report) -> None:
     """As lamp-skills holds `[stop] group` (#7401): only in a skill with no
     `[budget]`, whose group shares the stop already; its shape (lowercase
@@ -499,4 +530,5 @@ def check(folder: str | Path, *, shape_required: bool = True) -> Report:
     if isinstance(rules, dict):
         _permissions(rules, report)
         _stop(rules, report)
+        _first_run(rules, report)
     return report

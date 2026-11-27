@@ -460,6 +460,54 @@ fn help_holds_the_stores_rules_and_is_optional() {
     );
 }
 
+/// The owner's ask (#7814, the first builder's c7209938102 and Backend3's
+/// c7209987429): `first_run: {say}` is optional, plain text of at most 140
+/// characters, no markup or control characters, at most one question, and
+/// no other key; a package without it reads as before.
+#[test]
+fn first_run_holds_the_stores_rules_and_is_optional() {
+    let read = changed(|m, _| {
+        m["first_run"] = json!({"say": "English lessons is ready. Want to start with a short one?"})
+    })
+    .expect("a first-run line reads");
+    assert_eq!(
+        read.manifest
+            .first_run
+            .as_ref()
+            .map(|first| first.say.as_str()),
+        Some("English lessons is ready. Want to start with a short one?")
+    );
+    assert!(
+        changed(|_, _| {}).unwrap().manifest.first_run.is_none(),
+        "no first-run line is fine"
+    );
+    assert!(changed(|m, _| m["first_run"] = json!({"say": "a".repeat(140)})).is_ok());
+    refused(
+        changed(|m, _| m["first_run"] = json!({"say": "a".repeat(141)})),
+        "lamp-skill.json: first_run.say: 1 to 140 characters",
+    );
+    refused(
+        changed(|m, _| m["first_run"] = json!({"say": "Ready? Shall we start?"})),
+        "lamp-skill.json: first_run.say: at most one question",
+    );
+    refused(
+        changed(|m, _| m["first_run"] = json!({"say": "Say <b>start</b>."})),
+        "first_run.say: no markup or quotes",
+    );
+    refused(
+        changed(|m, _| m["first_run"] = json!({"say": "Ready.\nStart?"})),
+        "first_run.say: one line, no control characters",
+    );
+    refused(
+        changed(|m, _| m["first_run"] = json!({"say": "Ready.", "then": "start"})),
+        "unknown field",
+    );
+    refused(
+        changed(|m, _| m["first_run"] = json!("Ready.")),
+        "expected struct FirstRun",
+    );
+}
+
 #[test]
 fn settings_hold_each_types_rules() {
     let setting = |value: Value| move |m: &mut Value, _: &mut Files| m["settings"] = json!([value]);

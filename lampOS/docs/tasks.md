@@ -763,6 +763,80 @@ landed`, the reason the first gate shut: `reminder_waiting`,
 `lamp_replying`, `turn_open`, `not_ready`); news told (`task news told:
 task N, X ms after it landed`); and a short line told.
 
+### An installed item's first-run line (#7814, `LAMP_INSTALL_FIRST_RUN`, off unless set)
+
+The product owner's ask, ruled by the first builder on #7814 (comment
+7209938102): when the owner installs an app or a skill from the Store, Lamp
+says the item's first line right away, the way task news is told
+(`lamp_voice::install_told`). `lamp-cloud` puts one `store/installed` on
+the bus for each finished install, never for an update
+([apps.md](apps.md), "The first-run line"); the voice takes it from `cloud`
+alone, checked, and keeps it across a sleep or a mute.
+
+- **The line** is the item's own `first_run.say` (at most 140 characters,
+  one question), or "*Name* is ready." with none. It is said as the lamp's
+  own written turn (basis `first_run_told`), word for word, in the
+  conversation's language; it stays in the conversation, so the person's
+  answer within the 20 s window is a follow-up like any other and gets the
+  app's tools (`LAMP_FOLLOW_UPS`). On the second route an English lamp says
+  its words with no chat asked (`install_told::said_with_no_chat`); in
+  another language the model says it in theirs, as before.
+- **From the speech cache** (the first builder's ruling on #8842, comment
+  7212623876: the 2 s target is the first sound, from the install's
+  finish): the moment `store/installed` comes, before the pause or the
+  turn, both its wordings (the line, and "By the way, ...") are rendered
+  into the speech cache (`say::tts_cache`, which keeps the lamp's fixed
+  lines; bounded by its 64 files, oldest first, as every line there;
+  `install_told::arrived`). An English lamp on the second route only:
+  another language's line is the model's, and a first-route lamp renders
+  nothing, as nothing would play it. An at-once line waits for that render at most 1.2 s after
+  the finish (`RENDER_HOLD_US`); the second route then plays the kept file
+  (`install_told::kept_clip`, the voice it speaks in only), or renders the
+  words as they come when it is not kept.
+- **At once**, when anyone was heard in the last minute
+  (`install_told::HEARD_WITHIN_US`) or a face is in view as the news comes:
+  said at the first free moment, within 2 s of the finish in a room not
+  talking. A sensor only helps it speak: the face is one way to be near,
+  never needed. News first looked at more than 10 s after the finish (the
+  lamp was asleep or private) is past its "at once".
+- **Otherwise**, and once nobody is near (no face, nobody heard for a
+  minute), it waits for Lamp's next answer to a person and comes 1 s after
+  the answer's words end with nobody starting: "By the way, Gym Coach is
+  ready." (`install_told::by_the_way`), as #8812 tells task news. A face
+  seen later never tells it: no camera-guessed arrival.
+- **Never into people's talk:** away from an answer, only after 5 s with
+  no words heard (`TALK_PAUSE_US`) and 3 s after the lamp's own words. A
+  turn that heard no words leaves the pause alone (the same ruling): the
+  pause counts the speech last heard as a transcript with a word came
+  (`Moment::last_words_us`). Speech still under way holds it, worded or
+  not (the Reviewer-lead's must-fix, c7213149798, within the ruling,
+  c7213454550): detector speech in the last 1 s (`UNDER_WAY_US`), and
+  speech not yet resolved by a transcript or its turn's end
+  (`Moment::last_resolved_us`) for the old 5 s.
+- **Never to the wrong room** (c7210755978): never in the quiet hours or in
+  a busy room (`room_told`), at once or after an answer. A face that is not
+  the owner's does not hold it: face ids are not measured on the body (the
+  first builder, c7214429444). With no face, someone heard is near enough (the
+  ruling's "a face is one way to be near, never a need"). Never
+  while the keeper pauses the lamp, signed out, in the care hold, while a
+  reminder waits or anything is owed, under way or being said; the
+  conversation doesn't run with the privacy switch closed or asleep, so
+  nothing is said then.
+- **Once per install:** taken off the queue as its turn is handed to
+  speech; the same install heard twice is taken once; at most 4 wait, the
+  oldest let go first; one not said within 12 h is let go untold.
+- **The journal** says `lamp-voice: the owner installed app gym-coach: its
+  first-run line handed to speech N ms after its install finished, at once`
+  (or `right after Lamp's answer`), then `its words kept in the speech
+  cache` or `its words not kept yet`, never the line, and the trace records
+  `first_run_told` with `after_finish_ms` and `kept`. At its first sound
+  (the speaker's first write, as every turn's) one line says both: `its
+  first-run line handed to speech N ms and its first sound M ms after its
+  install finished, at once, from the speech cache` (or `rendered as it
+  came`): the ROW measures the 2 s from M.
+  `lamp-cloud`'s line is `the owner installed app gym-coach: told on
+  store/installed (first-run line: its own)`.
+
 ## Wire interface
 
 Each Unix connection carries one UTF-8 JSON object followed by a newline and

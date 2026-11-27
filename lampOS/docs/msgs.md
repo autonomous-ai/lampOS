@@ -673,6 +673,7 @@ and `declaration_of()` find its topic.
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
 | `AttachRef` | `attachments/arrived` | event | none / 120 s | Where an attachment from the app is, never its bytes: `path` (`/run/lampos-attachments/<id>` on a lamp), `id` (16 lowercase hex, its SHA-256's start), `kind` (`photo` or `text`), `mime` (`image/jpeg`; `text/plain` or `text/markdown`), `bytes` (at most 184 KiB for a photo, 64 KiB for a text) and `sent_at` (Unix ms, 0 if unsaid). Published by `lamp-cloud` ([cloud.md](cloud.md), "A photo or a text from the app"); the second route's worker takes it only from `cloud` and only in that folder ([second-voice.md](second-voice.md), "A photo from the app") |
+| `Installed` | `store/installed` | event | none / 10 s | A Store install that finished, once an install and never for an update (the first builder's ruling on #7814, c7209938102): `item` (`app` or `skill`), `name`, `title`, `by` (always `owner`, never a person's name), `first_run` (`{"say"}`, the item's own first-run line, only when it declares one; `lamp_msgs::installed::say_ok`) and `finished_us` (this host's monotonic clock, for the line's latency). Published by `lamp-cloud` ([apps.md](apps.md), "The first-run line"); with `LAMP_INSTALL_FIRST_RUN=on` the voice takes it only from `cloud` and says the line ([tasks.md](tasks.md), "An installed item's first-run line") |
 
 `check()` holds the id to 16 lowercase hex, the path to an absolute one
 ending in the id, the mime to the kind's, and the size to 1 byte up to the

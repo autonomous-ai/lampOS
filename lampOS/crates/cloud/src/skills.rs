@@ -920,6 +920,11 @@ pub fn install(places: &Places, data: &Value) -> Result<Value, String> {
         return Err(why.to_owned());
     }
     let (said, page) = changed_said(places, "skills.install", &asked.request(), INSTALL_TIMEOUT)?;
+    // A new skill, not one replaced (an update), is told to the voice
+    // (`store/installed`, #7814): it may have a first-run line to say.
+    if let Some(event) = installed_event(&said, &page, &places.folder, lamp_ipc::monotonic_us()) {
+        crate::installed::tell(&event);
+    }
     // The skill put on, by the entry's name or the helper's "installed
     // NAME" / "replaced NAME": told to the app when it needs a connector.
     if places.link.is_some()
@@ -933,6 +938,36 @@ pub fn install(places: &Places, data: &Value) -> Result<Value, String> {
         note_installed(&page, &name);
     }
     Ok(page)
+}
+
+/// The install the helper's `said` tells, as `store/installed` has it: only
+/// "installed NAME", a skill new to the lamp; "replaced NAME" is an update,
+/// and says nothing. Its title is the page's row's, its first-run line the
+/// installed `skill.toml`'s ([`lamp_skills::first_run_of`]).
+pub fn installed_event(
+    said: &str,
+    page: &Value,
+    folder: &Path,
+    finished_us: u64,
+) -> Option<lamp_msgs::Installed> {
+    let mut words = said.split_whitespace();
+    if words.next() != Some("installed") {
+        return None;
+    }
+    let name = words.next()?;
+    let title = page["skills"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|row| row["name"] == name)
+        .and_then(|row| row["title"].as_str())
+        .unwrap_or(name);
+    crate::installed::of_skill(
+        name,
+        title,
+        lamp_skills::first_run_of(&folder.join(name)),
+        finished_us,
+    )
 }
 
 /// Why the manage helper did not remove or install a skill.
@@ -1439,6 +1474,28 @@ pub mod tests {
             .map(|row| row["group"].as_str().unwrap())
             .collect();
         assert_eq!(groups, ["made_here", "pushed", "pushed"]);
+    }
+
+    #[test]
+    fn a_new_skill_from_the_store_is_told_and_a_replaced_one_is_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("gym-tips");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("skill.toml"),
+            "version = \"1.0.0\"\n[first_run]\nsay = \"Gym tips are ready. Want one now?\"\n",
+        )
+        .unwrap();
+        let page = json!({"skills": [{"name": "gym-tips", "title": "Gym tips"}]});
+        let event = installed_event("installed gym-tips", &page, dir.path(), 5).unwrap();
+        assert_eq!(
+            (event.item.as_str(), event.title.as_str(), event.by.as_str()),
+            ("skill", "Gym tips", "owner")
+        );
+        assert_eq!(event.line(), "Gym tips are ready. Want one now?");
+        assert!(installed_event("replaced gym-tips", &page, dir.path(), 5).is_none());
+        let plain = installed_event("installed other", &json!({}), dir.path(), 5).unwrap();
+        assert_eq!(plain.line(), "other is ready.");
     }
 
     #[test]

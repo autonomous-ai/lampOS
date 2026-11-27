@@ -4155,6 +4155,9 @@ fn service_speaker_control(
                         let token = owner.playback_started(now(), pending.permit)?;
                         current.playback = Some(token);
                         current.sounded = true;
+                        // An installed item's first-run line: its first
+                        // sound from the install's finish (#7814).
+                        crate::install_told::sounded(turn, observed_at_us);
                         // The news this turn tells has begun: its finished
                         // task's harness is closed now, not once the turn is
                         // heard whole (#6530).
@@ -6885,6 +6888,13 @@ fn conversation_with_gate_inner(
     let mut loud_blocks: VecDeque<u64> = VecDeque::new();
     // When the detector last called a block speech.
     let mut last_speech_us = 0u64;
+    // `last_speech_us` as the last transcript with a word came: an installed
+    // item's first-run line waits for a pause in talk with words only, so a
+    // turn that heard none leaves it alone (#7814, the ruling on #8842).
+    let mut last_words_us = 0u64;
+    // `last_speech_us` as a heard line last resolved (its transcript, or its
+    // turn's end): speech after it is still under way (#7814).
+    let mut last_resolved_us = 0u64;
     let reminder_cycle_started_us = monotonic_us();
     // `--fixture-at-ms` (diagnostic only): when the fixture's own turn is
     // due, N ms after `listening_ready`; set once, when that is recorded.
@@ -7126,6 +7136,10 @@ fn conversation_with_gate_inner(
     // when: someone was there then.
     let mut said_turn: Option<u64> = None;
     let mut said_at_us: Option<u64> = None;
+    // When the lamp last answered someone's line (a turn it did not begin
+    // itself, heard with audio): "Hey Lamp, ..." while task news waits
+    // tells it right after (#8783).
+    let mut answered_at_us: Option<u64> = None;
     // The overdue reminder last said to be waiting for someone.
     let mut overdue_wait = crate::reminders::OverdueWait::default();
     // The late reminder waiting for a pause in the talk (29e7, 2 Nov).
@@ -7278,6 +7292,13 @@ fn conversation_with_gate_inner(
     // `LAMP_MAKE_MAY_RUN_ON=on`): none with the switch off.
     let mut long_makes = if lifetime.continuous() {
         crate::long_make::Tells::from_environment()
+    } else {
+        None
+    };
+    // An installed item's first-run line (#7814, `LAMP_INSTALL_FIRST_RUN=on`):
+    // none with the switch off.
+    let first_runs = if lifetime.continuous() {
+        crate::install_told::Tells::from_environment(rig.provider.role == "second")
     } else {
         None
     };
@@ -9257,7 +9278,17 @@ fn conversation_with_gate_inner(
             }
             if words_heard(&event) {
                 last_turn_us = monotonic_us();
+                last_words_us = last_speech_us;
                 second_look.words_heard();
+            }
+            // A heard line resolved, words or none: speech before it is no
+            // longer under way for an installed item's line (#7814).
+            if matches!(
+                &event,
+                ProviderOutput::Transcript { request: None, .. }
+                    | ProviderOutput::TurnComplete { .. }
+            ) {
+                last_resolved_us = last_speech_us;
             }
             if let (
                 Some(hold),
@@ -12688,6 +12719,11 @@ fn conversation_with_gate_inner(
             let turn = current.owner.turn();
             if current.had_audio {
                 lamp_words_ended_us = Some(monotonic_us());
+                if current.local_only.is_none()
+                    && own_turn().load(std::sync::atomic::Ordering::Acquire) != turn
+                {
+                    answered_at_us = lamp_words_ended_us;
+                }
             }
             owner.complete_turn(now(), current.owner)?;
             current.complete_requested_audio(monotonic_us());
@@ -15102,6 +15138,61 @@ fn conversation_with_gate_inner(
                 .as_ref()
                 .zip(crate::long_make::key_of(&note))
                 .map(|(current, key)| (current.owner.turn(), key.to_owned()));
+            last_publish = monotonic_us();
+        }
+        // An item the owner installed from the Store says its first-run
+        // line (#7814, `crate::install_told`): at once with someone near,
+        // else right after Lamp's next answer; never into people's talk,
+        // and never paused, signed out or in the care hold (the privacy
+        // switch closed or asleep, this loop does not run). Looked for
+        // first, so the moment is read only with an install waiting.
+        if let Some(tells) = first_runs.as_ref()
+            && tells.has_news()
+            && let Some(telling) = tells.next(&crate::install_told::Moment {
+                now_us: clock,
+                face: presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock)),
+                last_speech_us,
+                last_words_us,
+                last_resolved_us,
+                night: crate::run_write_yes::quiet_hours_now(),
+                busy: room.busy(),
+                lamp_words_ended_us,
+                answered_at_us,
+                free: !reminder_waiting
+                    && !care_holds
+                    && reply.is_none()
+                    && provider_queue.is_empty()
+                    && !admission.owns_stream()
+                    && !submission_draining
+                    && snapshot.listening_ready(now())
+                    && unasked_session(&cloud, unasked_paused).is_some(),
+            })
+            && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
+        {
+            eprintln!("{}", telling.journal());
+            record(
+                trace,
+                json!({"kind":"first_run_told","at_us":clock,"item":telling.item,"name":telling.name,
+                    "after_answer":telling.after_answer,"after_finish_ms":telling.after_finish_ms,"kept":telling.kept}),
+            )?;
+            snapshot = commit_written_turn(
+                owner,
+                reply,
+                &mut provider_queue,
+                &telling.note,
+                false,
+                crate::install_told::BASIS,
+                provider_session,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )?;
+            // Its first sound is journaled with this handing, on one line.
+            if let Some(current) = reply.as_ref() {
+                crate::install_told::handed(current.owner.turn(), &telling);
+            }
             last_publish = monotonic_us();
         }
         // News whose turn was cut short since the last tick: with

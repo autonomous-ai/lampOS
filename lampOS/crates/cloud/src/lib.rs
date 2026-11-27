@@ -19,6 +19,7 @@ pub mod faces;
 pub mod guard;
 pub mod harness_sign_in;
 pub mod hermes_llm;
+pub mod installed;
 pub mod lamp;
 pub mod light;
 pub mod make_skill;
