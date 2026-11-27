@@ -8260,7 +8260,7 @@ mod tests {
     /// the kept id it is about stays for the second route, which holds it
     /// for their yes (`second_provider::hold_on_face_yes`).
     #[test]
-    fn with_the_switch_a_bare_forget_after_their_keep_is_held_not_refused() {
+    fn with_the_switch_a_bare_forget_after_their_keep_is_refused_here_and_its_kept_id_stays() {
         crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
         let ann = crate::remember::person_id("Ann");
         let key = |request: u64| crate::memory_scope::RequestKey {
@@ -8301,6 +8301,11 @@ mod tests {
             "{told}"
         );
         assert!(listener.accept().is_err(), "asked of no memory");
+        assert_eq!(
+            one_face_just_kept_id(key(8_570_202), &ann),
+            Some(6),
+            "the refusal here leaves the kept id for the second route's hold"
+        );
         crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
         std::fs::remove_file(socket).unwrap();
     }

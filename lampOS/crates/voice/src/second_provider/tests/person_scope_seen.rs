@@ -8660,6 +8660,59 @@ fn with_no_sight_their_yes_by_their_face_alone_runs_and_nothing_else_does() {
     }
 }
 
+/// The voice's copy off: a no by their face alone in view, and another
+/// person's yes by their own face alone in view, run none of the held
+/// calls; their own plain yes, the control, runs each.
+#[test]
+fn with_no_sight_a_no_or_another_persons_yes_runs_nothing() {
+    let a = (7, crate::remember::person_id("A"));
+    let b = (7, crate::remember::person_id("B"));
+    let five = Duration::from_secs(5);
+    for (name, args) in [
+        (crate::remember::FORGET_EVERYTHING, json!({})),
+        (crate::known_faces::FORGET, json!({})),
+        (
+            crate::remember::REMEMBER,
+            json!({"text": "Gym is on Ninth Street.", "replaces": 7}),
+        ),
+        (crate::remember::FORGET, json!({"source_id": 91})),
+    ] {
+        let control = take_unsighted(
+            &format!("face-yes-unsighted-control-{name}"),
+            (name, args.clone()),
+            ("Yes.", true),
+            (&a, IN_VIEW),
+            five,
+        );
+        assert!(
+            matches!(&control, Taken::Runs(call, _, true) if call.name == name),
+            "{name}: their yes runs"
+        );
+        let no = take_unsighted(
+            &format!("face-yes-unsighted-no-{name}"),
+            (name, args.clone()),
+            ("No.", true),
+            (&a, IN_VIEW),
+            five,
+        );
+        assert!(
+            !matches!(no, Taken::Runs(..) | Taken::Agrees(_)),
+            "{name}: a no runs nothing"
+        );
+        let other = take_unsighted(
+            &format!("face-yes-unsighted-other-{name}"),
+            (name, args.clone()),
+            ("Yes.", true),
+            (&b, IN_VIEW),
+            five,
+        );
+        assert!(
+            matches!(other, Taken::NotTheirs),
+            "{name}: another person's yes runs nothing"
+        );
+    }
+}
+
 /// Row 8654 L4: a held correction whose turn was cut before it asked
 /// (`asked: false`), taken by the next spoken line, is dropped, and the
 /// journal says so with a `face-hold:` line; a plain held forget (not

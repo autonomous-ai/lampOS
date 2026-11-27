@@ -1544,9 +1544,12 @@ impl ScopeLease {
     /// so it is told and read as the admitted person's ([`Self::scope`]):
     /// recall, hits, the memory note, their thread and its exchange's
     /// record. Its keep is theirs ([`Self::kept_by_one_face`]). No forget,
-    /// and no yes to a held one, runs on it ([`Self::forgets_need_mouth`]):
-    /// a forget is not undone, and still needs the mouth seen saying it (the
-    /// memory owner, 16:49). The known risk: a guest off camera, the
+    /// and no yes to a held one, runs on it at once
+    /// ([`Self::forgets_need_mouth`]): a forget is not undone. With
+    /// `LAMP_ONE_FACE_FORGETS_ON_YES` (on in the product, #8654) it is held
+    /// for their plain yes instead, the mouth never used (the memory owner,
+    /// 25 Nov and 27 Nov 14:11, replacing their 16:49 rule); with it off,
+    /// it still needs the mouth seen saying it. The known risk: a guest off camera, the
     /// person's face silent and alone in view and no other voice heard, is
     /// told the person's memory. Any later narrow (another voice) makes it
     /// the room's, keeps and all. `false`, and nothing changed, for a
@@ -1576,9 +1579,13 @@ impl ScopeLease {
     /// `LAMP_PERSON_SCOPE_ONE_FACE_READS` ([`Self::read_by_one_face`],
     /// [`Self::keep_for_one_face_recorded`]), while current and no narrow
     /// came after: nothing saw the mouth say it, so no forget of any kind
-    /// (one thing, everything, a face, a rule) and no yes runs on it, a
-    /// single-item forget its keep reaches ([`Self::reached_by_one_face`])
-    /// among them (the memory owner, 16:49 on #5385).
+    /// (one thing, everything, a face, a rule) and no yes runs on it at
+    /// once, a single-item forget its keep reaches
+    /// ([`Self::reached_by_one_face`]) among them (the memory owner, 16:49
+    /// on #5385). The name is the old rule's: with
+    /// `LAMP_ONE_FACE_FORGETS_ON_YES` (on in the product, #8654) such a
+    /// forget or correction is held for their plain yes and the mouth is
+    /// never used (the memory owner, 25 Nov and 27 Nov 14:11).
     pub fn forgets_need_mouth(&self) -> bool {
         if !self.is_current() {
             return false;
