@@ -1,5 +1,7 @@
 # The same voice (#829)
 
+The [caller-match trial](verification/caller-match-8849/README.md) measures a follow-up against the opening spoken call with its own off-by-default switch. [Tiếng Việt](vi/caller-match_vi.md).
+
 Whether two things said to the lamp are the same voice. The question
 comes from two people at the lamp: when B follows up on A's question
 ("And what about tomorrow?"), or A and B go on talking to each other after
