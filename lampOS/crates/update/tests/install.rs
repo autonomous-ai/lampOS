@@ -2738,8 +2738,8 @@ fn the_product_leaves_task_no_yes_off() {
     }
 }
 
-/// The product owner, 27 Nov 2026: "we just start with a simple 'hey lamp'
-/// + 20s renewing. then we'll slowly add one thing at a time and always make
+/// The product owner, 27 Nov 2026: "we just start with a simple 'hey lamp' +
+/// 20s renewing. then we'll slowly add one thing at a time and always make
 /// sure the quality is good." The product runs the one rule
 /// (`LAMP_SIMPLE_CALL`): a call is "Hey Lamp" in a line's words, and a line
 /// within 20 s of the lamp's last words is answered.
