@@ -1232,11 +1232,18 @@ pub struct Onboarding {
     /// is offered only then.
     make_on: bool,
     /// The state lines last set ([`walk_v2::set_state`]), by what they say.
-    state_key: Option<(Step, usize, usize, bool)>,
+    state_key: Option<(Step, usize, usize, bool, bool)>,
     /// The walk step told to the app as asked (#8871), with when in Unix
     /// ms ([`lamp_msgs::OnboardingPending::asking`]), and since when the
     /// walk's first line is held for it ([`ASKED_LEAD_US`]).
     asked_told: Option<(Step, u64)>,
+    /// The person paused the walk by voice (#8871 phase 2, `{"walk":
+    /// "pause"}` from the worker after its one confirm): nothing is asked
+    /// until they carry on. Since when nobody has been in view while
+    /// paused, and whether the one offer to carry on was made since.
+    voice_paused: bool,
+    paused_gone_since_us: Option<u64>,
+    paused_offered: bool,
     asked_held_us: Option<u64>,
     /// Whether the walk's first ask was held for the app once already.
     asked_lead_done: bool,
@@ -1831,6 +1838,9 @@ impl Onboarding {
             make_on: false,
             state_key: None,
             asked_told: None,
+            voice_paused: false,
+            paused_gone_since_us: None,
+            paused_offered: false,
             asked_held_us: None,
             asked_lead_done: false,
             harness_line: false,
@@ -3739,7 +3749,10 @@ impl Onboarding {
         still: bool,
     ) -> Option<String> {
         if self.walk_v2 {
-            self.publish_state(paused);
+            self.publish_state(paused || self.voice_paused);
+            if self.voice_paused {
+                return self.tick_voice_paused(now_us, quiet_us, can_speak, face);
+            }
         }
         // "Preferences"' hello: once the model has answered the quiet hours
         // (its words came), or [`HELLO_WAIT_US`] after them if it says
@@ -3811,16 +3824,53 @@ impl Onboarding {
         let key = step.and_then(|step| {
             let offered = self.walk_steps();
             let at = offered.iter().position(|name| name == step.name())?;
-            Some((step, at + 2, offered.len() + 1, waits))
+            Some((step, at + 2, offered.len() + 1, waits, self.voice_paused))
         });
         if key == self.state_key {
             return;
         }
         self.state_key = key;
-        walk_v2::set_state(key.map(|(step, at, of, waits)| walk_v2::StateLines {
-            waits,
-            ..walk_v2::state_lines(step, at, of, self.language)
-        }));
+        walk_v2::set_state(
+            key.map(|(step, at, of, waits, paused)| walk_v2::StateLines {
+                waits,
+                paused,
+                ..walk_v2::state_lines(step, at, of, self.language)
+            }),
+        );
+    }
+
+    /// The walk paused by voice (#8871 phase 2): nothing asked, the step
+    /// kept to carry on at. When the person comes back into view after
+    /// [`GONE_US`] away, one offer to carry on, then quiet again.
+    fn tick_voice_paused(
+        &mut self,
+        now_us: u64,
+        quiet_us: u64,
+        can_speak: bool,
+        face: Option<Framing>,
+    ) -> Option<String> {
+        if self.drop_led().is_some() {
+            self.records
+                .push(json!({"kind":"onboarding_stopped","why":"paused_by_voice","at_us":now_us}));
+        }
+        if face.is_none() {
+            self.paused_gone_since_us.get_or_insert(now_us);
+            return None;
+        }
+        let back = self
+            .paused_gone_since_us
+            .take()
+            .is_some_and(|since| now_us.saturating_sub(since) >= GONE_US);
+        if !back || self.paused_offered || !can_speak || quiet_us < START_QUIET_US {
+            return None;
+        }
+        let step = self
+            .next_step()
+            .filter(|step| walk_v2::WALK.contains(step))?;
+        self.paused_offered = true;
+        self.records
+            .push(json!({"kind":"onboarding_carry_on_offered","step":step.name(),"at_us":now_us}));
+        Some(walk_v2::carry_on_offer(step, self.language))
     }
 
     fn tick_led(
@@ -5302,6 +5352,30 @@ impl Onboarding {
             let Ok(told) = serde_json::from_str::<Value>(line) else {
                 continue;
             };
+            // The walk paused or carried on by voice (#8871 phase 2): the
+            // worker's, after the person's own words.
+            if self.walk_v2
+                && let Some(walk) = told.get("walk").and_then(Value::as_str)
+            {
+                match walk {
+                    "pause" => {
+                        eprintln!(
+                            "lamp-voice: onboarding: paused by voice: nothing asked until they carry on"
+                        );
+                        self.voice_paused = true;
+                        self.paused_offered = false;
+                        self.paused_gone_since_us = None;
+                    }
+                    "resume" => {
+                        eprintln!("lamp-voice: onboarding: carried on by voice");
+                        self.voice_paused = false;
+                    }
+                    _ => {}
+                }
+                self.records
+                    .push(json!({"kind":"onboarding_voice","walk":walk,"at_us":now_us}));
+                continue;
+            }
             // A face forgotten ([`face_forgotten`]): one saved earlier no
             // longer answers "who you are", and the owner mark goes, whoever's
             // face it was, so a later face saved under that name is never
@@ -15081,6 +15155,36 @@ mod tests {
         assert!(off.walk.pending().asking.is_none());
     }
 
+    /// #8871 phase 2: paused by voice, nothing is asked and the step is
+    /// kept; back in view after being away, one offer to carry on, then
+    /// quiet; carried on, the same step is asked again.
+    #[test]
+    fn a_walk_paused_by_voice_offers_once_and_carries_on_at_the_same_step() {
+        let mut room = walk_v2_room("v2-paused");
+        walked_to_try(&mut room, Outcome::Done);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
+        room.walk.apply_mailbox("{\"walk\":\"pause\"}\n", room.at);
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(walk_v2::state().is_some_and(|lines| lines.paused && !lines.waits));
+        assert_eq!(room.outcome(Step::TrySkill), None);
+        // Away, then back: one offer.
+        assert_eq!(room.wait(GONE_US + S, None), NONE);
+        assert_eq!(
+            room.wait(6 * S, Some(NEAR_MIDDLE)),
+            [
+                "(Say only this, nothing before or after it: \"Shall we carry on? We were at Try a skill.\")"
+            ]
+        );
+        room.wait(GONE_US + S, None);
+        assert_eq!(
+            room.wait(30 * S, Some(NEAR_MIDDLE)),
+            NONE,
+            "offered once a pause"
+        );
+        room.walk.apply_mailbox("{\"walk\":\"resume\"}\n", room.at);
+        assert_eq!(room.wait(6 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
+    }
+
     /// lamp-9adf at 16443: "Hey Lamp, redo the whole setup, from the
     /// start." reached `redo_setup` with no step, refused twice. With the
     /// walk Lamp leads by voice, the whole walk's words redo it, and a
@@ -15108,7 +15212,10 @@ mod tests {
         let (first, _) = run_in(&room.walk.file, &redo(Value::Null), None);
         let (second, _) = run_in(&room.walk.file, &redo(Value::Null), None);
         assert!(refused(&first), "{first}");
-        assert!(!refused(&second) && second.get("error").is_none(), "{second}");
+        assert!(
+            !refused(&second) && second.get("error").is_none(),
+            "{second}"
+        );
         walk_v2::set_on_for_test(false);
     }
 

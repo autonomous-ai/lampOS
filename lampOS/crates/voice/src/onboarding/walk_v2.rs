@@ -248,7 +248,11 @@ pub(crate) fn refused_again() -> bool {
     #[cfg(not(test))]
     {
         static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
-        again(&mut LAST.lock().unwrap_or_else(std::sync::PoisonError::into_inner))
+        again(
+            &mut LAST
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        )
     }
 }
 
@@ -546,6 +550,13 @@ pub struct StateLines {
     /// waits. False while the walk is paused, left or between asks.
     #[serde(default)]
     pub waits: bool,
+    /// The person paused the walk by voice (#8871 phase 2): only "carry
+    /// on" is the walk's then.
+    #[serde(default)]
+    pub paused: bool,
+    /// The walk's own answers to what the person says to it.
+    #[serde(default)]
+    pub talk: TalkLines,
 }
 
 /// Whether a person's line now is an answer to the walk's waiting ask
@@ -628,6 +639,8 @@ pub(crate) fn state_lines(
         how_many: own(how_many),
         done: own(done),
         waits: false,
+        paused: false,
+        talk: talk_lines(step, left, language),
     }
 }
 
@@ -668,13 +681,10 @@ const WHICH: [&str; 9] = [
 ];
 /// Asked alone, the whole line: "Where are we?" (not "where are we going").
 const WHICH_ALONE: [&str; 2] = ["where are we", "what are we doing"];
-const HOW_MANY: [&str; 8] = [
+const HOW_MANY: [&str; 5] = [
     "how many more",
     "how many steps",
     "how many left",
-    "how much longer",
-    "how long will this",
-    "how long is this",
     "còn mấy bước",
     "còn bao lâu",
 ];
@@ -747,6 +757,452 @@ pub(crate) fn state_words(said: &str) -> Option<String> {
     let asked = state_asked(said)?;
     let lines = state()?;
     super::own_words(lines.line(asked)).map(str::to_owned)
+}
+
+// What the person may say to the walk itself, answered by the walk's own
+// lines in the second route's worker, no chat asked (#8871 phase 2): their
+// impatience, "what do I do?", a skip, a pause, carrying on and starting
+// over. Each carries the step's ask again, so the walk never loses them.
+
+/// The pleading lines for impatience, the owner's (#8871): gentle, under
+/// ~15 words, `{n}` the steps left, rotated so none is said twice in a row.
+const PLEAS_EN: [&str; 3] = [
+    "I know, sorry it's taking a bit! Just {n} more, I promise. It'll help me really get you.",
+    "Please bear with me, only {n} steps left. After this, I'll know how to help you best.",
+    "Almost done, I promise! {n} more and we're friends for real.",
+];
+const LAST_PLEA_EN: &str = "This is the last one, I promise! Then I'm all yours.";
+
+fn pleas(language: Option<Language>) -> ([&'static str; 3], &'static str) {
+    match language {
+        None => (PLEAS_EN, LAST_PLEA_EN),
+        Some(Language::Vietnamese) => (
+            [
+                "Mình biết, xin lỗi hơi lâu! Chỉ còn {n} bước thôi, hứa đấy. Để mình hiểu bạn hơn.",
+                "Bạn chờ mình chút nhé, chỉ còn {n} bước. Xong rồi mình sẽ giúp bạn tốt nhất.",
+                "Sắp xong rồi, hứa đấy! Thêm {n} bước nữa là mình thành bạn thật sự.",
+            ],
+            "Đây là bước cuối rồi, hứa đấy! Xong là mình ở đây vì bạn.",
+        ),
+        Some(Language::Japanese) => (
+            [
+                "ごめんなさい、少しかかりますね！あと{n}つだけ、約束します。あなたをよく知るためです。",
+                "もう少しだけ付き合ってください、あと{n}ステップです。終わればいちばんお役に立てます。",
+                "もうすぐです、約束します！あと{n}つで、本当の友だちです。",
+            ],
+            "これが最後です、約束します！そのあとはあなたのためだけです。",
+        ),
+        Some(Language::Chinese) => (
+            [
+                "我知道，抱歉要花点时间！只剩{n}步了，我保证。这样我才能真正懂你。",
+                "请再忍耐一下，只剩{n}步。之后我就知道怎么最好地帮你。",
+                "快好了，我保证！再{n}步，我们就是真正的朋友了。",
+            ],
+            "这是最后一步了，我保证！然后我就全听你的。",
+        ),
+        Some(Language::Korean) => (
+            [
+                "알아요, 좀 오래 걸려서 미안해요! {n}단계만 더요, 약속해요. 당신을 잘 알게 돼요.",
+                "조금만 참아 주세요, {n}단계 남았어요. 끝나면 제일 잘 도와드릴 수 있어요.",
+                "거의 다 됐어요, 약속해요! {n}단계만 더 하면 진짜 친구예요.",
+            ],
+            "이게 마지막이에요, 약속해요! 그다음엔 다 당신 거예요.",
+        ),
+        Some(Language::French) => (
+            [
+                "Je sais, désolée, ça prend un peu de temps ! Plus que {n}, promis. Ça m'aidera à vraiment vous connaître.",
+                "Encore un peu de patience, plus que {n} étapes. Après, je saurai vous aider au mieux.",
+                "Presque fini, promis ! Encore {n} et on est vraiment amis.",
+            ],
+            "C'est la dernière, promis ! Ensuite, je suis toute à vous.",
+        ),
+    }
+}
+
+/// The step's ask as its own sentence, first letter up: "Pet my head."
+fn ask_sentence(step: Step, language: Option<Language>) -> String {
+    let ask = step_ask(step, language);
+    let mut chars = ask.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
+/// The walk's own lines for what the person says to it, from its real
+/// state, each with the step's ask: sent with [`StateLines`].
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TalkLines {
+    /// The pleading answers to impatience, rotated.
+    pub pleas: Vec<String>,
+    /// "What do I do?": the ask, plainly.
+    pub what: String,
+    /// A skip asked: "This one's needed. Let's try once more." and the ask.
+    pub needed: String,
+    /// The one confirm before pausing: "Pause setup for now? Just say yes."
+    pub pause_ask: String,
+    /// Paused: "Okay, paused. Say 'Hey Lamp, carry on' when you're ready."
+    pub paused: String,
+    /// Not paused after all: "Great, let's keep going." and the ask.
+    pub keep_going: String,
+    /// The one confirm before starting over.
+    pub over_ask: String,
+    /// Starting over: "Okay, let's start from the beginning."
+    pub over: String,
+    /// Carrying on from a pause: "Great, let's carry on."
+    pub carry_on: String,
+}
+
+/// [`TalkLines`] for `step`, with `left` steps left (it counted), in
+/// `language`.
+pub(crate) fn talk_lines(step: Step, left: usize, language: Option<Language>) -> TalkLines {
+    let ask = ask_sentence(step, language);
+    let (three, last) = pleas(language);
+    let pleas: Vec<String> = if left <= 1 {
+        vec![format!("{last} {ask}")]
+    } else {
+        three
+            .iter()
+            .map(|plea| format!("{} {ask}", plea.replace("{n}", &left.to_string())))
+            .collect()
+    };
+    let (what, needed, pause_ask, paused, keep_going, over_ask, over, carry_on) = match language {
+        None => (
+            format!("Right now, just this: {ask}"),
+            format!("This one's needed. Let's try once more. {ask}"),
+            "Pause setup for now? Just say yes.".to_owned(),
+            "Okay, paused. Say 'Hey Lamp, carry on' when you're ready.".to_owned(),
+            format!("Great, let's keep going. {ask}"),
+            "Start setup over from the beginning? Just say yes.".to_owned(),
+            "Okay, let's start from the beginning.".to_owned(),
+            "Great, let's carry on.".to_owned(),
+        ),
+        Some(Language::Vietnamese) => (
+            format!("Bây giờ chỉ cần: {ask}"),
+            format!("Bước này cần làm. Mình thử lại nhé. {ask}"),
+            "Tạm dừng cài đặt nhé? Chỉ cần nói có.".to_owned(),
+            "Được, tạm dừng. Khi nào sẵn sàng, nói 'Hey Lamp, tiếp tục' nhé.".to_owned(),
+            format!("Tốt quá, mình tiếp nhé. {ask}"),
+            "Làm lại cài đặt từ đầu nhé? Chỉ cần nói có.".to_owned(),
+            "Được, mình bắt đầu lại từ đầu.".to_owned(),
+            "Tốt quá, mình tiếp tục nhé.".to_owned(),
+        ),
+        Some(Language::Japanese) => (
+            format!("いまはこれだけです：{ask}"),
+            format!("これは必要なステップです。もう一度やってみましょう。{ask}"),
+            "セットアップをいったん止めますか？「はい」と言ってください。".to_owned(),
+            "わかりました、止めますね。準備ができたら「Hey Lamp、続けて」と言ってください。"
+                .to_owned(),
+            format!("よかった、続けましょう。{ask}"),
+            "セットアップを最初からやり直しますか？「はい」と言ってください。".to_owned(),
+            "わかりました、最初から始めましょう。".to_owned(),
+            "よかった、続けましょう。".to_owned(),
+        ),
+        Some(Language::Chinese) => (
+            format!("现在只要：{ask}"),
+            format!("这一步是必须的。我们再试一次。{ask}"),
+            "先暂停设置吗？说“是”就行。".to_owned(),
+            "好的，已暂停。准备好了就说“Hey Lamp，继续”。".to_owned(),
+            format!("太好了，我们继续。{ask}"),
+            "要从头重新设置吗？说“是”就行。".to_owned(),
+            "好的，我们从头开始。".to_owned(),
+            "太好了，我们继续吧。".to_owned(),
+        ),
+        Some(Language::Korean) => (
+            format!("지금은 이것만 하면 돼요: {ask}"),
+            format!("이 단계는 꼭 필요해요. 한 번 더 해 봐요. {ask}"),
+            "설정을 잠시 멈출까요? '네'라고만 하세요.".to_owned(),
+            "알겠어요, 멈췄어요. 준비되면 'Hey Lamp, 계속해'라고 하세요.".to_owned(),
+            format!("좋아요, 계속해요. {ask}"),
+            "설정을 처음부터 다시 할까요? '네'라고만 하세요.".to_owned(),
+            "알겠어요, 처음부터 시작해요.".to_owned(),
+            "좋아요, 계속해요.".to_owned(),
+        ),
+        Some(Language::French) => (
+            format!("Pour l'instant, juste ceci : {ask}"),
+            format!("Celle-ci est nécessaire. Essayons encore une fois. {ask}"),
+            "Mettre la configuration en pause ? Dites simplement oui.".to_owned(),
+            "D'accord, en pause. Dites « Hey Lamp, on continue » quand vous êtes prêt.".to_owned(),
+            format!("Super, on continue. {ask}"),
+            "Recommencer la configuration depuis le début ? Dites simplement oui.".to_owned(),
+            "D'accord, on recommence depuis le début.".to_owned(),
+            "Super, on continue.".to_owned(),
+        ),
+    };
+    let own = |words: String| super::said_as_is(&words).unwrap_or_default();
+    TalkLines {
+        pleas: pleas.into_iter().map(own).collect(),
+        what: own(what),
+        needed: own(needed),
+        pause_ask: own(pause_ask),
+        paused: own(paused),
+        keep_going: own(keep_going),
+        over_ask: own(over_ask),
+        over: own(over),
+        carry_on: own(carry_on),
+    }
+}
+
+/// What a person's line says to the walk itself (#8871 phase 2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Talk {
+    Impatient,
+    What,
+    Skip,
+    Pause,
+    CarryOn,
+    StartOver,
+}
+
+/// Impatience, the whole line: "How long?" (not "how long the pasta cooks").
+const IMPATIENT_ALONE: [&str; 6] = [
+    "how long",
+    "how much longer",
+    "how long is this",
+    "how long will this take",
+    "how long does this take",
+    "is it much longer",
+];
+const IMPATIENT: [&str; 15] = [
+    "taking forever",
+    "taking so long",
+    "takes forever",
+    "takes so long",
+    "is this necessary",
+    "is this really necessary",
+    "do we have to",
+    "do i have to",
+    "i'm bored",
+    "im bored",
+    "this is boring",
+    "can we skip this",
+    "too long",
+    "lâu quá",
+    "chán quá",
+];
+const WHAT: [&str; 7] = [
+    "what do i do",
+    "what should i do",
+    "what do you want me to do",
+    "what do i need to do",
+    "what now",
+    "tôi phải làm gì",
+    "làm gì bây giờ",
+];
+/// A skip, the whole line: "skip", "skip it", "next".
+const SKIP_ALONE: [&str; 7] = [
+    "skip",
+    "skip it",
+    "skip that",
+    "next",
+    "next step",
+    "bỏ qua",
+    "qua bước",
+];
+const PAUSE: [&str; 13] = [
+    "let's pause",
+    "lets pause",
+    "pause setup",
+    "pause the setup",
+    "not now",
+    "i'm busy",
+    "im busy",
+    "i'm done",
+    "im done",
+    "stop setup",
+    "stop the setup",
+    "let's stop",
+    "để sau",
+];
+const CARRY_ON: [&str; 9] = [
+    "carry on",
+    "let's continue",
+    "lets continue",
+    "continue",
+    "let's go on",
+    "go on",
+    "resume",
+    "i'm back",
+    "tiếp tục",
+];
+const START_OVER: [&str; 7] = [
+    "start over",
+    "start again",
+    "start from the beginning",
+    "from the beginning",
+    "restart setup",
+    "restart the setup",
+    "làm lại từ đầu",
+];
+
+/// What `text` says to the walk itself, if anything: a few plain phrases,
+/// in English and Vietnamese. Anything else is the model's. "Carry on"
+/// counts only while `paused`; a pause only while not.
+pub(crate) fn talk_asked(text: &str, paused: bool) -> Option<Talk> {
+    let text = plain(text);
+    let has = |phrases: &[&str]| {
+        phrases
+            .iter()
+            .any(|phrase| text.contains(&format!(" {phrase} ")))
+    };
+    if has(&START_OVER) {
+        Some(Talk::StartOver)
+    } else if paused {
+        has(&CARRY_ON).then_some(Talk::CarryOn)
+    } else if has(&PAUSE) {
+        Some(Talk::Pause)
+    } else if SKIP_ALONE
+        .iter()
+        .any(|phrase| text == format!(" {phrase} ") || text == format!(" {phrase} please "))
+    {
+        Some(Talk::Skip)
+    } else if has(&IMPATIENT)
+        || IMPATIENT_ALONE
+            .iter()
+            .any(|phrase| text == format!(" {phrase} "))
+    {
+        Some(Talk::Impatient)
+    } else if has(&WHAT) {
+        Some(Talk::What)
+    } else {
+        None
+    }
+}
+
+/// A confirm the walk asked and waits for (pause, start over), in this
+/// process, with when it was asked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Confirm {
+    Pause,
+    StartOver,
+}
+
+/// How long a confirm waits for its yes.
+const CONFIRM_FOR: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// The worker's memory of the walk's talk: the last plea said (never twice
+/// in a row) and a confirm waiting.
+#[derive(Default)]
+struct Said {
+    last_plea: Option<usize>,
+    confirm: Option<(Confirm, std::time::Instant)>,
+}
+
+fn with_said<T>(apply: impl FnOnce(&mut Said) -> T) -> T {
+    #[cfg(test)]
+    {
+        thread_local! {
+            static SAID: std::cell::RefCell<Said> = std::cell::RefCell::new(Said::default());
+        }
+        SAID.with(|said| apply(&mut said.borrow_mut()))
+    }
+    #[cfg(not(test))]
+    {
+        static SAID: std::sync::Mutex<Option<Said>> = std::sync::Mutex::new(None);
+        let mut said = SAID
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        apply(said.get_or_insert_with(Said::default))
+    }
+}
+
+/// The words a person's line `said` is answered with when it talks to the
+/// walk itself, with the switch on and the walk under way (#8871 phase
+/// 2), and what the runner is told through `post` (a pause, carrying on,
+/// starting over). The walk's own lines, said as they are; none for any
+/// other line.
+pub(crate) fn talk_words(said: &str, post: impl FnOnce(&Value)) -> Option<String> {
+    if !on() {
+        return None;
+    }
+    let lines = state()?;
+    let talk = &lines.talk;
+    let own = |line: &str| super::own_words(line).map(str::to_owned);
+    // A confirm waiting: its yes does it, its no goes on.
+    let waiting = with_said(|memory| {
+        let waiting = memory
+            .confirm
+            .filter(|(_, at)| at.elapsed() <= CONFIRM_FOR)
+            .map(|(confirm, _)| confirm);
+        memory.confirm = None;
+        waiting
+    });
+    if let Some(confirm) = waiting {
+        if crate::services::plain_yes(said) {
+            return match confirm {
+                Confirm::Pause => {
+                    post(&json!({"walk": "pause"}));
+                    own(&talk.paused)
+                }
+                Confirm::StartOver => {
+                    post(&json!({"redo": true}));
+                    own(&talk.over)
+                }
+            };
+        }
+        if crate::services::plain_no(said) {
+            return own(&talk.keep_going);
+        }
+    }
+    // Paused, the only question Lamp asked is whether to carry on.
+    if lines.paused && crate::services::plain_yes(said) {
+        post(&json!({"walk": "resume"}));
+        return own(&talk.carry_on);
+    }
+    match talk_asked(said, lines.paused)? {
+        Talk::Impatient => {
+            let at = with_said(|memory| {
+                let count = talk.pleas.len().max(1);
+                let next = memory.last_plea.map_or(0, |last| (last + 1) % count);
+                memory.last_plea = Some(next);
+                next
+            });
+            talk.pleas.get(at).and_then(|line| own(line))
+        }
+        Talk::What => own(&talk.what),
+        Talk::Skip => own(&talk.needed),
+        Talk::Pause => {
+            with_said(|memory| {
+                memory.confirm = Some((Confirm::Pause, std::time::Instant::now()));
+            });
+            own(&talk.pause_ask)
+        }
+        Talk::StartOver => {
+            with_said(|memory| {
+                memory.confirm = Some((Confirm::StartOver, std::time::Instant::now()));
+            });
+            own(&talk.over_ask)
+        }
+        Talk::CarryOn => {
+            post(&json!({"walk": "resume"}));
+            own(&talk.carry_on)
+        }
+    }
+}
+
+/// The one offer to carry on when the person is back in view after a
+/// pause (#8871): "Shall we carry on? We were at Touch.", in `language`.
+pub(crate) fn carry_on_offer(step: Step, language: Option<Language>) -> String {
+    let name = step_name(step, language);
+    let line = match language {
+        None => format!("Shall we carry on? We were at {name}."),
+        Some(Language::Vietnamese) => format!("Mình tiếp tục nhé? Lúc nãy mình đang ở {name}."),
+        Some(Language::Japanese) => format!("続けましょうか？{name}のところでした。"),
+        Some(Language::Chinese) => format!("我们继续吗？刚才到了{name}。"),
+        Some(Language::Korean) => format!("계속할까요? {name}까지 했어요."),
+        Some(Language::French) => format!("On continue ? On en était à {name}."),
+    };
+    format!("(Say only this, nothing before or after it: \"{line}\")")
+}
+
+/// [`talk_words`] in the worker's process, posting to the runner's
+/// mailbox (`LAMP_ONBOARDING_FILE`).
+pub(crate) fn talk_words_posted(said: &str) -> Option<String> {
+    talk_words(said, |line| {
+        if let Some(file) = super::file_from_environment() {
+            let _ = super::post(&file, line);
+        }
+    })
 }
 
 /// The step the walk leads now, as its file at `file` shows: the first of
@@ -939,7 +1395,9 @@ mod tests {
         assert_eq!(state_asked("Which step are we on?"), Some(Asked::Which));
         assert_eq!(state_asked("Wait, what were we doing?"), Some(Asked::Which));
         assert_eq!(state_asked("How many more?"), Some(Asked::HowMany));
-        assert_eq!(state_asked("how much longer"), Some(Asked::HowMany));
+        // "How much longer?" is impatience, pleaded with (phase 2).
+        assert_eq!(state_asked("how much longer"), None);
+        assert_eq!(talk_asked("how much longer", false), Some(Talk::Impatient));
         assert_eq!(state_asked("Is setup done?"), Some(Asked::Done));
         assert_eq!(state_asked("Are we finished?"), Some(Asked::Done));
         assert_eq!(state_asked("Còn mấy bước?"), Some(Asked::HowMany));
@@ -968,7 +1426,15 @@ mod tests {
     /// with no step is never refused.
     #[test]
     fn the_whole_setup_is_redone_by_its_words_and_never_refused_twice() {
-        for said in ["whole", "the whole setup", "all steps", "everything", "from the start", "setup", "lại từ đầu"] {
+        for said in [
+            "whole",
+            "the whole setup",
+            "all steps",
+            "everything",
+            "from the start",
+            "setup",
+            "lại từ đầu",
+        ] {
             assert!(whole_walk(said), "{said}");
         }
         for said in ["touch", "who_you_are", "how you sound"] {
@@ -977,6 +1443,123 @@ mod tests {
         assert!(!refused_again());
         assert!(refused_again());
         assert!(!refused_again());
+    }
+
+    /// #8871 phase 2: impatience gets a pleading line with the real count
+    /// and the ask, never the same twice in a row; the last step its own.
+    #[test]
+    fn impatience_is_pleaded_with_rotating_and_the_ask_follows() {
+        set_on_for_test(true);
+        set_state(Some(state_lines(Step::Touch, 4, 7, None)));
+        let mut said = Vec::new();
+        for line in [
+            "This is taking forever",
+            "how long?",
+            "I'm bored",
+            "Is this necessary?",
+            "can we skip this",
+        ] {
+            let words =
+                talk_words(line, |_| panic!("nothing posted")).unwrap_or_else(|| panic!("{line}"));
+            assert!(words.ends_with(" Pet my head."), "{words}");
+            assert!(words.contains('4') || words.contains("four"), "{words}");
+            said.push(words);
+        }
+        assert!(said.windows(2).all(|two| two[0] != two[1]), "{said:?}");
+        assert!(
+            said[0].starts_with("I know, sorry it's taking a bit! Just 4 more"),
+            "{}",
+            said[0]
+        );
+        set_state(Some(state_lines(Step::MakeSkill, 7, 7, None)));
+        assert!(
+            talk_words("this takes so long", |_| {})
+                .unwrap()
+                .starts_with("This is the last one, I promise!")
+        );
+        // Not the walk's: a mid-step ask is the model's.
+        assert_eq!(
+            talk_words("Remind me how long the pasta cooks", |_| {}),
+            None
+        );
+        assert_eq!(talk_words("What's the weather?", |_| {}), None);
+        for language in [
+            Language::Vietnamese,
+            Language::Japanese,
+            Language::Chinese,
+            Language::Korean,
+            Language::French,
+        ] {
+            let lines = state_lines(Step::Touch, 4, 7, Some(language));
+            assert_eq!(lines.talk.pleas.len(), 3);
+            assert!(lines.talk.pleas.iter().all(|line| !line.contains("{n}")));
+        }
+        set_state(None);
+        set_on_for_test(false);
+    }
+
+    /// A skip gets "This one's needed", "what do I do?" the ask; a pause and
+    /// a start over each wait for one yes, a no goes on; paused, "carry on"
+    /// or a yes to the offer carries on.
+    #[test]
+    fn skips_pauses_and_starting_over_are_the_walks_own() {
+        set_on_for_test(true);
+        set_state(Some(state_lines(Step::WhoYouAre, 3, 7, None)));
+        let posted = std::cell::RefCell::new(Vec::new());
+        let post = |line: &Value| posted.borrow_mut().push(line.clone());
+        assert_eq!(
+            talk_words("Skip.", post).as_deref(),
+            Some("This one's needed. Let's try once more. Tell me what to call you.")
+        );
+        assert_eq!(
+            talk_words("What do I do?", post).as_deref(),
+            Some("Right now, just this: Tell me what to call you.")
+        );
+        assert_eq!(
+            talk_words("I'm busy right now", post).as_deref(),
+            Some("Pause setup for now? Just say yes.")
+        );
+        assert_eq!(
+            talk_words("No.", post).as_deref(),
+            Some("Great, let's keep going. Tell me what to call you.")
+        );
+        assert!(posted.borrow().is_empty());
+        talk_words("Let's pause", post);
+        assert_eq!(
+            talk_words("Yes.", post).as_deref(),
+            Some("Okay, paused. Say 'Hey Lamp, carry on' when you're ready.")
+        );
+        assert_eq!(posted.borrow().as_slice(), [json!({"walk": "pause"})]);
+        // Paused: only carrying on is the walk's.
+        set_state(Some(StateLines {
+            paused: true,
+            ..state_lines(Step::WhoYouAre, 3, 7, None)
+        }));
+        assert_eq!(talk_words("I'm bored", post), None);
+        assert_eq!(
+            talk_words("Let's carry on", post).as_deref(),
+            Some("Great, let's carry on.")
+        );
+        assert_eq!(
+            talk_words("Yes", post).as_deref(),
+            Some("Great, let's carry on.")
+        );
+        assert_eq!(posted.borrow()[1], json!({"walk": "resume"}));
+        set_state(Some(state_lines(Step::WhoYouAre, 3, 7, None)));
+        assert_eq!(
+            talk_words("Can we start over?", post).as_deref(),
+            Some("Start setup over from the beginning? Just say yes.")
+        );
+        assert_eq!(
+            talk_words("Yes please", post).as_deref(),
+            Some("Okay, let's start from the beginning.")
+        );
+        assert_eq!(posted.borrow().last(), Some(&json!({"redo": true})));
+        // A name is no skip: "Skip" is only the whole line.
+        assert_eq!(talk_words("Call me Skip Jones", post), None);
+        set_on_for_test(false);
+        assert_eq!(talk_words("Skip.", post), None, "switch off");
+        set_state(None);
     }
 
     /// The first builder's change 3: while the walk's ask waits, the

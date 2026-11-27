@@ -20026,6 +20026,14 @@ async fn answer(
             heard
                 .then(|| crate::onboarding::walk_v2::state_words(&said))
                 .flatten()
+        })
+        // What the person says to the walk itself (#8871 phase 2): their
+        // impatience, "what do I do?", a skip, a pause, carrying on or
+        // starting over, answered with the walk's own line and its ask.
+        .or_else(|| {
+            heard
+                .then(|| crate::onboarding::walk_v2::talk_words_posted(&said))
+                .flatten()
         });
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
