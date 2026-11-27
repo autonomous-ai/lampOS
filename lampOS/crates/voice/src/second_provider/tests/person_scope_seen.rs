@@ -7455,6 +7455,28 @@ async fn a_one_face_role_set_or_end_runs_on_the_request_with_the_switch() {
     }
 }
 
+/// With the voice's copy of the eyes' speaking off, as in the product since
+/// #8791 (`forget_sight` `None`): a role set and end on A's one-face line,
+/// no mouth seen, still run once on the request, in A's scope.
+#[tokio::test]
+async fn with_no_sight_a_one_face_role_set_or_end_still_runs_on_the_request() {
+    let a = crate::remember::person_id("A");
+    for (case, words, name, args) in role_cases() {
+        NO_SIGHT.with(|off| off.set(true));
+        let got = role_on_one_face(
+            &format!("role-face-unsighted-{case}"),
+            (words, name, args.clone()),
+            vec![("f1", false)],
+            true,
+            true,
+        )
+        .await;
+        assert_eq!(ran_named(&got, name), [args], "{case}: run once");
+        assert_eq!(got.calls, [Some(a.clone())], "{case}: in A's scope");
+        assert!(!refused_by_one_face(&got), "{case}: not refused");
+    }
+}
+
 /// The same calls with a second face in view, silent or seen speaking, are
 /// never A's; outside the private room A's one-face line refuses them as
 /// before (`ONE_FACE_FORGET`).

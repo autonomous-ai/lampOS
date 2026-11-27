@@ -19211,14 +19211,13 @@ fn hold_on_face_yes(
 /// 17:34; "Run on the request", 17:5x): a `set_role` or `end_role` on a
 /// spoken line its person's by their own known face alone in view, the
 /// mouth not seen saying it (`ScopeLease::in_view_by_one_face`: not
-/// carried, sticky, narrowed or answering words seen said), the eyes
-/// reading who speaks, not held by a face's gap, and the private room on,
+/// carried, sticky, narrowed or answering words seen said), the mouth not
+/// used, not held by a face's gap, and the private room on,
 /// runs on the request itself: no hold, no question, no new words. It marks
 /// the lease (`ScopeLease::mark_held_yes`), so [`one_face_refused`] and the
 /// memory's role gate (`remember::DaysClient::role_for_guarded`) let that
 /// one call by. Off, or any other call or line: nothing, as before.
 fn role_on_request(
-    shared: &Shared,
     request: u64,
     heard: bool,
     call: &net::ToolCall,
@@ -19233,8 +19232,9 @@ fn role_on_request(
     let Some(lease) = scope else {
         return;
     };
+    // No `forget_sight` needed: the mouth is not used (the memory owner,
+    // 27 Nov 14:11; off in the product since #8791).
     if !heard
-        || shared.forget_sight.is_none()
         || held_by_gap(scope)
         || !lease.in_view_by_one_face()
         || !crate::person::private_room()
@@ -24333,7 +24333,7 @@ async fn answer(
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
-                role_on_request(shared, request, heard, call, scope.as_ref());
+                role_on_request(request, heard, call, scope.as_ref());
                 if one_face_refused(scope.as_ref(), call) {
                     eprintln!(
                         "lamp-voice second: request {request} chat round {round}: {} not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)",
