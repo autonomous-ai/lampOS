@@ -359,6 +359,46 @@ pub async fn look(
     }
 }
 
+/// A lamp with only its places, bus, device id and the build it started
+/// with, for tests.
+#[cfg(test)]
+pub(crate) fn bare(places: Places, bus: Option<Bus>, build: &str) -> Real {
+    Real {
+        places,
+        bus,
+        device_id: "d-42".into(),
+        build: build.into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        harness_sign_in: None,
+        make_skill: None,
+        write_skill: None,
+        share: None,
+        services: None,
+        control: None,
+        consent: None,
+        desk_noticing: None,
+        privacy_light: None,
+        monitor: None,
+        devices: None,
+        apps: None,
+        upload: None,
+        attachments: None,
+        shutdown: None,
+    }
+}
+
 /// The default route's interface and gateway, from `/proc/net/route`.
 pub fn default_route(route: &str) -> Option<(String, Ipv4Addr)> {
     route.lines().skip(1).find_map(|line| {
@@ -1729,5 +1769,36 @@ mod tests {
         );
         assert!(wifi.stuck.is_none());
         std::fs::remove_dir_all(answering.parent().unwrap()).unwrap();
+    }
+
+    /// #8874: until lamp-update says a build, and whenever what it says
+    /// cannot be read, the identity names the build lamp-cloud started with.
+    #[test]
+    fn the_identity_names_the_started_build_until_a_readable_status() {
+        let (places, root) = places("started-build");
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path()).unwrap();
+        let lamp = bare(places, Some(bus.clone()), "812+460a1a1aa2b3");
+        assert_eq!(lamp.identity().version, "812+460a1a1aa2b3");
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        for unreadable in [
+            json!({"running": null, "now": "idle", "last": null}),
+            json!({"running": {"sequence": 813}, "now": "idle", "last": null}),
+            json!({"running": {"sequence": "813", "commit": "9f00aa11bb22cc33"}, "now": "idle", "last": null}),
+            json!({"running": {"sequence": 813, "commit": ""}, "now": "idle", "last": null}),
+            json!({"running": {"sequence": 813, "commit": "9f00aa11bb22cc33"}, "now": "elsewhere", "last": null}),
+            json!("nonsense"),
+        ] {
+            says.publish_json(lamp_ipc::monotonic_us(), &unreadable)
+                .unwrap();
+            assert_eq!(lamp.identity().version, "812+460a1a1aa2b3", "{unreadable}");
+        }
+        let _ = std::fs::remove_dir_all(root);
     }
 }
