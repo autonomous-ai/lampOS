@@ -1078,77 +1078,6 @@ fn opens_with_the_name(heard: &str) -> bool {
         .is_some_and(|word| word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb"))
 }
 
-/// With `LAMP_SIMPLE_CALL`, whether `heard`'s words open with "Hey Lamp":
-/// one of [`HEY_GREETINGS`], past one filler, then the lamp's name written
-/// as "Lamp", in any case and with any punctuation: "Hey Lamp, …", "Hey,
-/// lamp.", "Hi Lamp", "Um, hello Lamp". Never "Hey man", "Hey Lynn", "Hey
-/// lamb" nor "Lamp, what time is it?" (the product owner, 27 Nov 2026:
-/// "keep it strictly 'Hey Lamp'. reason: false positive.").
-pub(crate) fn opens_with_hey_lamp(heard: &str) -> bool {
-    let mut words = past_a_filler(heard);
-    words.next().is_some_and(|word| {
-        HEY_GREETINGS
-            .iter()
-            .any(|greeting| word.eq_ignore_ascii_case(greeting))
-    }) && words
-        .next()
-        .is_some_and(|word| word.eq_ignore_ascii_case("lamp"))
-}
-
-/// [`opens_with_hey_lamp`] on a lamp whose language is `language`: "Hey
-/// Lamp" in Latin letters, or the greeting and the name as that language's
-/// speech to text writes them ([`written`]; the Reviewer-lead's P1 on
-/// #8892), still strictly in the words, the greeting first. The greeting
-/// and the name in the line's first clause ("ヘイランプ", "嘿兰普", "헤이
-/// 램프", "Hây lăm", French "Hey man", Deepgram's for "Hey Lamp", #8517), or
-/// the first clause only greetings and the second opening with the name
-/// ("ヘイ、ランプ", "嘿，兰普"); in a language whose stand-ins are everyday
-/// words (Vietnamese "làm", French "man"), the second clause only with the
-/// name itself ("Này, làm." is no call). The name with no greeting ("ランプを
-/// 消して", "前、今何時？", "Làm, …") is none.
-pub(crate) fn opens_with_hey_lamp_in(heard: &str, language: Option<Language>) -> bool {
-    opens_with_hey_lamp(heard) || greeted_as_written(heard, language)
-}
-
-/// Whether `heard`'s words open with one of [`HEY_GREETINGS`], past one
-/// filler, or with one of the greetings of `language` as its speech to text
-/// writes them ([`written`]), whatever word follows. With
-/// `LAMP_SIMPLE_CALL_HEARD`, the words' half of a call heard
-/// ([`Attention::simple_calls_heard`]).
-pub(crate) fn opens_with_a_greeting_in(heard: &str, language: Option<Language>) -> bool {
-    past_a_filler(heard).next().is_some_and(|word| {
-        HEY_GREETINGS
-            .iter()
-            .any(|greeting| word.eq_ignore_ascii_case(greeting))
-    }) || language.map(written).is_some_and(|written| {
-        clauses(heard)
-            .next()
-            .is_some_and(|first| past_greetings(first, &written).1)
-    })
-}
-
-/// The greeted call of [`opens_with_hey_lamp_in`] for a language other than
-/// English.
-fn greeted_as_written(heard: &str, language: Option<Language>) -> bool {
-    let Some(written) = language.map(written) else {
-        return false;
-    };
-    let mut clauses = clauses(heard);
-    let Some(first) = clauses.next() else {
-        return false;
-    };
-    if let Some(call) = opens_as_written(first, &written) {
-        return call.greeted;
-    }
-    let (rest, greeted) = past_greetings(first, &written);
-    greeted
-        && rest.trim().is_empty()
-        && clauses
-            .next()
-            .and_then(|second| opens_as_written(second, &written))
-            .is_some_and(|call| call.real || !written.everyday)
-}
-
 /// Whether `heard` opens with one of [`HEY_GREETINGS`] and then the lamp's
 /// name itself, past one filler: "Hey Lamp, …", "Hello, Lamp. …", "Um, hi
 /// lamb". Not "Hey man, …" nor "Hey, Lynn.".
@@ -2353,8 +2282,6 @@ pub struct Attention {
     /// hearing was kept as one, or dropped for want of it.
     hey_only: bool,
     hey_kept: bool,
-    /// `LAMP_SIMPLE_CALL_HEARD` ([`Attention::simple_calls_heard`]).
-    simple_heard: bool,
     name_unhey_dropped: bool,
     /// A hearing that counts for the request in hand began within
     /// [`HEY_AT_THE_START_US`] of the line's start.
@@ -3049,35 +2976,19 @@ impl Attention {
     }
 
     /// With `LAMP_SIMPLE_CALL` (the product owner, 27 Nov 2026: "a simple
-    /// 'hey lamp' + 20s renewing", then "keep it strictly 'Hey Lamp'.
-    /// reason: false positive. someone may say Lamp or a word similar to
-    /// it."), whether the line last judged opens a conversation: its words,
-    /// a line going on from one included, open with "Hey Lamp" as the lamp's
-    /// language writes it ([`opens_with_hey_lamp_in`]), its head was tapped,
-    /// or a computer opened its turn (the coordinator, within 8 s of its
-    /// `turn.start`, `control_turn`). A hearing of the name by lamp-name never
-    /// counts, at any score; nor does a face, closeness or any other sign.
+    /// 'hey lamp' + 20s renewing"), whether the line last judged opens a
+    /// conversation: lamp-name's own wake for it, a hearing of the name for
+    /// the line's own sound ([`hearing_counts_for_line`]) begun within
+    /// [`HEY_AT_THE_START_US`] of its start, as `LAMP_NAME_HEY_ONLY` bounds a
+    /// start hearing, at the detector's own decision with no score bar of
+    /// this rule's (its threshold is the detector's tuning, #8844); its head
+    /// tapped; or a turn a computer opened (the coordinator, within 8 s of
+    /// its `turn.start`, `control_turn`). The words decide nothing: "Hey,
+    /// Lynn." heard at its start is a call, "Hey Lamp" written with no
+    /// hearing is none. The detector's false wakes are fixed in the detector,
+    /// by training, never by a rule here.
     pub fn simple_called(&self) -> bool {
-        let language = crate::language::at_start();
-        self.tapped
-            || self.opened
-            || opens_with_hey_lamp_in(&self.heard, language)
-            || self.simple_heard
-                && self.named_near_the_start
-                && self.start_score >= NEAR_SCORE
-                && opens_with_a_greeting_in(&self.heard, language)
-    }
-
-    /// With [`Self::simple_called`], `LAMP_SIMPLE_CALL_HEARD=on` (in no
-    /// product unit): a line also calls when its words open with a greeting
-    /// ([`opens_with_a_greeting_in`]), whatever word follows ("Hey, Lynn.",
-    /// "Hello, ma'am.", "Hey, man.": lamp-dbda, 27 Nov), and lamp-name's
-    /// hearing for that line's own sound ([`hearing_counts_for_line`]) began
-    /// within [`HEY_AT_THE_START_US`] of its start at [`NEAR_SCORE`] (0.95)
-    /// or more, as `LAMP_NAME_HEY_ONLY` bounds a start hearing. No greeting,
-    /// no call, at any score: a bare "Lamp, …", "OK Lamp" or a lookalike.
-    pub fn simple_calls_heard(&mut self, on: bool) {
-        self.simple_heard = on;
+        self.tapped || self.opened || self.named_near_the_start
     }
 
     /// Whether the line last judged was a turn the lamp began itself.
