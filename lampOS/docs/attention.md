@@ -1730,7 +1730,10 @@ the date, a news headline, a quick fact: "can you look up the weather in
 Hanoi tomorrow morning?", "find out what time it is in Tokyo"), unless the
 line also asks for several steps (summarise, compare, list, write, plan:
 "find this week's main AI news and summarise it in five points" is still
-forced). The rule's verdict is the same either way.
+forced; not "I plan to …" or "we plan …", the person's own plan, and
+"weather report" is no ask for a report). A poem, a story, a song, a
+lullaby, a joke, a haiku, a riddle, a limerick or a rhyme is the lamp's own
+to say, never forced. The rule's verdict is the same either way.
 `AFTER_NEWS` is taken on timing alone, so a colleague's line in the window
 is forced too when it asks for such work: "can you look up flights to Tokyo
 next Friday", said to someone else within 180 s of the news in a room not

@@ -1549,8 +1549,9 @@ const AFTER_NEWS_OWN_LOOKUPS: [&[&str]; 32] = [
 /// Words that ask for several steps or several things, research rather
 /// than a quick lookup: with one of them a line about the lamp's own
 /// lookups ([`AFTER_NEWS_OWN_LOOKUPS`]) is still work ("find this week's
-/// main AI news and summarise it in five points").
-const AFTER_NEWS_SEVERAL_STEPS: [&str; 18] = [
+/// main AI news and summarise it in five points"). No "report": "the
+/// weather report" asks for the weather (Twelve's P2 on #8809).
+const AFTER_NEWS_SEVERAL_STEPS: [&str; 17] = [
     "summarise",
     "summarize",
     "summary",
@@ -1566,9 +1567,32 @@ const AFTER_NEWS_SEVERAL_STEPS: [&str; 18] = [
     "analyze",
     "investigate",
     "gather",
-    "report",
     "points",
     "options",
+];
+
+/// Who says their own plan, not an ask: a several-steps word
+/// ([`AFTER_NEWS_SEVERAL_STEPS`]) right after one of these ("I plan to go
+/// hiking", "we're planning") does not count (Twelve's P2 on #8809).
+const AFTER_NEWS_FIRST_PERSON: [&str; 10] = [
+    "i", "we", "i'm", "we're", "im", "i'll", "we'll", "i'd", "we'd", "ill",
+];
+
+/// Things made up to enjoy, the lamp's own to say rather than an agent's
+/// work (Twelve's P3 on #8809, rule 8): a line naming one is never forced
+/// ("write me a short poem about autumn"). Plurals end in "s" or are listed.
+const AFTER_NEWS_CREATIVE: [&str; 11] = [
+    "poem",
+    "story",
+    "stories",
+    "song",
+    "lullaby",
+    "lullabies",
+    "joke",
+    "haiku",
+    "riddle",
+    "limerick",
+    "rhyme",
 ];
 
 /// The fewest content words ([`ask_words`]) from the work verb on, so a
@@ -1643,7 +1667,11 @@ pub fn new_work_after_news(said: &str) -> bool {
     {
         return false;
     }
-    if own_lookup_after_news(&words) {
+    if own_lookup_after_news(&words)
+        || words
+            .iter()
+            .any(|word| AFTER_NEWS_CREATIVE.contains(&word.trim_end_matches('s')))
+    {
         return false;
     }
     said.split(['.', '!', '?', ';', ':'])
@@ -1666,16 +1694,20 @@ pub fn new_work_after_news(said: &str) -> bool {
 
 /// Whether `words`, a line's [`plain_words`], ask a quick lookup of the
 /// lamp's own ([`AFTER_NEWS_OWN_LOOKUPS`]) and nothing of several steps
-/// ([`AFTER_NEWS_SEVERAL_STEPS`]): never forced by
+/// ([`AFTER_NEWS_SEVERAL_STEPS`], not right after "I" or "we",
+/// [`AFTER_NEWS_FIRST_PERSON`]): never forced by
 /// [`new_work_after_news`], so the model answers it with its own tools.
 fn own_lookup_after_news(words: &[String]) -> bool {
     let words: Vec<String> = words.iter().map(|word| word.replace('’', "'")).collect();
     AFTER_NEWS_OWN_LOOKUPS
         .iter()
         .any(|lookup| words.windows(lookup.len()).any(|run| run == *lookup))
-        && !words
-            .iter()
-            .any(|word| AFTER_NEWS_SEVERAL_STEPS.contains(&word.as_str()))
+        && !words.iter().enumerate().any(|(at, word)| {
+            AFTER_NEWS_SEVERAL_STEPS.contains(&word.as_str())
+                && !at
+                    .checked_sub(1)
+                    .is_some_and(|before| AFTER_NEWS_FIRST_PERSON.contains(&words[before].as_str()))
+        })
 }
 
 /// Whether `after`, the words after a make verb ([`AFTER_NEWS_MAKES`]),
@@ -7551,6 +7583,23 @@ pub(crate) mod tests {
             "Find this week's main AI news and summarize it in five points",
             "Look up the weather in Hanoi, Tokyo and Seoul next week and compare them for me.",
             "Search what time the museums in Hue open and plan a day of visits for us.",
+            // Twelve's must-stay asks on #8809, and the ROW's N1 asks.
+            "Plan a simple three-day trip to Hoi An",
+            "Make me a four-week study plan for learning basic Python",
+            "Hey Lamp, compare three robot vacuums under 300 dollars and tell me which to buy.",
+            "Hey Lamp, research the pros and cons of electric scooters for commuting in Hanoi.",
+            "Hey Lamp, find this week's main AI news and summarise it in five points.",
+            "Hey Lamp, look up the best-rated phở places in Hanoi's Old Quarter with their prices.",
+            "Hey Lamp, find three recent studies on sleep and screen time and summarise what they agree on.",
+            "Hey Lamp, research how to start a small coffee shop in Vietnam and write me a checklist.",
+            "Hey Lamp, plan a simple three-day trip to Hoi An.",
+            "Hey Lamp, make me a four-week study plan for learning basic Python.",
+            "Hey Lamp, compare the three most popular note-taking apps and tell me which suits a student.",
+            "Hey Lamp, research the cheapest way to fly from Hanoi to Tokyo next month and list the options.",
+            "Hey Lamp, research which electric cars sold in Vietnam have the longest range and summarise the top three.",
+            "Hey Lamp, compare three budget laptops for a university student and tell me which to buy.",
+            "Hey Lamp, find the best time of year to visit Sapa and summarise the weather by month.",
+            "Hey Lamp, research how to keep basil growing indoors and write me a short care guide.",
         ] {
             assert!(super::new_work_after_news(said), "{said}");
         }
@@ -7587,6 +7636,14 @@ pub(crate) mod tests {
             // Made things of its own (the Reviewer-lead's P3 on #8809).
             "Make me a cup of coffee with a little milk please.",
             "Make an appointment with the dentist for next Tuesday morning.",
+            // A several-steps word only as the ask, not "weather report" or
+            // the person's own plan (Twelve's P2 on #8809).
+            "Can you look up the weather report for Hanoi tomorrow?",
+            "Look up the forecast for Sapa, I plan to go hiking tomorrow",
+            // Something made up to enjoy is the lamp's own to say (Twelve's
+            // P3 on #8809, rule 8).
+            "Write me a short poem about autumn",
+            "Write a story about a dragon for my daughter",
         ] {
             assert!(!super::new_work_after_news(said), "{said}");
         }
