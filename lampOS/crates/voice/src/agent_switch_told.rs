@@ -13,7 +13,10 @@
 //! "In a conversation" is the voice's own sign, read by the coordinator:
 //! a turn open (a reply in hand or a stream the person owns), or the
 //! thread's conversation going on (`thread::Thread::going_on`, the lamp's
-//! words within `thread::GOING_ON_FOR`, 45 s, and not closed since). A
+//! words within `thread::GOING_ON_FOR`, 45 s, and not closed since) with
+//! someone at the lamp (`reminders::someone_here`: a face in view, or a
+//! person heard within the last two minutes), so the lamp's own unasked
+//! words to an empty room are no conversation ([`in_conversation`]). A
 //! switch asked by voice is in one by its nature. Out of a conversation
 //! nothing is read and nothing is owed; a conversation that opens later
 //! starts with what lamp-tasks says then, so a switch made before it is

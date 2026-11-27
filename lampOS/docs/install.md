@@ -2747,7 +2747,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      and restarts nothing when the default moved meanwhile or Hermes's
      gateway (`lamp-hermes-gateway.service`) is not down (`inactive` or
      `failed`), journaling "lamp-openclaw-gateway.service not restarted:
-     …" once; a round starts it once both hold. A round asks it for no `gateway` block while OpenClaw
+     …" once; lamp-update's gateway keeper starts it at its next look
+     (every 10 s) once both hold, or the next round does. The check and
+     the restart are made under `agent-gateway-start.lock` in
+     `/var/lib/lampos-update/`, which Hermes's start by lamp-update also
+     takes, never waiting for it: held, each leaves its start for the
+     next look, so neither starts in the instant after the other's check;
+     the restart also waits while Hermes's gateway is enabled (a start
+     begun but not yet seen by systemd). A round asks it for no `gateway` block while OpenClaw
      isn't wanted. Its unit is written by a round only, never by the one-shot:
      a one-shot that finds an earlier build's unit (a lamp-update ahead
      of its units) changes nothing and takes nothing out, journals
