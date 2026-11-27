@@ -1078,6 +1078,23 @@ fn opens_with_the_name(heard: &str) -> bool {
         .is_some_and(|word| word.eq_ignore_ascii_case("lamp") || word.eq_ignore_ascii_case("lamb"))
 }
 
+/// With `LAMP_SIMPLE_CALL`, whether `heard`'s words open with "Hey Lamp":
+/// one of [`HEY_GREETINGS`], past one filler, then the lamp's name written
+/// as "Lamp", in any case and with any punctuation: "Hey Lamp, …", "Hey,
+/// lamp.", "Hi Lamp", "Um, hello Lamp". Never "Hey man", "Hey Lynn", "Hey
+/// lamb" nor "Lamp, what time is it?" (the product owner, 27 Nov 2026:
+/// "keep it strictly 'Hey Lamp'. reason: false positive.").
+pub(crate) fn opens_with_hey_lamp(heard: &str) -> bool {
+    let mut words = past_a_filler(heard);
+    words.next().is_some_and(|word| {
+        HEY_GREETINGS
+            .iter()
+            .any(|greeting| word.eq_ignore_ascii_case(greeting))
+    }) && words
+        .next()
+        .is_some_and(|word| word.eq_ignore_ascii_case("lamp"))
+}
+
 /// Whether `heard` opens with one of [`HEY_GREETINGS`] and then the lamp's
 /// name itself, past one filler: "Hey Lamp, …", "Hello, Lamp. …", "Um, hi
 /// lamb". Not "Hey man, …" nor "Hey, Lynn.".
@@ -2973,6 +2990,23 @@ impl Attention {
     /// Lamp" at the line's start, with `LAMP_NAME_HEY_ONLY`.
     pub fn name_kept_as_hey(&self) -> bool {
         self.hey_kept
+    }
+
+    /// With `LAMP_SIMPLE_CALL` (the product owner, 27 Nov 2026: "a simple
+    /// 'hey lamp' + 20s renewing", then "keep it strictly 'Hey Lamp'.
+    /// reason: false positive. someone may say Lamp or a word similar to
+    /// it."), whether the line last judged opens a conversation: its words,
+    /// a line going on from one included, open with "Hey Lamp"
+    /// ([`opens_with_hey_lamp`]), its head was tapped, or a computer opened
+    /// its turn. A hearing of the name by lamp-name never counts, at any
+    /// score; nor does a face, closeness or any other sign.
+    pub fn simple_called(&self) -> bool {
+        self.tapped || self.opened || opens_with_hey_lamp(&self.heard)
+    }
+
+    /// Whether the line last judged was a turn the lamp began itself.
+    pub fn judged_own(&self) -> bool {
+        self.judged_own
     }
 
     /// With `LAMP_ONE_REPLY_WINDOW` (`second_provider::ONE_REPLY_WINDOW_ENVIRONMENT`,

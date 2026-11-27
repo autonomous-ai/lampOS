@@ -1111,6 +1111,26 @@ pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
 /// owner's own calls.
 pub const NAME_HEY_ONLY_ENVIRONMENT: &str = "LAMP_NAME_HEY_ONLY";
 
+/// `on` exactly, off unless set (the product owner, 27 Nov 2026: "we just
+/// start with a simple 'hey lamp' + 20s renewing. then we'll slowly add one
+/// thing at a time and always make sure the quality is good."): whether a
+/// line is the lamp's is decided by one rule, and no sensor or other rule
+/// holds or lets out a line. A conversation opens only with a line whose
+/// words open with "Hey Lamp" (strictly: "keep it strictly 'Hey Lamp'.
+/// reason: false positive."; a hearing of the name alone never counts), a
+/// tap, or the lamp's own turn; a line begun within
+/// [`crate::follows_on::WITHIN_US`] (20 s) of the end of the lamp's last
+/// words is the lamp's and is answered, and every answer renews it; any
+/// other line is never answered
+/// ([`worker::Heeding::taking_simple_calls`]). The model is offered no
+/// decline.
+pub const SIMPLE_CALL_ENVIRONMENT: &str = "LAMP_SIMPLE_CALL";
+
+/// Why a line is held with [`SIMPLE_CALL_ENVIRONMENT`] on: no call and no
+/// conversation going on.
+pub(crate) const SIMPLE_HELD: &str =
+    "not \"Hey Lamp\", and no conversation going on (LAMP_SIMPLE_CALL)";
+
 /// `on` exactly, off unless set (the product owner, 26 Nov 2026): the lamp's
 /// own news is replied to within the conversation's 20 s, as any answer is,
 /// and a line about its work opens no window of its own

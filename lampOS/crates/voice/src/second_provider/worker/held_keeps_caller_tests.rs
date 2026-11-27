@@ -403,6 +403,7 @@ fn a_sure_other_voice_gets_no_callers_tie() {
         .said_lately
         .push_back((1, (10_000_000, 11_800_000), true, 10_000_000));
     let seen = |other_voice| Seen {
+        began_us: 0,
         room: crate::room_told::Room::Quiet,
         going_on: true,
         turned: None,
@@ -961,6 +962,7 @@ fn the_callers_face_speaking_yields_to_the_guards() {
     heeding.caller_faces = vec!["b/f1".to_owned()];
     heeding.caller_faces_from_call = true;
     let seen = |heard: &str, speakers: &[&str], other_voice| Seen {
+        began_us: 0,
         room: crate::room_told::Room::Quiet,
         going_on: true,
         turned: None,
@@ -1082,6 +1084,7 @@ fn held_gives_every_tie_its_why() {
         .said_lately
         .push_back((1, (10_000_000, 11_800_000), true, 10_000_000));
     let seen = |heard: &str, lamp_asked| Seen {
+        began_us: 0,
         room: crate::room_told::Room::Quiet,
         going_on: true,
         turned: None,
