@@ -481,6 +481,21 @@ pub const DEV_REACH_MAP_PATH: &str = "/var/lib/lampos-body/reach-map.json";
 /// Counts kept off the map's end (the page guard's margin; the first lamp tries). The body's own margin is 20: later, if the rows allow.
 pub const DEV_MARGIN: f64 = 48.0;
 
+/// `LAMP_BODY_DEV_REACH_MEASURED=on` (a dev lamp only, never a product unit; #7513): says this lamp has had a measured run of the map reach,
+/// so the first-try cap below is lifted. Off unless exactly `on`.
+pub const DEV_REACH_MEASURED: &str = "LAMP_BODY_DEV_REACH_MEASURED";
+/// The first-try cap on the dev reach: 45 degrees down from home (45 x 4096 / 360 = 512 counts) until the lamp has a measured run.
+pub const DEV_FIRST_TRY_CAP_COUNTS: f32 = 512.0;
+
+/// The dev reach's look down (counts) after the first-try cap: never past [`DEV_FIRST_TRY_CAP_COUNTS`] unless `measured` is exactly `on`.
+pub fn dev_reach_capped(counts: f32, measured: Option<&str>) -> f32 {
+    if measured == Some("on") {
+        counts
+    } else {
+        counts.min(DEV_FIRST_TRY_CAP_COUNTS)
+    }
+}
+
 /// Whether a value of [`DEV_REACH`] turns the map reach on.
 pub fn dev_reach_from(value: Option<&str>) -> bool {
     value == Some("on")
@@ -796,5 +811,15 @@ mod tests {
             Ok(2648.0_f32 + 19.0 - 1822.0 - 48.0)
         );
         assert_eq!(dev_pitch_down(Ok(map_75c9()), &LAMP_75C9), Ok(825.0));
+    }
+
+    #[test]
+    fn the_first_try_cap_holds_the_dev_reach_at_45_degrees_until_measured() {
+        assert_eq!(dev_reach_capped(825.0, None), 512.0);
+        assert_eq!(dev_reach_capped(825.0, Some("off")), 512.0);
+        assert_eq!(dev_reach_capped(825.0, Some("1")), 512.0);
+        assert_eq!(dev_reach_capped(825.0, Some("on")), 825.0);
+        // A map that gives less is never widened by the cap.
+        assert_eq!(dev_reach_capped(300.0, None), 300.0);
     }
 }
