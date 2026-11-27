@@ -1004,7 +1004,12 @@ export class Lamp {
     const following = await this.followHand(options).start();
     try { return await body(following); } finally { await following.stop(); }
   }
-  move(frames, stepMs, { wait = false } = {}) { return this.act('move', { step_ms: stepMs, frames }, wait); }
+  // `queue`: wait for this computer's own move playing and start on the step it ends, no ease back between (the lamp's
+  // LAMP_BODY_MOVE_QUEUE; without it, or behind anything else, a move as before).
+  move(frames, stepMs, { wait = false, queue = false } = {}) {
+    // Only `true` waits: any other value (a string 'no', 1) is a move as before.
+    return this.act('move', queue === true ? { step_ms: stepMs, frames, queue: true } : { step_ms: stepMs, frames }, wait);
+  }
   // A move through `poses`, each the degrees of the joints it turns from the
   // standing pose ({ pitch: 10, yaw: -8 }), eased there and back
   // (`posesToFrames`). A LampError (code 'bad_request'), before sending, for poses a move can't make.

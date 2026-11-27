@@ -1335,7 +1335,13 @@ class Lamp:
         where the hand is."""
         return Following(self, for_ms, why)
 
-    async def move(self, frames: list[list[int]], step_ms: int, *, wait: bool = False) -> dict:
+    async def move(
+        self, frames: list[list[int]], step_ms: int, *, wait: bool = False, queue: bool = False
+    ) -> dict:
+        # `queue`: wait for this computer's own move playing and start on the step it ends, no ease back
+        # between (the lamp's LAMP_BODY_MOVE_QUEUE; without it, or behind anything else, a move as before).
+        if queue:
+            return await self._act("move", wait, step_ms=step_ms, frames=frames, queue=True)
         return await self._act("move", wait, step_ms=step_ms, frames=frames)
 
     async def move_poses(self, poses: list[dict], *, hold_ms: int = 400, wait: bool = False) -> dict:
