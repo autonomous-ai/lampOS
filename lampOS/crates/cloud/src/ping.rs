@@ -49,6 +49,47 @@ pub struct Payload {
     /// lamp without the switch sends what it sent before.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub mqtt_tls: bool,
+    /// OpenClaw's and Hermes's versions and whether each is installed, from
+    /// lamp-update's fresh `update/status` (#8881): only with
+    /// `LAMP_BEAT_ENGINES=on`, else left out, so the body is what it was.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engines: Option<Engines>,
+    /// Harness's version and whether it is installed, as `engines` (#8881).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub harness: Option<Part>,
+}
+
+/// The heartbeat's switch (#8881), in lamp-cloud's unit: `on` exactly.
+pub const ENGINES_ENVIRONMENT: &str = "LAMP_BEAT_ENGINES";
+
+/// Whether this lamp-cloud runs with `LAMP_BEAT_ENGINES=on` (#8881).
+pub fn engines_on() -> bool {
+    engines_from(std::env::var(ENGINES_ENVIRONMENT).ok().as_deref())
+}
+
+/// [`engines_on`] for a given value: `on` exactly.
+pub fn engines_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// One part of the lamp in the heartbeat (#8881): its version, left out
+/// unless known, and whether it is installed. Never a path or any other
+/// field lamp-update says.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Part {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    pub installed: bool,
+}
+
+/// The heartbeat's `engines` (#8881): OpenClaw and Hermes only, each left
+/// out unless lamp-update says it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct Engines {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub openclaw: Option<Part>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hermes: Option<Part>,
 }
 
 impl Payload {
@@ -65,6 +106,8 @@ impl Payload {
             wakeword_enabled: false,
             voice_input_mode: "automatic",
             mqtt_tls: false,
+            engines: None,
+            harness: None,
         }
     }
 
@@ -72,6 +115,14 @@ impl Payload {
     /// ([`crate::online::tls_on`], #6031).
     pub fn with_tls(mut self, tls: bool) -> Self {
         self.mqtt_tls = tls;
+        self
+    }
+
+    /// The payload with OpenClaw's, Hermes's and Harness's versions (#8881),
+    /// with the switch `on` and `kept`, lamp-update's kept `update/status`,
+    /// fresh and readable as [`crate::update_events::read`] has it. Off, or
+    /// with no such status, the payload is left as it was.
+    pub fn with_engines(self, _on: bool, _kept: Option<lamp_bus::Message>) -> Self {
         self
     }
 }
@@ -284,6 +335,50 @@ impl Backoff {
     }
 }
 
+/// lamp-update's `update/status` as it says it with its engines and
+/// Harness switches on, kept on a bus in a temporary folder: OpenClaw
+/// and Hermes installed, a third engine, and Harness installed.
+#[cfg(test)]
+pub(crate) fn said_status(
+    with_parts: bool,
+) -> (tempfile::TempDir, lamp_bus::Bus, lamp_bus::Message) {
+    use lamp_msgs::{EngineInstall, HarnessInstall, UpdateStatus};
+    let root = tempfile::tempdir().unwrap();
+    let bus = lamp_bus::Bus::new(root.path()).unwrap();
+    let mut says = bus
+        .publisher_declared(UpdateStatus::TOPIC, &UpdateStatus::declaration(), "update")
+        .unwrap();
+    let installed = |version: &str| EngineInstall {
+        state: "installed".into(),
+        version: Some(version.into()),
+        reason: None,
+        at_unix_ms: Some(5),
+    };
+    let status = UpdateStatus {
+        running: None,
+        now: "idle".into(),
+        last: None,
+        harness: with_parts.then(|| HarnessInstall {
+            version: Some("1.4.0".into()),
+            pinned: Some(true),
+            ..HarnessInstall::new("installed", None, 5)
+        }),
+        round: None,
+        refused: None,
+        engines: with_parts.then(|| {
+            std::collections::BTreeMap::from([
+                ("openclaw".into(), installed("2026.11.2")),
+                ("hermes".into(), installed("0.9.1")),
+                ("codex".into(), installed("1.0")),
+            ])
+        }),
+    };
+    says.publish_json(0, &status).unwrap();
+    let kept = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap();
+    assert!(!kept.expired);
+    (root, bus, kept)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,6 +483,80 @@ mod tests {
             serde_json::to_value(Payload::of(&identity)).unwrap(),
             "nothing else changes"
         );
+    }
+
+    fn beat_identity() -> Identity {
+        Identity {
+            device: "lamp".into(),
+            version: "0.1.0+abc".into(),
+            id: "d-42".into(),
+            mac: "lamp-7f72".into(),
+            timezone: String::new(),
+            local_ip: "192.168.1.42".into(),
+        }
+    }
+
+    /// #8881 (a): with `LAMP_BEAT_ENGINES` off, unset or any value but `on`,
+    /// or with no status, the body is byte for byte what `Payload::of` sends.
+    #[test]
+    fn the_beat_is_byte_identical_with_its_switch_off_or_no_status() {
+        let identity = beat_identity();
+        let before = serde_json::to_vec(&Payload::of(&identity)).unwrap();
+        let (_root, _bus, kept) = said_status(true);
+        for value in [None, Some("off"), Some("ON"), Some("1"), Some("on ")] {
+            let body = Payload::of(&identity).with_engines(engines_from(value), Some(kept.clone()));
+            assert_eq!(serde_json::to_vec(&body).unwrap(), before, "{value:?}");
+        }
+        let none = Payload::of(&identity).with_engines(engines_from(Some("on")), None);
+        assert_eq!(serde_json::to_vec(&none).unwrap(), before, "no status");
+    }
+
+    /// #8881 (b): with the switch on and a fresh status, the body says
+    /// OpenClaw's, Hermes's and Harness's versions and that each is
+    /// installed, and nothing else of the status: no third engine, no
+    /// state, message or pin.
+    #[test]
+    fn the_beat_says_the_three_versions_with_a_status() {
+        let identity = beat_identity();
+        let (_root, _bus, kept) = said_status(true);
+        let body = Payload::of(&identity).with_engines(engines_from(Some("on")), Some(kept));
+        let value = serde_json::to_value(&body).unwrap();
+        assert_eq!(
+            value["engines"],
+            json!({"openclaw": {"version": "2026.11.2", "installed": true},
+                "hermes": {"version": "0.9.1", "installed": true}}),
+            "{value}"
+        );
+        assert_eq!(
+            value["harness"],
+            json!({"version": "1.4.0", "installed": true}),
+            "{value}"
+        );
+        let mut without = value.as_object().unwrap().clone();
+        without.remove("engines");
+        without.remove("harness");
+        assert_eq!(
+            serde_json::Value::Object(without),
+            serde_json::to_value(Payload::of(&identity)).unwrap(),
+            "nothing else changes"
+        );
+    }
+
+    /// #8881 (c): a stale status, or one that says no engines and no
+    /// Harness, sends no engine or harness field rather than an old one.
+    #[test]
+    fn a_stale_or_missing_status_sends_no_engine_or_harness() {
+        let identity = beat_identity();
+        let before = serde_json::to_vec(&Payload::of(&identity)).unwrap();
+        let (_root, _bus, mut stale) = said_status(true);
+        stale.expired = true;
+        let body = Payload::of(&identity).with_engines(true, Some(stale));
+        assert_eq!(serde_json::to_vec(&body).unwrap(), before, "stale");
+        let (_root, _bus, bare) = said_status(false);
+        let body = Payload::of(&identity).with_engines(true, Some(bare));
+        assert_eq!(serde_json::to_vec(&body).unwrap(), before, "no parts said");
+        let body = Payload::of(&identity).with_engines(true, None);
+        assert_eq!(serde_json::to_vec(&body).unwrap(), before, "missing");
     }
 
     /// #6414: a reply's region, missing or strange, never loses the reply.
