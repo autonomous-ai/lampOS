@@ -8731,8 +8731,7 @@ pub(crate) struct Heeding {
     fired: Option<u64>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
-    /// Of those, the one not surely someone else's, with whether the
-    /// lamp's own last words ended in a question and how long after their
+    /// Of those, the last, with whether the lamp's own last words ended in a question and how long after their
     /// end it began ([`Self::asked_follow_up`]).
     asked_alone: Option<(u64, bool, Option<u64>)>,
     /// The request last judged in a busy room ([`Self::judged_busy`]).
@@ -14228,7 +14227,7 @@ impl Heeding {
         // `LAMP_APP_TOOLS`: such a line in answer to the lamp's own question,
         // inside the reply window, is offered an app's tools (lamp-9adf,
         // 27 Nov; `app_tools::let_in`).
-        self.asked_alone = (self.alone.is_some() && !someone_else).then(|| {
+        self.asked_alone = self.alone.is_some().then(|| {
             let asked =
                 crate::thread::current(self.thread.as_deref(), |thread| thread.lamp_asked(request))
                     .unwrap_or_default();
@@ -14504,9 +14503,8 @@ impl Heeding {
         })
     }
 
-    /// For `request` let out only as the conversation going on and not
-    /// surely someone else's ([`Self::someone_else`]): whether the lamp's
-    /// own last words ended in a question, and how long after their end it
+    /// For `request` let out only as the conversation going on: whether the
+    /// lamp's own last words ended in a question, and how long after their end it
     /// began. An answer within `app_tools::REPLY_WINDOW_US` is offered the
     /// running apps' tools (`LAMP_APP_TOOLS`, `app_tools::let_in`). On
     /// lamp-9adf on 27 Nov, "Uh, I dunno. Three days I guess, twenty

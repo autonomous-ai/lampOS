@@ -9429,7 +9429,7 @@ unanswered at 1.5 s, with nothing said yet, says "Let me check." once. A guest's
 private lamp, the care hold or a care turn, a line let in only as the
 conversation going on (unless it answers Lamp's own question: Lamp's last
 words ended in a question and the line began within the 20 s reply window
-after them, `app_tools::let_in`, and is not surely someone else's), or an
+after them, `app_tools::let_in`), or an
 answer awaited: nothing offered or sent, and
 the call is told `not now: nothing was done`. The thread keeps the call by
 its name and outcome only, and the exchange stays out of memory. Tools in

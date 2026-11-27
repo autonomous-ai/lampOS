@@ -306,9 +306,8 @@ Eighth's part, beside app views piece 2.
   back-and-forth (Gym Coach's "How many days a week?") needs no "Hey Lamp"
   each turn. Lamp's last words ended in a question (`Thread::lamp_asked`),
   the line began within the 20 s reply window after them
-  (`app_tools::REPLY_WINDOW_US`, `follows_on::WITHIN_US`), and it is not
-  surely someone else's (another voice, or a face not the caller's seen
-  speaking it); `app_tools::let_in` decides it, and the journal says
+  (`app_tools::REPLY_WINDOW_US`, `follows_on::WITHIN_US`); no unmeasured
+  sensor keeps it out (#8791). `app_tools::let_in` decides it, and the journal says
   `app tools offered: the line answers the lamp's own question` once. The
   owner's turn, privacy, the care hold and an app told the line as a phrase
   still hold, and a room line after an answer that asked nothing, or past

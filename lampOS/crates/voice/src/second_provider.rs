@@ -5276,8 +5276,7 @@ struct Turn {
 /// Whether a request was judged in a busy room (`worker::Heeding`).
 pub type Busy = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 
-/// For `request` let out only as the conversation going on and not surely
-/// someone else's: whether the lamp's own last words ended in a question,
+/// For `request` let out only as the conversation going on: whether the lamp's own last words ended in a question,
 /// and how long after their end the line began, in µs; none for any other
 /// line ([`Engine::telling_the_asked_follow_up`]).
 pub type AskedFollowUp = Arc<dyn Fn(u64) -> Option<(bool, Option<u64>)> + Send + Sync>;
@@ -8061,8 +8060,7 @@ impl Engine {
         self
     }
 
-    /// For a line let out only as the conversation going on and not surely
-    /// someone else's: whether the lamp's own last words ended in a question,
+    /// For a line let out only as the conversation going on: whether the lamp's own last words ended in a question,
     /// and how long after their end the line began. One that answers it
     /// within `app_tools::REPLY_WINDOW_US` is offered the running apps' tools
     /// (`LAMP_APP_TOOLS`, `app_tools::LetIn::AnswersTheLamp`), so an app's
