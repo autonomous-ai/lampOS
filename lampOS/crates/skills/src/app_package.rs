@@ -135,6 +135,14 @@ pub struct AppManifest {
     /// for `app_help` (#7415); absent is none.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub help: BTreeMap<String, String>,
+    /// The line the lamp says when the owner installs it (#7814, the first
+    /// builder's c7209938102): `{"say": "..."}`, plain text of at most 140
+    /// characters with at most one question (`lamp_msgs::installed::say_ok`,
+    /// the Store's checks). Optional; without it the lamp says "<title> is
+    /// ready.". A lamp built before it refuses a manifest that names it, so
+    /// an app that does sets `min_build` to a build that reads it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_run: Option<lamp_msgs::installed::FirstRun>,
     #[serde(default)]
     pub settings: Vec<Setting>,
     #[serde(default)]

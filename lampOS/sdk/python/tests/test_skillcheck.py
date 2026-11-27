@@ -484,3 +484,18 @@ def test_a_stop_group_is_taken_with_no_budget_and_refused_beside_one(tmp_path):
     bad = check(skill(tmp_path / "underscore", rules='version = "1.0.0"\n' + STOP.replace("quiet-ones", "quiet_ones")))
     assert any(line.startswith("skill.toml: stop.group:") for line in bad.errors), bad.errors
 
+
+
+def test_a_first_run_line_is_taken_and_held_as_the_lamp_holds_it(tmp_path):
+    """#7814: `[first_run] say`, the Store's checks (lamp_msgs::installed::say_ok)."""
+    ok = check(skill(tmp_path / "tips", rules='version = "1.0.0"\n[first_run]\nsay = "Gym tips are ready. Want one now?"\n'))
+    assert ok.errors == []
+    for name, say, said in [
+        ("two", "Ready? Want one?", "skill.toml: [first_run] first_run.say: at most one question"),
+        ("marked", "Say *go*.", "skill.toml: [first_run] first_run.say: no markup or quotes (found '*')"),
+        ("long", "a" * 141, "skill.toml: [first_run]"),
+    ]:
+        report = check(skill(tmp_path / name, rules=f'version = "1.0.0"\n[first_run]\nsay = "{say}"\n'))
+        assert any(line.startswith(said) for line in report.errors), (name, report.errors)
+    other = check(skill(tmp_path / "other", rules='version = "1.0.0"\n[first_run]\nsay = "Ready."\nthen = "go"\n'))
+    assert other.errors, "no other key in [first_run]"

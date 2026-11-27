@@ -168,6 +168,9 @@ pub trait Backend: Send + Sync {
     /// Staged files left more than `older` ago gone: what an install left for
     /// a helper that was late. A backend with no folder does nothing.
     fn unstage_older(&self, _older: Duration) {}
+    /// An install finished (never an update): told to the voice on the bus
+    /// (`crate::installed`, #7814).
+    fn installed(&self, _event: &lamp_msgs::Installed) {}
 }
 
 /// How long a staged package may stay: past the owner's yes (it expires at
@@ -191,6 +194,16 @@ pub struct Watch {
     at: Option<Instant>,
     running: bool,
     seen: HashMap<String, Seen>,
+    /// Installs the helper had not answered in its wait (`installing`):
+    /// told once the watcher sees them installed ([`look`]).
+    late: Vec<Late>,
+}
+
+/// An install the helper answered late, waiting to be seen finished.
+struct Late {
+    event: lamp_msgs::Installed,
+    sha256: String,
+    since: Instant,
 }
 
 #[derive(Default)]
@@ -629,16 +642,17 @@ impl Apps {
         {
             return Err(BUSY.into());
         }
-        let (backend, done, under_way) = (
+        let (backend, done, under_way, watching) = (
             self.backend.clone(),
             self.done.clone(),
             self.under_way.clone(),
+            self.watching.clone(),
         );
         std::thread::spawn(move || {
             // The slot is freed even if the install panics.
             let _slot = Slot(under_way);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                install_run(&*backend, &asked)
+                install_and_tell(&*backend, &asked, &watching)
             }))
             .unwrap_or_else(|_| {
                 // The phone is told, and the staged file (if one was made) goes.
@@ -715,6 +729,7 @@ impl Drop for Looking {
 pub fn look(backend: &dyn Backend, watching: &Mutex<Watch>, now: Instant) -> Vec<Outcome> {
     // A late install's staged file does not stay past the owner's yes.
     backend.unstage_older(STAGED_FOR);
+    finished_late(backend, watching, now);
     let mut names = backend.names();
     names.retain(|name| lamp_apps::name::app_name_ok(name));
     let mut pushes = Vec::new();
@@ -776,8 +791,67 @@ fn push(kind: &str, data: Value) -> Outcome {
     }
 }
 
-/// The install, whole, on its thread: what it says at the end.
+/// The late installs the watcher now sees finished, told; one gone or past
+/// [`STAGED_FOR`] (its yes expired) let go untold. The backend is asked
+/// with no lock held.
+fn finished_late(backend: &dyn Backend, watching: &Mutex<Watch>, now: Instant) {
+    let waiting: Vec<(String, String)> = match watching.lock() {
+        Ok(mut watch) => {
+            watch
+                .late
+                .retain(|late| now.saturating_duration_since(late.since) < STAGED_FOR);
+            watch
+                .late
+                .iter()
+                .map(|late| (late.event.name.clone(), late.sha256.clone()))
+                .collect()
+        }
+        Err(_) => return,
+    };
+    let finished: Vec<String> = waiting
+        .into_iter()
+        .filter(|(name, sha256)| {
+            !backend.marks(name).installing
+                && backend
+                    .package(name)
+                    .is_some_and(|package| &package.sha256 == sha256)
+        })
+        .map(|(name, _)| name)
+        .collect();
+    if finished.is_empty() {
+        return;
+    }
+    let told: Vec<lamp_msgs::Installed> = match watching.lock() {
+        Ok(mut watch) => {
+            let (told, kept) = std::mem::take(&mut watch.late)
+                .into_iter()
+                .partition(|late| finished.contains(&late.event.name));
+            watch.late = kept;
+            told.into_iter().map(|late: Late| late.event).collect()
+        }
+        Err(_) => return,
+    };
+    for mut event in told {
+        event.finished_us = lamp_ipc::monotonic_us();
+        backend.installed(&event);
+    }
+}
+
+/// The install, whole, as [`install_and_tell`] with nothing else watched.
+#[cfg(test)]
 fn install_run(backend: &dyn Backend, asked: &Asked) -> Result<Value, String> {
+    install_and_tell(backend, asked, &Mutex::default())
+}
+
+/// The install, whole, on its thread: what it says at the end. An install
+/// (not an update) the helper finished is told at once
+/// ([`Backend::installed`]); one it answered late is kept in `watching`
+/// and told when the watcher sees it installed ([`finished_late`]).
+fn install_and_tell(
+    backend: &dyn Backend,
+    asked: &Asked,
+    watching: &Mutex<Watch>,
+) -> Result<Value, String> {
     let bytes = backend.download(&asked.url, lamp_apps::staging::MOST_STAGED)?;
     // What was fetched is what the owner was shown.
     if lamp_skills::package::sha256_hex(&bytes) != asked.sha256 {
@@ -832,6 +906,16 @@ fn install_run(backend: &dyn Backend, asked: &Asked) -> Result<Value, String> {
             // the page shows "installing" by its mark. A helper that never
             // answers is covered by lamp-control's yes expiring (10 min).
             Err(late) if late == HELPER_LATE => {
+                if !updated
+                    && let Some(event) = crate::installed::of_app(&manifest, 1)
+                    && let Ok(mut watch) = watching.lock()
+                {
+                    watch.late.push(Late {
+                        event,
+                        sha256: asked.sha256.clone(),
+                        since: Instant::now(),
+                    });
+                }
                 return Ok((
                     json!({"id": asked.id, "version": asked.version, "updated": updated, "installing": true}),
                     true,
@@ -840,6 +924,12 @@ fn install_run(backend: &dyn Backend, asked: &Asked) -> Result<Value, String> {
             other => other?,
         };
         refused(&answer)?;
+        // Finished: an install is told to the voice now, an update never.
+        if !updated
+            && let Some(event) = crate::installed::of_app(&manifest, lamp_ipc::monotonic_us())
+        {
+            backend.installed(&event);
+        }
         Ok((
             json!({"id": asked.id, "version": asked.version, "updated": updated}),
             false,
@@ -941,6 +1031,9 @@ pub fn output_within(program: &str, args: &[&str], wait: Duration) -> Option<Str
 }
 
 impl Backend for Real {
+    fn installed(&self, event: &lamp_msgs::Installed) {
+        crate::installed::tell(event);
+    }
     fn names(&self) -> Vec<String> {
         let Ok(entries) = std::fs::read_dir(&self.layout.code) else {
             return Vec::new();
@@ -1266,6 +1359,15 @@ pub mod tests {
                 .lock()
                 .unwrap()
                 .push(format!("unstage_older {}", older.as_secs()));
+        }
+        fn installed(&self, event: &lamp_msgs::Installed) {
+            self.lines.lock().unwrap().push(format!(
+                "installed {} {} by {} line {:?}",
+                event.item,
+                event.name,
+                event.by,
+                event.first_run.as_ref().map(|first| first.say.as_str())
+            ));
         }
         fn control(&self, line: &Value) -> Result<Value, String> {
             self.lines.lock().unwrap().push(format!("control {line}"));
@@ -1633,6 +1735,92 @@ pub mod tests {
         fn unstage(&self, p: &Path) {
             self.0.unstage(p)
         }
+        fn installed(&self, e: &lamp_msgs::Installed) {
+            self.0.installed(e)
+        }
+    }
+
+    fn told(fake: &Fake) -> Vec<String> {
+        fake.lines
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|line| line.starts_with("installed "))
+            .cloned()
+            .collect()
+    }
+
+    /// #7814: a finished install is told once, with the owner and the
+    /// app's first-run line; an update is told nothing.
+    #[test]
+    fn a_finished_install_is_told_once_and_an_update_never() {
+        let (bytes, sha) = package_of(
+            json!({"name": "x1", "title": "Gym Coach", "version": "1.0.0", "grants": [],
+            "first_run": {"say": "Gym Coach is ready. Want to set your first plan?"}}),
+        );
+        let fake = Arc::new(Fake {
+            package: Some(bytes.clone()),
+            ..Default::default()
+        });
+        install_run(&Shared(fake.clone()), &asked_for("x1", "1.0.0", &sha)).unwrap();
+        assert_eq!(
+            told(&fake),
+            [
+                r#"installed app x1 by owner line Some("Gym Coach is ready. Want to set your first plan?")"#
+            ]
+        );
+        let mut update = Fake {
+            package: Some(bytes),
+            ..Default::default()
+        };
+        update.apps.push(Fake::app("x1"));
+        let update = Arc::new(update);
+        install_run(&Shared(update.clone()), &asked_for("x1", "1.0.0", &sha)).unwrap();
+        assert!(told(&update).is_empty(), "an update says nothing");
+        // A refused install is told nothing.
+        let (bytes, sha) = package_of(json!({"name": "x1", "version": "1.0.0", "grants": []}));
+        let refused = Arc::new(Fake {
+            package: Some(bytes),
+            helper_answer: Some(json!({"refused": "not signed"})),
+            ..Default::default()
+        });
+        assert!(install_run(&Shared(refused.clone()), &asked_for("x1", "1.0.0", &sha)).is_err());
+        assert!(told(&refused).is_empty());
+    }
+
+    /// #7814: an install the helper answered late is told when the watcher
+    /// sees it installed, not before, and once.
+    #[test]
+    fn a_late_install_is_told_once_the_watcher_sees_it_installed() {
+        let (bytes, sha) = package_of(
+            json!({"name": "x1", "title": "Gym Coach", "version": "1.0.0", "grants": []}),
+        );
+        let fake = Arc::new(Fake {
+            package: Some(bytes),
+            helper_late: true,
+            ..Default::default()
+        });
+        let watching = Mutex::default();
+        install_and_tell(
+            &Shared(fake.clone()),
+            &asked_for("x1", "1.0.0", &sha),
+            &watching,
+        )
+        .unwrap();
+        assert!(told(&fake).is_empty(), "not finished yet");
+        let now = Instant::now();
+        look(&Shared(fake.clone()), &watching, now);
+        assert!(told(&fake).is_empty(), "still not installed");
+        // Installed now, from this package.
+        let mut installed = Fake::default();
+        let mut app = Fake::app("x1");
+        app.4.as_mut().unwrap().sha256 = sha.clone();
+        installed.apps.push(app);
+        let installed = Arc::new(installed);
+        look(&Shared(installed.clone()), &watching, now);
+        assert_eq!(told(&installed), ["installed app x1 by owner line None"]);
+        look(&Shared(installed.clone()), &watching, now);
+        assert_eq!(told(&installed).len(), 1, "once");
     }
 
     #[test]

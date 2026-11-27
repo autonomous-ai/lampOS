@@ -309,6 +309,11 @@ struct SkillFile {
     /// The same for a `say = { from = "schedule" }`, a due reminder
     /// (`[reminder.words]`, #940).
     reminder: Option<lamp_voice::skill_words::Section<lamp_voice::skill_words::ReminderWords>>,
+    /// `[first_run] say = "..."`: the line the lamp says when the owner
+    /// installs it from the Store (#7814, the first builder's c7209938102),
+    /// checked here as the Store checks it ([`lamp_msgs::installed::say_ok`]);
+    /// `lamp-cloud` reads it from the installed file ([`first_run_of`]).
+    first_run: Option<lamp_msgs::installed::FirstRun>,
     /// The core onboarding runner's order and words, checked by the same
     /// validator Voice uses when it takes its service-start snapshot.
     onboarding: Option<lamp_voice::onboarding::skill::Definition>,
@@ -4454,6 +4459,15 @@ pub fn present_on() -> bool {
 
 /// One skill folder, or why it cannot be loaded: with its `[present]`
 /// values when [`PRESENT_ENVIRONMENT`] is on ([`load_with`]).
+/// The first-run line of the skill in `dir` (`[first_run] say`), checked
+/// as its load checks it ([`lamp_msgs::installed::say_ok`]): none when its
+/// `skill.toml` has none, can't be read, or holds one that isn't right.
+/// Read by `lamp-cloud` once a Store install finishes (#7814).
+pub fn first_run_of(dir: &Path) -> Option<String> {
+    let _ = dir;
+    None
+}
+
 pub fn load(dir: &Path) -> Result<Skill, String> {
     load_with(dir, present_on())
 }
@@ -13749,6 +13763,54 @@ mod tests {
         let why = package::install(&other, None, &folder).unwrap_err();
         assert!(why.contains(service_read::QUERY_NOT_AN_ORDER), "{why}");
         assert!(!other.join(name).exists());
+    }
+
+    /// #7814: `[first_run] say` is optional, checked at load as the Store
+    /// checks it, and read back for `lamp-cloud` by [`first_run_of`].
+    #[test]
+    fn a_first_run_line_is_checked_at_load_and_read_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = "version = \"1.0.0\"\ntool = \"tip\"\n[permissions]\nlight = true\nspeak = true\n[[do]]\nlight = { colour = \"warm\" }\n[[do]]\nsay = \"Here is a tip.\"\n";
+        let plain = write_skill(dir.path(), "gym-tips", base);
+        assert!(load(&plain).is_ok(), "{:?}", load(&plain).err());
+        assert_eq!(first_run_of(&plain), None);
+        let asking = write_skill(
+            dir.path(),
+            "gym-tips-2",
+            &format!("{base}[first_run]\nsay = \"Gym tips are ready. Want one now?\"\n"),
+        );
+        assert!(load(&asking).is_ok(), "{:?}", load(&asking).err());
+        assert_eq!(
+            first_run_of(&asking).as_deref(),
+            Some("Gym tips are ready. Want one now?")
+        );
+        for (name, first_run, why) in [
+            (
+                "two-asks",
+                "say = \"Ready? Want one?\"",
+                "at most one question",
+            ),
+            (
+                "long-say",
+                &format!("say = \"{}\"", "a".repeat(141)),
+                "1 to 140 characters",
+            ),
+            ("marked", "say = \"Say *go*.\"", "no markup"),
+            (
+                "other-key",
+                "say = \"Ready.\"\nthen = \"go\"",
+                "unknown field",
+            ),
+        ] {
+            let folder = write_skill(
+                dir.path(),
+                name,
+                &format!("{base}[first_run]\n{first_run}\n"),
+            );
+            let refused = load(&folder).err().unwrap_or_default();
+            assert!(refused.contains(why), "{name}: {refused:?}");
+            assert_eq!(first_run_of(&folder), None, "{name}");
+        }
     }
 
     /// A skill folder `name` in `dir` with `toml` as its skill.toml.

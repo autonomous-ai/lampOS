@@ -224,6 +224,37 @@ def test_the_check_refuses_what_the_reader_refuses(tmp_path, change, said):
     assert any(said in line for line in report.errors), report.errors
 
 
+def test_a_first_run_line_is_checked_and_packed_as_the_reader_takes_it(tmp_path):
+    """#7814: `first_run: {say}` is optional, plain text of at most 140 characters, no markup or control
+    characters, at most one question and no other key (the Store's checks, lamp_msgs::installed::say_ok)."""
+    say = "Gym coach is ready. Want to set your first plan?"
+    folder = make_app(tmp_path, first_run={"say": say})
+    assert apps.check(folder).ok, apps.check(folder).errors
+    assert apps.pack(folder).manifest["first_run"] == {"say": say}
+    assert "first_run" not in apps.pack(make_app(tmp_path / "plain")).manifest
+    assert apps.check(make_app(tmp_path / "long-ok", first_run={"say": "a" * 140})).ok
+
+
+@pytest.mark.parametrize(
+    "first_run, said",
+    [
+        ({"say": "a" * 141}, "first_run.say: 1 to 140 characters of plain text, no space at either end"),
+        ({"say": ""}, "first_run.say: 1 to 140 characters of plain text, no space at either end"),
+        ({"say": " Ready."}, "first_run.say: 1 to 140 characters of plain text, no space at either end"),
+        ({"say": "Ready.\nGo?"}, "first_run.say: one line, no control characters"),
+        ({"say": "Say <b>go</b>."}, "first_run.say: no markup or quotes (found '<')"),
+        ({"say": 'Say "go".'}, "first_run.say: no markup or quotes (found '\"')"),
+        ({"say": "Ready? Want a plan?"}, "first_run.say: at most one question"),
+        ({"say": "Ready.", "then": "go"}, "first_run: {say} and no other key"),
+        ("Ready.", "first_run: {say} and no other key"),
+        ({"say": 3}, "first_run.say: 1 to 140 characters of plain text, no space at either end"),
+    ],
+)
+def test_a_first_run_line_the_reader_refuses_is_refused(tmp_path, first_run, said):
+    report = apps.check(make_app(tmp_path, first_run=first_run))
+    assert f"lamp-skill.json: {said}" in report.errors, report.errors
+
+
 def test_a_loud_asset_and_a_broken_companion_skill_are_refused(tmp_path):
     folder = make_app(tmp_path)
     wav(folder / "assets" / "ok.wav", level=30_000)
