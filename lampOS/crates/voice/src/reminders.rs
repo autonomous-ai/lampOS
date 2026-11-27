@@ -69,6 +69,16 @@ pub(crate) fn speaks(value: Option<&str>) -> bool {
 fn speaking(value: Result<&str, &std::env::VarError>) -> bool {
     speaks(value.ok())
 }
+/// With Schedule speech off the consumer never starts, so its start never
+/// clears the reminders' clips (#8894): the voice's own start does, with
+/// `value` the speech switch as read. How many files went.
+pub(crate) fn clear_clips_without_speech(
+    value: Option<&str>,
+    clips: &crate::ring_clips::Clips,
+) -> usize {
+    let _ = (value, clips);
+    0
+}
 pub const LEDGER_VARIABLE: &str = "LAMP_SCHEDULE_DELIVERY_DIR";
 /// `on` exactly (#5560): a delivery ledger fenced ahead of the store is
 /// re-fenced to it at the voice's start, and while one still can't be, a
