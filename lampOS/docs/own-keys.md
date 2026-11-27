@@ -733,19 +733,25 @@ start; the folder stays root's alone, 0700, each file 0600.
   same update lock (`keys::restart_after`), so the forwarder loads the
   change. The voice restarts once it has rested 1 s
   (`change::KEY_CHANGE_QUIET`, #8710), the reply already written and
-  flushed to lamp-cloud before the wait starts. lamp-cloud waits an update's
-  `QUIET` (45 s) of rest after that: it holds the reply only in memory until
-  its online loop publishes it (only while connected, owed again if the
-  publish fails), so a link down or a slow publish within 1 s would lose it
-  (Sixth's P2 on #8741). Someone speaking to the new voice pushes it on; not
-  quiet within the 30 minutes in all, lamp-cloud is not restarted and loads
-  the key at its next start. Its journal line: "lamp-cloud
+  flushed to lamp-cloud before the wait starts. lamp-cloud restarts a fixed
+  5 s (`keys::CLOUD_AFTER_REPLY`) after the voice's restart returns, under
+  the same lock, with no rest waited for: a room with sound (a TV, an
+  office's faint sound giving a 0-word line every ~40 s) never gives an
+  update's 45 s of rest, and lamp-cloud must still load the key (option (b)
+  on #8741). lamp-cloud publishes the reply on its 50 ms online tick while
+  connected, so a connected link has it out well before. With the link down
+  at the change, the reply held only in lamp-cloud's memory is lost at its
+  restart: the app says the lamp didn't answer, though the key was kept, and
+  `keys.get` then tells the truth. That harms only the person who set their
+  own key, so it doesn't block (the own-keys rule); a publish-acked restart
+  (#8742's `Changes::acked` as the signal) is the later step. Its journal
+  line: "lamp-cloud
   restarted to load the person's model key for the agent (its
   LoadCredential= is copied only at its start, #8742)". Never for an
   ElevenLabs or Deepgram key. Restarting lamp-cloud drops the app's link
   until it reconnects. Tested in `tests/update_lock.rs`
   (`a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet`,
-  `lamp_cloud_restarts_only_after_quiet_of_rest_past_the_voice`).
+  `lamp_cloud_restarts_5_s_after_the_voice_even_while_the_room_keeps_sounding`).
 - **`lamp-cloud`** passes the helper's `done` through as it is
   (`settings::ask_keys`), under its 4096-byte read of a reply.
 - **Tests:** `src/keys.rs` (`a_model_check_asks_once_for_a_tool_call`) and
