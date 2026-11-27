@@ -305,7 +305,7 @@ async def _app_request_public(args) -> int:
     from .store import Store
 
     Store.signed_in(where=_where(args)).request_public(args.id)
-    print(f"{args.id}: asked to go public; the reviewers decide, and `lamp app status` shows it")
+    print(f"{args.id}: asked to go public; staff decide, and `lamp app status` shows it")
     return 0
 
 
@@ -429,7 +429,7 @@ def parser() -> argparse.ArgumentParser:
     app_pack.add_argument("folder")
     app_pack.add_argument("-o", "--output", help="the tar's path (NAME-VERSION.tar)")
     app_pack.set_defaults(run=_app_pack)
-    app_submit = _store_options(app_commands.add_parser("submit", help="check, then upload an app for review (hidden until approved)"))
+    app_submit = _store_options(app_commands.add_parser("submit", help="check, then upload an app for review (it stays unlisted)"))
     app_submit.add_argument("path", help="an app's folder (packed for you) or a packed .tar")
     app_submit.add_argument("--icon", help="a PNG, exactly 1024x1024, 2 MB at most")
     app_submit.add_argument("--cover", help="a PNG, exactly 1600x900, 2 MB at most")
@@ -440,7 +440,7 @@ def parser() -> argparse.ArgumentParser:
     app_status = _store_options(app_commands.add_parser("status", help="your apps' reviews, or one's"))
     app_status.add_argument("id", nargs="?")
     app_status.set_defaults(run=_app_status)
-    app_public = _store_options(app_commands.add_parser("request-public", help="ask the reviewers to make an approved app public"))
+    app_public = _store_options(app_commands.add_parser("request-public", help="ask staff to make an approved app public"))
     app_public.add_argument("id")
     app_public.set_defaults(run=_app_request_public)
     app_studio = _store_options(app_commands.add_parser("studio", help="a page on this computer to check, submit and follow an app"))

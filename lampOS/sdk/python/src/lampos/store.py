@@ -75,6 +75,13 @@ ERRORS: dict[str, str] = {
     "developer_app_only": "this is a skill (format 1): a skill goes on through the lamp (`lamp skill push`), not the Store's app upload",
     "lampos_package_invalid": "the Store's check refused the package",
     "skill_name_exists": "that app name belongs to another account: change `name` in app.json",
+    "skill_version_exists": "that version is in the Store with other bytes: raise `version` in app.json",
+    "skill_name_reserved": "that name is a lampOS built-in's: change `name` in app.json",
+    "listing_invalid": "the title or description is too long, or holds markup or a control character: fix it (`--title`, `--description`)",
+    "skill_media_invalid": "the icon or cover is not a PNG of the right size (icon 1024x1024, cover 1600x900, each 2 MB at most): fix it",
+    "developer_upload_in_progress": "this account is already sending an upload: wait for it, then try again",
+    "developer_upload_disabled": "the Store's uploads are off for now: try again later",
+    "developer_upload_unavailable": "the Store's upload is unavailable for now: try again later",
     "app_not_found": "no app of yours has that id (`lamp app status` lists yours)",
     "app_not_approved": "only an approved app can ask to go public: wait for the review",
     "app_already_public": "this app is public already",
@@ -309,7 +316,7 @@ class Store:
         category: str | None = None,
     ) -> dict[str, Any]:
         """Upload an unsigned format-2 tar; the Store's app, `review_status`
-        "pending" and hidden. The same bytes again answer the same app. The
+        "pending" and `unlisted`. The same bytes again answer the same app. The
         art and listing's limits are checked here first, so a wrong one costs
         no attempt of the day's 30."""
         if len(package) > MOST_PACKAGE_BYTES:
@@ -340,7 +347,7 @@ class Store:
         return self._call("GET", self.where.store + PATHS["app"].format(id=urllib.parse.quote(str(app_id), safe="")))
 
     def request_public(self, app_id: str | int) -> dict[str, Any] | None:
-        """Ask the reviewers to make an approved app public; asking again
+        """Ask staff to make an approved app public; asking again
         changes nothing."""
         return self._call("POST", self.where.store + PATHS["request_public"].format(id=urllib.parse.quote(str(app_id), safe="")))
 
@@ -348,7 +355,7 @@ class Store:
 def describe(app: dict[str, Any]) -> str:
     """One app's line: id, name, version, review, visibility, the note."""
     review = app.get("review_status") or "?"
-    shown = app.get("visibility") or "hidden"
+    shown = app.get("visibility") or "unlisted"
     asked = ", public asked" if app.get("public_requested") else ""
     note = f"\n  reviewer: {app['review_note']}" if app.get("review_note") else ""
     return f"{app.get('id')}\t{app.get('name')} {app.get('version')}\t{review}\t{shown}{asked}{note}"

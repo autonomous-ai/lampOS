@@ -56,7 +56,7 @@ async function fakeStore(t) {
     if (path === '/store/apps' && req.method === 'POST') {
       if (fake.refuseWith) return fail(400, ...fake.refuseWith);
       const form = await new Response(body, { headers: { 'content-type': req.headers['content-type'] } }).formData();
-      const app = { id: String(fake.apps.size + 1), name: 'gym-coach', version: '1.0.0', title: form.get('title'), review_status: 'pending', visibility: 'hidden', public_requested: false, fields: [...form.keys()].sort(), size: (await form.get('file').arrayBuffer()).byteLength };
+      const app = { id: String(fake.apps.size + 1), name: 'gym-coach', version: '1.0.0', title: form.get('title'), review_status: 'pending', visibility: 'unlisted', public_requested: false, fields: [...form.keys()].sort(), size: (await form.get('file').arrayBuffer()).byteLength };
       fake.apps.set(app.id, app);
       return send(200, { status: 1, data: app });
     }
@@ -103,7 +103,7 @@ test('sign in with the emailed code, submit, follow the review and ask to go pub
   assert.deepEqual(app.fields, ['category', 'cover', 'file', 'icon', 'title']);
   assert.equal(app.size, APP.length);
   assert.equal((await submissions(undefined, { where })).total, 1);
-  assert.equal((await submissions('1', { where })).visibility, 'hidden');
+  assert.equal((await submissions('1', { where })).visibility, 'unlisted');
   await assert.rejects(requestPublic('1', { where }), (e) => e instanceof StoreError && e.code === 'app_not_approved' && /only an approved app/.test(e.why));
   fake.apps.get('1').review_status = 'approved';
   assert.equal((await requestPublic('1', { where })).public_requested, true);
