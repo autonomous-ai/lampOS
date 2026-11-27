@@ -1004,7 +1004,7 @@ fn a_key_change_restarts_the_voice_after_one_second_of_quiet() {
 
 /// #8735: a key change is answered first, then the voice restarts once the
 /// lamp is quiet and no update is at work, under lamp-update's lock; a model
-/// key's change restarts lamp-cloud after it, which #8742's forwarder needs
+/// key's change restarts lamp-cloud 5 s after it, which #8742's forwarder needs
 /// to load the key, and the journal says why. Never for ElevenLabs or
 /// Deepgram.
 #[test]
@@ -1044,9 +1044,9 @@ fn a_model_key_change_restarts_the_voice_then_lamp_cloud_once_quiet() {
             stop_fails: false,
         };
         let said = keys::restart_after(&done, &mut ears, &records, &mut units);
-        // The voice after 1 s of quiet (#8710); lamp-cloud 45 s after it, its
-        // reply relayed by then (#8741).
-        assert_eq!(ears.now, if cloud { 46 * S } else { S }, "{line}");
+        // The voice after 1 s of quiet (#8710); lamp-cloud 5 s after it, its
+        // reply relayed by then (#8741, option b).
+        assert_eq!(ears.now, if cloud { 6 * S } else { S }, "{line}");
         let mut want = vec![("try-restart lamp-voice.service".to_owned(), true)];
         if cloud {
             want.push(("try-restart lamp-cloud.service".to_owned(), true));

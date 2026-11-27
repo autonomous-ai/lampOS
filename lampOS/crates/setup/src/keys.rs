@@ -1330,14 +1330,22 @@ pub struct Done {
     pub said: String,
 }
 
+/// How long after the voice's restart returns `lamp-cloud` restarts, when a
+/// model key changed: the reply is written and flushed to lamp-cloud before
+/// [`restart_after`] starts, and lamp-cloud publishes it on its 50 ms online
+/// tick while connected. A fixed wait, not a rest: a room with sound never
+/// gives 45 s of rest (kit-8735 runs 2 and 3, option (b) on #8741).
+pub const CLOUD_AFTER_REPLY: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// After a key change is answered: the voice restarted once it has rested
 /// 1 s, a turn in flight waited out ([`crate::change::KEY_CHANGE_QUIET`],
 /// #8710), and no update is at work, lamp-update's lock held through both
-/// restarts. `lamp-cloud`, when `done.restart_cloud`, waits an update's
-/// [`lamp_update::quiet::QUIET`] (45 s) of rest after the voice's restart:
-/// it holds the reply only in memory until its online loop relays it, and a
-/// link down or a slow publish must not lose it (Sixth's P2 on #8741). All
-/// within [`crate::change::QUIET_MOST`]. The journal's lines.
+/// restarts. `lamp-cloud`, when `done.restart_cloud`, restarts
+/// [`CLOUD_AFTER_REPLY`] (5 s) after the voice's restart returns, with no
+/// rest waited for, so its reply is relayed first while the link is up. With
+/// the link down at the change, the reply held in lamp-cloud's memory is lost
+/// at its restart; the key is kept and `keys.get` says so. The journal's
+/// lines.
 pub fn restart_after(
     done: &Done,
     ears: &mut impl crate::change::Ears,
@@ -1345,7 +1353,6 @@ pub fn restart_after(
     systemd: &mut impl crate::change::Systemd,
 ) -> Vec<String> {
     use crate::change;
-    let started = ears.now_ms();
     let _held = match change::quiet_and_unlocked(
         ears,
         records,
@@ -1370,19 +1377,8 @@ pub fn restart_after(
         Err(why) => format!("the voice could not be restarted: {why}"),
     }];
     if done.restart_cloud {
-        let spent = std::time::Duration::from_millis(ears.now_ms().saturating_sub(started));
-        if let Err(why) = change::wait_for_rest(
-            ears,
-            lamp_update::quiet::QUIET,
-            change::QUIET_MOST.saturating_sub(spent),
-        ) {
-            said.push(format!(
-                "lamp-cloud was not restarted: the lamp was not quiet for {} s within {} min ({why}); it loads the person's model key at its next start",
-                lamp_update::quiet::QUIET.as_secs(),
-                change::QUIET_MOST.as_secs() / 60
-            ));
-            return said;
-        }
+        // `listen` takes the whole wait; what it hears doesn't matter here.
+        let _ = ears.listen(CLOUD_AFTER_REPLY);
         said.push(match systemd.systemctl(&["try-restart", ASKER_UNIT]) {
             Ok(()) => "lamp-cloud restarted to load the person's model key for the agent (its LoadCredential= is copied only at its start, #8742)".to_owned(),
             Err(why) => format!("lamp-cloud could not be restarted to load the person's model key: {why}"),
