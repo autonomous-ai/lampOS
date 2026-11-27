@@ -833,7 +833,7 @@ and send it again. Without `retry_ms`, it is a held part, as above.
 | `lamp logout` | forgets the sign-in kept for that Store |
 | `lamp app check FOLDER\|TAR...` | each an app's folder (with `app.json`) or a packed `.tar`, checked as the Store's reader checks it, less the signature |
 | `lamp app pack FOLDER [-o TAR]` | the Store's unsigned tar; `-o`/`--output` names it (`NAME-VERSION.tar`) |
-| `lamp app submit FOLDER\|TAR [--icon PNG] [--cover PNG] [--title T] [--description D] [--category SLUG]` | checks it, then uploads it for review, hidden until approved. `--icon`: PNG, 1024x1024; `--cover`: PNG, 1600x900; each 2 MB at most. `--title` up to 100, `--description` up to 1000 characters; `--category` optional, the Store sets the final one at review |
+| `lamp app submit FOLDER\|TAR [--icon PNG] [--cover PNG] [--title T] [--description D] [--category SLUG]` | checks it, then uploads it for review; it stays `unlisted`. `--icon`: PNG, 1024x1024; `--cover`: PNG, 1600x900; each 2 MB at most. `--title` up to 100, `--description` up to 1000 characters; `--category` optional, the Store sets the final one at review |
 | `lamp app status [ID]` | your apps, or one: `review_status` (`pending`, `approved`, `rejected`), the reviewer's note, visibility (`unlisted`, `public`), whether going public was asked |
 | `lamp app request-public ID` | asks for an approved app to go public; staff decide |
 | `lamp app studio [--port N] [--no-open]` | the publishing page, on 127.0.0.1 only; `--port` (any free one), `--no-open` prints its address without opening a browser |

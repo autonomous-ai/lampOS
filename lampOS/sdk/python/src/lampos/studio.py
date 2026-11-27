@@ -229,7 +229,7 @@ table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:.35rem .
 <label for="category">Category</label><input type="text" id="category" placeholder="a Store category slug">
 <label for="icon">Icon (PNG, 1024 x 1024)</label><input type="file" id="icon" accept="image/png">
 <label for="cover">Cover (PNG, 1600 x 900)</label><input type="file" id="cover" accept="image/png"><div id="art"></div></section>
-<section><h2>3. Submit</h2><p class="muted">The Store checks the package again, then a reviewer reads it. It stays hidden until approved; going public is a separate ask.</p>
+<section><h2>3. Submit</h2><p class="muted">The Store checks the package again, then a reviewer reads it. It stays unlisted; once approved, going public is a separate ask that staff decide.</p>
 <button id="submit" disabled>Submit for review</button><div id="submitmsg"></div></section>
 <section><h2>Your apps</h2><div id="apps" class="muted">Sign in to see them.</div></section>
 <script>

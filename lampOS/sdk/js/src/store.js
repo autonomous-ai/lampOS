@@ -45,6 +45,13 @@ export const STORE_ERRORS = Object.freeze({
   developer_app_only: "this is a skill (format 1): a skill goes on through the lamp (`lamp skill push`), not the Store's app upload",
   lampos_package_invalid: "the Store's check refused the package",
   skill_name_exists: 'that app name belongs to another account: change `name` in app.json',
+  skill_version_exists: 'that version is in the Store with other bytes: raise `version` in app.json',
+  skill_name_reserved: "that name is a lampOS built-in's: change `name` in app.json",
+  listing_invalid: 'the title or description is too long, or holds markup or a control character: fix it (`--title`, `--description`)',
+  skill_media_invalid: 'the icon or cover is not a PNG of the right size (icon 1024x1024, cover 1600x900, each 2 MB at most): fix it',
+  developer_upload_in_progress: 'this account is already sending an upload: wait for it, then try again',
+  developer_upload_disabled: "the Store's uploads are off for now: try again later",
+  developer_upload_unavailable: "the Store's upload is unavailable for now: try again later",
   app_not_found: 'no app of yours has that id (`lamp app status` lists yours)',
   app_not_approved: 'only an approved app can ask to go public: wait for the review',
   app_already_public: 'this app is public already',
@@ -221,7 +228,7 @@ export async function signIn(email, otp, opts = {}) {
 }
 
 // Upload an unsigned format-2 tar (bytes) for review: the Store's app,
-// `review_status` "pending", hidden. `icon` (PNG 1024x1024) and `cover`
+// `review_status` "pending", `unlisted`. `icon` (PNG 1024x1024) and `cover`
 // (PNG 1600x900), each 2 MB at most, and the listing are checked here first.
 export async function submitApp(tar, { icon, cover, title, description, category, filename = 'app.tar', ...opts } = {}) {
   const { where, token } = options(opts);
@@ -248,7 +255,7 @@ export async function submissions(id, { page = 1, limit = 50, ...opts } = {}) {
   return { data: data?.data ?? [], total: data?.total ?? 0 };
 }
 
-// Ask the reviewers to make an approved app public; asking again changes nothing.
+// Ask staff to make an approved app public; asking again changes nothing.
 export async function requestPublic(id, opts = {}) {
   const { where, token } = options(opts);
   return call('POST', where.store + PATHS.requestPublic(id), { token });
