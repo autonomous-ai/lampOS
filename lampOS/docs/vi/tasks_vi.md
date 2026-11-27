@@ -5161,6 +5161,13 @@ là mười phút, không phải một, và:
   yên. Sau một câu ngắn, tin đầy đủ chỉ theo sau khi đèn trả lời ai đó lần
   nữa, không phải ở câu kế tiếp của bất kỳ ai, cũng không ở quãng ngừng dài
   kế tiếp của một phòng yên (`TaskNews::short_unanswered`).
+- Một câu trả lời chỉ được tính cho tất cả những điều trên ngay sau nó
+  (#8812): trong khung trả lời 20 s từ khi lời của nó kết thúc
+  (`follows_on::WITHIN_US`), và cho tới câu kế tiếp của bất kỳ ai, tùy cái
+  nào hết trước (`task_news::answer_counts`). Một câu trả lời từ vài phút
+  trước, khi hai người đang nói với nhau, không còn cho tin ra ở một quãng
+  ngừng một giây, không biến câu ngắn thành "By the way, ...", và không gỡ
+  việc giữ tin của một phòng bận.
 - Mọi tin (trừ tin đăng nhập, thứ người dùng vừa hỏi và có thể đang gõ
   trong im lặng) chỉ được kể khi có người ở đó lúc này: một khuôn mặt trong
   tầm nhìn, hoặc bất kỳ ai được nghe nói trong khoảng 15 s
@@ -5178,6 +5185,7 @@ là mười phút, không phải một, và:
 | Chờ phòng yên, tối đa | 10 phút từ khi giọng nói có tin (60 s trước #8783) | `task_news::WAITS_AT_MOST` |
 | Quãng ngừng trong lời nói để kể | 5 s không ai được nghe nói và không có lượt nào (1 s trước #8783) | `task_news::LONG_PAUSE_US` |
 | Quãng ngừng sau khi đèn trả lời ai đó | 1 s không ai được nghe nói, lượt đã xong cũng lâu như vậy | `task_news::PAUSE_US` (không đổi) |
+| Câu trả lời được tính cho tin | 20 s từ khi lời của nó kết thúc, cho tới câu kế tiếp của bất kỳ ai | `follows_on::WITHIN_US`, `task_news::answer_counts` |
 | Có người ở đó | một khuôn mặt, hoặc bất kỳ ai được nghe trong 15 s (2 phút trước #8783) | `task_news::HEARD_WITHIN_US` |
 | Cuộc nói chuyện của phòng bận đã xong | 10 s không ai được nghe nói và không có lượt nào | `task_news::TALK_OVER_US` |
 | Sau lời của chính đèn | 3 s không ai bắt đầu | `task_news::AFTER_LAMP_US` (không đổi) |
