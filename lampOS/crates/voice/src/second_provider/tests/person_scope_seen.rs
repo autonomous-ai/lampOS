@@ -121,6 +121,10 @@ thread_local! {
     /// thread, once, as in the product since #8791: no
     /// [`Engine::confirming_forgets_by_sight`], so `forget_sight` is `None`.
     static NO_SIGHT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// What the next [`lines_known`] on this thread's `remember` answers,
+    /// once: a failed store or a refusal, for the held correction's run.
+    static REMEMBER_TOLD: std::cell::RefCell<Option<Value>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// One test at a time that reads a one-face keep's mark: the marks
@@ -582,6 +586,7 @@ async fn lines_known(
     let ran: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
     let seen_ran = ran.clone();
     let keep_marks = KEEP_MARKS.with(std::cell::Cell::take);
+    let remember_told = REMEMBER_TOLD.with(|told| told.borrow_mut().take());
     // With `real`, each call runs on the voice's own memory route
     // (`tools::run_call_scoped`, as the worker's runner does) against the
     // test's memory socket, here on the test's thread so the test's switches
@@ -624,6 +629,9 @@ async fn lines_known(
                     crate::tools::run_call_scoped(route, &call, request, heard, &lease)
                         .1
                         .0
+                }
+                _ if remember_told.is_some() && name == crate::remember::REMEMBER => {
+                    remember_told.clone().unwrap_or_default()
                 }
                 _ if doubt_undoes && name == crate::remember::REMEMBER => {
                     json!({"remembered": true, "id": 391})
@@ -7205,6 +7213,60 @@ async fn a_one_face_correction_asks_and_retires_the_old_fact_on_yes() {
     assert_eq!(got.calls, [Some(a)], "in A's scope");
 }
 
+/// The Reviewer-lead's P2 on #8654: a held correction their yes runs, whose
+/// store fails (an error or `remembered: false`) or which the memory
+/// route's gate refuses (`kept: false`, tools.rs), is never told as kept:
+/// the yes's round is told it was not done ([`crate::seen_yes::NOT_KEPT`]);
+/// one that kept is told it is kept, as before.
+#[tokio::test]
+async fn a_correction_on_the_yes_that_fails_or_is_refused_is_never_told_kept() {
+    let args = json!({"text": "Gym is on Ninth Street.", "replaces": 7});
+    for (case, told) in [
+        ("error", json!({"error": "the memory did not answer"})),
+        ("not-remembered", json!({"remembered": false})),
+        (
+            "refused",
+            json!({"kept": false, "note": crate::second_provider::ONE_FACE_FORGET}),
+        ),
+        ("kept", json!({"remembered": true, "id": 12})),
+    ] {
+        REMEMBER_TOLD.with(|cell| *cell.borrow_mut() = Some(told));
+        let got = face_yes_chats(
+            &format!("face-yes-correction-{case}"),
+            vec![
+                line(CORRECTS, vec![("f1", false)], 0),
+                line("Yes.", vec![("f1", false)], 5),
+            ],
+            asks_then(
+                crate::remember::REMEMBER,
+                args.clone(),
+                "Shall I remember that instead?",
+                1,
+            ),
+            true,
+        )
+        .await;
+        assert_eq!(
+            ran_named(&got, crate::remember::REMEMBER),
+            [args.clone()],
+            "{case}: run once on the yes"
+        );
+        let kept = case == "kept";
+        assert_eq!(
+            held_told(&got, "what you asked to keep for them is kept now"),
+            kept,
+            "{case}: told kept only when kept: {:?}",
+            got.rounds
+        );
+        assert_eq!(
+            held_told(&got, crate::seen_yes::NOT_KEPT),
+            !kept,
+            "{case}: told not done when it failed: {:?}",
+            got.rounds
+        );
+    }
+}
+
 /// `forget_everything` on their one-face line: nothing runs on the asking
 /// line, which is told to ask; their yes runs it once, in A's scope alone.
 #[tokio::test]
@@ -7975,6 +8037,90 @@ async fn row_8654_l2_a_bare_forget_on_the_yes_after_a_word_ask_runs_at_once() {
             );
         }
     }
+}
+
+/// The Reviewer-lead's P3 1 on #8654: the L2 bare forget that ran at once
+/// on their yes, as the forget of the kept id, journals no
+/// `face-hold: refused: not_bare` after it: the agreed call is never put
+/// to the hold.
+#[tokio::test]
+async fn an_at_once_forget_on_the_yes_journals_no_refusal() {
+    const NAME: &str = "second_provider::tests::person_scope_seen::an_at_once_forget_on_the_yes_journals_no_refusal";
+    if let Some(said) = in_child(NAME, "LAMP_TEST_ROW_8654_AT_ONCE_NO_REFUSAL") {
+        assert!(
+            !said.contains("face-hold: refused: not_bare"),
+            "no refusal journalled for the forget that ran: {said}"
+        );
+        return;
+    }
+    let _one = KEEP_MARK_TESTS.lock().await;
+    KEEP_MARKS.with(|marks| marks.set(Some(95)));
+    let got = face_yes_chats(
+        "row-8654-at-once-no-refusal",
+        vec![
+            line(
+                "Remember my parking spot is B twelve.",
+                vec![("f1", false)],
+                0,
+            ),
+            line("Forget that.", vec![("f1", false)], 3),
+            line("Yes, please.", vec![("f1", false)], 3),
+        ],
+        row_8654_l2_chats(),
+        true,
+    )
+    .await;
+    assert_eq!(
+        ran_named(&got, crate::remember::FORGET),
+        [json!({"source_id": 95})],
+        "ran at once: {:?}",
+        got.labels
+    );
+}
+
+/// The Reviewer-lead's P3 2 on #8654: a `forget_everything` held for their
+/// yes runs on it, before round 1; the model calling it again on that yes
+/// line is never held and asked again (one ask, one yes).
+#[tokio::test]
+async fn a_held_call_that_ran_on_the_yes_is_not_held_again_on_that_line() {
+    let mut chats = asks_then(
+        crate::remember::FORGET_EVERYTHING,
+        json!({}),
+        "Shall I forget everything I know about you, including your name?",
+        0,
+    );
+    chats.extend(one_call(crate::remember::FORGET_EVERYTHING, json!({})));
+    chats.push(vec![text("Done."), Ok(ChatEvent::Done)]);
+    // Spare, so a second ask (the bug) still reaches the asserts.
+    chats.push(vec![text("Shall I?"), Ok(ChatEvent::Done)]);
+    let got = face_yes_chats(
+        "face-yes-everything-again",
+        vec![
+            line(FORGET_ME, vec![("f1", false)], 0),
+            line("Yes.", vec![("f1", false)], 5),
+        ],
+        chats,
+        true,
+    )
+    .await;
+    let held = got
+        .rounds
+        .iter()
+        .flatten()
+        .filter(|message| {
+            format!("{message:?}").contains("forgetting everything always waits for their yes")
+        })
+        .count();
+    assert_eq!(
+        held, 1,
+        "held once, never again on the yes: {:?}",
+        got.rounds
+    );
+    assert!(
+        !ran_named(&got, crate::remember::FORGET_EVERYTHING).is_empty(),
+        "ran on the yes: {:?}",
+        got.ran
+    );
 }
 
 /// A plain yes after their one-face keep, `between` the line between,
