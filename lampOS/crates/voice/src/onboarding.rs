@@ -6765,13 +6765,21 @@ fn answer(file: &Path, call: &ToolCall, order: Option<&[Step]>) -> (Value, bool)
         // step, which reopened every step (#3754).
         REDO => match call.args.get("step").and_then(Value::as_str) {
             Some(REDO_ALL) => json!({"redo": true}),
+            // The walk Lamp leads by voice (#8871, lamp-9adf at 16443:
+            // "redo the whole setup, from the start" refused twice): words
+            // for the whole walk are the whole walk.
+            Some(said) if walk_v2::on() && walk_v2::whole_walk(said) => json!({"redo": true}),
             Some(said) => match Step::spoken(said) {
                 Some(step) => match redo_one(step, order) {
                     Ok(line) => line,
                     Err(error) => return (error, true),
                 },
+                None if walk_v2::on() && walk_v2::refused_again() => json!({"redo": true}),
                 None => return refuse_redo(order),
             },
+            // With the walk Lamp leads by voice, never refused twice in a
+            // row: the second ask with no step is the whole walk.
+            None if walk_v2::on() && walk_v2::refused_again() => json!({"redo": true}),
             None => return refuse_redo(order),
         },
         STEP => {
@@ -15061,6 +15069,37 @@ mod tests {
         let mut off = Room::new("v2-asked-off");
         off.wait(4 * S, Some(NEAR_MIDDLE));
         assert!(off.walk.pending().asking.is_none());
+    }
+
+    /// lamp-9adf at 16443: "Hey Lamp, redo the whole setup, from the
+    /// start." reached `redo_setup` with no step, refused twice. With the
+    /// walk Lamp leads by voice, the whole walk's words redo it, and a
+    /// second ask with no step is never refused; without it, as before.
+    #[test]
+    fn a_whole_setup_redo_is_never_refused_twice_with_the_walk_v2() {
+        let room = Room::new("v2-redo");
+        let redo = |step: Value| ToolCall {
+            id: "r".into(),
+            name: REDO.into(),
+            args: json!({ "step": step }),
+        };
+        let refused = |answer: &Value| {
+            answer["error"]
+                .as_str()
+                .is_some_and(|error| error.starts_with("Nothing was redone."))
+        };
+        walk_v2::set_on_for_test(false);
+        let (first, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        let (second, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        assert!(refused(&first) && refused(&second));
+        walk_v2::set_on_for_test(true);
+        let (whole, _) = run_in(&room.walk.file, &redo(json!("the whole setup")), None);
+        assert!(!refused(&whole) && whole.get("error").is_none(), "{whole}");
+        let (first, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        let (second, _) = run_in(&room.walk.file, &redo(Value::Null), None);
+        assert!(refused(&first), "{first}");
+        assert!(!refused(&second) && second.get("error").is_none(), "{second}");
+        walk_v2::set_on_for_test(false);
     }
 
     /// With the switch off nothing changes: no new steps, no state lines,

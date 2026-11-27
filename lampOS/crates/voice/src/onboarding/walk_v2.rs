@@ -63,7 +63,22 @@ pub fn switched(value: Option<&str>) -> bool {
 
 /// The switch in this process's environment.
 pub fn on() -> bool {
+    #[cfg(test)]
+    if ON_FOR_TEST.with(std::cell::Cell::get) {
+        return true;
+    }
     switched(std::env::var(ENVIRONMENT).ok().as_deref())
+}
+
+#[cfg(test)]
+thread_local! {
+    static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The switch on for this test's thread only.
+#[cfg(test)]
+pub(crate) fn set_on_for_test(on: bool) {
+    ON_FOR_TEST.with(|cell| cell.set(on));
 }
 
 /// `order` with the two new steps right after "how you sound" (at the end
@@ -175,6 +190,65 @@ fn words(step: Step) -> StepWords {
         skipped: Some(skipped.to_owned()),
         later_reoffer: Some(later.to_owned()),
         nudge: None,
+    }
+}
+
+/// Whether `said`, a `redo_setup` step, names the whole walk (#8871):
+/// "whole", "all", "everything", "from the start", "full", "setup".
+pub(crate) fn whole_walk(said: &str) -> bool {
+    let said = said.to_lowercase();
+    let words: Vec<&str> = said
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let has = |word: &str| words.contains(&word);
+    has("whole")
+        || has("all")
+        || has("everything")
+        || has("full")
+        || has("entire")
+        || said.contains("from the start")
+        || said.contains("from scratch")
+        || words == ["setup"]
+        || words == ["set", "up"]
+        || has("tất")
+        || said.contains("từ đầu")
+}
+
+/// How long a refused `redo_setup` with no step stays the last one: a
+/// second within it is the whole walk ([`refused_again`]).
+const REFUSED_FOR: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// A `redo_setup` with no step known now (#8871): `true` when one was
+/// refused within [`REFUSED_FOR`], so it is never refused twice in a row;
+/// `false` the first time, kept for the next.
+pub(crate) fn refused_again() -> bool {
+    let again = |last: &mut Option<std::time::Instant>| {
+        let now = std::time::Instant::now();
+        if last.is_some_and(|at| now.duration_since(at) <= REFUSED_FOR) {
+            *last = None;
+            return true;
+        }
+        *last = Some(now);
+        false
+    };
+    // Each test's thread its own; the worker's process one.
+    #[cfg(test)]
+    {
+        thread_local! {
+            static LAST: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
+        }
+        LAST.with(|cell| {
+            let mut last = cell.get();
+            let told = again(&mut last);
+            cell.set(last);
+            told
+        })
+    }
+    #[cfg(not(test))]
+    {
+        static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+        again(&mut LAST.lock().unwrap_or_else(std::sync::PoisonError::into_inner))
     }
 }
 
@@ -873,6 +947,22 @@ mod tests {
         );
         assert_eq!(state_words("What's the weather?"), None);
         set_state(None);
+    }
+
+    /// lamp-9adf at 16443: "redo the whole setup, from the start" was
+    /// refused twice. Words for the whole walk are it, and a second ask
+    /// with no step is never refused.
+    #[test]
+    fn the_whole_setup_is_redone_by_its_words_and_never_refused_twice() {
+        for said in ["whole", "the whole setup", "all steps", "everything", "from the start", "setup", "lại từ đầu"] {
+            assert!(whole_walk(said), "{said}");
+        }
+        for said in ["touch", "who_you_are", "how you sound"] {
+            assert!(!whole_walk(said), "{said}");
+        }
+        assert!(!refused_again());
+        assert!(refused_again());
+        assert!(!refused_again());
     }
 
     #[test]
