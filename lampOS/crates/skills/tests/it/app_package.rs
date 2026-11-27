@@ -341,7 +341,10 @@ fn grants_are_the_doors_fourteen_and_nothing_else() {
     );
     for grant in app_package::GRANTS {
         assert!(
-            changed(move |m, _| m["grants"] = json!([grant, "hear"])).is_ok() || grant == "hear",
+            changed(move |m, _| m["grants"] = json!([grant, "hear"])).is_ok()
+                || grant == "hear"
+                || grant == "turns"
+                || grant == "report",
             "{grant}"
         );
     }
@@ -723,10 +726,12 @@ fn the_name_rules_are_the_texts_and_a_clip_may_be_quiet() {
     assert!(!app_package::app_name_ok(&"a".repeat(25)));
     assert!(!app_package::app_name_ok("-a"));
     assert!(!app_package::app_name_ok("a_b"));
-    assert_eq!(app_package::GRANTS.len(), 16);
+    assert_eq!(app_package::GRANTS.len(), 18);
     // `remember` is an app's own grant (apps.remember), never the door's plain
-    // one a computer is paired with: the last in the list.
+    // one a computer is paired with: the first after the door's 15, then
+    // Lamp Doctor's two, also an app's own (#8726).
     assert_eq!(app_package::GRANTS[15], app_package::REMEMBER_GRANT);
+    assert_eq!(app_package::GRANTS[16..], app_package::DOCTOR_GRANTS);
 }
 
 #[test]
@@ -1125,5 +1130,76 @@ fn an_apps_tools_file_reads_only_with_the_switch_on_and_stays_in_its_folder() {
             files.push(("tools.json".into(), b"{}".to_vec()));
         }),
         "an app's files are under src/, assets/ and skills/",
+    );
+}
+
+#[test]
+fn lamp_doctors_turns_and_report_are_an_apps_own_and_report_is_refused_beside_the_readers() {
+    // Off (the default), neither is one of the lamp's: no owner's yes is
+    // taken for a grant that does nothing yet (#8765's read).
+    for grant in ["turns", "report"] {
+        refused(
+            changed(move |m, _| m["grants"] = json!([grant, "hear"])),
+            "not one of the door's",
+        );
+    }
+    // On, neither is a computer's; both read, with and without `net`, beside
+    // `device` and the like (#8726).
+    app_package::with_doctor_switches(true, true, || {
+        for net in [false, true] {
+            let read = changed(|m, _| {
+                m["grants"] = json!(["turns", "report", "device"]);
+                m["phrases"] = json!([]);
+                m["triggers"] = json!([]);
+                m["net"] = json!(net);
+            });
+            assert!(read.is_ok(), "{:?}", read.err());
+        }
+        // `report` is refused beside each grant that reads what a person
+        // says or does, or keeps what an app learned, at install; `turns` is
+        // not.
+        for reader in [
+            "hear",
+            "speech",
+            "microphone",
+            "camera",
+            "notes",
+            "remember",
+        ] {
+            refused(
+                changed(move |m, _| m["grants"] = json!(["turns", "report", reader])),
+                "report can't be held beside",
+            );
+        }
+        assert!(
+            changed(|m, _| m["grants"] = json!(["turns", "hear"])).is_ok(),
+            "turns beside hear is not refused"
+        );
+    });
+    // Each is behind its own switch.
+    app_package::with_doctor_switches(true, false, || {
+        refused(
+            changed(|m, _| m["grants"] = json!(["report", "device"])),
+            "not one of the door's",
+        );
+        let turns = changed(|m, _| {
+            m["grants"] = json!(["turns", "device"]);
+            m["phrases"] = json!([]);
+            m["triggers"] = json!([]);
+        });
+        assert!(
+            turns.is_ok(),
+            "turns is behind its own switch: {:?}",
+            turns.err()
+        );
+    });
+    // `conversation` and `model` are not this version's.
+    refused(
+        changed(|m, _| m["grants"] = json!(["conversation", "device"])),
+        "not one of the door's",
+    );
+    refused(
+        changed(|m, _| m["grants"] = json!(["model", "device"])),
+        "not one of the door's",
     );
 }

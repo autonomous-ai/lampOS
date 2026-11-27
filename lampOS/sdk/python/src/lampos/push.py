@@ -221,7 +221,7 @@ def asks_beyond(folder: str | Path, grants: list[str]) -> tuple[str, str] | None
 APP_PUSH_MAX = 4 << 20
 APP_PARTS_MAX = 128
 # The app-only grant a pushed app is never given (`apps.remember`).
-APP_ONLY_GRANTS = ("remember",)
+APP_ONLY_GRANTS = ("remember", "turns", "report")
 
 
 def app_for_push(path: str | Path):

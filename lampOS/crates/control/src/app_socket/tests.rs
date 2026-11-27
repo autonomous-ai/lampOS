@@ -379,3 +379,83 @@ fn took_is_ten_a_second_and_a_panel_cannot_carry_a_line_break_or_a_bidi_mark() {
     }
     let _ = std::fs::remove_dir_all(&apps);
 }
+
+fn install_with_net(apps: &Path, name: &str, grants: Value, net: bool) {
+    install(apps, name, grants, json!([]));
+    let file = apps.join(name).join("current").join("lamp-skill.json");
+    let mut manifest: Value =
+        serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    manifest["net"] = json!(net);
+    std::fs::write(file, manifest.to_string()).unwrap();
+}
+
+#[test]
+fn lamp_doctors_grants_are_an_apps_own_said_in_hello_and_checked_at_a_call() {
+    lamp_skills::app_package::with_doctor_switches(true, true, doctors_grants);
+}
+
+fn doctors_grants() {
+    let apps = folder("doctor");
+    // `turns` and `report` ride with `net`: an app may send what it scored.
+    install_with_net(&apps, "sends", json!(["turns", "report"]), true);
+    let sends = peer_for(&apps, "sends", true).unwrap();
+    assert_eq!(sends.said_grants(), ["turns", "report"]);
+    assert!(sends.grants.is_empty());
+    assert!(sends.may("turns").is_ok() && sends.may("report").is_ok());
+    // An app that did not ask is refused at the call, whatever its other grants.
+    install_with_net(&apps, "reads", json!(["turns"]), false);
+    let reads = peer_for(&apps, "reads", false).unwrap();
+    assert!(reads.may("turns").is_ok());
+    assert!(reads.may("report").unwrap_err().contains("not granted"));
+    // And an old build's grants list holds none of them.
+    install_with_net(&apps, "plain", json!(["speak"]), false);
+    assert!(
+        peer_for(&apps, "plain", false)
+            .unwrap()
+            .may("turns")
+            .is_err()
+    );
+    let _ = std::fs::remove_dir_all(&apps);
+}
+
+#[test]
+fn report_beside_a_reader_is_refused_at_connect() {
+    lamp_skills::app_package::with_doctor_switches(true, true, readers_refused);
+}
+
+fn readers_refused() {
+    let apps = folder("doctor-reader");
+    for reader in [
+        "hear",
+        "speech",
+        "microphone",
+        "camera",
+        "notes",
+        "remember",
+    ] {
+        install_with_net(&apps, "reader", json!(["turns", "report", reader]), false);
+        let why = peer_for(&apps, "reader", false).unwrap_err();
+        assert!(
+            why.contains("report can't be held beside"),
+            "{reader}: {why}"
+        );
+    }
+    install_with_net(&apps, "ok", json!(["turns", "report", "device"]), false);
+    assert!(peer_for(&apps, "ok", false).is_ok());
+    let _ = std::fs::remove_dir_all(&apps);
+}
+
+#[test]
+fn off_an_app_holding_turns_or_report_does_not_connect() {
+    let apps = folder("doctor-off");
+    install_with_net(&apps, "doctor", json!(["turns", "report"]), false);
+    let why = peer_for(&apps, "doctor", false).unwrap_err();
+    assert!(why.contains("does not know"), "{why}");
+    lamp_skills::app_package::with_doctor_switches(true, false, || {
+        assert!(
+            peer_for(&apps, "doctor", false).is_err(),
+            "report is behind its own switch"
+        );
+    });
+    let _ = std::fs::remove_dir_all(&apps);
+}

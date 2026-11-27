@@ -741,6 +741,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
         if let (true, Some(bus)) = (lamp_control::app_yes::on(), &bus) {
             lamp_control::app_triggers::start(bus, shared.clone());
+            lamp_control::app_turns::start(bus, shared.clone());
             // The running apps' tools for Lamp's model (#8386), dark behind
             // LAMP_APP_TOOLS.
             if lamp_control::app_tools::on() {

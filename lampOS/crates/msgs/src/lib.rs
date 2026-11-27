@@ -2795,6 +2795,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(onboarding_topics())
         .chain(online_topics())
         .chain(arrival_topics())
+        .chain(doctor::turn_record_topics())
         .chain(turn_topics())
         .chain(hand_topics())
         .chain(tone_topics())

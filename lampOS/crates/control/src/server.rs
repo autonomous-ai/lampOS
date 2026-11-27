@@ -1349,6 +1349,32 @@ impl Shared {
         true
     }
 
+    /// A finished turn's record (`voice/turn_record`, #8726) is told, as
+    /// `turns.finished`, to every running app whose manifest holds `turns`,
+    /// and to no other. Nothing is told with the apps off. How many were told.
+    pub fn offer_turn(&self, record: &lamp_msgs::doctor::TurnRecord) -> usize {
+        if !(*self.apps_on.lock().expect("apps_on"))() {
+            return 0;
+        }
+        let apps_dir = self.apps_dir.lock().expect("apps_dir").clone();
+        let running = self.apps.lock().expect("apps").1.running();
+        let event = crate::app_turns::turn_event(record);
+        let mut told = 0;
+        for name in running {
+            let holds = crate::app_yes::installed(&apps_dir, &name).is_some_and(|manifest| {
+                manifest
+                    .grants
+                    .iter()
+                    .any(|grant| grant == lamp_skills::app_package::TURNS_GRANT)
+            });
+            if holds {
+                self.tell_client(&crate::app_socket::app_client(&name), &event);
+                told += 1;
+            }
+        }
+        told
+    }
+
     /// The turns apps took, told to the voice by the sink (after the apps'
     /// lock is let go).
     fn tell_took(&self, took: Vec<(String, u64)>) {
@@ -2496,7 +2522,22 @@ async fn connection<S>(
                                 apps: &apps_dir,
                                 state: state.as_deref(),
                             };
+                            // The lamp's own date for a report, read before the
+                            // apps' lock is taken.
+                            let report_day = (frame.get("op").and_then(Value::as_str)
+                                == Some("log.send"))
+                            .then(|| {
+                                let wall_s = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map_or(0, |since| since.as_secs());
+                                shared.door.lock().expect("door").local_day(wall_s)
+                            });
                             let mut apps = shared.apps.lock().expect("apps");
+                            if let Some(day) = report_day {
+                                apps.1.set_report_stamp(
+                                    day.map(|day| (day, crate::app_report::build_number())),
+                                );
+                            }
                             let reply = crate::app_socket::answer(
                                 &mut apps.1,
                                 &place,
@@ -3701,6 +3742,94 @@ mod tests {
         }
     }
 
+    /// #8726: a turn's record is told to a running app that holds `turns`,
+    /// and to no other; it holds no text.
+    #[test]
+    fn a_turn_record_goes_only_to_a_running_app_that_holds_turns() {
+        let apps_dir =
+            std::env::temp_dir().join(format!("lampos-turn-offer-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&apps_dir);
+        for (name, grants) in [
+            ("doctor", json!(["turns", "report"])),
+            ("plain", json!(["hear"])),
+        ] {
+            let dir = apps_dir.join(name).join("current");
+            std::fs::create_dir_all(&dir).unwrap();
+            let manifest = json!({
+                "format": 2, "kind": "app", "name": name, "title": "T", "version": "1.0.0",
+                "min_build": 1, "runtime": {"name": "python", "entry": "src/main.py"},
+                "grants": grants, "triggers": [], "settings": [], "files": []
+            });
+            std::fs::write(dir.join("lamp-skill.json"), manifest.to_string()).unwrap();
+        }
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        *shared.apps_dir.lock().unwrap() = apps_dir.clone();
+        *shared.apps_on.lock().unwrap() = || true;
+        let mut inboxes = Vec::new();
+        for (id, name) in [(9, "doctor"), (10, "plain")] {
+            let (outbox, inbox) = mpsc::unbounded_channel();
+            let (frames, _) = mpsc::channel(FRAMES_QUEUED);
+            let (body_state, _) = watch::channel(None);
+            shared.open.lock().unwrap().insert(
+                id,
+                Open {
+                    client: Some(crate::app_socket::app_client(name)),
+                    outbox,
+                    frames,
+                    events: Default::default(),
+                    phrases: Vec::new(),
+                    grants: Default::default(),
+                    body_state,
+                },
+            );
+            inboxes.push(inbox);
+        }
+        let record = lamp_msgs::doctor::TurnRecord {
+            turn: 3,
+            at_min: 29_000_000,
+            heard_to_first_sound_ms: Some(1_800),
+            cut_ins: None,
+            tool_calls: 0,
+            tool_timeouts: 0,
+            tool_errors: 0,
+            outcome: lamp_msgs::doctor::Outcome::Answered,
+            words_heard: Some(5),
+            words_said: Some(4),
+            heard_wrongly: false,
+            name_missed: false,
+            held_then_repeated: false,
+            failed: Vec::new(),
+            proofs: Vec::new(),
+            route: lamp_msgs::doctor::Route::Unknown,
+            build: 1,
+        };
+        // Not running: nobody is told.
+        assert_eq!(shared.offer_turn(&record), 0);
+        for name in ["doctor", "plain"] {
+            shared.apps.lock().unwrap().1.connection(name, true);
+        }
+        assert_eq!(shared.offer_turn(&record), 1);
+        let event = inboxes[0].try_recv().expect("the doctor is told");
+        assert_eq!(event["ev"], "turns.finished");
+        assert_eq!(event["turn"], 3);
+        assert_eq!(event["outcome"], "answered");
+        assert!(
+            inboxes[1].try_recv().is_err(),
+            "an app without turns is not"
+        );
+        // Whatever it holds, no field of it is text.
+        for (key, value) in event.as_object().unwrap() {
+            assert!(
+                !value.is_string() || ["ev", "outcome", "route"].contains(&key.as_str()),
+                "{key}"
+            );
+        }
+        // Apps off: nobody is told.
+        *shared.apps_on.lock().unwrap() = || false;
+        assert_eq!(shared.offer_turn(&record), 0);
+        let _ = std::fs::remove_dir_all(&apps_dir);
+    }
+
     /// #7415 piece 3b-2b: a trigger the voice holds is offered to an app only
     /// when apps are on, the app is running and its manifest has those exact
     /// words; the app's `app.took` within 3 s, once, is told to the voice.
@@ -4242,6 +4371,8 @@ mod tests {
             client: crate::app_socket::app_client("gym-coach"),
             grants: Default::default(),
             remember: true,
+            net: false,
+            doctor: Default::default(),
         };
         let (outbox, mut answers) = mpsc::unbounded_channel::<Value>();
         let long = Duration::from_secs(60);
@@ -4354,6 +4485,8 @@ mod tests {
             client: crate::app_socket::app_client("gym-coach"),
             grants: Default::default(),
             remember: true,
+            net: false,
+            doctor: Default::default(),
         };
         let gates = shared.remember_gates(&coach);
         assert!(gates.apps && gates.on && gates.granted && gates.private);
@@ -4377,6 +4510,8 @@ mod tests {
             client: crate::app_socket::app_client("gym-coach"),
             grants: Default::default(),
             remember: true,
+            net: false,
+            doctor: Default::default(),
         }
     }
 
@@ -4421,6 +4556,8 @@ mod tests {
         private.store(false, Ordering::SeqCst);
         let ungranted = crate::app_socket::AppPeer {
             remember: false,
+            net: false,
+            doctor: Default::default(),
             ..gym_coach()
         };
         assert_eq!(
@@ -4575,6 +4712,8 @@ mod tests {
             client: crate::app_socket::app_client("gym-coach"),
             grants: Default::default(),
             remember: true,
+            net: false,
+            doctor: Default::default(),
         };
         assert!(shared.remember_gates(&coach).forgetting);
         // Memory comes back: the facts go with no second remove.
@@ -4626,6 +4765,8 @@ mod tests {
             client: crate::app_socket::app_client("gym-coach"),
             grants: Default::default(),
             remember: true,
+            net: false,
+            doctor: Default::default(),
         };
         let (outbox, mut answers) = mpsc::unbounded_channel::<Value>();
         assert!(
