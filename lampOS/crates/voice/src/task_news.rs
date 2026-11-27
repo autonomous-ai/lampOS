@@ -85,14 +85,22 @@ const TOGETHER_ANSWER_LEAST: usize = 120;
 /// Nothing said by or to the lamp for this long before news is told.
 pub const QUIET_US: u64 = 15_000_000;
 /// News of a task's agent that settled waits for a quiet moment at most
-/// this long from when it came in (#8240, the first builder's bar: the
-/// asker hears it within about a minute, and others' talk never holds it
-/// for good). Past it, it is told at the next pause of [`PAUSE_US`] in
-/// anyone's speech, a busy room no longer holds it, and never over the
-/// lamp's own words; a room still talking hears one short line first
-/// ([`News::short`]). Into a room where nobody was seen or heard since it
-/// came in, it still waits as before.
-pub const WAITS_AT_MOST: Duration = Duration::from_secs(60);
+/// this long from when it came in (#8240; ten minutes since #8783, the
+/// product owner's rule of 26 Nov: the lamp never talks into people's
+/// talk, and others' talk still never holds it for good). Past it, it is
+/// its one short line only ([`News::short`]), at the first pause of
+/// [`LONG_PAUSE_US`] in anyone's speech, a busy room no longer holding it,
+/// never over the lamp's own words. Before that, the lamp answering
+/// someone ("Hey Lamp, ...") tells it right after, as "By the way, ..."
+/// ([`TaskNews::overdue`]). Only with someone there now
+/// ([`someone_there`]); else it waits.
+pub const WAITS_AT_MOST: Duration = Duration::from_secs(10 * 60);
+/// News is told only at a pause this long in people's talk: nobody heard
+/// speaking, and no turn, for as long (#8783: a breath between two
+/// people's lines, or a person listening on a call, is not a pause to talk
+/// into); [`talk_paused`]. After the lamp answered someone, its own pause
+/// ([`PAUSE_US`]) is enough: they are talking to it.
+pub const LONG_PAUSE_US: u64 = 5_000_000;
 /// A finished answer this short (in characters, whole) is one short line
 /// already: past [`WAITS_AT_MOST`] it is told as it is, with no short line
 /// first.
@@ -102,6 +110,11 @@ pub const SHORT_FITS_CHARS: usize = 80;
 pub const SHORT_DONE: &str = "Excuse me: the work you handed over is done.";
 pub const SHORT_ASKING: &str = "Excuse me: the work you handed over needs your answer.";
 pub const SHORT_STOPPED: &str = "Excuse me: the work you handed over has stopped.";
+/// The short lines said right after the lamp answered someone while the
+/// news waited (#8783), one for each of the lines above.
+pub const BY_THE_WAY_DONE: &str = "By the way, the work you handed over is done.";
+pub const BY_THE_WAY_ASKING: &str = "By the way, the work you handed over needs your answer.";
+pub const BY_THE_WAY_STOPPED: &str = "By the way, the work you handed over has stopped.";
 /// `on`: news is told at the first pause of [`PAUSE_US`] instead of after
 /// [`QUIET_US`] with no turn (#560). The first builder's bound (20:49 on
 /// #560): a person at the lamp who handed work to it hears the result
@@ -228,9 +241,45 @@ pub fn quiet_for_news(
     });
     speech_paused && since_turn >= PAUSE_US && after_the_lamp
 }
+
+/// Whether people's talk leaves room for news now (#8783: the lamp never
+/// talks into it): at the voice's pause for news (`paused`), and, unless
+/// the lamp answered someone since the news came in (`answered`: they are
+/// talking to it), only once nobody was heard (`last_speech_us`) and no
+/// turn was (`last_turn_us`) for [`LONG_PAUSE_US`]. A sign-in's news, which
+/// the person just asked for, waits only for the voice's pause.
+pub fn talk_paused(
+    paused: bool,
+    answered: bool,
+    now_us: u64,
+    last_turn_us: u64,
+    last_speech_us: u64,
+) -> bool {
+    paused && (answered || now_us.saturating_sub(last_turn_us.max(last_speech_us)) >= LONG_PAUSE_US)
+}
+
 /// Without eyes that say someone is there, something said this recently
-/// says it.
-pub const HEARD_WITHIN_US: u64 = 120_000_000;
+/// says it: about 15 s (#8783, the product owner's rule of 26 Nov: no
+/// sensor holds a person; two minutes, as before, told an empty desk).
+pub const HEARD_WITHIN_US: u64 = 15_000_000;
+
+/// Whether someone is at the lamp now (`now_us`), for its news (#8783): a
+/// face seen (`present`), or anyone heard speaking (`last_speech_us`) or
+/// a line said (`said_at_us`) within [`HEARD_WITHIN_US`]. Nothing heard
+/// since the voice began (`0`) is nobody, so a restart is no one speaking.
+pub fn someone_there(
+    now_us: u64,
+    present: bool,
+    last_speech_us: u64,
+    said_at_us: Option<u64>,
+) -> bool {
+    someone_since(
+        now_us.saturating_sub(HEARD_WITHIN_US).max(1),
+        present,
+        last_speech_us,
+        said_at_us,
+    )
+}
 /// Progress news is told only with this set to `on`, read at start (#752).
 /// Off unless set: without it no decision is subscribed to and no progress
 /// is asked for or kept. `tasks/status` is listened to either way, only for
@@ -1305,27 +1354,29 @@ impl TaskNews {
         Some(news)
     }
 
-    /// Whether the news first in line has waited [`WAITS_AT_MOST`] since it
-    /// came in, and how it is told now (#8240): its short line first, if
-    /// it has one and none was said; after that the whole news only once
-    /// the person spoke to the lamp (`said_at_us`, the voice's clock)
-    /// since the short line. None for progress, for news told once more
-    /// (the person speaking always wins, #4342) and for news that has not
-    /// waited so long: those wait as before. Never blocks.
-    pub fn overdue(&self, said_at_us: Option<u64>) -> Option<Overdue> {
+    /// Whether the news first in line is told now past the gates news
+    /// waits for, and how (#8240, #8783): once it has waited
+    /// [`WAITS_AT_MOST`] since it came in, or once the lamp answered someone
+    /// since (`answered_us`, the voice's clock: "Hey Lamp, ..." while it
+    /// waits). Its short line first, if it has one and none was said ("By
+    /// the way, ..." after an answer); after that the whole news only once
+    /// the lamp answered someone since the short line. None for progress,
+    /// for news told once more (the person speaking always wins, #4342) and
+    /// for news neither waited so long nor asked over: those wait as
+    /// before. Never blocks.
+    pub fn overdue(&self, answered_us: Option<u64>) -> Option<Overdue> {
         let front = self.waiting.front()?;
         if front.progress.is_some() || self.retelling_first() {
             return None;
         }
-        if self.found.get(&front.key)?.elapsed() < WAITS_AT_MOST {
-            return None;
-        }
+        let waited = self.found.get(&front.key)?.elapsed() >= WAITS_AT_MOST;
         match (self.short_said.get(&front.key), &front.short) {
-            (Some(at), _) => said_at_us
-                .is_some_and(|said| said > *at)
+            (Some(at), _) => answered_us
+                .is_some_and(|answered| answered > *at)
                 .then_some(Overdue::Whole),
-            (None, Some(note)) => Some(Overdue::Short(note.clone())),
-            (None, None) => Some(Overdue::Whole),
+            (None, Some(note)) if answered_us.is_some() => Some(Overdue::Short(by_the_way(note))),
+            (None, Some(note)) => waited.then(|| Overdue::Short(note.clone())),
+            (None, None) => (waited || answered_us.is_some()).then_some(Overdue::Whole),
         }
     }
 
@@ -2199,6 +2250,27 @@ fn short_note(data: &Value) -> Option<String> {
     Some(unprompted(&format!(
         "People near you are still talking. Say only these words, once, and nothing more, then let them go on: \"{line}\""
     )))
+}
+
+/// The short line `short` ([`short_note`]) as said right after the lamp
+/// answered someone (#8783): "By the way, ...", with nothing about a room
+/// still talking. A line of no known kind is left as it is.
+fn by_the_way(short: &str) -> String {
+    [
+        (SHORT_DONE, BY_THE_WAY_DONE),
+        (SHORT_ASKING, BY_THE_WAY_ASKING),
+        (SHORT_STOPPED, BY_THE_WAY_STOPPED),
+    ]
+    .into_iter()
+    .find(|(line, _)| short.contains(line))
+    .map_or_else(
+        || short.to_owned(),
+        |(_, line)| {
+            unprompted(&format!(
+                "Say only these words, once, and nothing more: \"{line}\""
+            ))
+        },
+    )
 }
 
 pub(crate) fn unprompted(words: &str) -> String {
@@ -5956,16 +6028,20 @@ mod tests {
 
     /// #8240: news that waited less than [`WAITS_AT_MOST`] waits as before;
     /// past it, a room still talking hears its short line first, and the
-    /// whole news only once the person spoke to the lamp after that line.
+    /// whole news only once the lamp answered someone after that line.
     /// News with no short line is told whole; progress and news told once
     /// more wait as before.
     #[test]
     fn news_past_its_wait_is_told_short_then_whole_once_the_person_speaks() {
-        let early =
-            TaskNews::waiting_for_test(settled_news(Some("short")), Duration::from_secs(59));
+        let early = TaskNews::waiting_for_test(
+            settled_news(Some("short")),
+            WAITS_AT_MOST - Duration::from_secs(1),
+        );
         assert_eq!(early.overdue(None), None);
-        let mut late =
-            TaskNews::waiting_for_test(settled_news(Some("short")), Duration::from_secs(61));
+        let mut late = TaskNews::waiting_for_test(
+            settled_news(Some("short")),
+            WAITS_AT_MOST + Duration::from_secs(1),
+        );
         assert_eq!(late.overdue(None), Some(Overdue::Short("short".into())));
         late.short_told(1_000);
         assert_eq!(
@@ -5975,7 +6051,8 @@ mod tests {
         assert_eq!(late.overdue(None), None, "the short line is said once");
         assert_eq!(late.overdue(Some(900)), None, "spoken before it");
         assert_eq!(late.overdue(Some(1_001)), Some(Overdue::Whole));
-        let fits = TaskNews::waiting_for_test(settled_news(None), Duration::from_secs(61));
+        let fits =
+            TaskNews::waiting_for_test(settled_news(None), WAITS_AT_MOST + Duration::from_secs(1));
         assert_eq!(fits.overdue(None), Some(Overdue::Whole));
         let mut progress = settled_news(Some("short"));
         progress.progress = Some(ProgressOf {
@@ -5985,12 +6062,15 @@ mod tests {
             run: 1,
         });
         assert_eq!(
-            TaskNews::waiting_for_test(progress, Duration::from_secs(61)).overdue(None),
+            TaskNews::waiting_for_test(progress, WAITS_AT_MOST + Duration::from_secs(1))
+                .overdue(None),
             None
         );
-        let retold =
-            TaskNews::waiting_for_test(settled_news(Some("short")), Duration::from_secs(61))
-                .retelling_for_test(&["s1:2:4"]);
+        let retold = TaskNews::waiting_for_test(
+            settled_news(Some("short")),
+            WAITS_AT_MOST + Duration::from_secs(1),
+        )
+        .retelling_for_test(&["s1:2:4"]);
         assert_eq!(retold.overdue(None), None);
     }
 
@@ -6092,5 +6172,29 @@ mod tests {
             Some("s1:2:4".into()),
             "untold, it waits"
         );
+    }
+
+    /// #8783 (a): news is told only at a pause of [`LONG_PAUSE_US`] in
+    /// anyone's speech and any turn: two voices leaving 4.9 s between lines
+    /// hold it, 5 s lets it out; after the lamp answered someone, the
+    /// voice's own pause for news is enough; and never while the voice's
+    /// pause is not there at all.
+    #[test]
+    fn news_past_its_wait_is_told_only_at_a_five_second_pause() {
+        let now: u64 = 1_000_000_000;
+        let paused =
+            |gap: u64, answered: bool| talk_paused(true, answered, now, now - gap, now - gap);
+        assert!(!paused(1_000_000, false), "a breath between two voices");
+        assert!(!paused(4_900_000, false), "under five seconds");
+        assert!(paused(LONG_PAUSE_US, false), "five seconds");
+        assert!(paused(1_000_000, true), "the lamp answered someone");
+        assert!(!talk_paused(false, true, now, 0, 0));
+        assert!(
+            !talk_paused(true, false, now, now - 6_000_000, now - 2_000_000),
+            "speech after the last turn"
+        );
+        // Nothing heard since the voice began is nobody, early on too.
+        assert!(!someone_there(5_000_000, false, 0, None));
+        assert!(someone_there(5_000_000, false, 4_000_000, None));
     }
 }

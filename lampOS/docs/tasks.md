@@ -759,10 +759,37 @@ that fits one short line is told as it is. Into a room where nobody was
 seen or heard since it came in (`task_news::someone_since`), it waits as
 before. Before the minute, nothing changes.
 
+**Since #8783** (the product owner's rule of 26 Nov: no sensor holds a
+person, and the lamp never talks into people's talk), the wait is ten
+minutes, not one, and:
+
+- Any news (but a sign-in's, which the person just asked for) is told only
+  at a pause of 5 s in anyone's speech with no turn for as long
+  (`task_news::LONG_PAUSE_US`, `task_news::talk_paused`): a breath between
+  two people's lines, or a person listening on a call, is no pause to talk
+  into. After the lamp answered someone since the news came in, the
+  voice's pause for news is enough: they are talking to it.
+- Past ten minutes, the news is its short line only, whatever the room, at
+  that pause. An answer that fits one short line is still told as it is.
+- Before it, the lamp answering someone ("Hey Lamp, ...": a turn it did not
+  begin itself, heard with audio) since the news came in tells it right
+  after, at the voice's pause for news (1 s, 3 s after the lamp's words):
+  "By the way, the work you handed over is done." (`BY_THE_WAY_DONE`,
+  `BY_THE_WAY_ASKING`, `BY_THE_WAY_STOPPED`) to a room still talking, the
+  whole news to a quiet one. After a short line, the whole news follows
+  once the lamp answers someone again, not at anyone's next line.
+- Any news is told only with someone there now: a face in view, or anyone
+  heard speaking within about 15 s (`task_news::someone_there`,
+  `HEARD_WITHIN_US`). Otherwise it waits, untold, until someone is. A
+  reminder and a skill run's held write keep their two minutes
+  (`reminders::HEARD_WITHIN_US`).
+
 | Limit | Value | Where |
 |---|---|---|
-| Wait for a quiet room, at most | 60 s from when the voice had the news | `task_news::WAITS_AT_MOST` |
-| Pause it is told at after that | 1 s with nobody heard speaking, the turn over as long | `task_news::PAUSE_US` (unchanged) |
+| Wait for a quiet room, at most | 10 min from when the voice had the news (60 s before #8783) | `task_news::WAITS_AT_MOST` |
+| Pause in talk it is told at | 5 s with nobody heard speaking and no turn (1 s before #8783) | `task_news::LONG_PAUSE_US` |
+| Pause after the lamp answered someone | 1 s with nobody heard speaking, the turn over as long | `task_news::PAUSE_US` (unchanged) |
+| Someone there | a face, or anyone heard within 15 s (2 min before #8783) | `task_news::HEARD_WITHIN_US` |
 | After the lamp's own words | 3 s with nobody starting | `task_news::AFTER_LAMP_US` (unchanged) |
 | An answer that is one short line already | at most 80 characters, whole | `task_news::SHORT_FITS_CHARS` |
 | Short lines said | one for each news, once | `TaskNews::short_told` |
@@ -7486,12 +7513,15 @@ used only to say it.
   settled observation of each task, if it was seen in this boot within the
   last 12 hours and has not been told. The coordinator tells it as a turn the
   lamp begins itself (basis `lamp_tells_news`, record `task_news`) when the
-  eyes say someone is at the lamp, or something was said to or by it within
-  two minutes; nothing has been said for 15 s; nothing is owed or being
+  eyes say someone is at the lamp, or anyone was heard speaking within about
+  15 s (`task_news::someone_there`, `HEARD_WITHIN_US`; two minutes before
+  #8783 told an empty desk); nothing has been said for 15 s; nothing is owed or being
   heard; and the room is not busy. With `LAMP_TASK_NEWS_AT_PAUSE=on` (#560,
   off unless set) the 15 s is the first pause of a second instead: nobody
   heard speaking for 1 s and the lamp's last turn over for as long, as a
-  due reminder waits (`task_news::quiet_for_news`, `PAUSE_US`). After the
+  due reminder waits (`task_news::quiet_for_news`, `PAUSE_US`); since
+  #8783, 5 s with nobody heard and no turn unless the lamp answered someone
+  since the news came in ("News that waited a minute" above). After the
   lamp's own words it waits 3 s with nobody starting (`AFTER_LAMP_US`): 1 s
   after the lamp stops is the person's turn to answer it, and someone who
   starts then has their line, the news waiting for its end and 1 s more

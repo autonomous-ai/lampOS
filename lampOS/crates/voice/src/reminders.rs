@@ -300,13 +300,17 @@ pub const LEASE_US: u64 = 750_000;
 /// twelve hours late, was never said and stayed pending).
 pub const OVERDUE_MS: u64 = 60 * 60_000;
 
-/// Someone is at the lamp, as for the news: the eyes say a face is there
-/// (`present`), or a person said something within the last two minutes. A
-/// TV's speech counts too, as it does for the news.
+/// Without eyes that say someone is there, something said this recently
+/// says it, for a reminder and a skill run's held write: two minutes, as
+/// task news had it before #8783 (its own is about 15 s now,
+/// `task_news::HEARD_WITHIN_US`).
+pub(crate) const HEARD_WITHIN_US: u64 = 120_000_000;
+
+/// Someone is at the lamp: the eyes say a face is there (`present`), or a
+/// person said something within the last two minutes
+/// ([`HEARD_WITHIN_US`]). A TV's speech counts too.
 pub(crate) fn someone_here(present: bool, said_at_us: Option<u64>, now_us: u64) -> bool {
-    present
-        || said_at_us
-            .is_some_and(|at| now_us.saturating_sub(at) < crate::task_news::HEARD_WITHIN_US)
+    present || said_at_us.is_some_and(|at| now_us.saturating_sub(at) < HEARD_WITHIN_US)
 }
 
 /// The overdue reminder last said to be waiting for someone, so the
