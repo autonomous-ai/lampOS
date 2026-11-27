@@ -29,8 +29,14 @@ The rules are as phase 0 has them on #6543, with the first builder's
 seventh line. The lead approved all seven, adding to the seventh that the
 lamp also says once when the opt-in is turned off.
 
-1. **The opt-in is off by default.** It is the owner's yes on that lamp,
-   given in the app or spoken. `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
+1. **The opt-in is off by default.** It is a yes on that lamp, given in
+   the app or spoken at the lamp by anyone: one spoken ask turns desk
+   noticing on and one turns it off, with no mouth seen, no owner match, no
+   voice likeness and no offer first (the owner's call on #7767,
+   c7210153642, 27 Nov: "Just one ask and the lamp can turn on and off,
+   not mouth or owner check"). Only a line spoken at the lamp counts
+   (`heard`); one nobody spoke (a skill's, a written turn's) is refused
+   (`seen_yes::NOT_SPOKEN`). `LAMP_NOTICING_BY_DEFAULT=on` (#7767,
    switches.md; off unless set, in no unit) turns a missing
    `seen-activity.json` into a yes nobody gave (`"by":"default"`, no
    time), by `lamp_msgs::consent::allowed`'s one rule, shared with face
@@ -49,14 +55,15 @@ lamp also says once when the opt-in is turned off.
    off and on leave them as they are. The stop's answer counts face reads
    too: with only faces on it says it stopped, in its own line
    (`seen_yes::STOPPED_FACES`, since lamp-seen says back only seen
-   activity's change). `look_at_my_desk` ("start looking again") keeps the
-   owner's own spoken yes with no offer and no "turn it on in the app",
+   activity's change). `look_at_my_desk` ("start looking again") keeps
+   anyone's spoken ask with no offer and no "turn it on in the app",
    turning a no in either file back to a yes, and says it is on already
    only when both were (`LOOKING_FACES` when only faces come back). With
    both on already, anyone's ask is told it is on already and nothing is
-   written, never "only the owner can turn this on": nothing is turned on
-   (lamp-06c1's re-row of #8674, 26 Nov, Q9); a guest's ask with either a
-   kept no is still refused, and anyone's stop still keeps a no. On the
+   written (lamp-06c1's re-row of #8674, 26 Nov, Q9); anyone's stop still
+   keeps a no, under the mark's lock. With the switch off the same one
+   spoken ask keeps seen activity's yes, with or without the voice's offer
+   before it. On the
    second route, a heard line naming the looking or the desk
    (`seen_yes::STATE_WORDS`: "look", "watching", "notice", "see",
    "camera", "desk", "eye", "eyes" and the like, one word enough, so a line
@@ -1216,7 +1223,7 @@ touches nothing, and the eyes serve no link.
 
 | Item | What | When |
 |---|---|---|
-| Giving the yes | Built in #6912 (onboarding.md "Seen activity"): the voice's offer naming the server (only with `LAMP_SEEN_VOICE_OFFER=on`, off in the product, where the yes comes from the app), counted only when played whole and uncut, then only the owner's spoken yes in the very next turn writes `seen-activity.json`; the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`; removal on every forget and "stop looking" (Fourteen's design on #6543; the PM's wording). Owed: the backend's written retention confirmation behind "deleted once they're checked" | before the switch goes on, with #6912's reads and that confirmation |
+| Giving the yes | Built in #6912 (onboarding.md "Seen activity"): the voice's offer naming the server (only with `LAMP_SEEN_VOICE_OFFER=on`, off in the product, where the yes comes from the app), counted only when played whole and uncut, then a spoken yes in the very next turn wrote `seen-activity.json` (since the owner's call on #7767, c7210153642, anyone's one spoken ask writes it, with no offer before it); the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`; removal on every forget and "stop looking" (Fourteen's design on #6543; the PM's wording). Owed: the backend's written retention confirmation behind "deleted once they're checked" | before the switch goes on, with #6912's reads and that confirmation |
 | Posture's on line wording | The posture line (`said_back::POSTURE_ON_LINE`, above) is gated in code but awaits the PM's wording | before `LAMP_SEEN_POSTURE` is on anywhere |
 | The more doings' on line wording | `said_back::MORE_ON_LINE` and `POSTURE_MORE_ON_LINE` (above) are gated in code but await the PM's wording | before `LAMP_SEEN_MORE_DOINGS` is on anywhere |
 | Posture at 320×240 | A slump read on `humans/posture` from frames sent at 320×240 (every frame is, above) against V1's 640×480, to see whether the 3D lifter's scale changes RULA (above) | with the lamp rows |
