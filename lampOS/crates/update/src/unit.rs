@@ -229,8 +229,9 @@ mod tests {
     }
 
     /// #8615: the ring's day ceiling is one value, the product unit's, raised
-    /// from 24 to 60; the hardware contract allows at most 120, and the
-    /// night stays under Actions' light cap of 24.
+    /// from 24 to 60, then eased to 30 because owners found 60 glaring; the
+    /// hardware contract allows at most 120, and the night stays under
+    /// Actions' light cap of 24.
     #[test]
     fn the_product_ring_ceiling_is_the_day_default_within_the_contract() {
         let exec = include_str!("../../../deploy/product/lamp-voice.service")
@@ -244,7 +245,7 @@ mod tests {
             .unwrap()
             .parse()
             .unwrap();
-        assert_eq!(value, 60, "{exec}");
+        assert_eq!(value, 30, "{exec}");
         assert!(value <= 120);
         assert_eq!(exec.matches("--ring-channel-ceiling").count(), 1, "{exec}");
     }

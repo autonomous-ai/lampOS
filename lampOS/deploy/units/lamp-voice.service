@@ -34,7 +34,7 @@ UMask=0077
 # (lampOS/docs/failure-notices.md), so a lamp moved from V1 says why it can't answer: a refused key, a spent
 # allowance, no network (#2943). The folder is the one lamp-keeper prepare fills from the product's pins, not
 # the product's under /opt/lampOS, which the package does not carry. A line it cannot load is a sigh.
-ExecStart=/opt/lampOS/releases/@VOICE_SHA256@/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --ring-channel-ceiling 60 --failure-notice-dir /var/lib/lampOS/voice/notices --failure-notice-language en-US @VOICE_OPTIONS@
+ExecStart=/opt/lampOS/releases/@VOICE_SHA256@/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --ring-channel-ceiling 30 --failure-notice-dir /var/lib/lampOS/voice/notices --failure-notice-language en-US @VOICE_OPTIONS@
 # Microphone and speaker threads may not wait behind other work (lamp-4ace, 2026-10-13).
 CPUSchedulingPolicy=rr
 CPUSchedulingPriority=20
