@@ -4701,6 +4701,71 @@ fn an_install_restarts_no_gateway_switched_away_during_its_wait() {
     );
 }
 
+/// One agent gateway at a time (#8693's two-gateway window): the
+/// one-shot's last check and its restart are made under
+/// `hermes_gateway::START_LOCK`. With lamp-update starting Hermes's
+/// gateway this instant (the lock held), or Hermes's start begun but not
+/// yet seen by systemd (Hermes enabled, still `inactive`), it never
+/// restarts OpenClaw's gateway; with neither, it does.
+#[test]
+fn an_install_restarts_no_gateway_while_hermes_is_being_started() {
+    for case in ["lock held", "hermes enabled", "neither"] {
+        let lamp = Lamp::new();
+        lamp.harness_there();
+        let mut systemd = Fake::default();
+        after_round_with(
+            lamp.root(),
+            &lamp.records(),
+            sk(true),
+            Gateway::Wanted,
+            true,
+            &mut systemd,
+            &mut Runs::new(&lamp).runner(),
+            1,
+            Ok(crate::hermes_schedule::Window::Reached),
+            &mut quiet(),
+        );
+        let held = (case == "lock held")
+            .then(|| hermes_gateway::start_lock(&lamp.records()).expect("the start lock free"));
+        if case == "hermes enabled" {
+            let wants = lamp.at(hermes_gateway::WANTS);
+            fs::create_dir_all(wants.parent().unwrap()).unwrap();
+            std::os::unix::fs::symlink(
+                format!("/etc/systemd/system/{}", hermes_gateway::UNIT),
+                wants,
+            )
+            .unwrap();
+        }
+        let runs = Runs::new(&lamp);
+        let mut said = Vec::new();
+        let done = install_said(
+            lamp.root(),
+            &lamp.records(),
+            &mut runs.runner(),
+            &mut || 2,
+            &mut |line: &str| said.push(line.to_owned()),
+            &kit(),
+            &mut || said_is("openclaw"),
+        )
+        .unwrap()
+        .unwrap();
+        drop(held);
+        assert_eq!(done.install, "installed", "{case}: {said:#?}");
+        let restarts = gateway_starts(&runs);
+        let why: Vec<_> = said
+            .iter()
+            .filter(|line| line.contains(hermes_gateway::UNIT) && line.contains("not restarted"))
+            .collect();
+        if case == "neither" {
+            assert!(!restarts.is_empty(), "{case}: {said:#?}");
+            assert!(why.is_empty(), "{case}: {said:#?}");
+        } else {
+            assert_eq!(restarts, Vec::<String>::new(), "{case}: {said:#?}");
+            assert_eq!(why.len(), 1, "{case}: {said:#?}");
+        }
+    }
+}
+
 /// One agent gateway at a time, an OpenClaw there: a round that doesn't
 /// want the gateway asks no one-shot for the gateway block (written and
 /// checked through the running gateway, then restarted on it); one that

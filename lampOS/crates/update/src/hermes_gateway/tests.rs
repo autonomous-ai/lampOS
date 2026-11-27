@@ -1164,6 +1164,67 @@ mod one_gateway {
         assert!(!systemd.ever_both);
     }
 
+    /// The start lock (#8693's two-gateway window): while OpenClaw's
+    /// one-shot holds `START_LOCK` (its last check and its restart), a
+    /// look leaves Hermes's gateway for the next look, said once per look;
+    /// the next look, the lock free, starts it. A switch is delayed by one
+    /// look at most, never lost, and the two never run at once.
+    #[test]
+    fn a_busy_start_lock_delays_hermes_to_the_next_look_never_loses_it() {
+        let (lamp, mut systemd) = lamp_with_both(false, false);
+        let records = lamp
+            .root()
+            .join(crate::install::RECORDS.trim_start_matches('/'));
+        let mut keeper = keeper(false);
+        let held = start_lock(&records).expect("the start lock free");
+        let mut said_lines = Vec::new();
+        let mut run = |_: &[String]| Ok::<String, String>(String::new());
+        keeper.look(
+            lamp.root(),
+            &mut systemd,
+            said(Some("hermes")),
+            &mut run,
+            &mut |line: &str| said_lines.push(line.to_owned()),
+        );
+        assert_eq!(systemd.is(UNIT), "inactive", "{:?}", systemd.log);
+        assert!(
+            said_lines
+                .iter()
+                .any(|line| line.contains("not started yet") && line.contains("one-shot")),
+            "{said_lines:#?}"
+        );
+        drop(held);
+        look(&mut keeper, &lamp, &mut systemd, said(Some("hermes")));
+        assert_eq!(systemd.is(UNIT), "active", "{:?}", systemd.log);
+        assert!(
+            start_lock(&records).is_some(),
+            "the lock let go after the start"
+        );
+        assert!(!systemd.ever_both, "{:?}", systemd.log);
+    }
+
+    /// Hermes's start re-reads OpenClaw's state under the start lock: an
+    /// OpenClaw gateway up by then (a restart that landed after the
+    /// keeper's own check) holds Hermes's start.
+    #[test]
+    fn hermes_never_starts_beside_an_openclaw_up_at_its_start() {
+        let (lamp, mut systemd) = lamp_with_both(true, false);
+        let mut said_lines = Vec::new();
+        keep_gateway(
+            lamp.root(),
+            &mut systemd,
+            Gateway::Wanted,
+            false,
+            &mut |line: &str| said_lines.push(line.to_owned()),
+        );
+        assert_eq!(systemd.is(UNIT), "inactive", "{said_lines:#?}");
+        assert!(!systemd.ever_both, "{:?}", systemd.log);
+        assert!(
+            said_lines.iter().any(|line| line.contains("still runs")),
+            "{said_lines:#?}"
+        );
+    }
+
     /// A round as main runs it, Hermes the default with OpenClaw's gateway
     /// up: `round_gateways` first, then Hermes's step, then OpenClaw's.
     /// OpenClaw's is stopped before Hermes's is started; with that stop
