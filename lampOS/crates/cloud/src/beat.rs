@@ -451,4 +451,134 @@ mod tests {
             "without the bus, today's body"
         );
     }
+
+    /// #8881: with the switch on, the engines part of the very body sent is
+    /// said once at the first ping and again only when it changes; never with
+    /// the switch off. The line holds `engines` and `harness` alone: nothing
+    /// of the identity, the key or the rest of the body.
+    #[tokio::test]
+    async fn the_heartbeat_s_engines_are_said_once_and_again_on_a_change() {
+        use lamp_msgs::UpdateStatus;
+        const PREFIX: &str = "lamp-cloud: the heartbeat says ";
+        let identity = Identity {
+            device: "lamp-device-zz91".into(),
+            version: "build-ver-qq77".into(),
+            id: "device-id-xx55".into(),
+            mac: "mac-ww33".into(),
+            timezone: "Zone/Tz-vv22".into(),
+            local_ip: "10.77.66.55".into(),
+        };
+        let run = |engines: Option<lamp_bus::Bus>, identity: Identity| async move {
+            let (base, requests) = backend(vec![]).await;
+            let (accounts, watched) = watch::channel(Some(account(&base)));
+            let (me_tx, me) = watch::channel(identity);
+            let lines = Arc::new(Mutex::new(Vec::<String>::new()));
+            let said = lines.clone();
+            let pinging = tokio::spawn(async move {
+                let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
+                pings(
+                    accounts,
+                    me,
+                    "voice-key-SECRET-uu11".into(),
+                    Duration::from_millis(10),
+                    &mut say,
+                    &mut |_: &Account| {},
+                    &mut |_: &ping::Reply| {},
+                    None,
+                    engines,
+                )
+                .await;
+            });
+            (requests, watched, me_tx, lines, pinging)
+        };
+        let pings_at_least = |requests: Arc<Mutex<Vec<String>>>, n: usize| async move {
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while requests.lock().unwrap().len() < n {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+            })
+            .await
+            .unwrap();
+        };
+        // On: said once over several unchanged pings.
+        let (_root, bus, _kept) = ping::said_status(true);
+        let (requests, watched, me_tx, lines, pinging) =
+            run(Some(bus.clone()), identity.clone()).await;
+        pings_at_least(requests.clone(), 4).await;
+        let first = r#"{"engines":{"hermes":{"version":"0.9.1","installed":true},"openclaw":{"version":"2026.11.2","installed":true}},"harness":{"version":"1.4.0","installed":true}}"#;
+        let ours = |lines: &Arc<Mutex<Vec<String>>>| -> Vec<String> {
+            lines
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|line| line.starts_with(PREFIX))
+                .cloned()
+                .collect()
+        };
+        let parts = |line: &str| -> serde_json::Value {
+            serde_json::from_str(line.strip_prefix(PREFIX).unwrap()).unwrap()
+        };
+        let said = ours(&lines);
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert_eq!(
+            parts(&said[0]),
+            serde_json::from_str::<serde_json::Value>(first).unwrap()
+        );
+        // A changed identity alone changes nothing said.
+        me_tx.send_modify(|me| me.local_ip = "10.77.66.56".into());
+        let seen = requests.lock().unwrap().len();
+        pings_at_least(requests.clone(), seen + 3).await;
+        assert_eq!(ours(&lines).len(), 1, "{:?}", ours(&lines));
+        // Hermes moves on: said again, once.
+        let mut says = bus
+            .publisher_declared(UpdateStatus::TOPIC, &UpdateStatus::declaration(), "update")
+            .unwrap();
+        let mut next: UpdateStatus = bus
+            .latest(UpdateStatus::TOPIC)
+            .unwrap()
+            .unwrap()
+            .parse()
+            .unwrap();
+        next.engines
+            .as_mut()
+            .unwrap()
+            .get_mut("hermes")
+            .unwrap()
+            .version = Some("0.9.2".into());
+        says.publish_json(0, &next).unwrap();
+        let seen = requests.lock().unwrap().len();
+        pings_at_least(requests.clone(), seen + 4).await;
+        drop(watched);
+        pinging.await.unwrap();
+        let said = ours(&lines);
+        assert_eq!(said.len(), 2, "{said:?}");
+        assert_eq!(parts(&said[1])["engines"]["hermes"]["version"], "0.9.2");
+        // Only `engines` and `harness`, and nothing of the rest.
+        for line in &said {
+            let keys: Vec<String> = parts(line).as_object().unwrap().keys().cloned().collect();
+            assert_eq!(keys, ["engines", "harness"], "{line}");
+            for secret in [
+                "lamp-device-zz91",
+                "build-ver-qq77",
+                "device-id-xx55",
+                "d-42",
+                "mac-ww33",
+                "Zone/Tz-vv22",
+                "10.77.66.5",
+                "voice-key",
+                "SECRET",
+                "s3cret",
+                "working",
+                "voice_input_mode",
+            ] {
+                assert!(!line.contains(secret), "{secret} in {line}");
+            }
+        }
+        // Off: never said.
+        let (requests, watched, _me_tx, lines, pinging) = run(None, identity).await;
+        pings_at_least(requests.clone(), 4).await;
+        drop(watched);
+        pinging.await.unwrap();
+        assert!(ours(&lines).is_empty(), "{:?}", ours(&lines));
+    }
 }
