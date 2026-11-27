@@ -768,13 +768,22 @@ either's). One frame and one blink can serve both.
 - **The window** (`pose/window.rs`), V1's rules (`pose.py` `_aggregate`):
   - a sample is bad when `risk_level` is 2 or more, or any region's
     subscore on either side is 4 or more;
-  - `bad_share` is the share of bad samples over the last ten minutes,
-    said only over at least 3 samples (V1's minimum; V1 said 0 under it);
+  - the window is the newest two samples, a minute of checks 30 s apart
+    (the owner's call on #8377, 27 Nov: "we should tell user when they
+    slump for like 1m (two posture check right?). Which health check only
+    tell user when they are slump for 10m? thay is too late"; it was ten
+    minutes and at least 3 samples, V1's minimum). A sample older than
+    120 s (`window::KEPT_US`, two of a hot board's one-a-minute checks)
+    no longer counts, so one check missed still pairs with the one before;
+  - `bad_share` is the share of bad samples over those two, 0, 0.5 or 1,
+    said only over two samples (V1 said 0 under its minimum);
   - `region` is the region most often high among the bad samples, with
     ties going to neck, trunk, upper arm, then lower arm. Wrist counts
     toward a bad sample, as in V1, but is never the region: the server
     fixes it at 1;
-  - `window_s` is how long this sitting has been watched, at most 600 s;
+  - `window_s` is the time the window's checks stand for, each its 30 s:
+    the older sample's age and 30 s, at most 60 s, so two checks 30 s
+    apart say 60, the window full;
   - a partial answer (`ergo.partial: true`: the hips hidden, the upper body
     scored alone) is bad only when the neck subscore on either side is 4
     or more, and its region can only be neck. The server fixes trunk and
@@ -793,19 +802,20 @@ either's). One frame and one blink can serve both.
   if the gate opens again within them, and is forgotten after.
 - **Said on `humans/posture`** (`lamp_msgs/HumanPosture` v1:
   `{window_s, bad_share, region}`) every 30 s while posture's gate is
-  open and the window holds at least 3 samples: as soon as the sitting's
-  third sample lands, then every 30 s. Closed, the topic says nothing and
-  its last value runs out, so no old sample is said while the privacy is
-  on. **Under 3 samples, nothing is said either** (#6839's and #6660's
+  open and the window holds its two samples: as soon as the sitting's
+  second sample lands (30 s into the sitting), then every 30 s. Closed,
+  the topic says nothing and its last value runs out, so no old sample is
+  said while the privacy is on. **Under 2 samples, nothing is said
+  either** (#6839's and #6660's
   reviews): frames not going out (the opt-in off, the slide shut), the
   server busy or failing, no body found, the sitting just begun, or the
   window just wiped (the privacy, sleep, `room/stood_up`, or
   a closing longer than 120 s).
   The topic runs out, and its one reader, Posture (`skills/posture`, V1's
   posture reminder, split from Sit back by the owner's call of 23 Nov),
-  says nothing until a value says the window full (`window_s` above 599)
-  and at least 0.6 bad: a `bad_share` of 0 is said only over at least 3
-  samples. Sit back reads no `humans/posture`.
+  says nothing until a value says the window full (`window_s` above 59)
+  and at least 0.6 bad, which over two checks is both bad: a `bad_share`
+  of 0 is said only over two samples. Sit back reads no `humans/posture`.
 - **Health.** `diagnostics` says `sends: activity+pose` (in place of
   `activity`), and adds `pose` (`idle`, `sending`
   or `backing_off`), the counts sent, answered, with no body, busy, failed
@@ -885,9 +895,9 @@ the owner onto someone who takes the seat:
   #6543; the keep holds timers only (`keep::Away::timer`), nothing about
   a person.
 - **The bounds:** `room/stood_up` or a forget wipes both at once; nobody
-  at the desk for 120 s wipes both (`keep::KEEP_US`); posture's samples
-  age out of its ten-minute window, so after 10 minutes it holds only the
-  one sitting now. Held without a face (`LAMP_SEEN_HOLDS_SITTING`), the
+  at the desk for 120 s wipes both (`keep::KEEP_US`); posture's window
+  is its newest two samples, so it holds only the one sitting now within
+  a minute. Held without a face (`LAMP_SEEN_HOLDS_SITTING`), the
   sitting ends when, after the face was lost and an answer with no close
   person, a face comes into view under another passing id than the one it
   was open on (`hold::End::OtherFace`, which wipes both and starts the
@@ -907,8 +917,8 @@ the owner onto someone who takes the seat:
 
 On lamp-06c1's run 3 (16 Nov) the gate closed four times in eight minutes
 on brief misreads and the face lost for a moment, and each closing forgot
-the posture window. With 3 samples wanted and one each 30 s, posture was
-almost never said. So a closing that is not one of those that wipe at
+the posture window. With 3 samples wanted then and one each 30 s, posture
+was almost never said. So a closing that is not one of those that wipe at
 once keeps the posture window and the doing timers, in memory only, for
 up to 120 s (`keep.rs`, `KEEP_US`):
 
@@ -933,7 +943,8 @@ up to 120 s (`keep.rs`, `KEEP_US`):
   (`Why::OtherFace`), so a second person within the 120 s never takes on
   the first one's window or timers (the Reviewer-lead's P2 on #7251).
   Past 120 s both are wiped, as any closing wiped them before. The
-  posture window's samples older than its ten minutes still age out.
+  posture window's samples older than 120 s (`window::KEPT_US`) still
+  age out.
 
   | Carry rule | Value | Source |
   |---|---|---|
@@ -1131,8 +1142,8 @@ names"). On, they name it.
 | A posture frame handed to its socket | `posture sample sent: 7650 bytes` |
 | Its answer | `posture sample answered: scored, 640 ms`, or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
 | Its answer, with labels | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms` (`score 3, risk 2, partial, bad, …` on a partial answer) |
-| `humans/posture` said | `posture said: window 93 s, 4 samples` |
-| `humans/posture` said, with labels | `posture said: window 93 s, 4 samples, bad_share 0.75, region neck` |
+| `humans/posture` said | `posture said: window 60 s, 2 samples` |
+| `humans/posture` said, with labels | `posture said: window 60 s, 2 samples, bad_share 0.50, region neck` |
 
 With labels, `top` is the surest label any frame's answer gave; `counted` is what the
 burst counts as drinking, eating or a break (`sitting.rs`), or `none`. The

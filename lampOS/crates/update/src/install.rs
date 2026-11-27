@@ -453,7 +453,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // Posture (#6543, the owner's call of 23 Nov, split from Sit back): V1's
     // posture reminder from the cloud's posture reading (`humans/posture`,
     // lamp-seen's with `LAMP_SEEN_POSTURE=on`), a word naming the region.
-    // It shares the wellbeing nudges' function and their hour.
+    // It shares the wellbeing nudges' function, not their hour (#8377).
     "posture",
     // The seen reactions (#6543): a line at a drink, eating, tiredness or
     // celebrating that lamp-seen saw, product skills by the owner's call

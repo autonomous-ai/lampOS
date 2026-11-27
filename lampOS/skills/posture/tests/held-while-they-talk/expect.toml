@@ -1,5 +1,5 @@
-# 11:00, bad neck all through, a conversation from 9 to 12 minutes: held at 10, said by
-# 12 and a half once the voice has rested 5 s.
+# 11:00, both checks bad from 9m30, a conversation from 9 to 12 minutes: held while
+# they talk, said at 12 and a half once the voice has rested 5 s and the lamp been quiet 10 s.
 clock = "11:00"
 
 [[expect]]
