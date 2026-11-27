@@ -179,7 +179,7 @@ build hash taken out. Same board (Orange Pi 4 Pro), two lamps.
   speaker with `off`; bounded recovery kept it up, #1298) and the call's
   wait came from lamp-4ace. The template's
   `@VOICE_OPTIONS@` calls them "the measured options of this lamp"; on two
-  lamps they are one set. The ring's `--ring-channel-ceiling 60` is not among
+  lamps they are one set. The ring's `--ring-channel-ceiling 30` (#8832) is not among
   them: the template carries it itself (#2529), and the voice refuses the flag
   given twice, so it never goes into `@VOICE_OPTIONS@`.
 - Every option of name, ears, air, actions, memory, schedule and controls
