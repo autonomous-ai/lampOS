@@ -1143,6 +1143,44 @@ mod one_gateway {
         assert!(!systemd.ever_both, "{:?}", systemd.log);
     }
 
+    /// lamp-ee17, 27 Nov (W leg): the look that started OpenClaw's cold
+    /// gateway ran the add 14 s into a 172 s start, and `runuser` said its
+    /// child was "Killed". That is no refusal: the entry stays owed and the
+    /// next look takes it, not the next round's one-shot.
+    #[test]
+    fn a_killed_add_in_a_cold_start_stays_owed() {
+        use std::cell::Cell;
+        let (lamp, mut systemd) = lamp_with_both(false, false);
+        let adds = Cell::new(0);
+        let mut run = |argv: &[String]| {
+            let line = argv.join(" ");
+            if line.contains(" approvals allowlist add ") {
+                adds.set(adds.get() + 1);
+                if adds.get() == 1 {
+                    return Err(format!("{line}: Killed"));
+                }
+            }
+            Ok(String::new())
+        };
+        let mut keeper = keeper(true);
+        let mut lines = Vec::new();
+        for _ in 0..2 {
+            keeper.look(
+                lamp.root(),
+                &mut systemd,
+                said(Some("openclaw")),
+                &mut run,
+                &mut |line: &str| lines.push(line.to_owned()),
+            );
+        }
+        assert_eq!(adds.get(), 2, "tried again at the next look: {lines:?}");
+        assert!(!keeper.entry_owed(), "taken at the second look");
+        assert!(
+            !lines.iter().any(|l| l.contains("the one-shot")),
+            "{lines:?}"
+        );
+    }
+
     /// Harness's one-shot at work, OpenClaw not wanted: the keeper still
     /// stops and disables OpenClaw's gateway (it used to leave it to the
     /// one-shot for as long as it ran), then starts Hermes's.

@@ -2574,7 +2574,17 @@ fn add_run_entry(run: &mut Runner, say: &mut dyn FnMut(&str), tries: u32) -> Opt
     }
     match ran {
         Ok(_) => Some(true),
-        Err(why) if tries <= 1 && gateway_not_ready(&why) => None,
+        // A look's one add that did not finish (lamp-ee17, 27 Nov: "Killed"
+        // 14 s into a 172 s cold start, the gateway it joined restarting
+        // under it; or past its bound) is not ready either: still owed, so
+        // the next look tries again, not the next round.
+        Err(why)
+            if tries <= 1
+                && (gateway_not_ready(&why)
+                    || lamp_checked_replace::check_did_not_finish(&why)) =>
+        {
+            None
+        }
         Err(why) if gateway_not_ready(&why) => {
             say(&format!(
                 "OpenClaw's gateway is not ready yet, so agent {RUN_AGENT}'s allow-list entry is not known: {why}; the next round checks again"
