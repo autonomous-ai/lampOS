@@ -8923,14 +8923,25 @@ never have asked or taken an answer on a lamp).
   A refusal counts only where it governs (Twelve's P2 on #8808): a
   refusal word (`sign_in::refusal_word`: "no", "not", "never", "don't",
   "dont", "cancel", "stop", any "…n't", "không", "đừng", "chưa") at most
-  two words before the sign-in word, in its clause (split at `,` `.` `?`
-  `!` `;` `:` and dashes; `sign_in::free_sign_in_words`), or a whole reply
-  that says no or not now (`sign_in::refuses_whole`: it begins with "no",
-  "nope", "nah", "không", "chưa" or "đừng", or says "not now", "not yet",
-  "later" or "để sau"). So "No, don't sign it in", "Yes, but not now",
-  "Sign it in later" and "I'd rather you didn't sign it in" are refused;
-  "It's not signed in, can you sign it in?", "Don't forget to sign me in
-  to my computer" and "Sign me in, I can't wait" are not.
+  two words before the sign-in word, or one before "want" or "need"
+  anywhere before it, in its clause (split at `,` `.` `?` `!` `;` `:` and
+  dashes; `sign_in::free_sign_in_words`), or a whole reply that says no or
+  not now (`sign_in::refuses_whole`: it begins with "no", "nope", "nah",
+  "không", "chưa" or "đừng"; says "not now", "not yet" or "để sau"
+  anywhere; has a clause of only a refusal or "later", with "please",
+  "maybe", "do it" and the like (`sign_in::bare_refusal`: "Don't.",
+  "Maybe later", "Do it later"); or says "later" in a clause with a
+  sign-in word and no "now"). A question asked with a negative is an ask,
+  not a refusal (Twelve's P3 on #8808 at deab5769dc,
+  `sign_in::asks_with_a_negative`): "can't", "couldn't", "won't",
+  "wouldn't", or "don't" after "why", followed by "you" or in a clause
+  ending in "?". So "No, don't sign it in", "Don't sign me in", "I don't
+  want you to sign me in", "You shouldn't sign me in", "Why would you sign
+  me in? Don't.", "Yes, but not now", "Sign it in later", "Maybe later"
+  and "I'd rather you didn't sign it in" are refused; "It's not signed in,
+  can you sign it in?", "Don't forget to sign me in to my computer", "Sign
+  me in, I can't wait", "Can't you sign me in?", "Why don't you sign me
+  in?" and "Sign me in now, I'll check it later" are not.
 
   The words, one set for both sides (`sign_in::sign_in_word`): sign-in
   words are "sign … in/into/onto" or "signed … in/into/onto" (within three

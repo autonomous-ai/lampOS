@@ -536,10 +536,60 @@ fn refusal_word(word: &str) -> bool {
         || word.ends_with("n’t")
 }
 
+/// The clauses of `text` as plain words, each with whether it ends in
+/// "?": split at `,`, `.`, `?`, `!`, `;`, `:` and a dash.
+fn clauses(text: &str) -> Vec<(Vec<String>, bool)> {
+    text.split_inclusive([',', '.', '?', '!', ';', ':', '—', '–'])
+        .map(|clause| {
+            (
+                crate::agent_tasks::plain_words(clause),
+                clause.ends_with('?'),
+            )
+        })
+        .collect()
+}
+
+/// Whether the refusal word at `at` in a clause's `words` only asks
+/// (Twelve's P3 on #8808 at deab5769dc): "can't", "couldn't", "won't" or
+/// "wouldn't", or "don't" after "why", followed by "you" or in a
+/// question ("Can't you sign me in?", "Why don't you sign me in?").
+/// "You shouldn't sign me in" and "Don't sign me in" still refuse.
+fn asks_with_a_negative(words: &[String], at: usize, question: bool) -> bool {
+    let word = words[at].replace('’', "'");
+    let negative = match word.as_str() {
+        "can't" | "couldn't" | "won't" | "wouldn't" => true,
+        "don't" | "dont" => at > 0 && words[at - 1] == "why",
+        _ => false,
+    };
+    negative && (question || words.get(at + 1).is_some_and(|next| next == "you"))
+}
+
+/// Words a clause of only refusal may hold besides its refusal
+/// ([`bare_refusal`]): "Please don't.", "Maybe later", "Do it later".
+const REFUSAL_FILLER: [&str; 10] = [
+    "please", "maybe", "perhaps", "do", "it", "that", "thanks", "then", "just", "actually",
+];
+
+/// Whether a clause's `words` are a refusal or a "later" and nothing
+/// else ([`REFUSAL_FILLER`] aside): "Don't.", "Later.", "Maybe later",
+/// "Do it later".
+fn bare_refusal(words: &[String]) -> bool {
+    words
+        .iter()
+        .any(|word| word == "later" || refusal_word(word))
+        && words.iter().all(|word| {
+            word == "later" || refusal_word(word) || REFUSAL_FILLER.contains(&word.as_str())
+        })
+}
+
 /// Whether the whole reply says no or not now (Twelve's P2 on #8808): it
-/// begins with "no", "nope", "nah", "không", "chưa" or "đừng", or says
-/// "not now", "not yet", "later" or "để sau" anywhere ("Yes, but not
-/// now.", "Sign it in later.").
+/// begins with "no", "nope", "nah", "không", "chưa" or "đừng"; says "not
+/// now", "not yet" or "để sau" anywhere ("Yes, but not now."); has a
+/// clause of only a refusal or a "later" ([`bare_refusal`]: "Why would
+/// you sign me in? Don't.", "Maybe later"); or says "later" in a clause
+/// with a sign-in word and no "now" ("Sign it in later."). A "later" in
+/// a clause of its own words does not (Twelve's P3 on #8808 at
+/// deab5769dc): "Sign me in now, I'll check it later".
 fn refuses_whole(text: &str) -> bool {
     let words = crate::agent_tasks::plain_words(text);
     let pair = |first: &str, second: &str| {
@@ -547,33 +597,47 @@ fn refuses_whole(text: &str) -> bool {
             .windows(2)
             .any(|two| two[0] == first && two[1] == second)
     };
+    let later = |words: &[String]| {
+        words.iter().any(|word| word == "later")
+            && !words.iter().any(|word| word == "now")
+            && (0..words.len()).any(|at| sign_in_word(words, at).is_some())
+    };
     words.first().is_some_and(|word| {
         matches!(
             word.as_str(),
             "no" | "nope" | "nah" | "không" | "chưa" | "đừng"
         )
-    }) || words.iter().any(|word| word == "later")
-        || pair("not", "now")
+    }) || pair("not", "now")
         || pair("not", "yet")
         || pair("để", "sau")
+        || clauses(text)
+            .iter()
+            .any(|(words, _)| bare_refusal(words) || later(words))
 }
 
 /// The sign-in words of `text` ([`sign_in_word`]) that no refusal governs:
 /// a refusal word ([`refusal_word`]) at most two words before it in the
-/// same clause (split at `,`, `.`, `?`, `!`, `;`, `:`, a dash). "Don't
-/// sign it in" and "never log in" are governed; "It's not signed in, can
-/// you sign it in?" and "Don't forget to sign me in" have one that is not.
-/// Each is `true` for a sign-in word itself, `false` for a pairing word.
+/// same clause ([`clauses`]), or one before "want" or "need" anywhere
+/// before it there ("I don't want you to sign me in"). "Don't sign it
+/// in" and "never log in" are governed; "It's not signed in, can you
+/// sign it in?" and "Don't forget to sign me in" have one that is not,
+/// and so do questions asked with a negative ([`asks_with_a_negative`]:
+/// "Can't you sign me in?"). Each is `true` for a sign-in word itself,
+/// `false` for a pairing word.
 fn free_sign_in_words(text: &str) -> Vec<bool> {
     let mut free = Vec::new();
-    for clause in text.split([',', '.', '?', '!', ';', ':', '—', '–']) {
-        let words = crate::agent_tasks::plain_words(clause);
+    for (words, question) in clauses(text) {
+        let refuses =
+            |at: usize| refusal_word(&words[at]) && !asks_with_a_negative(&words, at, question);
         for at in 0..words.len() {
-            if let Some(strong) = sign_in_word(&words, at)
-                && !words[at.saturating_sub(2)..at]
-                    .iter()
-                    .any(|word| refusal_word(word))
-            {
+            let Some(strong) = sign_in_word(&words, at) else {
+                continue;
+            };
+            let near = (at.saturating_sub(2)..at).any(refuses);
+            let wants_not = (1..at).any(|want| {
+                matches!(words[want].as_str(), "want" | "wanna" | "need") && refuses(want - 1)
+            });
+            if !near && !wants_not {
                 free.push(strong);
             }
         }
@@ -3839,7 +3903,10 @@ mod tests {
     }
 
     /// The rows written blind from #8700's spec (thirteen-kit's
-    /// `sign-in-table-8808.rs.txt`, 39 rows, kept as written): (owner's
+    /// `sign-in-table-8808.rs.txt`, 39 rows, kept as written; then 14 for
+    /// Twelve's two P3s on #8808 at deab5769dc, red first: the six new
+    /// allow rows, "I don't want you to sign me in" and "Why would you
+    /// sign me in? Don't." fail before the fix, 44 of 53 pass): (owner's
     /// language, the lamp's last line, fresh and not cut, a code kept, the
     /// person's words, allowed, why), and 22 Vietnamese rows added
     /// with the Vietnamese words (`vi_*`), no exception left: "đừng đăng
@@ -3857,7 +3924,7 @@ mod tests {
             bool,
             &'static str,
         );
-        const ROWS: [Row; 61] = [
+        const ROWS: [Row; 75] = [
             (
                 "en",
                 None,
@@ -4338,6 +4405,118 @@ mod tests {
                 "ừ",
                 false,
                 "yes, but the last line offered no sign-in",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "Can't you sign me in?",
+                true,
+                "a question asked with a negative is an ask (Twelve's P3 on #8808, 1)",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "Why don't you sign me in?",
+                true,
+                "a question asked with a negative is an ask",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "Couldn't you sign my computer in?",
+                true,
+                "a question asked with a negative is an ask",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "Won't you sign me in?",
+                true,
+                "a question asked with a negative is an ask",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "I don't want you to sign me in",
+                false,
+                "don't want governs the sign-in",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "You shouldn't sign me in",
+                false,
+                "shouldn't is no question, it refuses",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "Why would you sign me in? Don't.",
+                false,
+                "the second clause refuses",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "Sign me in now, I'll check it later",
+                true,
+                "later in its own clause, not the sign-in's (Twelve's P3 on #8808, 2)",
+            ),
+            (
+                "en",
+                Some("Your computer isn't signed in. Shall I sign it in?"),
+                false,
+                "Sign it in, I'll use Codex later",
+                true,
+                "later governs using Codex, not the sign-in",
+            ),
+            (
+                "en",
+                None,
+                false,
+                "Sign it in later.",
+                false,
+                "later in the sign-in's clause, a deferral",
+            ),
+            (
+                "en",
+                Some("Your computer isn't signed in. Shall I sign it in?"),
+                false,
+                "Later.",
+                false,
+                "a bare later after the offer",
+            ),
+            (
+                "en",
+                Some("Your computer isn't signed in. Shall I sign it in?"),
+                false,
+                "Maybe later",
+                false,
+                "a bare later after the offer",
+            ),
+            (
+                "en",
+                Some("Your computer isn't signed in. Shall I sign it in?"),
+                false,
+                "Do it later",
+                false,
+                "do it later after the offer",
+            ),
+            (
+                "en",
+                Some("Your computer isn't signed in. Shall I sign it in?"),
+                false,
+                "Not now, later",
+                false,
+                "not now and later after the offer",
             ),
         ];
         let fresh = Duration::from_secs(5);

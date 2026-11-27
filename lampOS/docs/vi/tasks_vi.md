@@ -335,14 +335,25 @@ người dùng nghe được:
 Một lời từ chối chỉ tính khi nó chi phối từ đăng nhập (P2 của Twelve trên
 #8808): một từ từ chối (`sign_in::refusal_word`: "no", "not", "never",
 "don't", "dont", "cancel", "stop", mọi từ "…n't", "không", "đừng", "chưa")
-nằm tối đa hai từ trước từ đăng nhập, trong cùng mệnh đề (tách ở `,` `.` `?`
-`!` `;` `:` và gạch ngang; `sign_in::free_sign_in_words`), hoặc cả câu trả
-lời là lời từ chối hay hoãn (`sign_in::refuses_whole`: bắt đầu bằng "no",
-"nope", "nah", "không", "chưa" hoặc "đừng", hoặc có "not now", "not yet",
-"later" hay "để sau"). Vì vậy "No, don't sign it in", "Yes, but not now",
-"Sign it in later" và "I'd rather you didn't sign it in" bị từ chối; còn
-"It's not signed in, can you sign it in?", "Don't forget to sign me in to my
-computer" và "Sign me in, I can't wait" thì không.
+nằm tối đa hai từ trước từ đăng nhập, hoặc đứng ngay trước "want" hay "need"
+ở bất kỳ đâu trước từ đó, trong cùng mệnh đề (tách ở `,` `.` `?` `!` `;` `:`
+và gạch ngang; `sign_in::free_sign_in_words`), hoặc cả câu trả lời là lời từ
+chối hay hoãn (`sign_in::refuses_whole`: bắt đầu bằng "no", "nope", "nah",
+"không", "chưa" hoặc "đừng"; có "not now", "not yet" hay "để sau" ở bất kỳ
+đâu; có một mệnh đề chỉ gồm lời từ chối hoặc "later", kèm "please", "maybe",
+"do it" và các từ tương tự (`sign_in::bare_refusal`: "Don't.", "Maybe
+later", "Do it later"); hoặc có "later" trong một mệnh đề có từ đăng nhập mà
+không có "now"). Một câu hỏi dạng phủ định là lời nhờ, không phải lời từ
+chối (P3 của Twelve trên #8808 ở deab5769dc,
+`sign_in::asks_with_a_negative`): "can't", "couldn't", "won't", "wouldn't",
+hoặc "don't" sau "why", theo sau là "you" hoặc trong mệnh đề kết thúc bằng
+"?". Vì vậy "No, don't sign it in", "Don't sign me in", "I don't want you to
+sign me in", "You shouldn't sign me in", "Why would you sign me in? Don't.",
+"Yes, but not now", "Sign it in later", "Maybe later" và "I'd rather you
+didn't sign it in" bị từ chối; còn "It's not signed in, can you sign it
+in?", "Don't forget to sign me in to my computer", "Sign me in, I can't
+wait", "Can't you sign me in?", "Why don't you sign me in?" và "Sign me in
+now, I'll check it later" thì không.
 
 Bộ từ, dùng chung cho cả hai phía (`sign_in::sign_in_word`): từ đăng nhập là
 "sign … in/into/onto" hoặc "signed … in/into/onto" (trong vòng ba từ),
