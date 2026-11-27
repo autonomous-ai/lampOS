@@ -415,6 +415,7 @@ fn a_sure_other_voice_gets_no_callers_tie() {
         other_voice,
         same_voice: false,
         likeness: None,
+        since_said_us: None,
     };
     assert!(
         heeding.callers_own_line(2, &seen(false), false).is_some(),
@@ -973,6 +974,7 @@ fn the_callers_face_speaking_yields_to_the_guards() {
         other_voice,
         same_voice: false,
         likeness: None,
+        since_said_us: None,
     };
     let kept = Some(crate::untied_going_on::CALLER_SPEAKING_KEPT);
     let question = "Maybe. What would you do?";
@@ -1094,6 +1096,7 @@ fn held_gives_every_tie_its_why() {
         other_voice: false,
         same_voice: false,
         likeness: None,
+        since_said_us: None,
     };
     let follow_up = "That's a good idea. Any tips to sleep better tonight?";
     for (answer, why) in [

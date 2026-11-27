@@ -553,11 +553,51 @@ pub fn declared(
     declared
 }
 
+/// How a spoken line reached the model, as the app tools read it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LetIn {
+    /// Said to the lamp: its name, a look, or words asking its work.
+    ToTheLamp,
+    /// Let in only as the conversation going on, with no question of the
+    /// lamp's waiting: it may be people's talk, so no app tool is offered.
+    ConversationGoingOn,
+    /// Let in only as the conversation going on, in answer to the lamp's
+    /// own question: its last words ended in a question and the line began
+    /// within [`REPLY_WINDOW_US`] of their end ([`let_in`]). An app's own
+    /// back-and-forth ("How many days a week?" "Three days, twenty
+    /// minutes.") reaches its tools without the lamp's name each turn
+    /// (lamp-9adf, 27 Nov: `set_plan` was never offered on such an answer;
+    /// the first builder's ruling on #7814).
+    AnswersTheLamp,
+}
+
+/// How long after the end of the lamp's words a line may begin and still
+/// answer its question: the follow-up's reply window
+/// (`follows_on::WITHIN_US`, 20 s).
+pub const REPLY_WINDOW_US: u64 = crate::follows_on::WITHIN_US;
+
+/// How a line reached the model: `alone`, let in only as the conversation
+/// going on (told `worker::CONVERSATION_ALONE`); `lamp_asked`, the lamp's
+/// own last words ended in a question; `since_said_us`, how long after the
+/// end of those words the line began (none: no words of the lamp's yet).
+/// Such a line answers the lamp only with both, inside
+/// [`REPLY_WINDOW_US`]; any other is the conversation going on alone.
+pub fn let_in(alone: bool, lamp_asked: bool, since_said_us: Option<u64>) -> LetIn {
+    if !alone {
+        LetIn::ToTheLamp
+    } else if lamp_asked && since_said_us.is_some_and(|us| us <= REPLY_WINDOW_US) {
+        LetIn::AnswersTheLamp
+    } else {
+        LetIn::ConversationGoingOn
+    }
+}
+
 /// The turn's notes for `request`, whose words are `line`: the app tools'
 /// section, on the owner's turn only (as `app_context::notes_for` judges
 /// it: in the private room always, else only when `person`, the known
 /// person in view, is the owner), never while private, in the care hold, or for a line let in
-/// only as the conversation going on; and on the turn after an app's
+/// only as the conversation going on unless it answers the lamp's own
+/// question ([`LetIn`]); and on the turn after an app's
 /// result, the note that it is narrowed. None of an app's tools is in it
 /// when `line` was told to that app as a phrase ([`told_apps`]). Marks
 /// whether this request is offered the tools, and the apps told, which
@@ -568,7 +608,7 @@ pub fn notes_for(
     now_ms: u64,
     private: bool,
     care_holds: bool,
-    conversation_alone: bool,
+    let_in: LetIn,
     person: Option<&str>,
 ) -> Vec<String> {
     if !on() {
@@ -577,8 +617,11 @@ pub fn notes_for(
     let owners_turn = crate::person::private_room()
         || person.is_some_and(|person| owners().iter().any(|id| id == person));
     let (offered, left_out, running) = current_with_running();
-    let offer =
-        owners_turn && !private && !care_holds && !conversation_alone && !offered.is_empty();
+    let offer = owners_turn
+        && !private
+        && !care_holds
+        && let_in != LetIn::ConversationGoingOn
+        && !offered.is_empty();
     let told = if offer {
         told_apps(&running, line)
     } else {
@@ -604,6 +647,11 @@ pub fn notes_for(
     .flatten();
     if !offer {
         return Vec::new();
+    }
+    if let_in == LetIn::AnswersTheLamp {
+        eprintln!(
+            "lamp-voice second: request {request}: app tools offered: the line answers the lamp's own question, let in as the conversation going on ({ENVIRONMENT})"
+        );
     }
     for app in &left_out {
         eprintln!(

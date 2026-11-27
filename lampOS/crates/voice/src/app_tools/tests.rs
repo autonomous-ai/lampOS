@@ -94,7 +94,15 @@ fn alone<T>(apps: Vec<AppsTools>, f: impl FnOnce(&Fake) -> T) -> T {
 
 /// The owner's turn, nothing held.
 fn owners_turn(request: u64, now_ms: u64) -> Vec<String> {
-    let notes = notes_for(request, "", now_ms, false, false, false, Some("owner-1"));
+    let notes = notes_for(
+        request,
+        "",
+        now_ms,
+        false,
+        false,
+        LetIn::ToTheLamp,
+        Some("owner-1"),
+    );
     // The turn's functions declared, as each chat request does.
     declared(lamps(), 64, now_ms);
     notes
@@ -156,18 +164,24 @@ fn an_apps_tools_are_functions_of_their_own_on_the_owners_turn() {
 
 /// A guest's turn, the room's, while private, in the care hold or for a
 /// line let in only as the conversation going on: no section, no function,
-/// and a call is refused with nothing sent.
+/// and a call is refused with nothing sent. An answer to the lamp's own
+/// question is held to the same owner, privacy and care checks.
 #[test]
 fn no_tool_is_offered_or_run_off_the_owners_plain_turn() {
-    for (private, care, alone_line, person) in [
-        (false, false, false, Some("guest-7")),
-        (false, false, false, None),
-        (true, false, false, Some("owner-1")),
-        (false, true, false, Some("owner-1")),
-        (false, false, true, Some("owner-1")),
+    use LetIn::{AnswersTheLamp, ConversationGoingOn, ToTheLamp};
+    for (private, care, let_in, person) in [
+        (false, false, ToTheLamp, Some("guest-7")),
+        (false, false, ToTheLamp, None),
+        (true, false, ToTheLamp, Some("owner-1")),
+        (false, true, ToTheLamp, Some("owner-1")),
+        (false, false, ConversationGoingOn, Some("owner-1")),
+        (false, false, AnswersTheLamp, Some("guest-7")),
+        (false, false, AnswersTheLamp, None),
+        (true, false, AnswersTheLamp, Some("owner-1")),
+        (false, true, AnswersTheLamp, Some("owner-1")),
     ] {
         alone(vec![coach()], |fake| {
-            let notes = notes_for(1, "", 1_000, private, care, alone_line, person);
+            let notes = notes_for(1, "", 1_000, private, care, let_in, person);
             assert!(notes.is_empty(), "{notes:?}");
             assert_eq!(
                 names(&declared(lamps(), 64, 1_000)),
@@ -699,7 +713,7 @@ fn a_line_told_to_an_app_as_a_phrase_offers_none_of_its_tools() {
             1_000,
             false,
             false,
-            false,
+            LetIn::ToTheLamp,
             Some("owner-1"),
         );
         assert_eq!(notes.len(), 1, "{notes:?}");
@@ -725,7 +739,7 @@ fn a_line_told_to_an_app_as_a_phrase_offers_none_of_its_tools() {
             2_000,
             false,
             false,
-            false,
+            LetIn::ToTheLamp,
             Some("owner-1"),
         );
         assert_eq!(
@@ -779,7 +793,7 @@ fn with_the_switch_off_a_phrase_line_changes_nothing() {
             1_000,
             false,
             false,
-            false,
+            LetIn::ToTheLamp,
             Some("owner-1"),
         );
         assert!(notes.is_empty());
@@ -787,5 +801,113 @@ fn with_the_switch_off_a_phrase_line_changes_nothing() {
             names(&declared(lamps(), 64, 1_000)),
             ["set_volume", "use_skill"]
         );
+    });
+}
+
+/// The owner's answer, five seconds after the lamp's words ended.
+const ANSWER: &str = "Uh, I dunno. Three days I guess, twenty minutes.";
+const FIVE_S_US: u64 = 5_000_000;
+
+/// The plan the owner said, as the model calls it.
+fn three_days() -> Value {
+    json!({"days": 3, "minutes": 20})
+}
+
+/// Whether request 1, `ANSWER` let in as `let_in`, is offered the coach's
+/// tools, its `set_plan` call sent to the app.
+fn plan_set(private: bool, care: bool, let_in: LetIn) -> bool {
+    alone(vec![coach()], |fake| {
+        let notes = notes_for(1, ANSWER, 1_000, private, care, let_in, Some("owner-1"));
+        let declared = names(&declared(lamps(), 64, 1_000));
+        let told = answer(1, "gym_coach_set_plan", &three_days(), false, 1_000);
+        let calls = fake.calls.lock().unwrap();
+        let offered = notes.iter().any(|note| note.contains("- set_plan:"))
+            && declared.contains(&"gym_coach_set_plan".to_owned());
+        let sent = calls.len() == 1 && calls[0].name == "set_plan" && calls[0].args == three_days();
+        assert_eq!(offered, sent, "{notes:?} {declared:?} {told}");
+        if !offered {
+            assert_eq!(told["error"], NOT_NOW, "{told}");
+        }
+        offered && sent
+    })
+}
+
+/// lamp-9adf, 27 Nov: the app asked a plan question and the owner answered
+/// without the lamp's name, "Uh, I dunno. Three days I guess, twenty
+/// minutes.", let in only as the conversation going on, and was offered no
+/// tool: `set_plan` was never called. The first builder's rule (#7814): the
+/// lamp's last words ended in a question and the line began within the
+/// 20 s reply window, so the app's tools are offered and the plan is set.
+#[test]
+fn the_lamps_question_answered_with_no_name_is_offered_the_apps_tools() {
+    let how = let_in(true, true, Some(FIVE_S_US));
+    assert_eq!(how, LetIn::AnswersTheLamp);
+    assert!(plan_set(false, false, how));
+    // At the window's end still; a line said to the lamp, as ever.
+    assert_eq!(
+        let_in(true, true, Some(REPLY_WINDOW_US)),
+        LetIn::AnswersTheLamp
+    );
+    assert_eq!(let_in(false, false, None), LetIn::ToTheLamp);
+    assert!(plan_set(false, false, LetIn::ToTheLamp));
+}
+
+/// The same answer begun past the 20 s reply window: only the
+/// conversation going on, offered nothing.
+#[test]
+fn past_the_reply_window_the_answer_is_offered_no_tool() {
+    let how = let_in(true, true, Some(REPLY_WINDOW_US + 1));
+    assert_eq!(how, LetIn::ConversationGoingOn);
+    assert!(!plan_set(false, false, how));
+    // No words of the lamp's yet: nothing it asked.
+    assert_eq!(let_in(true, true, None), LetIn::ConversationGoingOn);
+}
+
+/// A line in the window after a lamp answer that asked nothing: a room
+/// line the lamp didn't ask for, offered nothing.
+#[test]
+fn a_follow_up_after_an_answer_that_asked_nothing_is_offered_no_tool() {
+    let how = let_in(true, false, Some(FIVE_S_US));
+    assert_eq!(how, LetIn::ConversationGoingOn);
+    assert!(!plan_set(false, false, how));
+}
+
+/// The lamp's question answered in the window while private, or in the
+/// care hold: offered nothing, a call refused with nothing sent.
+#[test]
+fn an_answer_to_the_lamp_is_offered_no_tool_while_private_or_in_the_care_hold() {
+    let how = let_in(true, true, Some(FIVE_S_US));
+    assert!(!plan_set(true, false, how));
+    assert!(!plan_set(false, true, how));
+}
+
+/// An answer to the lamp's own question that holds an app's phrase still
+/// offers none of that app's tools: the phrase has ended it (#8386).
+#[test]
+fn an_answer_to_the_lamps_question_told_to_an_app_as_a_phrase_offers_none_of_its_tools() {
+    let listening = AppsTools {
+        phrases: vec!["end workout".into()],
+        ..coach()
+    };
+    alone(vec![listening], |fake| {
+        let notes = notes_for(
+            1,
+            "Yes, end workout.",
+            1_000,
+            false,
+            false,
+            LetIn::AnswersTheLamp,
+            Some("owner-1"),
+        );
+        assert!(
+            notes.iter().all(|note| !note.contains("gym_coach")),
+            "{notes:?}"
+        );
+        assert_eq!(
+            names(&declared(lamps(), 64, 1_000)),
+            ["set_volume", "use_skill"]
+        );
+        assert!(answer(1, "gym_coach_get_progress", &json!({}), false, 1_000)["not_done"] == true);
+        assert!(fake.calls.lock().unwrap().is_empty());
     });
 }

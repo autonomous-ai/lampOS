@@ -301,7 +301,19 @@ Eighth's part, beside app views piece 2.
   It is not offered, and a call is answered "not now: nothing was done", as
   `start_app` is. So is a call for a line
   let in only as the conversation going on, or while the lamp waits on an
-  answer (a read-back, a held forget, a skill's write).
+  answer (a read-back, a held forget, a skill's write). One such line is
+  offered the tools: an answer to Lamp's own question, so an app's own
+  back-and-forth (Gym Coach's "How many days a week?") needs no "Hey Lamp"
+  each turn. Lamp's last words ended in a question (`Thread::lamp_asked`),
+  the line began within the 20 s reply window after them
+  (`app_tools::REPLY_WINDOW_US`, `follows_on::WITHIN_US`); no unmeasured
+  sensor keeps it out (#8791). `app_tools::let_in` decides it, and the journal says
+  `app tools offered: the line answers the lamp's own question` once. The
+  owner's turn, privacy, the care hold and an app told the line as a phrase
+  still hold, and a room line after an answer that asked nothing, or past
+  the window, is offered nothing (the first builder's ruling on #7814; on
+  lamp-9adf on 27 Nov "Uh, I dunno. Three days I guess, twenty minutes."
+  got no tool and `set_plan` was never called).
 - **Grants bound what a tool may do.** A call carries only the tool's name
   and its checked arguments: no audio, no transcript, no person's name or
   memory. Whatever the app does for it, it does with its own ops on its own
