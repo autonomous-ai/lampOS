@@ -986,16 +986,32 @@ held correction's round is no longer told `LAMP_KEEP_QUIETLY`'s quiet note
 (`Quiet::held_keep`; row 8654 L4: 2 of 2 asked nothing and were dropped).
 The lamp still says no ask of its own: a hold whose answer asks nothing is
 dropped (`settle_held_forget`). Their
-plain yes within 60 s on a later line theirs by their face alone in view,
-no other face seen speaking it (the scope's one-face test from the eyes'
-marks, `LAMP_SECOND_SPEAKING_FACE`), runs exactly that call in their scope
-(`take_held_forget`, `HeldForget::face_yes`). A `set_role` or `end_role` on
+plain yes within 60 s on a later line theirs by their face alone in view
+runs exactly that call in their scope (`take_held_forget`,
+`HeldForget::face_yes`). The guard is the scope's one-face test alone
+(`ScopeLease::in_view_by_one_face`): their known face the only face in
+view, the line not narrowed by another voice, and not carried, sticky or
+gap-held. The voice's own "no other face seen speaking the yes" check in
+`take_held_forget` reads the voice's copy of the eyes' speaking, which
+nothing sets since #8791, so it no longer acts (the Reviewer-lead's P3 on
+#8654). **The accepted risk** (the memory owner's rule of 25 Nov, restated
+27 Nov 14:11: "mouth moving is not used anymore and not affect forget or
+correction in memory"): with only the owner's face in view and no other
+voice heard, someone off camera, or a TV, who says the forget or the
+correction and then "yes" forgets or changes the owner's memory; "forget
+everything" takes two such lines. A `set_role` or `end_role` on
 such a line, in the private room, runs on the request with no hold or
 question, the mouth not used (the memory owner's calls of 27 Nov on #8654,
 "yes-alone rule cover this too, like forgets and corrections" and "Run on
 the request"; `second_provider::role_on_request`). Its held run marks it agreed
 (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so it alone passes the
-one-face refusal and the memory route's correction check. The provider
+one-face refusal and the memory route's correction check. A correction
+their yes ran that did not keep (the memory's error or `remembered: false`,
+or the memory route's refusal) is never told as kept: the model is told the
+existing "not done" note, `seen_yes::NOT_KEPT` (the Reviewer-lead's P2 on
+#8654). A call their yes agreed to and runs at once is never put to the
+hold, and once a held call ran on a yes line nothing on that line is held
+and asked again. The provider
 route has no hold and answers `ONE_FACE_JUST_KEPT` ("when I can see you say
 it") only with the switch off or off such a line; with it on, there, it asks
 which (`ONE_FACE_BARE_FORGET`). With `LAMP_PRIVATE_ROOM` on, a named forget's

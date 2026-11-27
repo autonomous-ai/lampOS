@@ -1690,16 +1690,31 @@ lưu lặng lẽ của `LAMP_KEEP_QUIETLY` («đừng bao giờ hỏi có nên l
 câu hỏi của nó được nói như của một lần lưu mang tiếp (`Quiet::held_keep`;
 row 8654 L4: 2 trên 2 lần không hỏi gì và bị bỏ). Đèn vẫn không tự nói câu hỏi
 nào: lệnh giữ mà câu trả lời không hỏi gì thì bị bỏ (`settle_held_forget`). Lời «có» rõ ràng của họ trong 60 giây ở một câu sau cũng
-là của họ vì chỉ mặt họ trong khung, không mặt nào khác được thấy nói câu ấy
-(phép thử một mặt của phạm vi, từ dấu của mắt, `LAMP_SECOND_SPEAKING_FACE`), chạy
-đúng lệnh ấy trong phạm vi của họ (`take_held_forget`, `HeldForget::face_yes`).
+là của họ vì chỉ mặt họ trong khung chạy đúng lệnh ấy trong phạm vi của họ
+(`take_held_forget`, `HeldForget::face_yes`). Lớp bảo vệ chỉ còn là phép thử
+một mặt của phạm vi (`ScopeLease::in_view_by_one_face`): mặt quen của họ là mặt
+duy nhất trong khung, câu không bị thu hẹp vì một giọng khác, và không được mang
+tiếp, sticky hay giữ vì khoảng trống. Bước kiểm tra riêng của giọng «không mặt
+nào khác được thấy nói lời có» trong `take_held_forget` đọc bản sao của giọng về
+việc mắt thấy ai nói, mà từ #8791 không gì đặt nữa, nên nó không còn tác dụng
+(P3 của Reviewer-lead trên #8654). **Rủi ro đã chấp nhận** (quy tắc của chủ bộ
+nhớ ngày 25/11, nhắc lại 27/11 lúc 14:11: «mouth moving is not used anymore and
+not affect forget or correction in memory»): khi chỉ mặt chủ trong khung và
+không nghe giọng nào khác, một người ngoài khung hình, hay TV, nói lệnh quên
+hoặc lệnh sửa rồi nói «có» thì quên hoặc đổi bộ nhớ của chủ; «quên mọi thứ» cần
+hai câu như vậy.
 Một `set_role` hay `end_role` trên câu như vậy, trong phòng riêng, chạy ngay
 trên lượt ấy, không giữ chờ hay hỏi, không dùng miệng (các quyết định của chủ bộ nhớ ngày 27/11
 trên #8654, «yes-alone rule cover this too, like forgets and corrections» và
-«Run on the request»; `second_provider::role_on_request`);
-lần chạy giữ chờ đánh dấu nó đã được đồng ý (`ScopeLease::mark_held_yes`,
-`mark_forget_agreed`), nên chỉ lệnh ấy qua được lệnh từ chối một mặt và bước
-kiểm tra lệnh sửa của tuyến bộ nhớ. Tuyến provider không có giữ chờ và chỉ trả
+«Run on the request»; `second_provider::role_on_request`). Lần chạy giữ chờ đánh dấu nó đã được đồng ý
+(`ScopeLease::mark_held_yes`, `mark_forget_agreed`), nên chỉ lệnh ấy qua được
+lệnh từ chối một mặt và bước kiểm tra lệnh sửa của tuyến bộ nhớ. Một lệnh sửa
+mà lời «có» đã chạy nhưng không lưu được (bộ nhớ báo lỗi hoặc `remembered:
+false`, hoặc tuyến bộ nhớ từ chối) không bao giờ được báo là đã lưu: mô hình
+được báo ghi chú «chưa làm» sẵn có, `seen_yes::NOT_KEPT` (P2 của Reviewer-lead
+trên #8654). Một lệnh lời «có» đã đồng ý và chạy ngay không bao giờ bị đưa vào
+giữ chờ, và khi một lệnh giữ chờ đã chạy ở một câu «có» thì không gì trên câu
+ấy bị giữ và hỏi lại. Tuyến provider không có giữ chờ và chỉ trả
 `ONE_FACE_JUST_KEPT` («khi thấy bạn nói») khi công tắc tắt hoặc không phải câu
 như vậy; khi bật, ở đó, nó hỏi điều nào (`ONE_FACE_BARE_FORGET`). Khi
 `LAMP_PRIVATE_ROOM` bật, lời «có» cho một lệnh quên có tên chạy theo nhánh

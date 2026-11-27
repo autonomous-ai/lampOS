@@ -20963,7 +20963,19 @@ async fn answer(
                 } else {
                     held_keep_ran =
                         call.name == crate::remember::REMEMBER && result["remembered"] == true;
-                    messages.push(Message::system(if call.name == crate::remember::REMEMBER {
+                    // A keep or correction their yes ran that did not keep
+                    // (the memory's error or `remembered: false`, or the
+                    // memory route's refusal, `kept: false`) is never told
+                    // as kept: the existing "not done" note says it could
+                    // not be changed (the Reviewer-lead's P2 on #8654).
+                    messages.push(Message::system(if call.name == crate::remember::REMEMBER
+                        && !held_keep_ran
+                    {
+                        format!(
+                            "(For you to know: they said yes. {} Do not call remember again for it.)",
+                            crate::seen_yes::NOT_KEPT
+                        )
+                    } else if call.name == crate::remember::REMEMBER {
                     format!(
                         "(For you to know: they said yes, so what you asked to keep for them is kept now, with this result: {result}. Say in a few words that it is kept, and do not call remember again for it.)"
                     )
@@ -24306,14 +24318,21 @@ async fn answer(
                     && !crate::remember::forget_unguarded()
                     && (everything_now == Some(false)
                         || (everything_now.is_none() && asks_now && !asked_just_before));
-                if let Some(told) = hold_on_face_yes(
-                    shared,
-                    request,
-                    (heard, &heard_words),
-                    call,
-                    scope.as_ref(),
-                    everything_refused,
-                ) {
+                // Not a call their yes already agreed to and runs now (it is
+                // no hold's: no `refused: not_bare` for it), nor any once a
+                // held call ran on this yes line (never asked again): the
+                // Reviewer-lead's P3s 1 and 2 on #8654.
+                if agreed_now.is_none()
+                    && !held_forget_ran
+                    && let Some(told) = hold_on_face_yes(
+                        shared,
+                        request,
+                        (heard, &heard_words),
+                        call,
+                        scope.as_ref(),
+                        everything_refused,
+                    )
+                {
                     // A held correction asks to keep it the new way: its ask
                     // is the code's own, as a carried keep's is, so it is
                     // said (`Quiet::held_keep`), and the quiet note's "never
