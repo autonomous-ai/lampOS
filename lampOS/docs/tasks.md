@@ -10624,9 +10624,9 @@ policy decision is asked: the same progress thread reads `tasks/status`
 (without `on`, it subscribes to no `policy/decisions`).
 
 - **When.** Each task shown `working` is counted from its hand-over: when
-  the voice first saw it at work, less the `working_s` it had then
-  (`lamp-tasks` fills it for Harness and direct OpenClaw or Hermes tasks
-  handed over in this boot; unknown, from when it was first seen). Beat
+  the voice first saw it at work. Its `working_s` is not used, since it
+  counts from the ask, before the yes (lamp-ee17 27 Nov: beat 0 came about
+  20 s after the hand-over, not 30 s). Beat
   `n` (from 0) is due `FIRST + n × EVERY` after it, while `n < MOST`:
   `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 to 3600),
   `LAMP_PROGRESS_STILL_EVERY_S` (60, 10 to 3600) and
@@ -10672,7 +10672,7 @@ policy decision is asked: the same progress thread reads `tasks/status`
   waits).
 
 Shown in `task_news::tests` (`beats_come_at_first_then_every_at_most_most_in_other_words`,
-`a_beat_counts_from_the_hand_over_by_working_s`,
+`a_beat_counts_from_when_the_task_is_first_seen_at_work`,
 `no_beat_once_the_task_settles_or_its_news_waits_or_its_slot_passed`,
 `the_beats_settings_parse_and_bad_values_fall_back`), on a bus in
 `still_alone_beats_a_task_at_work_at_most_most_times_with_no_decision`

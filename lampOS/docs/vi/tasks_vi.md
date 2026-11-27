@@ -5448,8 +5448,9 @@ it landed`); và một câu ngắn được kể.
 Với `LAMP_PROGRESS_NEWS=still` (bật trong unit sản phẩm) hoặc `on,still`, khi
 một việc chạy lâu, đèn nói một câu ngắn cố định rằng nó vẫn đang làm, không
 hỏi Policy và không lấy gì từ phần tasks. Mỗi việc đang `working` trên
-`tasks/status` được tính từ lúc giao: lúc giọng nói thấy nó đang làm lần đầu,
-trừ `working_s` khi đó (không biết thì từ lúc thấy lần đầu). Nhịp `n` (từ 0)
+`tasks/status` được tính từ lúc giao: lúc giọng nói thấy nó đang làm lần đầu.
+Không dùng `working_s` của nó, vì số đó tính từ lúc hỏi, trước câu đồng ý
+(lamp-ee17 ngày 27/11: nhịp 0 đến khoảng 20 s sau lúc giao, không phải 30 s). Nhịp `n` (từ 0)
 đến hạn sau `FIRST + n × EVERY`, khi `n < MOST`:
 `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 đến 3600),
 `LAMP_PROGRESS_STILL_EVERY_S` (60, 10 đến 3600), `LAMP_PROGRESS_STILL_MOST`

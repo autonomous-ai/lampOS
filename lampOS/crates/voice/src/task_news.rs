@@ -2928,8 +2928,9 @@ struct ProgressReader {
     still: Option<Still>,
 }
 
-/// Each task at work, by store, run and task: its hand-over (first seen at
-/// work, less its `working_s` then) and its next beat.
+/// Each task at work, by store, run and task: its hand-over (when it was
+/// first seen at work; its `working_s` counts from the ask, before the
+/// yes, lamp-ee17 27 Nov) and its next beat.
 /// Also the change count at its last beat (at first sight, before one).
 type Beats = BTreeMap<(String, u64, u64), (Instant, u32, u32)>;
 
@@ -2954,10 +2955,7 @@ fn beats_due(
     for entry in (status.tasks.iter()).filter(|entry| still_working(status, entry.task)) {
         let (handed, next, last) = beats
             .entry((status.store_id.clone(), status.run, entry.task))
-            .or_insert_with(|| {
-                let at_it = Duration::from_secs(entry.working_s.unwrap_or(0));
-                (now.checked_sub(at_it).unwrap_or(now), 0, entry.changes)
-            });
+            .or_insert((now, 0, entry.changes));
         let since = now.saturating_duration_since(*handed);
         let Some(past_first) = since.checked_sub(still.first) else {
             continue;
@@ -6650,27 +6648,26 @@ mod tests {
         assert!(six[5].contains(&words.still_3));
     }
 
-    /// The hand-over is when the task was first seen at work less its
-    /// `working_s`: seen 35 s in, its first beat is due at once, let go
-    /// `BEAT_LATE` after its time; seen 45 s or 10 minutes in, none.
+    /// The hand-over is when the task is first seen at work, whatever its
+    /// `working_s` (counted from the ask, before the yes): its first beat
+    /// is `first` later.
     #[test]
-    fn a_beat_counts_from_the_hand_over_by_working_s() {
+    fn a_beat_counts_from_when_the_task_is_first_seen_at_work() {
         let still = still();
-        let now = Instant::now() + Duration::from_secs(3_600);
-        let seen = |working_s| {
-            beats_due(
-                &still,
-                Some(&status_of(AgentState::Working, 0, Some(working_s))),
-                &mut Beats::new(),
-                now,
-            )
-            .into_iter()
-            .map(|(of, until, _, _)| (of.beat, until))
-            .collect::<Vec<_>>()
-        };
-        assert_eq!(seen(35), [(Some(0), now + Duration::from_secs(5))]);
-        assert_eq!(seen(45), [], "more than BEAT_LATE past its time");
-        assert_eq!(seen(600), []);
+        let seen = Instant::now();
+        for working_s in [None, Some(10), Some(35), Some(600)] {
+            let status = status_of(AgentState::Working, 0, working_s);
+            let mut beats = Beats::new();
+            let due = |s: u64, beats: &mut Beats| {
+                beats_due(&still, Some(&status), beats, seen + Duration::from_secs(s))
+                    .into_iter()
+                    .map(|(of, _, at, _)| (of.beat, at.as_secs()))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(due(0, &mut beats), [], "{working_s:?}");
+            assert_eq!(due(29, &mut beats), [], "{working_s:?}");
+            assert_eq!(due(30, &mut beats), [(Some(0), 30)], "{working_s:?}");
+        }
     }
 
     /// No beat once the task is not at work, or once its own news waits;
