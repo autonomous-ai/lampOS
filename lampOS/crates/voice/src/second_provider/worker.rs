@@ -1791,7 +1791,8 @@ pub(crate) const SIMPLE_NOTE: &str =
     "(For you to know, not to answer: this was said to you: answer it.)";
 
 /// Why a line is let out with `LAMP_SIMPLE_CALL`: it called the lamp.
-pub(crate) const SIMPLE_CALLED: &str = "\"Hey Lamp\", or a tap, called it";
+pub(crate) const SIMPLE_CALLED: &str =
+    "lamp-name heard \"Hey Lamp\" at its start, or a tap or a computer's turn called it";
 
 /// Why a line is let out with `LAMP_SIMPLE_CALL`: begun within 20 s of the
 /// end of the lamp's last words.
@@ -5745,18 +5746,6 @@ pub fn serve(
                 heeding.taking_simple_calls();
             }
             engine = engine.taking_simple_calls();
-            // A greeting and a sure start hearing call too
-            // (`LAMP_SIMPLE_CALL_HEARD=on`, in no product unit).
-            if std::env::var(crate::second_provider::SIMPLE_CALL_HEARD_ENVIRONMENT)
-                .is_ok_and(|value| value == "on")
-            {
-                eprintln!(
-                    "lamp-voice second: a line whose words open with a greeting also calls when lamp-name heard the name at its start at 0.95 or more (LAMP_SIMPLE_CALL_HEARD)"
-                );
-                if let Ok(mut heeding) = heeding.lock() {
-                    heeding.taking_simple_calls_heard();
-                }
-            }
         }
         // Short replies carry (`LAMP_SHORT_REPLIES_CARRY=on`, #8772, the
         // product owner's rule of 26 Nov 2026).
@@ -10845,32 +10834,24 @@ impl Heeding {
     /// thing at a time and always make sure the quality is good."): one rule
     /// decides whether a line is the lamp's ([`Self::simple_verdict`]), and
     /// no camera, voice print, room or words rule holds or lets out a line.
-    /// A call is strictly "Hey Lamp" in the line's words
-    /// ([`crate::attention::opens_with_hey_lamp`]); a hearing of the name
-    /// alone never is ("keep it strictly 'Hey Lamp'. reason: false
-    /// positive.").
+    /// A call is lamp-name's own wake for the line, its hearing of "Hey Lamp"
+    /// at the line's start ([`crate::attention::Attention::simple_called`]);
+    /// the words, only for understanding the request, decide nothing.
     pub(crate) fn taking_simple_calls(&mut self) {
         self.simple_call = true;
         self.attention.only_hey_lamp(true);
     }
 
-    /// With [`Self::taking_simple_calls`], `LAMP_SIMPLE_CALL_HEARD=on`: a
-    /// greeting in the words and a sure hearing of the name at the line's
-    /// start call too ([`crate::attention::Attention::simple_calls_heard`]).
-    pub(crate) fn taking_simple_calls_heard(&mut self) {
-        self.attention.simple_calls_heard(true);
-    }
-
     /// With [`Self::taking_simple_calls`], the verdict on a line begun at
-    /// `began_us`: let out when it calls the lamp (its words open with "Hey
-    /// Lamp" as the lamp's language writes it, a head tap, or a turn a
-    /// computer opened within 8 s of its `turn.start`), is the lamp's own
-    /// turn, or begins within [`crate::follows_on::WITHIN_US`]
+    /// `began_us`: let out when it calls the lamp (lamp-name heard the name
+    /// at its start, a head tap, or a turn a computer opened within 8 s of its
+    /// `turn.start`), is the lamp's own turn, or begins within
+    /// [`crate::follows_on::WITHIN_US`]
     /// (20 s) of the end of the lamp's last words, measured to its start, as
     /// every answer's words move it on; held otherwise, and never answered.
     ///
     /// A line with no words in it (a sound, a cough, room noise) is never
-    /// answered, but for a tap or a computer's turn; and a line begun within
+    /// answered, but as a call; and a line begun within
     /// [`CALL_CARRIES_FOR`] (15 s) of a call let out (`called_at`) is the
     /// call's ("Hey Lamp, what's the weather" … "in Hanoi"), whatever the
     /// lamp said since: an answer doesn't clear it, only a stop or a new
@@ -10891,12 +10872,10 @@ impl Heeding {
         });
         if attention.judged_own() {
             Verdict::Play("the lamp began this turn itself")
-        } else if attention.tapped() {
+        } else if attention.simple_called() {
             Verdict::Play(SIMPLE_CALLED)
         } else if !heard.chars().any(char::is_alphanumeric) {
             Verdict::Hold(crate::second_provider::SIMPLE_NO_WORDS)
-        } else if attention.simple_called() {
-            Verdict::Play(SIMPLE_CALLED)
         } else if crate::follows_on::due(true, false, said_until_us, began_us) {
             Verdict::Play(SIMPLE_GOING_ON)
         } else if after_the_call {
