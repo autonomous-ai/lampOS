@@ -1,22 +1,22 @@
 # 09:00, 70 minutes at the desk, the eyes' room/activity saying head_down
-# (reading or writing, #1678) from minute 40 to 60: nothing at 45, then the
-# tilt at the first face after they look up, at 60.
+# (reading or writing, #1678) from minute 25 to 45: nothing at 30, then the
+# tilt at the first face after they look up, at 45.
 clock = "09:00"
 
 [[expect]]
-at = "60m"
+at = "45m"
 within = "1m"
 call = "body.gesture"
 args = { gesture = "curious" }
 
 [[expect]]
-at = "60m"
+at = "45m"
 within = "1m"
 call = "light"
 args = { dim = 1 }
 
 [[expect]]
-at = "60m"
+at = "45m"
 within = "1m"
 call = "say"
 args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }

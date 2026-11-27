@@ -132,12 +132,17 @@ sau:
    **Bốn quy tắc** (người xây dựng đầu tiên duyệt trên #6066):
    - **Mặc định có chừng mực** (`made_skill::mannered`, trong
      `made_skill::paced`): kỹ năng tạo ra tự khởi động (có `[trigger]`,
-     không có `tool`) được đèn gán chừng mực của các lời nhắc có sẵn, không
-     bao giờ bị từ chối vì thiếu chúng: `most_a_day = 3`, `[quiet]`
+     không có `tool`) được đèn gán chừng mực mà các lời nhắc có sẵn từng có,
+     không bao giờ bị từ chối vì thiếu chúng: `most_a_day = 3`, `[quiet]`
      22:00-08:00, `[budget] group = "wellbeing"` với `per_hour = 1`, nên nó
-     chia chung một lần mỗi giờ với các lời nhắc wellbeing, và
+     chia chung một lần mỗi giờ với các kỹ năng còn trong nhóm `[budget]`
+     đó (A meal check và Quiet focus, kỹ năng cài thêm), và
      `[rest] after_ignored = 2` (nghỉ đến sáng sau hai lần chạy không ai để
-     ý), như `skills/sip-of-water`. Mô hình được dặn không đặt cái nào trong
+     ý), như `skills/sip-of-water` trước ngày 27/11 (chủ sở hữu, 27/11:
+     bảy lời nhắc wellbeing lõi, Sip of water, Comfort break, Stand up,
+     Stretch break, Rest your eyes, Sit back và Wind down, không còn
+     `most_a_day`, `[budget]`, `[rest]` hay `[quiet]`; mẫu của
+     `made_skill::BEHAVIOUR_TEMPLATE` vẫn giữ chúng). Mô hình được dặn không đặt cái nào trong
      số đó trừ khi yêu cầu tự nói muốn nhiều hơn; cái nó viết bị kẹp vào
      giới hạn, không bao giờ bị từ chối (P2 của Thirteen và App Only trên
      #6103): `most_a_day` vào 1-6, `[budget]` luôn là `wellbeing` với
@@ -3734,13 +3739,16 @@ cả hai người viết.
   (`made_skill::template_guards`, lấy từ `made_skill::BEHAVIOUR_TEMPLATE`):
   `[[while]]` trên `voice/state` `not_equals = "speaking"` 30 giây và
   `equals = "resting"` 5 giây, trên `room/activity` `state not_equals =
-  "head_down"` với `unknown = "holds"`, topic của chúng do đèn cấp. Lần
+  "head_down"` với `unknown = "holds"`, topic của chúng do đèn cấp (bản
+  thân sip-of-water từ 27/11 chờ đèn im 10 giây, không còn 30, và
+  `cooldown = "30m"`, không còn 45, theo chủ sở hữu, 27/11; mẫu guard chưa đổi,
+  câu `SITTING` dưới đây đã theo 30m). Lần
   gọi thêm cũng được cho biết cách ngồi lâu của sip-of-water, kèm một câu
   trả lời mẫu cho "when I've sat at my desk a long while, remind me to
   stretch" (`make_no_cannot::SITTING`, `SAT_EXAMPLE`; lamp-9adf, 18/11, khi
   một yêu cầu như vậy bị tạo trên việc ai đó đứng dậy): `room/presence`
   `someone` `equals = true` với `for = "30m"` của sip-of-water, mỗi lần
-  ngồi một lần (`rearm = "leaves"`) và `cooldown = "45m"`, không bao giờ là
+  ngồi một lần (`rearm = "leaves"`) và `cooldown = "30m"` (45m trước 27/11), không bao giờ là
   đứng dậy; quay lại bàn vẫn là lúc đến. Mô hình chọn theo ý nghĩa; khi tắt,
   prompt như trước. Quyền
   của nó theo `make_no_cannot` (`net` chỉ khi có `LAMP_TASK_NET`), cần task
@@ -6487,9 +6495,11 @@ trong lần ngồi.
   hoãn, nghỉ hay một lời nhắc còn đang được xét, `most_a_day` của ngày, hay
   giờ hoặc khoảng cách của nhóm cản cũng giữ lần giữ của nó, và các giới
   hạn đã giữ cản nó sau lần khởi động lại đúng như trước: sau khi Rest your
-  eyes chạy (45 phút), lần giữ của sip, Stretch break, Stand up và Comfort
-  break được giữ qua một bản cập nhật trong khoảng cách 30 phút của nhóm, và
-  mỗi cái vẫn chờ hết khoảng cách đó. Chỉ một từ `stands_in_for_group` còn
+  eyes chạy (30 phút), lần giữ của nó được giữ qua một bản cập nhật trong
+  `cooldown` 45 phút của nó, và nó vẫn chờ hết cooldown đó. Từ 27/11 các lời
+  nhắc wellbeing lõi không còn chung nhóm `[budget]` (chủ sở hữu, 27/11),
+  nên giờ và khoảng cách của nhóm chỉ còn cản A meal check và Quiet focus,
+  hai kỹ năng cài thêm còn ở nhóm `[budget]` "wellbeing". Chỉ một từ `stands_in_for_group` còn
   chờ, hay một lần đọc dịch vụ đã liên kết còn đang chạy hoặc đã thực hiện
   trong ngày địa phương này (một lần mỗi ngày, #5288), vẫn khiến lần giữ
   của kỹ năng không được ghi, vì chúng không được giữ; nó bắt đầu lại sau
@@ -7006,8 +7016,16 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 
 ## Một `[stop]` dùng chung gọi tên một loại (`[stop] kind`, #6543)
 
-Các kỹ năng của một nhóm `[budget]` dùng chung một hàm `[stop]` (như
-`wellbeing_nudges`). Gọi không có `all` thì dừng kỹ năng chạy hoặc được hỏi
+Các kỹ năng của một nhóm `[budget]`, hoặc của một `[stop] group` (#7401),
+dùng chung một hàm `[stop]` (như `wellbeing_nudges`). Từ 27/11 (chủ sở
+hữu, 27/11) các lời nhắc wellbeing lõi (Sip of water, Comfort break, Stand
+up, Rest your eyes, Sit back, Wind down) không còn ở nhóm `[budget]` nào: chúng
+ghi `[stop] group = "wellbeing"`, không có giới hạn nào. Một `[stop] group`
+cùng tên với một nhóm `[budget]` dùng chung hàm của nhóm đó
+(`lamp_skills::load_each_with`), nên A meal check và Quiet focus, vẫn ở
+nhóm `[budget]` "wellbeing", dùng chung `wellbeing_nudges` với chúng. Câu của
+một lời nhắc như vậy không ai nghe (`Engine::unsaid`) trả lại `cooldown` của
+trigger, như của các phản ứng với điều thấy được. Gọi không có `all` thì dừng kỹ năng chạy hoặc được hỏi
 sau cùng, có `all` (hoặc khi chưa kỹ năng nào chạy) thì dừng tất cả, như
 trước. Từ #7473, lời của `all` và `about` của các kỹ năng wellbeing nói với
 mô hình: "the nudges" (số nhiều, hoặc nói chung) là `all`, còn "that one"
@@ -7185,7 +7203,8 @@ từng nói gì; `unknown = "holds_stale"` đúng cả khi giá trị đã hết
 Bốn kỹ năng đi kèm đọc chúng như vậy (#6543, phần kỹ năng), mỗi điều kiện có
 `unknown = "holds_stale"`, nên khi không có `lamp-seen`, hoặc nó đã im, mỗi
 kỹ năng chạy đúng như trước: Uống ngụm nước (`drank_s_ago` trên 1799, 30
-phút của các trigger, ở cả hai khối), Đứng dậy (`break_s_ago` trên 5999), Vươn vai
+phút của các trigger, ở cả hai khối), Đứng dậy (`break_s_ago` trên 4199, 70
+phút của trigger, chủ sở hữu, 27/11; trước đó 5999), Vươn vai
 (`break_s_ago` trên 1799: 30 phút của `sooner` theo cái ngáp, không phải 50
 phút của chính nó, nên một cái ngáp vẫn đưa lần vươn vai sớm lên), Hỏi bữa ăn
 (`ate_s_ago` trên 4499, 75 phút của các trigger; phiên bản 1.1.0). Một lần thấy uống, ăn hay vươn
@@ -7393,8 +7412,9 @@ cơ hội bị nó giữ lại thì bị bỏ, không bao giờ được giữ. 
 kỹ năng không có `[budget]`, để các kỹ năng dưới thư mục skills ghi cùng một
 `group` dùng chung hàm `[stop]` mà không có giới hạn nào, cùng với các kỹ năng
 của nhóm `[budget]` cùng tên (#8377: Tư thế dùng chung hàm của các lời nhắc
-wellbeing) (không được đặt cạnh `[budget]`; kỹ năng được đẩy lên không dùng
-chung). Nhịp clip: mặc định
+wellbeing; kỹ năng được đẩy lên không dùng chung; từ 27/11 các lời nhắc
+wellbeing lõi cũng vậy, `group = "wellbeing"`, cùng hàm với nhóm `[budget]`
+cùng tên, xem "Một `[stop]` dùng chung gọi tên một loại"). Nhịp clip: mặc định
 một burst mỗi phút; với `LAMP_SEEN_BURST_15S=on` (tối, không unit nào đặt),
 cloud có thể đặt nhịp từ 15 s tới 60 s qua `seen_clip` trong phản hồi
 `/ping` (`{"every_s": N, "until_unix_s": T}`, số giây nguyên). lamp-cloud

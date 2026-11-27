@@ -1,4 +1,5 @@
-# 11:00, due at 13 while they talk from 12 to 16: held, said once the voice has rested, by 17.
+# 11:00, leaned in from 11.5, due at 12.5 while they talk from 12 to 16: held,
+# said once the voice has rested, by 17.
 clock = "11:00"
 
 [[expect]]

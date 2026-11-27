@@ -3880,11 +3880,10 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
         &["room/activity", "humans/faces/tracked", "voice/state"]
             .map(|topic| toml::Value::String(topic.to_owned()))
     );
-    // In the wellbeing group's hour, as the other nudges: another wellbeing
-    // skill's run holds it back (`a_shared_budget_gives_its_group_its_runs_an_hour_between_them`);
-    // two words in a row unnoticed rest it, as theirs do.
-    assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 1)));
-    assert_eq!(skill.rest.map(|rest| rest.after_ignored), Some(2));
+    // In no budget and with no rest (the owner, 27 Nov): another wellbeing
+    // skill's run never holds it back, and words unnoticed never rest it.
+    assert_eq!(skill.budget, None);
+    assert_eq!(skill.rest, None);
     // Core, in the product, since its played check with a person (#5208).
     assert_eq!(skill.kind, SkillKind::Core);
 }
@@ -13663,28 +13662,21 @@ fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
     assert_eq!(stuffy(&mut engine, 60 * minute), ["a"]);
 }
 
-/// #1685: the four wellbeing skills and Stretch break as they are in
-/// `lampOS/skills/`, on one engine, through a five-hour sitting from 10:00
-/// with someone moving now and then (each nudge noticed): one nudge an hour
-/// between them, each in the order it came due, each with one short line
-/// (the owner, 25 Oct: "talk to the user").
-/// A sip of water at 30 minutes; Rest your eyes due at 45, waiting to 90;
-/// Stretch break due at 50, to 150; Stand up due at 100, to 210; then Rest
-/// your eyes again. Wind down is outside its hours. The four share one
-/// `[stop]`, `wellbeing_nudges`: one function in the tools file, which
-/// stops the one that came last, or with `all` every one of them.
-/// With `LAMP_NUDGES_PRESENT=on` (#5207): every wellbeing skill names two
-/// an hour, never within 30 minutes of each other, and over five hours at
-/// the desk the six product nudges come more often than one an hour, never
-/// two within 30 minutes, nor more than two in any hour.
+/// The owner, 27 Nov at lamp-06c1: "drop all the max-per-day", "drop all
+/// the other in view, no need", "drop all the share budget, there should be
+/// no shared budget", "drop all the quiet hour 8-22 or anything, user can
+/// work late". The eight wellbeing nudges in the product, Posture's too
+/// (#8377), with `LAMP_NUDGES_PRESENT` on and off alike: no budget, no daily most, no
+/// rest after ignored nudges, no quiet hours or hours (Wind down keeps its
+/// 22:00 to 23:00 window), no "nobody else in view", and the lamp's own
+/// last words 10 s back, not 30. Their one `wellbeing_nudges` is shared by
+/// their `[stop] group`, with A meal check's and Quiet focus's.
 #[test]
-fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minutes() {
+fn the_wellbeing_nudges_have_no_budget_cap_hours_or_others_in_view() {
     let names = [
         "comfort-break",
-        "meal-check",
-        // Not Posture: its own `[budget]` group (the owner, #8377), test
-        // `posture_reads_the_posture_alone_and_names_a_region_never_a_condition`.
-        "quiet-focus",
+        // Posture too (#8377): in the wellbeing `[stop] group`, no budget.
+        "posture",
         "rest-your-eyes",
         "sip-of-water",
         "sit-back",
@@ -13693,73 +13685,126 @@ fn with_the_switch_the_wellbeing_skills_share_two_an_hour_never_within_30_minute
         "wind-down",
     ];
     for name in names {
-        let skill = lamp_skills::load_with(&skills_root().join(name), true).unwrap();
-        assert_eq!(skill.budget, Some(("wellbeing".to_owned(), 2)), "{name}");
-        assert_eq!(skill.budget_gap_us, 30 * 60_000_000, "{name}");
-        assert!(skill.enabled, "{name}");
-        // Without it, as before: one an hour, no gap.
-        let own = lamp_skills::load_with(&skills_root().join(name), false).unwrap();
-        assert_eq!(own.budget, Some(("wellbeing".to_owned(), 1)), "{name}");
-        assert_eq!(own.budget_gap_us, 0, "{name}");
-    }
-    let skills: Vec<lamp_skills::Skill> = [
-        "comfort-break",
-        "rest-your-eyes",
-        "sip-of-water",
-        "stand-up",
-        "stretch-break",
-        "wind-down",
-    ]
-    .iter()
-    .map(|name| lamp_skills::load_with(&skills_root().join(name), true).unwrap())
-    .collect();
-    let mut engine = Engine::new(skills, true);
-    // 10:00 local at 0 s.
-    engine.clock(0, 0, 36_000_000);
-    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
-    let mut nudged: Vec<(u64, String)> = Vec::new();
-    for second in 0..=5 * 3_600u64 {
-        let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
-        let faces = format!(
-            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
-            left + 0.3
-        );
-        for run in engine.observe(
-            "humans/faces/tracked",
-            second * 1_000_000,
-            faces.as_bytes(),
-            None,
-        ) {
-            if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
-                nudged.push((second / 60, run.skill));
+        for present in [true, false] {
+            let skill = lamp_skills::load_with(&skills_root().join(name), present).unwrap();
+            assert_eq!(skill.budget, None, "{name} {present}");
+            assert_eq!(skill.most_a_day, None, "{name} {present}");
+            assert_eq!(skill.rest, None, "{name} {present}");
+            if name != "stretch-break" {
+                let stop = skill.stop.as_ref().unwrap();
+                assert_eq!(stop.tool, "wellbeing_nudges", "{name}");
+                assert_eq!(stop.group.as_deref(), Some("wellbeing"), "{name}");
             }
         }
+        let file = fs::read_to_string(skills_root().join(name).join("skill.toml")).unwrap();
+        let toml: toml::Value = toml::from_str(&file).unwrap();
+        for table in [&toml, toml.get("present").unwrap_or(&toml)] {
+            for key in ["quiet", "budget", "rest", "most_a_day"] {
+                assert!(table.get(key).is_none(), "{name}: {key}");
+            }
+            assert_eq!(
+                table.get("active").is_some(),
+                name == "wind-down" && std::ptr::eq(table, &toml),
+                "{name}: active"
+            );
+        }
+        assert!(!file.contains("faces_at_most"), "{name}");
+        assert!(!file.contains("for = \"30s\""), "{name}");
     }
-    let minutes: Vec<u64> = nudged.iter().map(|(minute, _)| *minute).collect();
-    assert!(
-        minutes.windows(2).all(|two| two[1] - two[0] >= 30),
-        "{nudged:?}"
-    );
-    assert!(
-        minutes.windows(3).all(|three| three[2] - three[0] >= 60),
-        "{nudged:?}"
-    );
-    // More than the five an hour's budget let through over these five
-    // hours without the switch.
-    assert!(minutes.len() > 5, "{nudged:?}");
-    let said: Vec<&str> = nudged.iter().map(|(_, skill)| skill.as_str()).collect();
-    for skill in ["comfort-break", "rest-your-eyes", "sip-of-water"] {
-        assert!(said.contains(&skill), "{nudged:?}");
+    // Every wellbeing skill loads beside the others: the nudges' `[stop]
+    // group` shares the function with A meal check's and Quiet focus's
+    // `[budget]` group of the same name.
+    let (loaded, errors) = load_all(&skills_root());
+    // (A comfort break is off in its own file, on by its `[present]`.)
+    for name in [
+        "meal-check",
+        "quiet-focus",
+        "sip-of-water",
+        "sit-back",
+        "wind-down",
+    ] {
+        assert!(
+            loaded.iter().any(|skill| skill.name == name),
+            "{name}: {errors:?}"
+        );
+    }
+    let tools = tools_file(&loaded);
+    let shared = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|tool| tool["name"] == "wellbeing_nudges")
+        .count();
+    assert_eq!(shared, 1, "{tools}");
+}
+
+/// The owner, 27 Nov: "there should be no shared budget". Two wellbeing
+/// nudges due within minutes of each other both speak, with
+/// `LAMP_NUDGES_PRESENT` on and off: Rest your eyes and A sip of water, both
+/// due at 30 minutes, both at 30, and Stretch break at 50, Stand up at 70.
+#[test]
+fn two_wellbeing_nudges_within_minutes_both_speak() {
+    for present in [true, false] {
+        let skills: Vec<lamp_skills::Skill> = [
+            "rest-your-eyes",
+            "sip-of-water",
+            "stretch-break",
+            "stand-up",
+        ]
+        .iter()
+        .map(|name| lamp_skills::load_with(&skills_root().join(name), present).unwrap())
+        .collect();
+        let mut engine = Engine::new(skills, true);
+        // 10:00 local at 0 s.
+        engine.clock(0, 0, 36_000_000);
+        engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+        let mut nudged: Vec<(u64, String)> = Vec::new();
+        for second in 0..=75 * 60u64 {
+            let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
+            let faces = format!(
+                r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+                left + 0.3
+            );
+            for run in engine.observe(
+                "humans/faces/tracked",
+                second * 1_000_000,
+                faces.as_bytes(),
+                None,
+            ) {
+                if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
+                    nudged.push((second / 60, run.skill));
+                }
+            }
+        }
+        // Each skill's first: with the switch, A sip of water comes again
+        // each 30 minutes while they stay.
+        let mut first: Vec<(u64, &str)> = Vec::new();
+        for (minute, skill) in &nudged {
+            if !first.iter().any(|(_, seen)| seen == skill) {
+                first.push((*minute, skill.as_str()));
+            }
+        }
+        first.sort();
+        assert_eq!(
+            first,
+            [
+                (30, "rest-your-eyes"),
+                (30, "sip-of-water"),
+                (50, "stretch-break"),
+                (70, "stand-up")
+            ],
+            "{present}: {nudged:?}"
+        );
     }
 }
 
-/// The lead's call (16 Nov: the owner's lamp reminded no water all day):
-/// with `LAMP_NUDGES_PRESENT=on`, as the product runs, A sip of water comes
-/// at 30 minutes at the desk, not at 29, and again 45 minutes later, not
-/// sooner, with the eyes' `sitting_s` and lamp-seen's `drank_s_ago` (no drink
-/// seen) counting the same sitting.
+/// The owner, 27 Nov: "the sip of water, make it 30m cooldown". With
+/// `LAMP_NUDGES_PRESENT=on`, as the product runs, A sip of water comes at 30
+/// minutes at the desk, not at 29, and again 30 minutes later, not sooner,
+/// with the eyes' `sitting_s` and lamp-seen's `drank_s_ago` (no drink seen)
+/// counting the same sitting.
 #[test]
-fn with_the_switch_a_sip_comes_at_30_minutes_and_again_45_minutes_later() {
+fn with_the_switch_a_sip_comes_at_30_minutes_and_again_30_minutes_later() {
     let sip = lamp_skills::load_with(&skills_root().join("sip-of-water"), true).unwrap();
     let mut engine = Engine::new(vec![sip], true);
     // 10:00 local at 0 s.
@@ -13793,75 +13838,7 @@ fn with_the_switch_a_sip_comes_at_30_minutes_and_again_45_minutes_later() {
     assert_eq!(said.len(), 2, "{said:?}");
     assert!((30 * 60..31 * 60).contains(&said[0]), "{said:?}");
     let again = said[1] - said[0];
-    assert!((45 * 60..46 * 60).contains(&again), "{said:?}");
-}
-
-/// With `LAMP_NUDGES_PRESENT=on` (#5207, Fourteen's finding on #5208): a
-/// wellbeing nudge that said nothing (its say expired unheard) gives its
-/// place in the group's hour, and its gap, back, so the next nudge due is
-/// not held back by one the person never heard. Without the switch the
-/// group gives nothing back, as before.
-#[test]
-fn with_the_switch_an_unsaid_nudge_gives_its_place_in_the_hour_back() {
-    let sitting = |present: bool, unsaid_first: bool| -> (Vec<(u64, String)>, Option<String>) {
-        let skills: Vec<lamp_skills::Skill> = ["rest-your-eyes", "sip-of-water"]
-            .iter()
-            .map(|name| lamp_skills::load_with(&skills_root().join(name), present).unwrap())
-            .collect();
-        let mut engine = Engine::new(skills, true);
-        // 10:00 local at 0 s.
-        engine.clock(0, 0, 36_000_000);
-        engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
-        let (mut nudged, mut given_back) = (Vec::new(), None);
-        for second in 0..=90 * 60u64 {
-            let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
-            let faces = format!(
-                r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
-                left + 0.3
-            );
-            let now = second * 1_000_000;
-            for run in engine.observe("humans/faces/tracked", now, faces.as_bytes(), None) {
-                if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
-                    if unsaid_first && nudged.is_empty() {
-                        // Its say expired unheard: the program tells it so
-                        // when the run is done.
-                        given_back = engine.unsaid(&run.skill, now);
-                    }
-                    nudged.push((second / 60, run.skill));
-                }
-            }
-        }
-        (nudged, given_back)
-    };
-    // Heard: Sip of water at 30, and Rest your eyes held to the gap, at 60.
-    let (heard, _) = sitting(true, false);
-    assert_eq!(
-        heard[..2],
-        [
-            (30, "sip-of-water".to_owned()),
-            (60, "rest-your-eyes".to_owned())
-        ]
-    );
-    // Unheard: its place is given back, and Rest your eyes comes when due, at 45.
-    let (unheard, given_back) = sitting(true, true);
-    assert_eq!(given_back.as_deref(), Some("wellbeing"));
-    assert_eq!(
-        unheard[..2],
-        [
-            (30, "sip-of-water".to_owned()),
-            (45, "rest-your-eyes".to_owned())
-        ]
-    );
-    // Without the switch nothing is given back: one an hour as before.
-    let (before, given_back) = sitting(false, true);
-    assert_eq!(given_back, None);
-    assert_eq!(before[..1], [(30, "sip-of-water".to_owned())]);
-    assert!(
-        before
-            .iter()
-            .all(|(minute, _)| *minute == 30 || *minute >= 90),
-        "{before:?}"
-    );
+    assert!((30 * 60..31 * 60).contains(&again), "{said:?}");
 }
 
 /// #5207, Fourteen's and Thirteen's P2 on #5237: Sit back's warm word (a
@@ -13879,9 +13856,9 @@ fn with_the_switch_an_unsaid_word_after_a_heard_nudge_gives_nothing_back() {
     let mut given_back = Vec::new();
     for second in 0..=40 * 60u64 {
         let now = second * 1_000_000;
-        // Two minutes at the desk, leaned in from 2 to 20 minutes, then
-        // sat back.
-        let state = if (120..1_200).contains(&second) {
+        // Two minutes at the desk, leaned in from 2 to 12 minutes (the
+        // word at 3 since the owner's 27 Nov minute), then sat back.
+        let state = if (120..720).contains(&second) {
             "leaning_in"
         } else {
             "at_desk"
@@ -14017,9 +13994,16 @@ fn a_says_may_end_unsaid_needs_a_note_and_no_shipped_skill_has_it() {
     }
 }
 
+/// The wellbeing nudges through a five-hour sitting from 10:00, in no
+/// budget (the owner, 27 Nov): each when it comes due, two at once if due
+/// at once, Rest your eyes again each 45 minutes while they stay, Wind down
+/// outside its hour. Their one `wellbeing_nudges`, shared by their `[stop]
+/// group` and A meal check's `[budget]` group of the same name, stops the
+/// one that came last, or with `all` every one of them, A meal check's too.
 #[test]
-fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
+fn the_wellbeing_nudges_each_come_when_due_and_share_one_stop() {
     let names = [
+        "meal-check",
         "rest-your-eyes",
         "sip-of-water",
         "stand-up",
@@ -14030,16 +14014,20 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
         .iter()
         .map(|name| load(&skills_root().join(name)).unwrap())
         .collect();
+    let (loaded, errors) = load_all(&skills_root());
+    assert!(
+        loaded.iter().any(|skill| skill.name == "meal-check")
+            && loaded.iter().any(|skill| skill.name == "sip-of-water"),
+        "{errors:?}"
+    );
     for skill in &skills {
-        assert_eq!(
-            skill.budget,
-            Some(("wellbeing".to_owned(), 1)),
-            "{}",
-            skill.name
-        );
         assert!(skill.permissions.speak, "{}", skill.name);
+        if skill.name == "meal-check" {
+            continue;
+        }
+        assert_eq!(skill.budget, None, "{}", skill.name);
         if skill.name != "stretch-break" {
-            assert!(skill.most_a_day.is_some() && skill.rest.is_some());
+            assert!(skill.most_a_day.is_none() && skill.rest.is_none());
             assert_eq!(skill.stop.as_ref().unwrap().tool, "wellbeing_nudges");
         }
     }
@@ -14092,11 +14080,16 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
     assert_eq!(
         nudged,
         [
+            (30, "rest-your-eyes"),
             (30, "sip-of-water"),
-            (90, "rest-your-eyes"),
-            (150, "stretch-break"),
-            (210, "stand-up"),
-            (270, "rest-your-eyes")
+            (50, "stretch-break"),
+            (70, "stand-up"),
+            (75, "rest-your-eyes"),
+            (120, "rest-your-eyes"),
+            (165, "rest-your-eyes"),
+            (210, "rest-your-eyes"),
+            (255, "rest-your-eyes"),
+            (300, "rest-your-eyes")
         ]
     );
     // "Not today": the one that came last of the four.
@@ -14138,9 +14131,15 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
     assert!(all.contains("none of the wellbeing nudges"), "{all}");
     assert!(!all.contains("Only those"), "{all}");
     assert!(
-        ["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"]
-            .iter()
-            .all(|skill| engine.stopped(skill, at))
+        [
+            "meal-check",
+            "rest-your-eyes",
+            "sip-of-water",
+            "stand-up",
+            "wind-down"
+        ]
+        .iter()
+        .all(|skill| engine.stopped(skill, at))
     );
     assert!(!engine.stopped("stretch-break", at));
     for args in [
@@ -14318,8 +14317,8 @@ fn just_drank_rests_the_water_nudge_30_minutes_and_no_other() {
     };
     // A sitting from 10:00, "I just had water" at 10 minutes: no sip at 30,
     // its chance kept until the rest ends at 40, when it comes; away at 45,
-    // back at 50, and the next sitting's 30 minutes, at 80, are within its
-    // 45-minute cooldown.
+    // back at 50, and the next sitting's 30 minutes, at 80, are past its
+    // 30-minute cooldown (the owner, 27 Nov), so it comes again.
     let mut engine = Engine::new(skills(&["sip-of-water"]), true);
     resting(&mut engine);
     let mut nudged = sat_and_nudged(&mut engine, 0, 10, 10, 10);
@@ -14341,14 +14340,20 @@ fn just_drank_rests_the_water_nudge_30_minutes_and_no_other() {
     assert!(engine.stopped("sip-of-water", at + 30 * 60_000_000 - 1));
     assert!(!engine.stopped("sip-of-water", at + 30 * 60_000_000));
     nudged.extend(sat_and_nudged(&mut engine, 10, 45, 50, 120));
-    assert_eq!(nudged, [(40, "sip-of-water".to_owned())]);
+    assert_eq!(
+        nudged,
+        [
+            (40, "sip-of-water".to_owned()),
+            (80, "sip-of-water".to_owned())
+        ]
+    );
 
     // With the other wellbeing nudges, "I just had water" a minute into
     // the sitting: only the water nudge rests, with `all` too, and its
     // chance at 30 minutes comes when the rest ends, at 31, not a sitting
-    // later (before #7753's fix, no sip in the whole 100 minutes). Rest
-    // your eyes, due at 45 with the group's hour spent, comes once it is
-    // free.
+    // later (before #7753's fix, no sip in the whole 100 minutes). The
+    // others come when due, in no budget (the owner, 27 Nov): Rest your
+    // eyes at 30 and 75, Stand up at 70.
     let mut engine = Engine::new(
         skills(&["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"]),
         true,
@@ -14369,8 +14374,10 @@ fn just_drank_rests_the_water_nudge_30_minutes_and_no_other() {
     assert_eq!(
         nudged,
         [
+            (30, "rest-your-eyes".to_owned()),
             (31, "sip-of-water".to_owned()),
-            (91, "rest-your-eyes".to_owned())
+            (70, "stand-up".to_owned()),
+            (75, "rest-your-eyes".to_owned())
         ]
     );
 

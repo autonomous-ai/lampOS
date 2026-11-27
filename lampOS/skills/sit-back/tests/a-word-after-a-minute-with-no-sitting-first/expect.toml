@@ -1,0 +1,16 @@
+# 11:00, the eyes' baseline at 2 minutes, then leaned in to the end: a word at
+# minute 3, with no twelve minutes' sitting first (the owner, 27 Nov: "sit
+# back's 12-min sitting prerequisite: drop it too").
+clock = "11:00"
+
+[[expect]]
+at = "3m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "3m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }

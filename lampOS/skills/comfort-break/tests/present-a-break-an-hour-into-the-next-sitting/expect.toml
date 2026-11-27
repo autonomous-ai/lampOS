@@ -1,0 +1,17 @@
+# LAMP_NUDGES_PRESENT=on (#5207): 10:00, an hour, three minutes away, 70
+# minutes more: the first sitting just short of 60 minutes, so nothing; 60
+# minutes into the second, at 123, once.
+clock = "10:00"
+present = true
+
+[[expect]]
+at = "123m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "123m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about an hour. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health." }

@@ -1,0 +1,21 @@
+# 20:00, 110 minutes at the desk: at 70 minutes, 21:10, once: no hours of its
+# own (the owner, 27 Nov: "user can work late").
+clock = "20:00"
+
+[[expect]]
+at = "70m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "70m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "70m"
+within = "1m"
+call = "say"
+args = { note = "They have been sitting for a very long time. In one short, friendly line, suggest standing up and moving about for a minute." }

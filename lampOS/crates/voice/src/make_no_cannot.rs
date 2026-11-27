@@ -414,7 +414,7 @@ const EXAMPLE_ASKED: &str = "every morning at eight, tell me a joke";
 const SITTING: &str = " Someone has sat at the desk a long while, as the lamp's own \
 sip-of-water fires: \"room/presence\", \"someone\", equals true, for = \"30m\" (or the while the \
 request names), rearm = \"leaves\" (once a sitting, again only after they have left), \
-cooldown = \"45m\"; a long sitting is never a getting up, which runs only as they stand. \
+cooldown = \"30m\"; a long sitting is never a getting up, which runs only as they stand. \
 Someone coming back to the desk is an arrival, never the desk left.";
 
 /// One whole answer for a long sitting ([`SITTING`]), shown to the model
@@ -431,7 +431,7 @@ field = \"someone\"
 equals = true
 for = \"30m\"
 rearm = \"leaves\"
-cooldown = \"45m\"
+cooldown = \"30m\"
 ```";
 
 /// The request [`SAT_EXAMPLE`] is for.

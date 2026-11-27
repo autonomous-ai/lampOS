@@ -32,14 +32,14 @@ rearm = "leaves"          # once per sitting; again only after they have left
 # below never mentions it. Only with LAMP_YAWN_SOONER=on and the eyes
 # counting yawns (LAMP_EYES_YAWN=on).
 sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }
-cooldown = "90m"
+cooldown = "75m"          # the owner, 27 Nov: "all 90m cooldown, set back to 75m cooldown"
 wait = "10m"              # talking when the 50 minutes come: it stretches once the talk ends, within ten minutes (#1021)
 
-[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+[[while]]                 # the lamp itself has not spoken for 10 s, as Posture waits (the owner, 27 Nov): not on top of its own last words
 topic = "voice/state"
 field = "state"
 not_equals = "speaking"
-for = "30s"
+for = "10s"
 
 [[while]]                 # not in the middle of a conversation
 topic = "voice/state"
@@ -61,12 +61,6 @@ unknown = "holds_stale"   # or has run out, and it runs as before. 30 minutes, n
                           # With LAMP_SEEN_BREAK_IS_STANDING=on a break is a stand-up, not a
                           # stretch: break_s_ago counts from their return (#6543 step 2).
 
-# One nudge an hour between the wellbeing skills (#1685): with none of the
-# installable ones on the lamp, it is the only member and nothing changes.
-[budget]
-group = "wellbeing"
-per_hour = 1
-
 [ask]
 policy = "nudge"
 
@@ -81,15 +75,5 @@ body = { gesture = "stretching" }
 # change the person's own light for good.
 say = "{sitting} They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too."
 
-# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
-# group's two an hour, never within 30 minutes of each other, which
-# Sip of water and Comfort break name too (a group keeps its quietest).
-[present.quiet]            # never at night, as the other nudges (#5207, the P3 on #5237)
-from = "22:00"
-to = "08:00"
-
-[present.budget]
-group = "wellbeing"
-per_hour = 2
-gap = "30m"
-give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
+# No budget shared with the other nudges and no quiet hours, with or without
+# LAMP_NUDGES_PRESENT (the owner, 27 Nov): a person may work late.
