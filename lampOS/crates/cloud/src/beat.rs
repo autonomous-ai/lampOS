@@ -162,7 +162,7 @@ pub async fn pings(
             if engines.is_some() {
                 let parts = payload.engines_part();
                 if parts_said.as_deref() != Some(parts.as_str()) {
-                    say.line(&format!("lamp-cloud: the heartbeat says {parts}"));
+                    say.line(&format!("the heartbeat says {parts}"));
                     parts_said = Some(parts);
                 }
             }
@@ -469,7 +469,7 @@ mod tests {
     #[tokio::test]
     async fn the_heartbeat_s_engines_are_said_once_and_again_on_a_change() {
         use lamp_msgs::UpdateStatus;
-        const PREFIX: &str = "lamp-cloud: the heartbeat says ";
+        const PREFIX: &str = "the heartbeat says ";
         let identity = Identity {
             device: "lamp-device-zz91".into(),
             version: "build-ver-qq77".into(),
