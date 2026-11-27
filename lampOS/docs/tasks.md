@@ -5497,7 +5497,14 @@ file:
   succeeds is journaled ("tasks: the OpenClaw Gateway's allow-list add
   for /usr/local/lib/lampos/skill-start succeeded on its second try in
   61200 ms (the first: exit 1)", or "killed at its 60 s bound") and the start is kept.
-  Both bounded by the run's own gateway wait. An add that fails both
+  Both tries end by the later of the run's own gateway wait and 60 s
+  from the add's start: a held launch's look (25 s) spent 13 to 18 s of
+  it on the read on lamp-ee17 (27 Nov), and its remainder alone killed
+  every add ("the first: stopped, the second: past the run's bound"), so
+  the start was never kept and every launch was held for a full look.
+  The add is a Node CLI start, an `exec.approvals.get`, and an
+  `exec.approvals.set` when the entry is missing (each RPC at the CLI's
+  default 30 s timeout); adds took 10.5 to 19.3 s on lamp-c0a4. An add that fails both
   tries is journaled ("tasks: the OpenClaw Gateway's
   allow-list add for /usr/local/lib/lampos/skill-start did not succeed in
   120000 ms (the first: …, the second: …); the next run tries again") and does not hold the run, but the start
