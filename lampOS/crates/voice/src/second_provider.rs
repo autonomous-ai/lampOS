@@ -13452,11 +13452,15 @@ async fn spoken(
                 .care
                 .as_ref()
                 .is_some_and(|care| care.holds(Instant::now()) || care.is_turn(request)),
-            shared
-                .conversation_alone
-                .as_ref()
-                .and_then(|note| note(request))
-                == Some(worker::CONVERSATION_ALONE),
+            crate::app_tools::let_in(
+                shared
+                    .conversation_alone
+                    .as_ref()
+                    .and_then(|note| note(request))
+                    == Some(worker::CONVERSATION_ALONE),
+                false,
+                None,
+            ),
             scope
                 .as_ref()
                 .and_then(crate::memory_scope::ScopeLease::scope)
