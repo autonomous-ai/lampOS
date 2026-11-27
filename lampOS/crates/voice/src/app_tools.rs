@@ -583,12 +583,12 @@ pub const REPLY_WINDOW_US: u64 = crate::follows_on::WITHIN_US;
 /// Such a line answers the lamp only with both, inside
 /// [`REPLY_WINDOW_US`]; any other is the conversation going on alone.
 pub fn let_in(alone: bool, lamp_asked: bool, since_said_us: Option<u64>) -> LetIn {
-    // Not yet: every line let in alone is the conversation going on.
-    let _ = (lamp_asked, since_said_us);
-    if alone {
-        LetIn::ConversationGoingOn
-    } else {
+    if !alone {
         LetIn::ToTheLamp
+    } else if lamp_asked && since_said_us.is_some_and(|us| us <= REPLY_WINDOW_US) {
+        LetIn::AnswersTheLamp
+    } else {
+        LetIn::ConversationGoingOn
     }
 }
 

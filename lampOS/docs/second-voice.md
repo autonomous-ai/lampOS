@@ -9427,7 +9427,10 @@ result declares, of the apps, that app's functions alone, beside the lamp's
 own (no `use_skill`), so "set a timer" then still sets one. A call still
 unanswered at 1.5 s, with nothing said yet, says "Let me check." once. A guest's or the room's turn, a
 private lamp, the care hold or a care turn, a line let in only as the
-conversation going on, or an answer awaited: nothing offered or sent, and
+conversation going on (unless it answers Lamp's own question: Lamp's last
+words ended in a question and the line began within the 20 s reply window
+after them, `app_tools::let_in`, and is not surely someone else's), or an
+answer awaited: nothing offered or sent, and
 the call is told `not now: nothing was done`. The thread keeps the call by
 its name and outcome only, and the exchange stays out of memory. Tools in
 the file's `outside` list are not offered in this build. Off: nothing

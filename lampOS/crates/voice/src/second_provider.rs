@@ -2399,6 +2399,11 @@ struct Shared {
     /// Whether a line let out only as the conversation going on is surely
     /// someone else's ([`Engine::telling_someone_elses`], #7664).
     someone_elses: Option<Busy>,
+    /// For a line let out only as the conversation going on, whether the
+    /// lamp's last words asked a question and how long after their end the
+    /// line began ([`Engine::telling_the_asked_follow_up`]): an answer in the
+    /// reply window is offered an app's tools (`LAMP_APP_TOOLS`).
+    asked_follow_up: Option<AskedFollowUp>,
     /// With `LAMP_TASKS_NAMED_ASK=on`: whom a line's words ask by name
     /// ([`Engine::asking_by_name`]).
     named_ask: Option<NamedAsk>,
@@ -5271,6 +5276,12 @@ struct Turn {
 /// Whether a request was judged in a busy room (`worker::Heeding`).
 pub type Busy = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 
+/// For `request` let out only as the conversation going on and not surely
+/// someone else's: whether the lamp's own last words ended in a question,
+/// and how long after their end the line began, in µs; none for any other
+/// line ([`Engine::telling_the_asked_follow_up`]).
+pub type AskedFollowUp = Arc<dyn Fn(u64) -> Option<(bool, Option<u64>)> + Send + Sync>;
+
 /// What the rule says of a line that waits for the Policy's decision
 /// (`LAMP_GOING_ON_ASKS`, #1522): in a busy room, a line it would let out
 /// only as a conversation going on. The turn then asks
@@ -5725,6 +5736,7 @@ impl Engine {
                 conversation_alone: None,
                 untied: None,
                 someone_elses: None,
+                asked_follow_up: None,
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
@@ -8045,6 +8057,20 @@ impl Engine {
     pub fn telling_someone_elses(mut self, someone_elses: Busy) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.someone_elses = Some(someone_elses);
+        }
+        self
+    }
+
+    /// For a line let out only as the conversation going on and not surely
+    /// someone else's: whether the lamp's own last words ended in a question,
+    /// and how long after their end the line began. One that answers it
+    /// within `app_tools::REPLY_WINDOW_US` is offered the running apps' tools
+    /// (`LAMP_APP_TOOLS`, `app_tools::LetIn::AnswersTheLamp`), so an app's
+    /// own questions are answered without the lamp's name. Before any turn
+    /// only.
+    pub fn telling_the_asked_follow_up(mut self, asked: AskedFollowUp) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.asked_follow_up = Some(asked);
         }
         self
     }
@@ -13440,9 +13466,10 @@ async fn spoken(
         ))
         // An installed app's tools (`LAMP_APP_TOOLS`, #8406): their section,
         // on the owner's turn by the same gate, never while private, in the
-        // care hold or for a line let in only as the conversation going on;
-        // this also marks the request the tools are offered on. An app the
-        // line was told to as a phrase offers none on it (#8386).
+        // care hold or for a line let in only as the conversation going on,
+        // unless it answers the lamp's own question; this also marks the
+        // request the tools are offered on. An app the line was told to as a
+        // phrase offers none on it (#8386).
         .chain(crate::app_tools::notes_for(
             request,
             &text,
@@ -13452,15 +13479,22 @@ async fn spoken(
                 .care
                 .as_ref()
                 .is_some_and(|care| care.holds(Instant::now()) || care.is_turn(request)),
-            crate::app_tools::let_in(
-                shared
-                    .conversation_alone
+            {
+                let (asked, since_said_us) = shared
+                    .asked_follow_up
                     .as_ref()
-                    .and_then(|note| note(request))
-                    == Some(worker::CONVERSATION_ALONE),
-                false,
-                None,
-            ),
+                    .and_then(|asked| asked(request))
+                    .unwrap_or((false, None));
+                crate::app_tools::let_in(
+                    shared
+                        .conversation_alone
+                        .as_ref()
+                        .and_then(|note| note(request))
+                        == Some(worker::CONVERSATION_ALONE),
+                    asked,
+                    since_said_us,
+                )
+            },
             scope
                 .as_ref()
                 .and_then(crate::memory_scope::ScopeLease::scope)

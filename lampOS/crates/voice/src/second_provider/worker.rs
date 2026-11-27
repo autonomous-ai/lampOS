@@ -6022,6 +6022,12 @@ pub fn serve(
                     .lock()
                     .is_ok_and(|heeding| heeding.surely_someone_elses(request))
             }));
+            // `LAMP_APP_TOOLS`: such a line answering the lamp's own
+            // question is offered the running apps' tools.
+            let asked = heeding.clone();
+            engine = engine.telling_the_asked_follow_up(Arc::new(move |request| {
+                asked.lock().ok()?.asked_follow_up(request)
+            }));
         }
         // `LAMP_UNTIED_GOING_ON`: such a line with no tie to the lamp is not
         // told it cut in (#3882).
@@ -8725,6 +8731,10 @@ pub(crate) struct Heeding {
     fired: Option<u64>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
+    /// Of those, the one not surely someone else's, with whether the
+    /// lamp's own last words ended in a question and how long after their
+    /// end it began ([`Self::asked_follow_up`]).
+    asked_alone: Option<(u64, bool, Option<u64>)>,
     /// The request last judged in a busy room ([`Self::judged_busy`]).
     busy: Option<u64>,
     /// The requests judged where talk not for the lamp may be, newest
@@ -9871,6 +9881,9 @@ struct Seen {
     /// Its print's likeness to the conversation's voice, if judged: none
     /// begun over the lamp's voice or too short for a print.
     likeness: Option<f32>,
+    /// How long after the end of the lamp's words it began, in µs (none:
+    /// the lamp has said nothing yet), for the app tools' reply window.
+    since_said_us: Option<u64>,
 }
 
 /// A line that waits for the Policy's decision: its request, since when,
@@ -10146,6 +10159,7 @@ impl Heeding {
             noted: None,
             fired: None,
             alone: None,
+            asked_alone: None,
             busy: None,
             others_may_talk: std::collections::VecDeque::new(),
             policy: None,
@@ -13651,6 +13665,9 @@ impl Heeding {
             heard: heard.to_owned(),
             named_faced,
             likeness,
+            since_said_us: self
+                .said_until_us
+                .map(|ended| began_us.saturating_sub(ended)),
         };
         // The conversation's window over (none going on, whoever spoke):
         // the caller's faces go with it, before a call sets them again.
@@ -14208,6 +14225,15 @@ impl Heeding {
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
         self.someone_elses_line = (self.alone.is_some() && someone_else).then_some(request);
+        // `LAMP_APP_TOOLS`: such a line in answer to the lamp's own question,
+        // inside the reply window, is offered an app's tools (lamp-9adf,
+        // 27 Nov; `app_tools::let_in`).
+        self.asked_alone = (self.alone.is_some() && !someone_else).then(|| {
+            let asked =
+                crate::thread::current(self.thread.as_deref(), |thread| thread.lamp_asked(request))
+                    .unwrap_or_default();
+            (request, asked, seen.since_said_us)
+        });
         // `LAMP_GOING_ON_NOT_OWN`: the answer to a line let out only as the
         // conversation going on renews nothing when it is surely someone
         // else's ([`Self::someone_else`]). Under #829's own bar another voice
@@ -14476,6 +14502,20 @@ impl Heeding {
         } else {
             CONVERSATION_ALONE
         })
+    }
+
+    /// For `request` let out only as the conversation going on and not
+    /// surely someone else's ([`Self::someone_else`]): whether the lamp's
+    /// own last words ended in a question, and how long after their end it
+    /// began. An answer within `app_tools::REPLY_WINDOW_US` is offered the
+    /// running apps' tools (`LAMP_APP_TOOLS`, `app_tools::let_in`). On
+    /// lamp-9adf on 27 Nov, "Uh, I dunno. Three days I guess, twenty
+    /// minutes.", the owner's answer to the app's plan question, was offered
+    /// none, and `set_plan` was never called.
+    pub(crate) fn asked_follow_up(&self, request: u64) -> Option<(bool, Option<u64>)> {
+        self.asked_alone
+            .filter(|(of, _, _)| *of == request)
+            .map(|(_, asked, since)| (asked, since))
     }
 
     /// Whether `request` was let out only as the conversation going on and
@@ -23371,6 +23411,7 @@ mod tests {
             other_voice: false,
             same_voice: false,
             likeness,
+            since_said_us: None,
         };
         assert!(
             !heeding.someone_else(&seen(Some(0.35))),
