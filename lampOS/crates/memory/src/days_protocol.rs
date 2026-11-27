@@ -79,6 +79,11 @@ enum Extra {
         /// nightly items (`Days::nightly_find`). Absent, as before.
         #[serde(default)]
         nightly: bool,
+        /// #8639 (the voice's `LAMP_MEMORY_GUEST_MARKED`): only what a
+        /// guest said, in the room's scope (`Wider::guest`). Absent, as
+        /// before.
+        #[serde(default)]
+        guest: bool,
     },
     /// The legacy `recall` with any of #2176's fields: a span of days
     /// (`day_from`, `day_to`) or `recall_v2`. Without them a recall is the
@@ -113,6 +118,9 @@ enum Extra {
         /// Nightly pass B, as `search`'s.
         #[serde(default)]
         nightly: bool,
+        /// #8639: only what a guest said, as `search`'s.
+        #[serde(default)]
+        guest: bool,
     },
     Forget {
         #[serde(default)]
@@ -566,6 +574,15 @@ fn value(response: Response) -> Value {
     serde_json::to_value(response).expect("the response contains JSON values only")
 }
 
+/// `"said_by":"guest"` on an answer's entry of the room's that a guest said
+/// (#8639, [`Days::guest_ids`]); nothing on any other, so an answer with no
+/// guest's entry is as before.
+fn said_by_guest(entry: &mut Value, guests: &std::collections::BTreeSet<u64>, id: u64) {
+    if guests.contains(&id) {
+        entry["said_by"] = json!(lamp_msgs::known::GUEST_SPEAKER);
+    }
+}
+
 /// A recall's answer, each kept entry with the day it is about (`on`) as
 /// `kept` and `search` give it (#3987): the voice tells it apart from the
 /// day it was said. Older readers ignore it.
@@ -582,8 +599,10 @@ fn recalled_with_days(
     });
     let days = store.event_days(person)?;
     let said = store.last_said(person)?;
+    let guests = store.guest_ids(person)?;
     if let Some(told) = answer["entries"].as_array_mut() {
         for (told, entry) in told.iter_mut().zip(entries) {
+            said_by_guest(told, &guests, entry.id());
             if let (Entry::Kept(_), Some(day)) = (entry, days.get(&entry.id())) {
                 told["on"] = json!(day);
             }
@@ -786,8 +805,10 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             // (#4753); older readers ignore it.
             let days = store.event_days(&person)?;
             let said = store.last_said(&person)?;
+            let guests = store.guest_ids(&person)?;
             if let Some(entries) = answer["entries"].as_array_mut() {
                 for (entry, kept) in entries.iter_mut().zip(&kept) {
+                    said_by_guest(entry, &guests, kept.id);
                     if let Some(day) = days.get(&kept.id) {
                         entry["on"] = json!(day);
                     }
@@ -882,6 +903,7 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             newer_first,
             strength,
             nightly,
+            guest,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
@@ -896,6 +918,7 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
                 last_day,
                 second: recall_v2,
                 newer_first,
+                guest,
             };
             let (records, more) = store.search_wider_more(
                 &person,
@@ -907,8 +930,10 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             // A kept thing said again since it was kept says when it was
             // last said (#4753); `at_unix_ms` stays when it was kept.
             let said = store.last_said(&person)?;
+            let guests = store.guest_ids(&person)?;
             if let Some(entries) = entries.as_array_mut() {
                 for (entry, record) in entries.iter_mut().zip(&records) {
+                    said_by_guest(entry, &guests, record.id);
                     if let Some(day) = store.event_day(&person, record.id)? {
                         entry["on"] = json!(day);
                     }
@@ -983,6 +1008,7 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             newer_first,
             strength,
             nightly,
+            guest,
         } => {
             // `more` is said only for a span of days (#3627); dated kept
             // entries can still carry `on` without a span (#3987).
@@ -997,6 +1023,7 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
                 last_day,
                 second: recall_v2,
                 newer_first,
+                guest,
             };
             let (entries, more) = store.recall_wider_more(
                 &person,
@@ -1052,6 +1079,19 @@ fn extra(store: &mut Days, request: Extra, now: u64) -> Result<Value> {
             } else {
                 json!({"ok":true,"snapshot":snapshot})
             };
+            // The room's note names its facts a guest said (#8639), so the
+            // voice tells each as a guest's; a note with none is as before.
+            let guests = store.guest_ids(&person)?;
+            let ids: Vec<u64> = answer["snapshot"]["source_ids"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_u64)
+                .filter(|id| guests.contains(id))
+                .collect();
+            if !ids.is_empty() {
+                answer["snapshot"]["guest_ids"] = json!(ids);
+            }
             if role {
                 answer["role"] = json!(store.role(&person)?);
             }
@@ -1596,6 +1636,7 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
                 "newer_first",
                 "strength",
                 "nightly",
+                "guest",
             ]
             .iter()
             .any(|field| parsed.get(field).is_some());

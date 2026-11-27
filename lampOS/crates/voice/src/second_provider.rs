@@ -6198,9 +6198,14 @@ impl Engine {
             // the eyes saw in view as it began; a warm cache with no change
             // through the line arms nothing (El's P2 on #3108).
             let late = heard && self.memory_camera_allowed && self.scopes_context();
+            // A guest line (#8639, `LAMP_MEMORY_GUEST_MARKED`): heard with
+            // the camera allowed, an unknown face in view and no known face
+            // seen in the last two minutes. Read in the same pass, no wait.
+            let mut guest = false;
             let scope = if heard && self.memory_camera_allowed {
                 let now = std::time::Instant::now();
                 let scope = cache.snapshot(now);
+                guest = !scope.held() && cache.guest(now);
                 // With `LAMP_FACE_GAP_HOLD`, why the line is or isn't
                 // held: counts and ms only (c0a4's run on #2449).
                 if let Some(told) = cache.gap_told(now) {
@@ -6216,7 +6221,8 @@ impl Engine {
                 // reason, ms and counts, never a name.
                 if let Some(told) = cache.room_told(now) {
                     eprintln!(
-                        "lamp-voice second: request {request}: memory scope the room's: {told}"
+                        "lamp-voice second: request {request}: memory scope the room's: {told}{}",
+                        crate::remember::guest::journal(guest)
                     );
                 }
                 // A line held only by a gap is never journalled, whether or
@@ -6236,6 +6242,8 @@ impl Engine {
                 session,
                 request,
             };
+            // Kept whatever the switch, read only with it on.
+            crate::remember::guest::mark_line(request, guest);
             if late {
                 crate::memory_scope::RequestScope::looking_later(key, scope, cache.clone())
             } else {

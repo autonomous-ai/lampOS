@@ -113,9 +113,84 @@ pub fn line(request: u64) -> bool {
     on() && with_marks(|marks| marks.is(request))
 }
 
-/// The memory's functions with recall's `guest` (W2), with the switch on.
-pub(crate) fn described(tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::Tool> {
+/// The journal's words beside a room line's reason, for a guest line with
+/// the switch on: no name, nothing but the mark.
+pub fn journal(guest: bool) -> &'static str {
+    if guest && on() {
+        ", a guest: marked for the room's memory (LAMP_MEMORY_GUEST_MARKED)"
+    } else {
+        ""
+    }
+}
+
+/// What a recall item a guest said carries (W1, approved 27 Nov 17:58).
+pub const SAID_BY: &str = "a guest";
+
+/// W1's rule, after the recall answer's `scope`, when any item says
+/// [`SAID_BY`].
+pub const SAID_BY_RULE: &str = " Items with said_by were said by a guest, someone the lamp did not know: tell them as the guest's, never as the asker's or the household's.";
+
+/// W2: recall's `guest` parameter. W2's other half, "For what a guest
+/// said, give guest true." in recall's description, is left out: under the
+/// product's switches (`LAMP_MEMORY_RECALL_V2`, `LAMP_MEMORY_REPLACES`)
+/// recall's description is 1,020 of a function's 1,024 bytes
+/// (`Tool::validate`, `tools::admitted`), and with it 1,060, so recall would
+/// be dropped. The parameter's own words say what it is for.
+pub const RECALL_PARAMETER: &str =
+    "true for only what a guest, someone the lamp did not know, said here.";
+
+/// W3: before a guest's kept fact in the session note and the hits.
+pub const SAID: &str = "A guest said: ";
+
+/// Whether a memory entry is a guest's (`"said_by":"guest"`, the memory's
+/// mark), with the switch on.
+pub fn said(entry: &serde_json::Value) -> bool {
+    on() && entry["said_by"] == lamp_msgs::known::GUEST_SPEAKER
+}
+
+/// The memory's functions with recall's `guest` (W2), with the switch on;
+/// off, as they are.
+pub(crate) fn described(mut tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::Tool> {
+    if !on() {
+        return tools;
+    }
+    for tool in tools.iter_mut().filter(|tool| tool.name == super::RECALL) {
+        if let Some(parameters) = tool.parameters.as_mut() {
+            parameters["properties"]["guest"] =
+                serde_json::json!({"type": "boolean", "description": RECALL_PARAMETER});
+        }
+    }
     tools
+}
+
+/// A validated room snapshot with each fact a guest said (the memory's
+/// `guest_ids`) told as [`SAID`] its words (W3), with the switch on; off,
+/// or with none, as it is.
+pub(crate) fn told_in_note(snapshot: &serde_json::Value) -> Option<serde_json::Value> {
+    if !on() {
+        return None;
+    }
+    let guests: Vec<u64> = snapshot["guest_ids"]
+        .as_array()?
+        .iter()
+        .filter_map(serde_json::Value::as_u64)
+        .collect();
+    let mut quoted: serde_json::Value = serde_json::from_str(snapshot["note"].as_str()?).ok()?;
+    let mut told = 0;
+    for fact in quoted.get_mut("facts")?.as_array_mut()? {
+        if fact["id"].as_u64().is_some_and(|id| guests.contains(&id))
+            && let Some(text) = fact["text"].as_str()
+        {
+            fact["text"] = serde_json::json!(format!("{SAID}{text}"));
+            told += 1;
+        }
+    }
+    if told == 0 {
+        return None;
+    }
+    let mut snapshot = snapshot.clone();
+    snapshot["note"] = serde_json::json!(quoted.to_string());
+    Some(snapshot)
 }
 
 #[cfg(test)]

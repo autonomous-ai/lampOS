@@ -167,6 +167,36 @@ fn a_guest_line_is_sent_marked_to_the_room_memory() {
     std::fs::remove_file(&socket).unwrap();
 }
 
+/// A guest's kept fact (a `remember` on a guest line) is sent marked, so it
+/// expires with the exchanges and is told as the guest's; one on a line
+/// that is no guest's, or in a person's own scope, is not.
+#[test]
+fn a_guests_kept_fact_is_sent_marked() {
+    let _on = Switch::set(true);
+    let (guest, other) = (8_639_031, 8_639_032);
+    mark_line(guest, true);
+    mark_line(other, false);
+    let (socket, served) = memory("kept", 12, |_| json!({"ok":true,"id":7}));
+    let client = DaysClient::with_idle(socket.clone(), Duration::from_secs(60)).unwrap();
+    let keep = ToolCall {
+        id: "c1".into(),
+        name: crate::remember::REMEMBER.into(),
+        args: json!({"text":"The guest's dog is called Biscuit"}),
+    };
+    for (request, person) in [(guest, None), (other, None), (guest, Some(owner()))] {
+        let _ = client.run_in(&keep, Duration::from_secs(1), person.as_deref(), request);
+    }
+    let read = served.join().unwrap();
+    let speakers: Vec<Option<&str>> = read
+        .iter()
+        .filter(|line| line["op"] == "remember")
+        .map(|line| line.get("speaker").and_then(Value::as_str))
+        .collect();
+    assert_eq!(speakers, [Some("guest"), None, None], "{read:?}");
+    drop(client);
+    std::fs::remove_file(&socket).unwrap();
+}
+
 /// "What did my guest say?", end to end against the real store: a guest's
 /// line and a household line are kept in the room's memory; the owner's
 /// recall with `guest` gets the guest's line only, told as the guest's
@@ -203,10 +233,10 @@ fn the_owner_asking_what_their_guest_said_is_told_the_guests_line_as_the_guests(
             .is_some(),
         "recall takes guest"
     );
-    assert!(
-        tools[0]
-            .description
-            .ends_with(" For what a guest said, give guest true.")
+    assert_eq!(
+        tools[0].description,
+        recall_tool(false).description,
+        "the description is as it was: 1,020 of its 1,024 bytes"
     );
     for person in [Some(owner()), None] {
         let (told, answered) = client.run_for(
@@ -299,6 +329,11 @@ fn with_the_switch_off_nothing_changes() {
         {"id":8,"kind":"kept","at_unix_ms":NOW,"text":"The guest's dog is called Biscuit","said_by":"guest"}
     ]});
     let (told, _) = days_answer(&answer, NOW, None, None).unwrap();
+    let item = told["found"][0].as_object().unwrap();
+    let mut keys: Vec<&str> = item.keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    assert_eq!(keys, ["asked_to_remember", "source_id", "when"], "{told}");
+    assert_eq!(told["scope"], "said in this room; speaker unknown");
     assert_eq!(
         told,
         json!({"found":[{"source_id":8,"when":"today","asked_to_remember":"The guest's dog is called Biscuit"}],

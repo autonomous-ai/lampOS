@@ -402,6 +402,28 @@ impl FaceCache {
         ))
     }
 
+    /// Whether a line admitted now is a guest's (#8639,
+    /// `LAMP_MEMORY_GUEST_MARKED`; the memory owner's call of 27 Nov 17:42):
+    /// the cache names nobody, at least one face was in view at the last
+    /// refresh, and no known face was freshly seen within [`NO_FACE_QUIET`]
+    /// ([`RoomReason::NeverKnown`], as [`Self::room_told`] reads it).
+    /// Nobody in view, a known face, or a one-turn misread (a known face
+    /// seen moments ago) is no guest. No lock is waited for: a busy lock
+    /// reads as no guest.
+    pub fn guest(&self, now: Instant) -> bool {
+        if self.snapshot(now).person().is_some() {
+            return false;
+        }
+        // `in_view` holds the faces plus one; 0 when not known.
+        if self.in_view.load(Ordering::Acquire) < 2 {
+            return false;
+        }
+        let Ok(seen) = self.last_seen_until.try_lock() else {
+            return false;
+        };
+        seen.is_none_or(|until| now.saturating_duration_since(until) >= NO_FACE_QUIET)
+    }
+
     /// Acquire before starting the source read, never after it completes.
     pub fn begin_refresh(&self) -> RefreshToken {
         RefreshToken {
