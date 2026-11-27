@@ -14,7 +14,7 @@
 
 ## 2026-11-27 16:10 +0700 — pull requests' ARM64 build from a 2-day-old cache, #8877
 
-Ready for lamp-voice: no (#8877 is a draft until its ARM64 run is green)
+Ready for lamp-voice: yes (#8877, ARM64 run 45967310182 and clippy green on `0bbad1fcd`)
 
 Asked by its person: why run 45957439867 (train-1291, #8861) took 31.5 min.
 - **Where the time went:** 24m 31s of it is the build job's `cargo nextest archive --release --workspace` (the release job, 12.8 min, runs beside it). Every crate printed "Compiling" by 4.7 min; the 20 min after are the test targets and linking 303 binaries.
