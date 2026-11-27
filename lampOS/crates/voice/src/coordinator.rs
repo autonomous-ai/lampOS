@@ -19973,12 +19973,43 @@ mod tests {
     #[test]
     fn diagnostic_shutdown_uses_one_deadline_and_reaps_every_hung_worker() {
         let directory = SessionDirectory::create().unwrap();
-        let (speaker, _speaker_peer) = Worker::sleeping_fixture(&directory.path, "speaker");
-        let (capture, _capture_peer) = Worker::sleeping_fixture(&directory.path, "capture");
-        let (provider, _provider_peer) = Worker::sleeping_fixture(&directory.path, "provider");
-        let (privacy, _privacy_peer) = Worker::sleeping_fixture(&directory.path, "privacy");
-        let (ring, _ring_peer) = Worker::sleeping_fixture(&directory.path, "ring");
-        let mut rig = Rig {
+        let (mut rig, _peers) = sleeping_rig(&directory);
+        let started = Instant::now();
+        let mut trace = SessionState::default();
+        assert!(rig.shutdown(&mut trace).is_err());
+        // A five-times-750 ms serial grace would fail this generous regression
+        // bound. It is a test observation, not a kernel kill/wait deadline.
+        assert!(started.elapsed() < Duration::from_millis(2500));
+        for worker in [
+            &mut rig.speaker,
+            &mut rig.capture,
+            &mut rig.provider,
+            &mut rig.privacy,
+        ]
+        .into_iter()
+        .chain(rig.ring.iter_mut())
+        {
+            assert!(worker.try_exit().unwrap().is_some());
+        }
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry["kind"] == "audio_diagnostics_certified"
+                    && entry["valid"] == false)
+                .count(),
+            2
+        );
+    }
+
+    /// A rig of sleeping fixture workers, with each worker's own side of
+    /// its channels: speaker, capture, provider, privacy and ring.
+    fn sleeping_rig(directory: &SessionDirectory) -> (Rig, [WorkerChannels; 5]) {
+        let (speaker, speaker_peer) = Worker::sleeping_fixture(&directory.path, "speaker");
+        let (capture, capture_peer) = Worker::sleeping_fixture(&directory.path, "capture");
+        let (provider, provider_peer) = Worker::sleeping_fixture(&directory.path, "provider");
+        let (privacy, privacy_peer) = Worker::sleeping_fixture(&directory.path, "privacy");
+        let (ring, ring_peer) = Worker::sleeping_fixture(&directory.path, "ring");
+        let rig = Rig {
             expression_out: None,
             second: None,
             end_silence_blocks: None,
@@ -20012,31 +20043,121 @@ mod tests {
             follows_on: false,
             paused: Box::new(|| false),
         };
-        let started = Instant::now();
-        let mut trace = SessionState::default();
-        assert!(rig.shutdown(&mut trace).is_err());
-        // A five-times-750 ms serial grace would fail this generous regression
-        // bound. It is a test observation, not a kernel kill/wait deadline.
-        assert!(started.elapsed() < Duration::from_millis(2500));
-        for worker in [
-            &mut rig.speaker,
-            &mut rig.capture,
-            &mut rig.provider,
-            &mut rig.privacy,
-        ]
-        .into_iter()
-        .chain(rig.ring.iter_mut())
-        {
-            assert!(worker.try_exit().unwrap().is_some());
+        (
+            rig,
+            [
+                speaker_peer,
+                capture_peer,
+                provider_peer,
+                privacy_peer,
+                ring_peer,
+            ],
+        )
+    }
+
+    /// What reached capture's side: each authority queued there, in order.
+    fn authorities_at(capture: &mut WorkerChannels) -> Vec<Snapshot> {
+        let mut seen = Vec::new();
+        while let Some(control) = capture.control.receive::<Control>().unwrap() {
+            if let Control::Authority { snapshot } = control {
+                seen.push(snapshot);
+            }
         }
-        assert_eq!(
-            trace
-                .iter()
-                .filter(|entry| entry["kind"] == "audio_diagnostics_certified"
-                    && entry["valid"] == false)
-                .count(),
-            2
-        );
+        seen
+    }
+
+    /// A controller's snapshot with the microphone and the camera as given
+    /// (Unknown is a new controller's own).
+    fn permitted(microphone: Permission, camera: Permission) -> Snapshot {
+        let mut owner = Controller::new(new_boot().unwrap(), now());
+        if microphone != Permission::Unknown {
+            owner.set_microphone_permission(now(), microphone).unwrap();
+        }
+        if camera != Permission::Unknown {
+            owner.set_camera_permission(now(), camera).unwrap();
+        }
+        owner.snapshot(now()).unwrap()
+    }
+
+    /// #7224, leg 2 on lamp-06c1 (28 Nov 01:48): the slide closed in a
+    /// ridden gap. The mute's snapshot grants nothing, so the gap's hold
+    /// lets it through to capture, as to the speaker: capture knows the
+    /// slide closed when the speaker it answers has gone.
+    #[test]
+    fn a_mute_in_a_ridden_gap_reaches_capture() {
+        let directory = SessionDirectory::create().unwrap();
+        // Every worker's side is kept: a dropped one refuses its sends.
+        let (mut rig, mut peers) = sleeping_rig(&directory);
+        rig.capture_held = true;
+        let mut owner = Controller::new(new_boot().unwrap(), now());
+        owner
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let revoked = revoke_for_mute(&mut owner, &mut None, |snapshot| rig.publish(snapshot));
+        assert_eq!(revoked.unpublished, None);
+        let seen = authorities_at(&mut peers[1]);
+        assert_eq!(seen.len(), 1, "the mute reached capture");
+        assert_eq!(seen[0].microphone_permission(), Permission::Denied);
+        assert!(crate::privacy_bus::denied_only(seen[0]));
+    }
+
+    /// The gap's hold still keeps from capture every snapshot that grants
+    /// anything (#2602): the microphone, or the camera with the microphone
+    /// Denied (#7224).
+    #[test]
+    fn a_ridden_gap_still_holds_from_capture_a_snapshot_that_grants() {
+        let directory = SessionDirectory::create().unwrap();
+        // Every worker's side is kept: a dropped one refuses its sends.
+        let (mut rig, mut peers) = sleeping_rig(&directory);
+        rig.capture_held = true;
+        for (microphone, camera) in [
+            (Permission::Allowed, Permission::Denied),
+            (Permission::Allowed, Permission::Allowed),
+            (Permission::Denied, Permission::Allowed),
+            (Permission::Denied, Permission::Unknown),
+        ] {
+            let snapshot = permitted(microphone, camera);
+            assert!(!crate::privacy_bus::denied_only(snapshot));
+            rig.publish(snapshot).unwrap();
+            rig.publish_hand_revocation(snapshot).unwrap();
+            assert_eq!(
+                authorities_at(&mut peers[1]),
+                [],
+                "microphone {microphone:?}, camera {camera:?} reached capture"
+            );
+        }
+    }
+
+    /// A hand's revocation in a ridden gap: as the mute's, a snapshot that
+    /// grants nothing reaches capture (#7224).
+    #[test]
+    fn a_hand_revocation_in_a_ridden_gap_reaches_capture() {
+        let directory = SessionDirectory::create().unwrap();
+        // Every worker's side is kept: a dropped one refuses its sends.
+        let (mut rig, mut peers) = sleeping_rig(&directory);
+        rig.capture_held = true;
+        let denied = permitted(Permission::Denied, Permission::Denied);
+        rig.publish_hand_revocation(denied).unwrap();
+        assert_eq!(authorities_at(&mut peers[1]), [denied]);
+    }
+
+    /// `denied_only` is a snapshot in which nothing is Allowed nor unread:
+    /// the microphones and the camera Denied and no turn (#7224).
+    #[test]
+    fn denied_only_is_nothing_allowed() {
+        for (microphone, camera, only) in [
+            (Permission::Denied, Permission::Denied, true),
+            (Permission::Denied, Permission::Allowed, false),
+            (Permission::Allowed, Permission::Denied, false),
+            (Permission::Denied, Permission::Unknown, false),
+            (Permission::Unknown, Permission::Denied, false),
+        ] {
+            assert_eq!(
+                crate::privacy_bus::denied_only(permitted(microphone, camera)),
+                only,
+                "microphone {microphone:?}, camera {camera:?}"
+            );
+        }
     }
 
     fn pair(dir: &SessionDirectory, role: &str) -> (WorkerChannels, WorkerChannels) {
