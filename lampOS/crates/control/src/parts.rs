@@ -3081,7 +3081,7 @@ mod tests {
         // Once it has: the pitch stays where it is.
         {
             let mut watch = watch.lock().unwrap();
-            let limits = json!({"joints": [{"name": "head_pitch", "min": 1955, "max": 2015, "home": 2000}, {"name": "base_yaw", "min": 1975, "max": 2055, "home": 2015}], "speed": 50.0, "acceleration": 400.0, "heat_stop": 62, "stands": false});
+            let limits = json!({"joints": [{"name": "head_pitch", "min": 1955, "max": 2015, "home": 2000}, {"name": "base_yaw", "min": 1975, "max": 2055, "home": 2015}], "speed": 50.0, "acceleration": 400.0, "heat_stop": 69, "stands": false});
             watch.take("body/limits", &limits, 0);
             let tau = std::f64::consts::TAU;
             let radians = |counts: f64| (counts - 2_048.0) * tau / 4_096.0;

@@ -1254,7 +1254,7 @@ async fn get_body_follows_the_joint_states_on_the_bus() {
         .unwrap();
     states.expires_after(Some(Duration::from_secs(1)));
     let limit = json!({"joints": [{"name": "base_yaw", "min": 1975, "max": 2055, "home": 2012}],
-                       "speed": 50.0, "acceleration": 400.0, "force": 600, "heat_stop": 62, "stands": true});
+                       "speed": 50.0, "acceleration": 400.0, "force": 600, "heat_stop": 69, "stands": true});
     let radians = |counts: f64| (counts - 2_048.0) * std::f64::consts::TAU / 4_096.0;
     let mut socket = paired(&lamp, json!(["body"]), 15).await;
     let yaw = |body: &Value| body["state"]["body"]["joints"]["yaw"]["counts"].as_f64();
