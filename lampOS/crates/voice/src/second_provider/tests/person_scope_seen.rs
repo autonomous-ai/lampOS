@@ -9020,7 +9020,7 @@ fn with_no_sight_a_no_or_another_persons_yes_runs_nothing() {
             five,
         );
         assert!(
-            !matches!(other, Taken::Runs(..) | Taken::Agrees(_)),
+            matches!(other, Taken::NotTheirs),
             "{name}: another person's yes runs nothing"
         );
     }
