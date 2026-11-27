@@ -99,6 +99,9 @@ Environment=LAMP_PRIVACY_RIDES_STALL=on
 Environment=LAMP_VOICE_UNSTARTED_FRAME_DROP=on
 # LAMP_PRIVACY_GAP_RIDE: its why and rules are its row in docs/switches.md (#2602, #7224 fault 5).
 Environment=LAMP_PRIVACY_GAP_RIDE=on
+# LAMP_PRIVACY_LIGHT: #8696, the privacy light red, dim or off as the person picks in the app; on in the product by the
+# lead's call (c7207644723, 27 Nov). The same line in lamp-cloud.service; its rules are its row in docs/switches.md.
+Environment=LAMP_PRIVACY_LIGHT=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
