@@ -5202,7 +5202,8 @@ cho mỗi lần cài xong, không bao giờ cho một lần cập nhật
   của nó (câu nói, và "By the way, ...") được render vào speech cache
   (`say::tts_cache`, nơi giữ các câu cố định của đèn; giới hạn 64 file, cũ
   nhất bỏ trước, như mọi câu ở đó; `install_told::arrived`). Chỉ đèn tiếng
-  Anh: câu ở ngôn ngữ khác là của model. Một câu "ngay" chờ lần render đó
+  Anh trên route thứ hai: câu ở ngôn ngữ khác là của model, và đèn dùng
+  route thứ nhất không render gì, vì không có gì phát nó. Một câu "ngay" chờ lần render đó
   tối đa 1.2 s sau khi cài xong (`RENDER_HOLD_US`); route thứ hai rồi phát
   file đã giữ (`install_told::kept_clip`, chỉ bằng giọng nó đang nói), hoặc
   render lời khi chúng đến nếu chưa được giữ.
@@ -5222,7 +5223,18 @@ cho mỗi lần cài xong, không bao giờ cho một lần cập nhật
   5 s không nghe thấy lời nào (`TALK_PAUSE_US`) và 3 s sau lời của chính đèn.
   Một lượt không nghe được lời nào không động đến khoảng lặng (cùng phán
   quyết): khoảng lặng tính theo tiếng nói nghe được lần cuối khi một bản
-  chép có từ đến (`Moment::last_words_us`).
+  chép có từ đến (`Moment::last_words_us`). Tiếng nói còn đang diễn ra vẫn
+  giữ nó lại, có lời hay không (must-fix của Reviewer-lead, c7213149798,
+  nằm trong phán quyết, c7213454550): tiếng nói detector trong 1 s qua
+  (`UNDER_WAY_US`), và tiếng nói chưa được giải quyết bởi một bản chép hay
+  lúc lượt của nó kết thúc (`Moment::last_resolved_us`) trong 5 s như cũ.
+- **Không bao giờ nói sai chỗ**, như `long_make::may_tell` (c7210755978):
+  không bao giờ trong giờ yên tĩnh, khi phòng đang bận (`room_told`), hay khi
+  có khuôn mặt trong khung hình mà không phải chỉ một mình chủ đèn
+  (`services::owner_sees_alone_now`), dù ngay lập tức hay sau một câu trả
+  lời. Khi không có mặt nào, có ai được nghe thấy là đủ gần (phán quyết:
+  "khuôn mặt là một cách để biết có người gần, không bao giờ là điều bắt
+  buộc").
   Không bao giờ khi keeper tạm dừng đèn, khi đã đăng xuất, trong lúc giữ chăm
   sóc (care hold), khi một nhắc nhở đang chờ hay có gì đang nợ, đang chạy hay
   đang được nói; cuộc trò chuyện không chạy khi công tắc riêng tư đóng hay

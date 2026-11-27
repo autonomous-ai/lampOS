@@ -30,10 +30,12 @@ use std::{
 /// Where the rendered lines are kept: the voice's own state (root's, 0700).
 pub const DIR: &str = "/var/lib/lampOS/voice/tts-cache";
 /// At most this many lines are kept; past it the oldest go first, never the
-/// owner's current lines (#4883, [`TtsCache::make_room`]). Only the lamp's
-/// own fixed lines come here: [`WARM`] and the fixed lines in the owner's
-/// language (#4473 (c), 45 since #5999's skill lines), with room for a change
-/// of voice or language and the lines asked since.
+/// owner's current lines (#4883, [`TtsCache::make_room`]): [`WARM`] and the
+/// fixed lines in the owner's language (#4473 (c), 45 since #5999's skill
+/// lines), with room for a change of voice or language and the lines asked
+/// since. An installed item's first-run line adds two files of the Store's
+/// text per install (`crate::install_told::arrived`, #7814), kept after it
+/// is said; they are never among the protected lines, so they go first.
 pub const MOST_FILES: usize = 64;
 /// The longest line kept: 20 s at the speaker's rate.
 pub const MOST_FRAMES: u32 = SOUND_RATE * 20;
@@ -272,6 +274,13 @@ impl TtsCache {
     }
 
     /// `text`'s samples: from the cache, or rendered once and kept.
+    ///
+    /// `rendering` is held across the render, network included (up to
+    /// [`render_within`]), so one line is rendered once: another uncached
+    /// caller waits behind it, e.g. a cached `say` behind an install's
+    /// first-run render on its listener thread (`crate::install_told`).
+    /// Never the coordinator's loop, which only reads kept lines
+    /// ([`Self::kept`]).
     pub fn samples(&self, text: &str) -> Result<Vec<i16>, String> {
         let path = self.path(text);
         if let Some(samples) = read(&path) {

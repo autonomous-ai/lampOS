@@ -22,7 +22,16 @@
 //!   of [`TALK_PAUSE_US`] in anyone's speech with words and [`AFTER_LAMP_US`]
 //!   after the lamp's own words. A turn that heard no words leaves the pause
 //!   alone (the first builder's ruling on #8842, comment 7212623876): nothing
-//!   was said, so it is not people's talk ([`Moment::last_words_us`]). Never while private, in the care hold or asleep: the
+//!   was said, so it is not people's talk ([`Moment::last_words_us`]). Speech
+//!   still under way holds it, worded or not (the Reviewer-lead's must-fix,
+//!   c7213149798, within the ruling, c7213454550): any detector speech in
+//!   the last [`UNDER_WAY_US`], and speech not resolved yet by a transcript
+//!   or its turn's end ([`Moment::last_resolved_us`]) for the old 5 s.
+//! - **Never to the wrong room**, as `long_make::may_tell` (the
+//!   Reviewer-lead's must-fix, c7210755978): never in the quiet hours, in a
+//!   busy room, or with a face in view that is not the owner alone; with no
+//!   face, someone heard is near enough (the ruling's "a face is one way to
+//!   be near, never a need"). Never while private, in the care hold or asleep: the
 //!   coordinator's conversation does not run while the privacy switch is
 //!   closed or the lamp sleeps, and it passes `free` false in the keeper's
 //!   pause, signed out, in the care hold, or while anything is owed, under
@@ -69,6 +78,9 @@ pub const HEARD_WITHIN_US: u64 = 60_000_000;
 /// The pause in anyone's speech the line waits for away from an answer
 /// (the product owner's 5 s, as #8812's `LONG_PAUSE_US`).
 pub const TALK_PAUSE_US: u64 = 5_000_000;
+/// Detector speech this recent is someone speaking now: it holds the line,
+/// words or none, before any transcript can say.
+pub const UNDER_WAY_US: u64 = 1_000_000;
 /// After the lamp's own words, the line waits this long with nobody
 /// starting: the person's turn to answer comes first (`task_news`).
 pub const AFTER_LAMP_US: u64 = crate::task_news::AFTER_LAMP_US;
@@ -135,6 +147,17 @@ pub struct Moment {
     /// transcript with a word came); 0, never. Only it holds the talk
     /// pause: a turn that heard no words leaves it alone.
     pub last_words_us: u64,
+    /// `last_speech_us` as a heard line last resolved: its transcript came,
+    /// with words or none, or its turn ended. Speech after it is still
+    /// under way, and holds the pause as any speech did.
+    pub last_resolved_us: u64,
+    /// The quiet hours (`run_write_yes::quiet_hours_now`).
+    pub night: bool,
+    /// The room is busy (`room_told`): people talking among themselves.
+    pub busy: bool,
+    /// A face in view that is not the owner alone
+    /// (`services::owner_sees_alone_now`): a guest, or more than one.
+    pub others_seen: bool,
     /// When the lamp's own words last finished playing.
     pub lamp_words_ended_us: Option<u64>,
     /// When the lamp's last answer to someone (a turn it did not begin
@@ -159,7 +182,11 @@ impl Moment {
     /// People's talk has left room: no words heard for [`TALK_PAUSE_US`],
     /// and the lamp's own words [`AFTER_LAMP_US`] behind.
     pub fn talk_paused(&self) -> bool {
-        (self.last_words_us == 0 || self.now_us.saturating_sub(self.last_words_us) >= TALK_PAUSE_US)
+        let unresolved = self.last_speech_us > self.last_resolved_us;
+        !self.heard_within(UNDER_WAY_US)
+            && !(unresolved && self.heard_within(TALK_PAUSE_US))
+            && (self.last_words_us == 0
+                || self.now_us.saturating_sub(self.last_words_us) >= TALK_PAUSE_US)
             && self
                 .lamp_words_ended_us
                 .is_none_or(|ended| self.now_us.saturating_sub(ended) >= AFTER_LAMP_US)
@@ -491,7 +518,7 @@ impl Waits {
                 waiting.mode = Some(Mode::AfterAnswer);
             }
         }
-        if !moment.free {
+        if !moment.free || moment.night || moment.busy || moment.others_seen {
             return None;
         }
         let at = self.waiting.iter().position(|waiting| {
@@ -537,7 +564,10 @@ pub struct Tells(());
 
 impl Tells {
     /// With the switch on and a bus: the listener started once a process.
-    pub fn from_environment() -> Option<Self> {
+    /// `second_route`: the lamp speaks through the second route, which
+    /// plays the line from the speech cache; on the first, nothing is
+    /// rendered, as nothing would play it.
+    pub fn from_environment(second_route: bool) -> Option<Self> {
         if !on() {
             return None;
         }
@@ -548,7 +578,7 @@ impl Tells {
                 )
             })
             .ok()?;
-        start(bus.root());
+        start(bus.root(), second_route);
         Some(Self(()))
     }
 
@@ -576,21 +606,21 @@ pub fn taken(message: &lamp_bus::Message) -> Option<Installed> {
 
 /// The listener, once a process: each install taken is kept for the
 /// coordinator.
-fn start(root: &Path) {
+fn start(root: &Path, second_route: bool) {
     static STARTED: std::sync::Once = std::sync::Once::new();
     let root = root.to_owned();
     STARTED.call_once(move || {
         waits().get_or_insert_with(Waits::default);
         let started = std::thread::Builder::new()
             .name("lamp-voice-first-run".into())
-            .spawn(move || listen(&root));
+            .spawn(move || listen(&root, second_route));
         if started.is_err() {
             eprintln!("lamp-voice: installs can't be listened for ({ENVIRONMENT})");
         }
     });
 }
 
-fn listen(root: &Path) {
+fn listen(root: &Path, second_route: bool) {
     let Ok(bus) = lamp_bus::Bus::new(root) else {
         eprintln!(
             "lamp-voice: no bus, so no installed item's first-run line is said ({ENVIRONMENT})"
@@ -629,11 +659,10 @@ fn listen(root: &Path) {
                         "its name ready"
                     }
                 );
-                arrived(
-                    event,
-                    crate::say::tts_cache::from_environment().as_deref(),
-                    &WAITS,
-                );
+                let cache = second_route
+                    .then(crate::say::tts_cache::from_environment)
+                    .flatten();
+                arrived(event, cache.as_deref(), &WAITS);
             }
             None => eprintln!(
                 "lamp-voice: a store/installed message not taken: not lamp-cloud's, or not one ({ENVIRONMENT})"

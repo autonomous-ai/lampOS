@@ -787,8 +787,9 @@ alone, checked, and keeps it across a sleep or a mute.
   turn, both its wordings (the line, and "By the way, ...") are rendered
   into the speech cache (`say::tts_cache`, which keeps the lamp's fixed
   lines; bounded by its 64 files, oldest first, as every line there;
-  `install_told::arrived`). An English lamp only: another language's line
-  is the model's. An at-once line waits for that render at most 1.2 s after
+  `install_told::arrived`). An English lamp on the second route only:
+  another language's line is the model's, and a first-route lamp renders
+  nothing, as nothing would play it. An at-once line waits for that render at most 1.2 s after
   the finish (`RENDER_HOLD_US`); the second route then plays the kept file
   (`install_told::kept_clip`, the voice it speaks in only), or renders the
   words as they come when it is not kept.
@@ -807,7 +808,16 @@ alone, checked, and keeps it across a sleep or a mute.
   no words heard (`TALK_PAUSE_US`) and 3 s after the lamp's own words. A
   turn that heard no words leaves the pause alone (the same ruling): the
   pause counts the speech last heard as a transcript with a word came
-  (`Moment::last_words_us`). Never
+  (`Moment::last_words_us`). Speech still under way holds it, worded or
+  not (the Reviewer-lead's must-fix, c7213149798, within the ruling,
+  c7213454550): detector speech in the last 1 s (`UNDER_WAY_US`), and
+  speech not yet resolved by a transcript or its turn's end
+  (`Moment::last_resolved_us`) for the old 5 s.
+- **Never to the wrong room**, as `long_make::may_tell` (c7210755978):
+  never in the quiet hours, in a busy room (`room_told`), or with a face in
+  view that is not the owner alone (`services::owner_sees_alone_now`), at
+  once or after an answer. With no face, someone heard is near enough (the
+  ruling's "a face is one way to be near, never a need"). Never
   while the keeper pauses the lamp, signed out, in the care hold, while a
   reminder waits or anything is owed, under way or being said; the
   conversation doesn't run with the privacy switch closed or asleep, so

@@ -3142,7 +3142,7 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 khi chủ đèn cài kỹ năng từ Store (first builder chốt trên #7814, comment
 c7209938102; [tasks_vi.md](tasks_vi.md), "Câu đầu tiên của một món vừa cài").
 `say` là chữ thường từ 1 đến 140 ký tự, không có khoảng trắng ở hai đầu, một
-dòng, không markup hay dấu ngoặc kép (``< > ` * [ ] { } " “ ” \``) và tối
+dòng, không markup hay dấu ngoặc kép (``< > ` * [ ] { } " “ ” \ ( ) （ ）``) và tối
 đa một câu hỏi: đúng các kiểm tra của Store (`lamp_msgs::installed::say_ok`,
 như `first_run` của một app, [apps.md](../apps.md)). Được kiểm tra khi nạp
 (`[first_run] first_run.say: at most one question`, và các lỗi khác cùng

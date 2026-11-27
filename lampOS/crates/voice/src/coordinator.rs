@@ -6868,6 +6868,9 @@ fn conversation_with_gate_inner(
     // item's first-run line waits for a pause in talk with words only, so a
     // turn that heard none leaves it alone (#7814, the ruling on #8842).
     let mut last_words_us = 0u64;
+    // `last_speech_us` as a heard line last resolved (its transcript, or its
+    // turn's end): speech after it is still under way (#7814).
+    let mut last_resolved_us = 0u64;
     let reminder_cycle_started_us = monotonic_us();
     // `--fixture-at-ms` (diagnostic only): when the fixture's own turn is
     // due, N ms after `listening_ready`; set once, when that is recorded.
@@ -7267,7 +7270,7 @@ fn conversation_with_gate_inner(
     // An installed item's first-run line (#7814, `LAMP_INSTALL_FIRST_RUN=on`):
     // none with the switch off.
     let first_runs = if lifetime.continuous() {
-        crate::install_told::Tells::from_environment()
+        crate::install_told::Tells::from_environment(rig.provider.role == "second")
     } else {
         None
     };
@@ -9249,6 +9252,15 @@ fn conversation_with_gate_inner(
                 last_turn_us = monotonic_us();
                 last_words_us = last_speech_us;
                 second_look.words_heard();
+            }
+            // A heard line resolved, words or none: speech before it is no
+            // longer under way for an installed item's line (#7814).
+            if matches!(
+                &event,
+                ProviderOutput::Transcript { request: None, .. }
+                    | ProviderOutput::TurnComplete { .. }
+            ) {
+                last_resolved_us = last_speech_us;
             }
             if let (
                 Some(hold),
@@ -15051,6 +15063,13 @@ fn conversation_with_gate_inner(
                     .is_some_and(|presence| presence.present(clock)),
                 last_speech_us,
                 last_words_us,
+                last_resolved_us,
+                night: crate::run_write_yes::quiet_hours_now(),
+                busy: room.busy(),
+                others_seen: presence
+                    .as_ref()
+                    .is_some_and(|presence| presence.present(clock))
+                    && !crate::services::owner_sees_alone_now(),
                 lamp_words_ended_us,
                 answered_at_us,
                 free: !reminder_waiting

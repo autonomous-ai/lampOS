@@ -386,7 +386,7 @@ def _permissions(rules: dict[str, Any], report: Report) -> None:
 
 # A first-run line (#7814), as lamp_msgs::installed::say_ok and the Store hold it.
 FIRST_RUN_MOST_CHARS = 140
-FIRST_RUN_MARKUP = set('<>`*[]{}"“”\\')
+FIRST_RUN_MARKUP = set('<>`*[]{}"“”\\()（）')
 
 
 def first_run_errors(first_run: object) -> list[str]:

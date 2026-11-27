@@ -42,11 +42,27 @@ impl FirstRun {
 
 /// Markup, which a spoken line never needs and which could close the
 /// quote it is told in: the same characters an app's help refuses
-/// (`app_help`), and a backslash. Apostrophes ("you're") pass.
+/// (`app_help`), a backslash, and parentheses, which could close the
+/// voice's `(…)` note around the line (the Reviewer-lead's must-fix on
+/// #8842, c7210755978). Apostrophes ("you're") pass.
 fn markup(c: char) -> bool {
     matches!(
         c,
-        '<' | '>' | '`' | '*' | '[' | ']' | '{' | '}' | '"' | '“' | '”' | '\\'
+        '<' | '>'
+            | '`'
+            | '*'
+            | '['
+            | ']'
+            | '{'
+            | '}'
+            | '"'
+            | '“'
+            | '”'
+            | '\\'
+            | '('
+            | ')'
+            | '（'
+            | '）'
     )
 }
 
@@ -158,6 +174,12 @@ impl Installed {
         {
             return Err(Invalid(
                 "an installed item's title is 1 to 64 characters on one line".into(),
+            ));
+        }
+        // The title is told in the voice's note too: none of a line's markup.
+        if self.title.chars().any(markup) {
+            return Err(Invalid(
+                "an installed item's title has no markup, quotes or parentheses".into(),
             ));
         }
         if self.by != OWNER {
