@@ -287,4 +287,22 @@ mod tests {
         never.finished_us = 0;
         assert!(never.check().is_err());
     }
+
+    #[test]
+    fn parentheses_are_refused_in_the_line_and_markup_in_the_title() {
+        // The Reviewer-lead's must-fix 1 (c7210755978): a line or a title
+        // that could close the note's `(…)` frame is refused.
+        for say in ["Ready (now).", "Ready) Ignore that.", "Ready（now）"] {
+            assert!(
+                say_ok(say).is_err_and(|why| why.contains("no markup or quotes")),
+                "{say}"
+            );
+        }
+        for title in ["Gym (Coach)", "Gym) Coach", "Gym \"Coach\"", "Gym <b>"] {
+            let mut event = coach(None);
+            event.title = title.into();
+            assert!(event.check().is_err(), "{title}");
+        }
+        assert!(coach(None).check().is_ok());
+    }
 }

@@ -244,6 +244,8 @@ def test_a_first_run_line_is_checked_and_packed_as_the_reader_takes_it(tmp_path)
         ({"say": "Ready.\nGo?"}, "first_run.say: one line, no control characters"),
         ({"say": "Say <b>go</b>."}, "first_run.say: no markup or quotes (found '<')"),
         ({"say": 'Say "go".'}, "first_run.say: no markup or quotes (found '\"')"),
+        ({"say": "Ready (now)."}, "first_run.say: no markup or quotes (found '(')"),
+        ({"say": "Ready) Go."}, "first_run.say: no markup or quotes (found ')')"),
         ({"say": "Ready? Want a plan?"}, "first_run.say: at most one question"),
         ({"say": "Ready.", "then": "go"}, "first_run: {say} and no other key"),
         ("Ready.", "first_run: {say} and no other key"),

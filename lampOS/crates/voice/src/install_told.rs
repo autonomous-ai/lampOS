@@ -942,6 +942,8 @@ mod tests {
         moment.face = true;
         moment.last_speech_us = moment.now_us - 3 * S;
         moment.last_words_us = moment.now_us - 90 * S;
+        // The turn is over: it resolved with no words.
+        moment.last_resolved_us = moment.last_speech_us;
         let told = waits.next(&moment).expect("nothing was said: at once");
         assert_eq!(told.after_finish_ms, 200);
     }
@@ -1090,5 +1092,84 @@ mod tests {
         );
         assert!(!line.contains("Gym Coach is ready"), "never the words");
         assert_eq!(sounding.sounded(7, finished + 2 * S), None, "once");
+    }
+
+    #[test]
+    fn speech_under_way_with_no_transcript_yet_holds_the_at_once_line() {
+        // The Reviewer-lead's must-fix on #8842 (c7213149798), within the
+        // first builder's ruling (c7213454550): someone starting a sentence
+        // after more than 5 s of quiet holds it, words or none.
+        let mut waits = Waits::default();
+        let finished = 1_000 * S;
+        waits.came(coach(finished, None));
+        let mut moment = quiet(finished + 200_000);
+        moment.face = true;
+        moment.last_words_us = moment.now_us - 90 * S;
+        moment.last_resolved_us = moment.last_words_us;
+        moment.last_speech_us = moment.now_us - 200_000;
+        assert!(waits.next(&moment).is_none(), "someone is speaking");
+        // Their speech ended 2 s ago, its transcript not come yet: still
+        // their talk, until it resolves or the 5 s pause passes.
+        let ended = moment.now_us - 2 * S;
+        moment.last_speech_us = ended;
+        assert!(waits.next(&moment).is_none(), "not resolved yet");
+        moment.now_us = ended + TALK_PAUSE_US;
+        assert!(waits.next(&moment).is_some(), "the old 5 s pause at most");
+        // Resolved with no words, it leaves the pause alone at once.
+        waits.came(coach(finished + 20 * S, None));
+        let mut moment = quiet(finished + 20 * S + 200_000);
+        moment.face = true;
+        moment.last_speech_us = moment.now_us - 2 * S;
+        moment.last_resolved_us = moment.last_speech_us;
+        assert!(waits.next(&moment).is_some(), "a finished wordless turn");
+    }
+
+    #[test]
+    fn never_in_the_quiet_hours_a_busy_room_or_with_a_guest_in_view() {
+        // The Reviewer-lead's must-fix 2 (c7210755978), as
+        // `long_make::may_tell`: the quiet hours and a busy room hold it, and
+        // a face in view that is not the owner alone; with no face, someone
+        // heard is near enough (the first builder's ruling, c7209938102).
+        for held in [
+            Moment {
+                night: true,
+                ..Moment::default()
+            },
+            Moment {
+                busy: true,
+                ..Moment::default()
+            },
+            Moment {
+                others_seen: true,
+                ..Moment::default()
+            },
+        ] {
+            let mut waits = Waits::default();
+            let finished = 1_000 * S;
+            waits.came(coach(finished, None));
+            let moment = Moment {
+                now_us: finished + 200_000,
+                face: true,
+                free: true,
+                ..held
+            };
+            assert!(waits.next(&moment).is_none(), "{moment:?}");
+            // Nor right after an answer.
+            let answered = finished + 60 * S;
+            let after = Moment {
+                now_us: answered + AFTER_ANSWER_US,
+                answered_at_us: Some(answered),
+                lamp_words_ended_us: Some(answered),
+                ..moment
+            };
+            assert!(waits.next(&after).is_none(), "{after:?}");
+            let free = Moment {
+                night: false,
+                busy: false,
+                others_seen: false,
+                ..after
+            };
+            assert!(waits.next(&free).is_some(), "{free:?}");
+        }
     }
 }
