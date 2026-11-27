@@ -945,7 +945,7 @@ pub enum ProviderInput {
         /// many more?" and "is setup done?", said as they are, no chat.
         /// Absent with its switch off.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        state: Option<crate::onboarding::walk_v2::StateLines>,
+        state: Option<Box<crate::onboarding::walk_v2::StateLines>>,
     },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.

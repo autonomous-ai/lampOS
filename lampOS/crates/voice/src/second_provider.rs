@@ -9227,7 +9227,7 @@ impl Engine {
                 // The first update's waiting line (#6284): this process's own.
                 crate::onboarding::set_updating(updating);
                 // Where the walk stands (#8871): this process's own.
-                crate::onboarding::walk_v2::set_state(state.filter(|_| on));
+                crate::onboarding::walk_v2::set_state(state.filter(|_| on).map(|lines| *lines));
             }
             // Begun in a computer's turn: the rule takes its line as a call,
             // as a tap's, whenever its words are judged.
