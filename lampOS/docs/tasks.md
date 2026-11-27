@@ -10527,8 +10527,10 @@ refuses a skill that lists `tasks/step`. Not tried on a lamp.
 
 Built by the second builder on 2026-10-15, in `crates/voice/src/task_news.rs`
 (the voice is the first builder's; the change stays in that file). **Off
-unless the voice starts with `LAMP_PROGRESS_NEWS=on`** (and the tasks part
-is set, `LAMP_TASKS_DIR`, as for all task news).
+unless the voice starts with `LAMP_PROGRESS_NEWS=on`** or `on,still` (and
+the tasks part is set, `LAMP_TASKS_DIR`, as for all task news). `still`
+alone turns on only the still-working beats ("Still-working beats",
+below), not this.
 
 - **What is listened to.** `policy/decisions` and `tasks/status`, on the
   lamp's bus (`LAMP_BUS_ROOT`, or `/run/lampos-bus`), by a thread of its own,
@@ -10613,6 +10615,66 @@ and words that come back past it are let go
 (`task_news::tests::words_that_come_back_past_the_decisions_time_are_let_go`).
 "Told" here is offered and taken by `TaskNews::tell`, as the coordinator
 takes it: the coordinator, the model and the sound are not in these tests.
+
+### Still-working beats
+
+With `LAMP_PROGRESS_NEWS=still` (on in the product unit) or `on,still`,
+during a long task the lamp says briefly that it is still on it. No
+policy decision is asked: the same progress thread reads `tasks/status`
+(without `on`, it subscribes to no `policy/decisions`).
+
+- **When.** Each task shown `working` is counted from its hand-over: when
+  the voice first saw it at work, less the `working_s` it had then
+  (`lamp-tasks` fills it for Harness and direct OpenClaw or Hermes tasks
+  handed over in this boot; unknown, from when it was first seen). Beat
+  `n` (from 0) is due `FIRST + n × EVERY` after it, while `n < MOST`:
+  `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 to 3600),
+  `LAMP_PROGRESS_STILL_EVERY_S` (60, 10 to 3600) and
+  `LAMP_PROGRESS_STILL_MOST` (4, 1 to 20); a value out of range or not a
+  whole number is its default, with a journal line. Each beat is let go at
+  the next one's time, so one held past its slot is dropped, never said
+  twice or late; a slot already past when looked at is skipped.
+- **What.** When the task's change count rose since its last beat (since
+  it was first seen, for beat 0) and `get_progress` gives a non-empty line
+  of the agent still working, the beat is the progress note
+  (`note_progress`, Task news' `progress` words, no signs, the time since
+  the hand-over) with one more instruction: one short sentence on what it
+  is doing now, no URLs, raw arguments or file paths, never that it is
+  finished. Otherwise one of Task news' `still_0` to `still_3` words
+  (built in, and in `skills/task-news/skill.toml`), said as they are
+  ("Say only these words, once"): the first, then the second and third in
+  turn, the last only last. The choice is `ProgressReader::beat_note`.
+  Defaults: "Still on it, I'll tell you when it's ready.",
+  "Still working on that, hang on.", "Taking a bit longer, I'm still on
+  it.", "This one's a long one. I'll tell you as soon as it's done."
+- **Never over anyone.** Told under the progress news' gates (someone
+  there or heard within 120 s, the room not busy, no reply or turn open),
+  always after 15 s with nothing said by or to the lamp, even with
+  `LAMP_TASK_NEWS_AT_PAUSE=on`. Like all progress, never a skill's to
+  tell, never an "Excuse me" short line, never told again.
+- **Stops** once the task is not at work on `tasks/status` (finished,
+  stopped, asking, gone) or its own news waits: a beat queued then is
+  withdrawn. A change of the progress line does not withdraw a beat.
+- **Key** `<store>:<task>:progress-<run>-<change>-b<n>`, kept as told.
+  Every gap between beats is `EVERY`; no back-off.
+- **Journal**, never the words: `lamp-voice: task news still beat offered:
+  task N bK at S s, fixed` or `..., about C chars` (S whole seconds since
+  the hand-over, C the length of the agent's line); `... held: task N
+  bK, REASON` (the first gate shut, as for `task news held`, once a reason:
+  `speech_not_paused` while not quiet, `nobody_there`, `room_busy`, …);
+  `... told: task N bK`; `... dropped: task N bK, slot passed` (let go at
+  the next beat's time, or a slot past before it was looked at) or
+  `, task settled` (not at work, moved off `tasks/status`, or its own news
+  waits).
+
+Shown in `task_news::tests` (`beats_come_at_first_then_every_at_most_most_in_other_words`,
+`a_beat_counts_from_the_hand_over_by_working_s`,
+`no_beat_once_the_task_settles_or_its_news_waits_or_its_slot_passed`,
+`the_beats_settings_parse_and_bad_values_fall_back`), on a bus in
+`still_alone_beats_a_task_at_work_at_most_most_times_with_no_decision`
+(`crates/voice/tests/it/progress_news.rs`), and in the coordinator's loop
+in `a_still_working_beat_waits_for_no_conversation_even_at_pause`. Not run
+on a lamp.
 
 ### Playing progress news on lamp-4ace
 

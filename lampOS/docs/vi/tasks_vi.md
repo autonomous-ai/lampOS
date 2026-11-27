@@ -5443,6 +5443,33 @@ do là cổng đầu tiên đóng: `reminder_waiting`, `agent_wording`,
 `turn_open`, `not_ready`); tin được kể (`task news told: task N, X ms after
 it landed`); và một câu ngắn được kể.
 
+### Nhịp "vẫn đang làm" (`LAMP_PROGRESS_NEWS=still`)
+
+Với `LAMP_PROGRESS_NEWS=still` (bật trong unit sản phẩm) hoặc `on,still`, khi
+một việc chạy lâu, đèn nói một câu ngắn cố định rằng nó vẫn đang làm, không
+hỏi Policy và không lấy gì từ phần tasks. Mỗi việc đang `working` trên
+`tasks/status` được tính từ lúc giao: lúc giọng nói thấy nó đang làm lần đầu,
+trừ `working_s` khi đó (không biết thì từ lúc thấy lần đầu). Nhịp `n` (từ 0)
+đến hạn sau `FIRST + n × EVERY`, khi `n < MOST`:
+`LAMP_PROGRESS_STILL_FIRST_S` (30, 1 đến 3600),
+`LAMP_PROGRESS_STILL_EVERY_S` (60, 10 đến 3600), `LAMP_PROGRESS_STILL_MOST`
+(4, 1 đến 20); giá trị sai thì dùng mặc định, có một dòng nhật ký. Mỗi nhịp
+bị bỏ ở thời điểm của nhịp sau, nên không bao giờ nói muộn hay nói hai lần.
+Nếu số lần đổi của dòng tiến độ tăng từ nhịp trước và `get_progress` cho một
+dòng không rỗng, nhịp là ghi chú tiến độ (`note_progress`) thêm một yêu cầu:
+một câu ngắn nói agent đang làm gì, không đọc URL, tham số thô hay đường dẫn
+tệp, không nói đã xong. Nếu không, lời là `still_0` đến `still_3` của Task
+news (sẵn trong mã và trong `skills/task-news/skill.toml`), mỗi lần một câu
+khác, câu cuối chỉ ở cuối.
+Không bao giờ nói đè lên ai: luôn chờ 15 s không ai nói với hay bởi đèn, kể
+cả với `LAMP_TASK_NEWS_AT_PAUSE=on`, cùng các cổng của tin tiến độ; không qua
+kỹ năng, không có câu "Excuse me". Dừng khi việc không còn `working` hoặc tin
+của chính nó đang chờ. Khoá `<store>:<task>:progress-<run>-<change>-b<n>`.
+Nhật ký, không bao giờ lời nói: `lamp-voice: task news still beat offered:
+task N bK at S s, fixed` (hoặc `, about C chars`), `... held: task N bK, REASON`, `... told: task N bK`,
+`... dropped: task N bK, slot passed` hoặc `, task settled`. Chi tiết:
+[tasks.md](../tasks.md#still-working-beats).
+
 ## Đóng harness của chính đèn khi việc xong, chờ kể tin tối đa một phút (#6530)
 
 Với `serve --close-told` (bật trong unit của sản phẩm), lamp-tasks đóng

@@ -470,6 +470,14 @@ Environment=LAMP_TASKS_DIR=/run/lampos-tasks
 Environment=LAMP_TASKS_NEEDS=/usr/local/bin/harness
 # LAMP_TASK_NEWS: its why and rules are its row in docs/switches.md (#1038, #1722).
 Environment=LAMP_TASK_NEWS=skill
+# LAMP_PROGRESS_NEWS=still: during a long task, a short "still working" line (what the agent does, else fixed)
+# at 30 s after the hand-over, then every 60 s, at most 4, only after 15 s with nothing said by or to the lamp;
+# none once the task settles.
+# Not the Policy's progress (`on`, off in the product). Its row in docs/switches.md; its settings, at their defaults:
+Environment=LAMP_PROGRESS_NEWS=still
+#Environment=LAMP_PROGRESS_STILL_FIRST_S=30
+#Environment=LAMP_PROGRESS_STILL_EVERY_S=60
+#Environment=LAMP_PROGRESS_STILL_MOST=4
 # A skill made for the person (#1685, #2813, #4914): asked aloud or typed in the app's "Make a skill",
 # made by the lamp's own model, with no computer and no tasks part, and put on only by a spoken yes at
 # the lamp (the lead's ruling on #1711); the app's button shows at once. Played on lamp-9adf on 2 Nov, by
