@@ -6732,7 +6732,9 @@ after a take-over, but now for every turn:
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
   still through the whole line, needs its name or a follow-up.
 - **A face turned to the lamp starts no conversation**
-  (`LAMP_FACE_NOT_A_CALL=on`; off, and in no product unit yet). The product
+  (`LAMP_FACE_NOT_A_CALL=on`; off unless set, and on in the product's
+  `lamp-voice.service` since the product owner's word of 27 Nov 2026, "a
+  simple 'hey lamp' to trigger and 20s renew window"). The product
   owner's rule of 26 Nov 2026: "Hey Lamp" is the only way to start a
   conversation, and facing the lamp counts as talking to it only once head
   direction is measured reliable on the body (#8847). With the switch, out
