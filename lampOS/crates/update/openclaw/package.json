@@ -1,1 +1,1 @@
-{"name":"lampos-openclaw","private":true,"dependencies":{"openclaw":"2026.11.2"}}
+{"name":"lampos-openclaw","private":true,"dependencies":{"openclaw":"2026.11.2","@openclaw/searxng-plugin":"2026.11.2"}}

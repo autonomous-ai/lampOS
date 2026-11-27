@@ -4091,19 +4091,40 @@ fn lamp_folder(home: &Path) -> PathBuf {
 /// user, at every start (on a thread of its own: it waits for OpenClaw's
 /// gateway to check the text, minutes at most, #7268), so an existing
 /// lamp's file is brought up to date on its next start or update. One
-/// journal line, and one per wait; no token is in the file.
-pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool, v1: bool) -> String {
+/// journal line, and one per wait; no token is in the file. `web_search`
+/// through lamp-cloud only while its search token (`search_token`) is
+/// there and not empty; without it the line says so.
+pub fn set_up_openclaw(
+    state_dir: &Path,
+    home: &Path,
+    skills: bool,
+    v1: bool,
+    search_token: &Path,
+) -> String {
     let workspace = lamp_folder(home);
-    match crate::openclaw_config::write(state_dir, HERMES_FORWARDER_PORT, &workspace, skills, v1) {
+    let search = std::fs::metadata(search_token).is_ok_and(|file| file.is_file() && file.len() > 0);
+    match crate::openclaw_config::write(
+        state_dir,
+        HERMES_FORWARDER_PORT,
+        &workspace,
+        skills,
+        v1,
+        search,
+    ) {
         Ok(changed) => format!(
-            "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}{}",
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config {}{}{}{}",
             if changed { "written" } else { "unchanged" },
             if skills {
                 ""
             } else {
                 ", the lamp's skills off"
             },
-            if v1 { "" } else { ", V1's tools off" }
+            if v1 { "" } else { ", V1's tools off" },
+            if search {
+                ""
+            } else {
+                ", web search off: no search token"
+            }
         ),
         Err(error) => format!("tasks: OpenClaw's settings not written: {error}"),
     }
@@ -5665,7 +5686,13 @@ pub fn serve<C: Clock>(
         std::thread::spawn(move || {
             eprintln!(
                 "{}",
-                set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &home, skills, v1)
+                set_up_openclaw(
+                    Path::new(OPENCLAW_STATE_DIR),
+                    &home,
+                    skills,
+                    v1,
+                    Path::new(lamp_update::openclaw_install::SEARCH_TOKEN),
+                )
             )
         });
     }
@@ -8063,8 +8090,10 @@ mod tests {
         )
         .unwrap();
         let home = dir.path().join("home");
+        let search = dir.path().join("search-token");
+        fs::write(&search, "srch-secret-123\n").unwrap();
         assert_eq!(
-            set_up_openclaw(&state, &home, true, true),
+            set_up_openclaw(&state, &home, true, true, &search),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config written"
         );
         let config: Value =
@@ -8094,13 +8123,29 @@ mod tests {
             config["tools"]["deny"],
             json!(["ask_user", "secrets", "suggest_task", "skill_workshop"])
         );
+        // lamp-cloud's search token there: `web_search` through it, the
+        // token never in the file, only its variable.
+        assert_eq!(config["tools"]["web"]["search"]["provider"], "searxng");
+        let text = fs::read_to_string(state.join("openclaw.json")).unwrap();
+        assert!(!text.contains("srch-secret-123"), "{text}");
+        assert!(text.contains("/v1/search/${LAMP_SEARCH_TOKEN}"), "{text}");
         assert_eq!(
-            set_up_openclaw(&state, &home, true, true),
+            set_up_openclaw(&state, &home, true, true, &search),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
         );
+        // No token (or an empty one): no search, said in the one line.
+        fs::write(&search, "").unwrap();
+        assert_eq!(
+            set_up_openclaw(&state, &home, true, true, &search),
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config written, web search off: no search token"
+        );
+        let config: Value =
+            serde_json::from_str(&fs::read_to_string(state.join("openclaw.json")).unwrap())
+                .unwrap();
+        assert_eq!(config["tools"].get("web"), None);
         fs::write(state.join("openclaw.json"), "{\"models\": []}").unwrap();
         assert!(
-            set_up_openclaw(&state, &home, true, true)
+            set_up_openclaw(&state, &home, true, true, &search)
                 .starts_with("tasks: OpenClaw's settings not written:")
         );
     }

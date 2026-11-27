@@ -605,8 +605,9 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
 fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.starts_with("#!/bin/sh\n"));
     assert!(WRAPPER_TEXT.contains(&format!("$(cat {TOKEN} 2>/dev/null)")));
+    assert!(WRAPPER_TEXT.contains(&format!("S=$(cat {SEARCH_TOKEN} 2>/dev/null) || S=\n")));
     assert!(WRAPPER_TEXT.contains(&format!(
-        "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} OPENCLAW_NO_AUTO_UPDATE=1 PATH=\"{NODE_BIN}:$PATH\" "
+        "export {TOKEN_ENV}=\"$T\" {SEARCH_TOKEN_ENV}=\"$S\" {STATE_ENV}={STATE} OPENCLAW_NO_AUTO_UPDATE=1 PATH=\"{NODE_BIN}:$PATH\" "
     )));
     assert_eq!(
         NS_FLAGS.join(" "),
@@ -642,7 +643,7 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     let printer = folder.path().join("unshare");
     fs::write(
         &printer,
-        "#!/bin/sh\necho \"token=$LAMP_HERMES_TOKEN state=$OPENCLAW_STATE_DIR path=$PATH gateway=${LAMP_OPENCLAW_GATEWAY-unset}\"\necho \"args: $*\"\n",
+        "#!/bin/sh\necho \"token=$LAMP_HERMES_TOKEN search=${LAMP_SEARCH_TOKEN-unset} state=$OPENCLAW_STATE_DIR path=$PATH gateway=${LAMP_OPENCLAW_GATEWAY-unset}\"\necho \"args: $*\"\n",
     )
     .unwrap();
     fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
@@ -657,11 +658,13 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     .unwrap();
     fs::set_permissions(&systemctl, fs::Permissions::from_mode(0o755)).unwrap();
     let token = folder.path().join("hermes-token");
+    let search = folder.path().join("search-token");
     let wrapper = folder.path().join("openclaw");
     fs::write(
         &wrapper,
         WRAPPER_TEXT
             .replace(TOKEN, &token.to_string_lossy())
+            .replace(SEARCH_TOKEN, &search.to_string_lossy())
             .replace("/usr/bin/unshare", &printer.to_string_lossy())
             .replace("/usr/bin/nsenter", &printer.to_string_lossy())
             .replace("/usr/bin/systemctl", &systemctl.to_string_lossy()),
@@ -688,9 +691,18 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     let good = ran(true);
     assert!(good.status.success(), "{good:?}");
     let out = String::from_utf8_lossy(&good.stdout);
+    // No search token: the variable is there but empty, so OpenClaw leaves
+    // `web_search` unavailable; with it, the token in `LAMP_SEARCH_TOKEN`.
     assert!(out.contains(&format!(
-        "token=tok_0123456789abcdef state={STATE} path={NODE_BIN}:/usr/bin:/bin gateway=unset\n"
+        "token=tok_0123456789abcdef search= state={STATE} path={NODE_BIN}:/usr/bin:/bin gateway=unset\n"
     )));
+    fs::write(&search, "srch_0123456789\n").unwrap();
+    let out = String::from_utf8_lossy(&ran(true).stdout).into_owned();
+    assert!(
+        out.contains("token=tok_0123456789abcdef search=srch_0123456789 state="),
+        "{out}"
+    );
+    fs::remove_file(&search).unwrap();
     assert!(out.contains(&format!("args: {} {NS} gateway run\n", NS_FLAGS.join(" "))));
     // A pane with no gateway running, or with a "gateway" in its own user
     // namespace: refused, nothing run, never a namespace of its own.
@@ -890,6 +902,16 @@ fn the_pins_are_node_24_and_the_measured_package() {
         format!("https://registry.npmjs.org/openclaw/-/openclaw-{VERSION}.tgz")
     );
     assert!(PACKAGE_INTEGRITY.starts_with("sha512-") && PACKAGE_INTEGRITY.len() == 95);
+    // The SearXNG plugin: the release built with this OpenClaw.
+    assert_eq!(
+        SEARXNG_URL,
+        format!("https://registry.npmjs.org/{SEARXNG_PACKAGE}/-/searxng-plugin-{VERSION}.tgz")
+    );
+    assert!(SEARXNG_INTEGRITY.starts_with("sha512-") && SEARXNG_INTEGRITY.len() == 95);
+    assert_eq!(
+        SEARXNG_DIR,
+        format!("{PREFIX}/node_modules/{SEARXNG_PACKAGE}")
+    );
     assert_eq!(
         integrity_of(b""),
         "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
@@ -911,7 +933,7 @@ fn the_lockfile_pins_the_whole_tree_and_the_measured_package() {
     let manifest: serde_json::Value = serde_json::from_str(MANIFEST).unwrap();
     assert_eq!(
         manifest["dependencies"],
-        serde_json::json!({"openclaw": VERSION})
+        serde_json::json!({"openclaw": VERSION, "@openclaw/searxng-plugin": VERSION})
     );
     assert_eq!(manifest["private"], true);
     let lock: serde_json::Value = serde_json::from_str(LOCKFILE).unwrap();
@@ -930,6 +952,16 @@ fn the_lockfile_pins_the_whole_tree_and_the_measured_package() {
     assert!(refused(LOCKFILE, "2026.11.1").contains("wants"));
     let other = LOCKFILE.replacen(PACKAGE_INTEGRITY, "sha512-other", 1);
     assert!(refused(&other, VERSION).contains("the lockfile's openclaw"));
+    // The SearXNG plugin is pinned as OpenClaw is: wanted by the project at
+    // VERSION, from its tarball with its integrity.
+    let plugin = LOCKFILE.replacen(SEARXNG_INTEGRITY, "sha512-other", 1);
+    assert!(refused(&plugin, VERSION).contains("the lockfile's @openclaw/searxng-plugin"));
+    let mut without = lock.clone();
+    without["packages"][""]["dependencies"]
+        .as_object_mut()
+        .unwrap()
+        .remove(SEARXNG_PACKAGE);
+    assert!(refused(&without.to_string(), VERSION).contains("wants"));
     let mut loose = lock.clone();
     loose["packages"]["node_modules/zod"]
         .as_object_mut()

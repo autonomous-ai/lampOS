@@ -40,7 +40,9 @@
   "plugins": {
     "allow": [
       "openai",
-      "memory-core"
+      "memory-core",
+      "web-readability",
+      "searxng"
     ]
   },
   "skills": {

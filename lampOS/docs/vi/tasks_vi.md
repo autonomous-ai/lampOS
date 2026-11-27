@@ -4876,6 +4876,40 @@ là phần của một coder khác trong #6226; thiết kế:
   riêng của người dùng (như `askFallback`) được giữ; file đã chỉ có `mode` thì không bị ghi lại (#7859). Mục cho phép của launcher
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
+- **Plugin và web.** `plugins.allow` là `openai`, `memory-core`,
+  `web-readability` và `searxng` khi chưa có danh sách nào (#6226 trên
+  lamp-c0a4: 41 plugin có sẵn mặc định của OpenClaw làm một lượt treo 92 s;
+  chỉ với hai plugin đầu, Gateway sẵn sàng trong 27-50 s). Danh sách đã có,
+  của đèn từ trước khi có tìm kiếm web hay của người dùng, được thêm
+  `web-readability` và `searxng` và không mất gì; danh sách rỗng (không
+  giới hạn) được giữ nguyên. `web-readability` có sẵn trong OpenClaw, trích
+  nội dung chính của trang cho `web_fetch`, như trên V1 (V1 không đặt danh
+  sách cho phép). `browser`, cũng được nạp trên V1, bị bỏ ra: nó chạy cả một
+  Chromium. Bản thân `web_fetch` bật sẵn và không cần khóa. Cả hai plugin
+  web chỉ nạp khi dùng lần đầu, không nạp lúc Gateway khởi động
+  (`activation.onStartup: false`).
+- **Tìm kiếm web qua lamp-cloud.** OpenClaw bỏ `web_search` khỏi công cụ
+  của agent khi chưa đặt nhà cung cấp; đó là trạng thái của đèn trước thay
+  đổi này (kiểm bằng `tools.effective` của OpenClaw 2026.11.2 trên bản sao
+  của file: có `web_fetch`, không có `web_search`). Khi token chỉ-để-tìm-kiếm
+  của lamp-cloud có mặt và không rỗng (`/var/lib/lampos-cloud/search-token`),
+  lamp-tasks ghi `tools.web.search.provider: "searxng"`,
+  `plugins.entries.searxng.config.webSearch.baseUrl:
+  "http://127.0.0.1:7741/v1/search/${LAMP_SEARCH_TOKEN}"` (đường tìm kiếm
+  dạng SearXNG của lamp-cloud; plugin tự thêm `/search?q=…&format=json`) và
+  thư mục của plugin,
+  `/var/lib/lampos-openclaw/npm/node_modules/@openclaw/searxng-plugin`, vào
+  `plugins.load.paths`. Token không bao giờ nằm trong file: wrapper của
+  OpenClaw xuất nó thành `LAMP_SEARCH_TOKEN` (rỗng khi không có file), và
+  OpenClaw điền vào chỗ `${…}`. Không có token thì ba giá trị đó của ta bị
+  bỏ đi, giá trị của người khác được giữ, và dòng nhật ký lúc khởi động kết
+  thúc bằng "web search off: no search token". OpenClaw coi plugin, đường
+  dẫn hay biến bị thiếu là cảnh báo, không bao giờ từ chối file. Plugin này
+  không có sẵn trong OpenClaw 2026.11.2; lamp-update cài nó cùng OpenClaw
+  (docs/install.md, "From a pinned lockfile"). **Rủi ro thời gian khởi động
+  (#6226):** thêm hai plugin vào danh sách cho phép; cả hai chỉ nạp khi
+  dùng, nhưng thời gian Gateway sẵn sàng và lượt tìm kiếm đầu tiên phải được
+  đo trong một lamp row trước khi coi là không tốn gì.
 
 **OpenClaw kiểm tra văn bản trước khi nó vào chỗ** (#7108; ngày 15/11 một
 lần merge mà OpenClaw 2026.11.2 từ chối, 78/CONFIG, đã làm gateway của

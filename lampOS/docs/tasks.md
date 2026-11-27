@@ -3400,6 +3400,39 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   file with `mode` alone already is left unwritten (#7859). The skill-start launcher's allow-list entry ("One exec approval",
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
+- **Plugins and the web.** `plugins.allow` is `openai`, `memory-core`,
+  `web-readability` and `searxng` when none is set (#6226 on lamp-c0a4:
+  OpenClaw's default 41 bundled plugins stalled a turn 92 s; with only the
+  first two the Gateway was ready in 27-50 s). A list already set, a lamp's
+  from before web search or a person's, gets `web-readability` and
+  `searxng` added and loses nothing; an empty list (no limit) is kept.
+  `web-readability` is bundled and extracts a fetched page's main text for
+  `web_fetch`, as on V1, which set no allow list. `browser`, also loaded on
+  V1, is left out: it drives a whole Chromium. `web_fetch` itself is on by
+  default and needs no key. Both web plugins load on first use, not at the
+  Gateway's start (`activation.onStartup: false`).
+- **Web search through lamp-cloud.** OpenClaw leaves `web_search` out of
+  the agent's tools when no provider is set; that was the lamp's state
+  before this (checked with OpenClaw 2026.11.2's `tools.effective` on a
+  copy of the file: `web_fetch` there, no `web_search`). When lamp-cloud's
+  search-only token is there and not empty
+  (`/var/lib/lampos-cloud/search-token`), lamp-tasks writes
+  `tools.web.search.provider: "searxng"`,
+  `plugins.entries.searxng.config.webSearch.baseUrl:
+  "http://127.0.0.1:7741/v1/search/${LAMP_SEARCH_TOKEN}"` (lamp-cloud's
+  SearXNG-shaped route; the plugin adds `/search?q=…&format=json`) and the
+  plugin's folder, `/var/lib/lampos-openclaw/npm/node_modules/@openclaw/searxng-plugin`,
+  in `plugins.load.paths`. The token is never in the file: OpenClaw's
+  wrapper exports it as `LAMP_SEARCH_TOKEN` (empty without the file), and
+  OpenClaw fills the `${…}` in. Without the token, those three values of
+  ours are taken out, others' kept, and the start's journal line ends
+  "web search off: no search token". OpenClaw takes a missing plugin, path
+  or variable as a warning, never a refused file. The plugin is not
+  bundled in OpenClaw 2026.11.2; lamp-update installs it with OpenClaw
+  (docs/install.md, "From a pinned lockfile"). **Start-time risk (#6226):**
+  two more plugins in the allow list; both load on use, but the Gateway's
+  ready time and a first search turn must be measured in a lamp row before
+  this is taken as free.
 
 **OpenClaw checks the text before it lands** (#7108; on 15 Nov a merge
 OpenClaw 2026.11.2 refused, 78/CONFIG, took lamp-52e6's gateway down): a

@@ -52,8 +52,18 @@
 //! - with [`SKILLS_SWITCH`] on, [`SKILLS_DIR`] in `skills.load.extraDirs`:
 //!   OpenClaw reads the lamp's own skills where they are, read-only, never
 //!   copied into its state; the dirs a person added there are kept;
-//! - `plugins.allow` = [`PLUGINS_ALLOW`], only when there is no `allow`
-//!   list yet: one a person set is kept as it is, and no `deny` is added.
+//! - `plugins.allow` = [`PLUGINS_ALLOW`] when there is no `allow` list
+//!   yet; a list already set (a lamp's from before web search, or a
+//!   person's) gets the [`WEB_PLUGINS`] it lacks added, nothing taken out,
+//!   and an empty one (no limit) is kept; no `deny` is added;
+//! - with `search` (lamp-cloud's search token there,
+//!   `lamp_update::openclaw_install::SEARCH_TOKEN`), `web_search` through
+//!   lamp-cloud's SearXNG-shaped route: `tools.web.search.provider` =
+//!   `searxng`, `plugins.entries.searxng.config.webSearch.baseUrl` =
+//!   [`search_base_url`] (the token as `${LAMP_SEARCH_TOKEN}`, which
+//!   OpenClaw's wrapper exports, never in this file) and the plugin's
+//!   installed folder in `plugins.load.paths`; without it, those values of
+//!   ours are taken out and OpenClaw leaves `web_search` out, as before.
 //!
 //! Every other key is kept as it was, the `gateway` block lamp-update
 //! writes above all. The file is read as JSON, the form lamp-update and
@@ -147,11 +157,22 @@ pub const EXEC_MODE: &str = "ask";
 pub const EXEC_MODE_V1: &str = "full";
 /// The plugins OpenClaw loads on the lamp when no `plugins.allow` is set
 /// (#6226, measured on lamp-c0a4): with OpenClaw's default 41 of 69
-/// bundled plugins on, a turn stalled 92 s and timed out; with only these
-/// two the Gateway was ready in 27-50 s and two Harness turns answered in
-/// 43-73 s. `openai` serves the lamp's OpenAI-compatible provider,
-/// `memory-core` OpenClaw's own memory.
-pub const PLUGINS_ALLOW: [&str; 2] = ["openai", "memory-core"];
+/// bundled plugins on, a turn stalled 92 s and timed out; with only
+/// `openai` and `memory-core` the Gateway was ready in 27-50 s and two
+/// Harness turns answered in 43-73 s. `openai` serves the lamp's
+/// OpenAI-compatible provider, `memory-core` OpenClaw's own memory, and
+/// [`WEB_PLUGINS`] the web.
+pub const PLUGINS_ALLOW: [&str; 4] = ["openai", "memory-core", "web-readability", "searxng"];
+/// The web's plugins, also added to an allow list already set:
+/// `web-readability` (bundled) extracts a fetched page's main text for
+/// `web_fetch`, as on V1 (no allow list there); `searxng` (installed beside
+/// OpenClaw) is `web_search`'s provider. Both load on use, not at the
+/// Gateway's start (`activation.onStartup: false`). `browser`, also V1's,
+/// is left out: it drives a whole Chromium, heavy on the lamp's memory and
+/// start, and `web_fetch` with `web_search` cover reading the web.
+pub const WEB_PLUGINS: [&str; 2] = ["web-readability", "searxng"];
+/// The SearXNG plugin's id, its `plugins.entries` key and the provider's.
+const SEARXNG: &str = "searxng";
 /// The switch for the lamp's skills in OpenClaw, as `LAMP_HERMES_SKILLS`
 /// for Hermes: on unless `off` ([`skills_on`]).
 pub const SKILLS_SWITCH: &str = "LAMP_OPENCLAW_SKILLS";
@@ -200,6 +221,15 @@ pub fn skills_on(value: Option<&str>) -> bool {
 /// The forwarder's base for OpenClaw, on `port`.
 pub fn base_url(port: u16) -> String {
     crate::hermes_config::base_url(port)
+}
+
+/// lamp-cloud's SearXNG-shaped search route on `port`, the token by
+/// reference (the plugin appends `/search?q=…&format=json`).
+pub fn search_base_url(port: u16) -> String {
+    format!(
+        "http://127.0.0.1:{port}/v1/search/${{{}}}",
+        lamp_update::openclaw_install::SEARCH_TOKEN_ENV
+    )
 }
 
 /// The provider block, ours whole.
@@ -354,9 +384,82 @@ fn deny_list(tools: &mut Map<String, Value>) -> Result<&mut Vec<Value>, Refused>
     }
 }
 
+/// `plugins.allow` ([`PLUGINS_ALLOW`], or the [`WEB_PLUGINS`] an allow
+/// list already set lacks, an empty one kept) and, with `search`,
+/// `web_search` through lamp-cloud on `port`; without it, our search
+/// values taken out where they are ours, so the file is as before.
+fn web(root: &mut Map<String, Value>, port: u16, search: bool) -> Result<(), Refused> {
+    let plugins = object(root, "plugins", "plugins")?;
+    let allow = plugins.entry("allow").or_insert(Value::Null);
+    if allow.is_null() {
+        *allow = json!(PLUGINS_ALLOW);
+    }
+    let allow = allow
+        .as_array_mut()
+        .ok_or_else(|| Refused("`plugins.allow` is not a list".into()))?;
+    if !allow.is_empty() {
+        for id in WEB_PLUGINS {
+            if !allow.iter().any(|have| have == id) {
+                allow.push(json!(id));
+            }
+        }
+    }
+
+    let dir = json!(lamp_update::openclaw_install::SEARXNG_DIR);
+    let url = json!(search_base_url(port));
+    let load = object(plugins, "load", "plugins.load")?;
+    let paths = load.entry("paths").or_insert(Value::Null);
+    if paths.is_null() {
+        *paths = json!([]);
+    }
+    let paths = paths
+        .as_array_mut()
+        .ok_or_else(|| Refused("`plugins.load.paths` is not a list".into()))?;
+    if search && !paths.contains(&dir) {
+        paths.push(dir);
+    } else if !search {
+        paths.retain(|path| *path != dir);
+    }
+    if paths.is_empty() {
+        load.remove("paths");
+    }
+    take_empty(plugins, "load");
+
+    let entries = object(plugins, "entries", "plugins.entries")?;
+    let entry = object(entries, SEARXNG, "plugins.entries.searxng")?;
+    let config = object(entry, "config", "plugins.entries.searxng.config")?;
+    let web_search = object(
+        config,
+        "webSearch",
+        "plugins.entries.searxng.config.webSearch",
+    )?;
+    if search {
+        web_search.insert("baseUrl".into(), url);
+    } else {
+        take(web_search, "baseUrl", &url);
+    }
+    take_empty(config, "webSearch");
+    take_empty(entry, "config");
+    take_empty(entries, SEARXNG);
+    take_empty(plugins, "entries");
+
+    let tools = object(root, "tools", "tools")?;
+    let tools_web = object(tools, "web", "tools.web")?;
+    let tools_search = object(tools_web, "search", "tools.web.search")?;
+    if search {
+        tools_search.insert("provider".into(), json!(SEARXNG));
+    } else {
+        take(tools_search, "provider", &json!(SEARXNG));
+    }
+    take_empty(tools_web, "search");
+    take_empty(tools, "web");
+    Ok(())
+}
+
 /// `openclaw.json`'s text with the lamp's keys merged in, on the
 /// forwarder's `port`, with `workspace` the lamp's work folder, the
-/// lamp's skills when `skills` and V1's tool grants when `v1` ([`v1_tools`]).
+/// lamp's skills when `skills`, V1's tool grants when `v1` ([`v1_tools`])
+/// and `web_search` through lamp-cloud when `search` ([`web`]).
 /// The text given back unchanged when nothing changes, so a second merge
 /// is idle.
 pub fn merge_config(
@@ -365,6 +468,7 @@ pub fn merge_config(
     workspace: &Path,
     skills: bool,
     v1: bool,
+    search: bool,
 ) -> Result<String, Refused> {
     let workspace = workspace
         .to_str()
@@ -395,12 +499,7 @@ pub fn merge_config(
     defaults.insert("workspace".into(), json!(workspace));
 
     v1_tools(root, v1)?;
-
-    // Only an allow list not there yet: a person's own is theirs.
-    let plugins = object(root, "plugins", "plugins")?;
-    if plugins.get("allow").is_none_or(Value::is_null) {
-        plugins.insert("allow".into(), json!(PLUGINS_ALLOW));
-    }
+    web(root, port, search)?;
 
     if skills {
         let skills = object(root, "skills", "skills")?;
@@ -451,6 +550,7 @@ pub fn write(
     workspace: &Path,
     skills: bool,
     v1: bool,
+    search: bool,
 ) -> io::Result<bool> {
     write_waiting(
         state_dir,
@@ -458,6 +558,7 @@ pub fn write(
         workspace,
         skills,
         v1,
+        search,
         &Check::lamp(),
         &GATEWAY_WAITS,
         &mut |line| eprintln!("{line}"),
@@ -471,6 +572,7 @@ pub fn write_checked(
     workspace: &Path,
     skills: bool,
     v1: bool,
+    search: bool,
     check: &Check,
 ) -> io::Result<bool> {
     let path = state_dir.join(CONFIG_FILE);
@@ -480,7 +582,7 @@ pub fn write_checked(
     fs::create_dir_all(state_dir)?;
     let _held = lamp_checked_replace::hold(state_dir, lamp_checked_replace::LOCK_WITHIN)?;
     let text = read_or_empty(&path)?;
-    let merged = merge_config(&text, port, workspace, skills, v1).map_err(|refused| {
+    let merged = merge_config(&text, port, workspace, skills, v1, search).map_err(|refused| {
         io::Error::other(format!(
             "OpenClaw's {CONFIG_FILE} is not merged: {}",
             refused.0
@@ -553,13 +655,14 @@ pub fn write_waiting(
     workspace: &Path,
     skills: bool,
     v1: bool,
+    search: bool,
     check: &Check,
     waits: &[Duration],
     say: &mut dyn FnMut(&str),
 ) -> io::Result<bool> {
     let mut waits = waits.iter();
     loop {
-        match write_checked(state_dir, port, workspace, skills, v1, check) {
+        match write_checked(state_dir, port, workspace, skills, v1, search, check) {
             Err(error)
                 if gateway_not_there(&error.to_string())
                     || check_did_not_finish(&error.to_string()) =>
@@ -618,8 +721,10 @@ mod tests {
     const TODAY_INSTALLED: &str = include_str!("openclaw_config_today.json");
 
     fn merged(text: &str, skills: bool) -> Value {
-        serde_json::from_str(&merge_config(text, 7741, Path::new(WORKSPACE), skills, true).unwrap())
-            .unwrap()
+        serde_json::from_str(
+            &merge_config(text, 7741, Path::new(WORKSPACE), skills, true, false).unwrap(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -664,27 +769,35 @@ mod tests {
         );
         assert_eq!(
             value["plugins"],
-            json!({"allow": ["openai", "memory-core"]})
+            json!({"allow": ["openai", "memory-core", "web-readability", "searxng"]})
         );
     }
 
-    /// #6226, lamp-c0a4: a fresh file gets exactly the two plugins; an
-    /// allow list already set is kept as it is, with no deny added; the
-    /// models and agents merge is the same either way.
+    /// #6226, lamp-c0a4: a fresh file gets exactly the four plugins; an
+    /// allow list already set (a lamp's from before web search, or a
+    /// person's) gets the web's two added and keeps every id it had, with no
+    /// deny added; an empty one (no limit) is kept; the models and agents
+    /// merge is the same either way.
     #[test]
-    fn the_plugins_allowed_are_set_only_when_none_are() {
+    fn the_plugins_allowed_get_the_webs_and_lose_none() {
         let fresh = merged("", true);
         assert_eq!(
             fresh["plugins"],
-            json!({"allow": ["openai", "memory-core"]})
+            json!({"allow": ["openai", "memory-core", "web-readability", "searxng"]})
+        );
+        let before = merged(r#"{"plugins": {"allow": ["openai", "memory-core"]}}"#, true);
+        assert_eq!(
+            before["plugins"], fresh["plugins"],
+            "an existing lamp's list"
         );
         let own = merged(
-            r#"{"plugins": {"allow": ["telegram"], "entries": {"x": {"enabled": true}}}}"#,
+            r#"{"plugins": {"allow": ["telegram", "searxng"], "entries": {"x": {"enabled": true}}}}"#,
             true,
         );
         assert_eq!(
             own["plugins"],
-            json!({"allow": ["telegram"], "entries": {"x": {"enabled": true}}})
+            json!({"allow": ["telegram", "searxng", "web-readability"],
+                "entries": {"x": {"enabled": true}}})
         );
         let empty = merged(r#"{"plugins": {"allow": []}}"#, true);
         assert_eq!(
@@ -696,7 +809,105 @@ mod tests {
             assert_eq!(value["models"], fresh["models"]);
             assert_eq!(value["agents"], fresh["agents"]);
         }
-        assert!(merge_config("{\"plugins\": []}", 7741, Path::new(WORKSPACE), true, true).is_err());
+        assert!(
+            merge_config(
+                "{\"plugins\": []}",
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                false
+            )
+            .is_err()
+        );
+        assert!(
+            merge_config(
+                r#"{"plugins": {"allow": "x"}}"#,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                false
+            )
+            .is_err()
+        );
+    }
+
+    fn searched(text: &str, search: bool) -> String {
+        merge_config(text, 7741, Path::new(WORKSPACE), true, true, search).unwrap()
+    }
+
+    /// Web search: with lamp-cloud's search token there, `web_search`
+    /// through its SearXNG-shaped route, the token only by reference, the
+    /// plugin loaded from where `npm ci` put it; a merge again idle.
+    #[test]
+    fn web_search_goes_through_lamp_cloud_with_the_search_token() {
+        for text in ["", INSTALLED, TODAY_INSTALLED] {
+            let on = searched(text, true);
+            let value: Value = serde_json::from_str(&on).unwrap();
+            assert_eq!(
+                value["tools"]["web"],
+                json!({"search": {"provider": "searxng"}})
+            );
+            assert_eq!(
+                value["plugins"]["entries"],
+                json!({"searxng": {"config": {"webSearch": {
+                    "baseUrl": "http://127.0.0.1:7741/v1/search/${LAMP_SEARCH_TOKEN}"}}}})
+            );
+            assert_eq!(
+                value["plugins"]["load"],
+                json!({"paths": ["/var/lib/lampos-openclaw/npm/node_modules/@openclaw/searxng-plugin"]})
+            );
+            assert_eq!(
+                value["plugins"]["allow"],
+                json!(["openai", "memory-core", "web-readability", "searxng"])
+            );
+            assert_eq!(searched(&on, true), on, "a second merge is idle");
+            // The gateway, the model and V1's tools are as without search.
+            let off: Value = serde_json::from_str(&searched(text, false)).unwrap();
+            for key in ["gateway", "models", "agents", "skills"] {
+                assert_eq!(value[key], off[key], "{key}");
+            }
+            assert_eq!(value["tools"]["exec"], off["tools"]["exec"]);
+        }
+    }
+
+    /// No search token: no search config, as before web search (OpenClaw
+    /// leaves `web_search` out), and a file written with it goes back to
+    /// that; a person's own load paths, plugin settings and provider stay.
+    #[test]
+    fn without_the_search_token_there_is_no_search_config() {
+        for text in ["", INSTALLED] {
+            let off = searched(text, false);
+            let value: Value = serde_json::from_str(&off).unwrap();
+            assert_eq!(value["tools"].get("web"), None);
+            assert_eq!(
+                value["plugins"],
+                json!({"allow": ["openai", "memory-core", "web-readability", "searxng"]})
+            );
+            assert_eq!(searched(&searched(text, true), false), off);
+        }
+        let theirs = r#"{"plugins": {"load": {"paths": ["/opt/mine"]},
+            "entries": {"searxng": {"enabled": true, "config": {"webSearch": {"baseUrl": "https://search.example"}}}}},
+            "tools": {"web": {"search": {"provider": "brave"}, "fetch": {"enabled": true}}}}"#;
+        let theirs_off: Value = serde_json::from_str(&searched(theirs, false)).unwrap();
+        assert_eq!(theirs_off["tools"]["web"]["search"]["provider"], "brave");
+        assert_eq!(
+            theirs_off["plugins"]["entries"]["searxng"]["config"]["webSearch"]["baseUrl"],
+            "https://search.example"
+        );
+        assert_eq!(
+            theirs_off["plugins"]["load"],
+            json!({"paths": ["/opt/mine"]})
+        );
+        // Search on writes ours over theirs; off again takes only ours out.
+        let value: Value = serde_json::from_str(&searched(&searched(theirs, true), false)).unwrap();
+        assert_eq!(value["plugins"]["load"], json!({"paths": ["/opt/mine"]}));
+        assert_eq!(
+            value["plugins"]["entries"]["searxng"],
+            json!({"enabled": true})
+        );
+        assert_eq!(value["tools"]["web"], json!({"fetch": {"enabled": true}}));
     }
 
     /// #7245: V1's tool grants (`runtimes/openclaw/service_setup.go`,
@@ -705,7 +916,8 @@ mod tests {
     /// workspace, gateway and a person's own keys stay.
     #[test]
     fn an_existing_lamps_file_gets_v1s_tools_and_keeps_its_keys() {
-        let before = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, false).unwrap();
+        let before =
+            merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, false, false).unwrap();
         let mut old: Value = serde_json::from_str(&before).unwrap();
         old["tools"]["exec"]["askFallback"] = json!("deny");
         old["tools"]["elevated"] = json!({"allowFrom": {"telegram": ["42"]}});
@@ -739,14 +951,16 @@ mod tests {
     /// file written with V1's tools back into that one.
     #[test]
     fn with_the_v1_tools_switch_off_the_file_is_todays() {
-        let off = |text: &str| merge_config(text, 7741, Path::new(WORKSPACE), true, false).unwrap();
+        let off = |text: &str| {
+            merge_config(text, 7741, Path::new(WORKSPACE), true, false, false).unwrap()
+        };
         assert_eq!(off(INSTALLED), TODAY_INSTALLED);
-        let on = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, true).unwrap();
+        let on = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, true, false).unwrap();
         assert_ne!(on, TODAY_INSTALLED);
         assert_eq!(off(&on), TODAY_INSTALLED);
         assert_eq!(
             off(""),
-            off(&merge_config("", 7741, Path::new(WORKSPACE), true, true).unwrap())
+            off(&merge_config("", 7741, Path::new(WORKSPACE), true, true, false).unwrap())
         );
     }
 
@@ -775,7 +989,8 @@ mod tests {
         let old = serde_json::to_string(&old).unwrap();
         for v1 in [true, false] {
             for text in [INSTALLED, "", old.as_str()] {
-                let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+                let merged =
+                    merge_config(text, 7741, Path::new(WORKSPACE), true, v1, false).unwrap();
                 let mut value: Value = serde_json::from_str(&merged).unwrap();
                 assert!(openclaw_takes(&value["tools"]["exec"]), "{v1}: {merged}");
                 let exec = value["tools"]["exec"].as_object_mut().unwrap();
@@ -788,7 +1003,7 @@ mod tests {
             }
         }
         let exec = |v1| {
-            let merged = merge_config("", 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            let merged = merge_config("", 7741, Path::new(WORKSPACE), true, v1, false).unwrap();
             serde_json::from_str::<Value>(&merged).unwrap()["tools"]["exec"].clone()
         };
         assert_eq!(exec(true), json!({"host": "gateway", "mode": EXEC_MODE_V1}));
@@ -802,7 +1017,7 @@ mod tests {
     #[test]
     fn the_tools_that_wait_for_a_person_are_denied_with_v1s_tools() {
         let deny = |text: &str, v1| {
-            let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1, false).unwrap();
             serde_json::from_str::<Value>(&merged).unwrap()["tools"]
                 .get("deny")
                 .cloned()
@@ -828,9 +1043,9 @@ mod tests {
                 "skill_workshop"
             ]))
         );
-        let on = merge_config(own, 7741, Path::new(WORKSPACE), true, true).unwrap();
+        let on = merge_config(own, 7741, Path::new(WORKSPACE), true, true, false).unwrap();
         assert_eq!(deny(&on, false), Some(json!(["browser", "ASK_USER"])));
-        let ours = merge_config("", 7741, Path::new(WORKSPACE), true, true).unwrap();
+        let ours = merge_config("", 7741, Path::new(WORKSPACE), true, true, false).unwrap();
         assert_eq!(deny(&ours, false), None, "an empty deny is taken out");
         for text in [
             r#"{"tools": {"deny": "secrets"}}"#,
@@ -838,7 +1053,7 @@ mod tests {
         ] {
             for v1 in [true, false] {
                 assert!(
-                    merge_config(text, 7741, Path::new(WORKSPACE), true, v1).is_err(),
+                    merge_config(text, 7741, Path::new(WORKSPACE), true, v1, false).is_err(),
                     "{text} {v1}"
                 );
             }
@@ -852,8 +1067,9 @@ mod tests {
     #[test]
     fn the_lamps_agent_cannot_write_or_patch_skills_of_its_own() {
         let merged = |text: &str, skills, v1| {
-            let merged = merge_config(text, 7741, Path::new(WORKSPACE), skills, v1).unwrap();
-            let again = merge_config(&merged, 7741, Path::new(WORKSPACE), skills, v1).unwrap();
+            let merged = merge_config(text, 7741, Path::new(WORKSPACE), skills, v1, false).unwrap();
+            let again =
+                merge_config(&merged, 7741, Path::new(WORKSPACE), skills, v1, false).unwrap();
             assert_eq!(again, merged, "a second merge is idle");
             merged
         };
@@ -883,7 +1099,7 @@ mod tests {
     }
 
     fn exec_of(text: &str, v1: bool) -> Value {
-        let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+        let merged = merge_config(text, 7741, Path::new(WORKSPACE), true, v1, false).unwrap();
         serde_json::from_str::<Value>(&merged).unwrap()["tools"]["exec"].clone()
     }
 
@@ -930,9 +1146,10 @@ mod tests {
     #[test]
     fn an_already_migrated_file_is_unchanged() {
         for v1 in [true, false] {
-            let once = merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+            let once =
+                merge_config(INSTALLED, 7741, Path::new(WORKSPACE), true, v1, false).unwrap();
             assert_eq!(
-                merge_config(&once, 7741, Path::new(WORKSPACE), true, v1).unwrap(),
+                merge_config(&once, 7741, Path::new(WORKSPACE), true, v1, false).unwrap(),
                 once,
                 "{v1}"
             );
@@ -955,9 +1172,9 @@ mod tests {
     fn merging_twice_changes_nothing() {
         for v1 in [true, false] {
             for text in [INSTALLED, "", "{}"] {
-                let once = merge_config(text, 7741, Path::new(WORKSPACE), true, v1).unwrap();
+                let once = merge_config(text, 7741, Path::new(WORKSPACE), true, v1, false).unwrap();
                 assert_eq!(
-                    merge_config(&once, 7741, Path::new(WORKSPACE), true, v1).unwrap(),
+                    merge_config(&once, 7741, Path::new(WORKSPACE), true, v1, false).unwrap(),
                     once
                 );
             }
@@ -1028,11 +1245,11 @@ mod tests {
             "{\"plugins\": true}",
         ] {
             assert!(
-                merge_config(text, 7741, Path::new(WORKSPACE), true, true).is_err(),
+                merge_config(text, 7741, Path::new(WORKSPACE), true, true, false).is_err(),
                 "{text:?}"
             );
         }
-        assert!(merge_config("{}", 7741, Path::new("relative"), true, true).is_err());
+        assert!(merge_config("{}", 7741, Path::new("relative"), true, true, false).is_err());
     }
 
     #[test]
@@ -1040,15 +1257,15 @@ mod tests {
         let state = tempfile::tempdir().unwrap();
         let path = state.path().join(CONFIG_FILE);
         fs::write(&path, INSTALLED).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).unwrap());
-        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true, true).unwrap());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true, false).unwrap());
+        assert!(!write(state.path(), 7741, Path::new(WORKSPACE), true, true, false).unwrap());
         let text = fs::read_to_string(&path).unwrap();
         assert!(text.contains("kept-gateway-token"));
         assert!(!text.contains("AUTONOMOUS_API_KEY") && !text.contains("campaign-api"));
         let mode = fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
         fs::write(&path, "{\"models\": []}").unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true, false).is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "{\"models\": []}");
     }
 
@@ -1059,7 +1276,7 @@ mod tests {
         let target = elsewhere.path().join(CONFIG_FILE);
         fs::write(&target, "{}").unwrap();
         std::os::unix::fs::symlink(&target, state.path().join(CONFIG_FILE)).unwrap();
-        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true).is_err());
+        assert!(write(state.path(), 7741, Path::new(WORKSPACE), true, true, false).is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "{}");
     }
 
@@ -1131,6 +1348,7 @@ mod tests {
                 Path::new(WORKSPACE),
                 true,
                 true,
+                false,
                 &joined(validator),
             )
         };
@@ -1233,7 +1451,17 @@ mod tests {
         fs::create_dir_all(&state).unwrap();
         let path = state.join(CONFIG_FILE);
         let check = standing_in(dir.path(), &path);
-        let write = || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &check);
+        let write = || {
+            write_checked(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                false,
+                &check,
+            )
+        };
 
         fs::write(&path, INSTALLED).unwrap();
         fs::write(dir.path().join("pid"), "0\n").unwrap();
@@ -1274,7 +1502,17 @@ mod tests {
         let check = standing_in(dir.path(), &path);
         fs::write(dir.path().join("pid"), "0\n").unwrap();
         let refused = with_exec(json!({"host": "gateway", "mode": "ask", "ask": "off"}));
-        let write = || write_checked(&state, 7741, Path::new(WORKSPACE), true, true, &check);
+        let write = || {
+            write_checked(
+                &state,
+                7741,
+                Path::new(WORKSPACE),
+                true,
+                true,
+                false,
+                &check,
+            )
+        };
 
         fs::write(&path, &refused).unwrap();
         assert!(write().unwrap());
@@ -1341,6 +1579,7 @@ mod tests {
                     Path::new(WORKSPACE),
                     true,
                     true,
+                    false,
                     &joined(&wrapper),
                 )
             }
@@ -1393,6 +1632,7 @@ mod tests {
                 Path::new(WORKSPACE),
                 true,
                 true,
+                false,
                 &joined(&wrapper),
                 &waits,
                 say,
@@ -1465,6 +1705,7 @@ mod tests {
             Path::new(WORKSPACE),
             true,
             true,
+            false,
             &joined(&wrapper),
             &[Duration::from_millis(1); 3],
             &mut |line| {
@@ -1511,6 +1752,7 @@ mod tests {
                 Path::new(WORKSPACE),
                 true,
                 true,
+                false,
                 &joined(&wrapper),
                 &waits,
                 say,
