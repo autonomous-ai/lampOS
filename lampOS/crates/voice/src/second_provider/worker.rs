@@ -32132,6 +32132,89 @@ mod tests {
         }
     }
 
+    #[test]
+    fn caller_match_worker_window_crossing_keeps_the_line_that_started_in_time() {
+        use crate::second_provider::Heard;
+        let _one = crate::provider_worker::tests::one_thread();
+        for (start_after_answer_ms, helps) in [(19_000, true), (20_001, false)] {
+            let _clock = clock_with_history();
+            let (mut h, _) = caller_match_worker(true);
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(
+                start_after_answer_ms - 15_000,
+            ))
+            .unwrap();
+            let start = monotonic_us();
+            h.hear(
+                2,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(1_001)).unwrap();
+            let _ = h.caller_match(); // Regular room tick while the person is still speaking.
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(999)).unwrap();
+            h.hear(2, Heard::Samples(&vec![100; crate::same_voice::ASKED_AT]));
+            h.hear(2, Heard::Ended);
+            let verdict = h.heed(2, (start, monotonic_us()), "And times two?", None);
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            assert_eq!(
+                verdict.is_none(),
+                helps,
+                "start {start_after_answer_ms} ms after the answer"
+            );
+        }
+    }
+
+    #[test]
+    fn caller_match_worker_window_crossing_keeps_first_playback_of_an_admitted_line() {
+        use crate::second_provider::{Did, Heard};
+        use std::sync::atomic::Ordering;
+        let _one = crate::provider_worker::tests::one_thread();
+        for (playback_delay_ms, renews) in [(900, true), (1100, true), (20_001, false)] {
+            let _clock = clock_with_history();
+            let (mut h, ready) = caller_match_worker(true);
+            h.taking_follow_ups();
+            h.not_renewing_untied();
+            ready.store(false, Ordering::Release);
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(2200)).unwrap();
+            let start = monotonic_us();
+            h.hear(
+                2,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(1800)).unwrap();
+            h.hear(2, Heard::Samples(&vec![100; crate::same_voice::ASKED_AT]));
+            h.hear(2, Heard::Ended);
+            assert!(
+                h.heed(
+                    2,
+                    (start, monotonic_us()),
+                    "The pencils are in the drawer.",
+                    None
+                )
+                .is_none()
+            );
+            assert!(h.chain_untied.contains(&2));
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(200)).unwrap();
+            ready.store(true, Ordering::Release);
+            let _ = h.caller_match();
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(playback_delay_ms - 200))
+                .unwrap();
+            let played = monotonic_us();
+            h.lamp_did(Did::Said(2, played));
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            assert_eq!(
+                h.said_until_free_us == Some(played),
+                renews,
+                "first playback after {playback_delay_ms} ms"
+            );
+        }
+    }
+
     /// The second route as the product runs it for #7891: `LAMP_SAID_TO_ME`
     /// and `LAMP_TURNED_FACE_SPEAKS` both on (`lamp-voice.service`), the
     /// name's second sign asked (`LAMP_NAME_SECOND_SIGN`), the room kept.
