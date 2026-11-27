@@ -1,10 +1,11 @@
 //! Quiet focus and the wellbeing nudges in one engine (#5620, the PM's call
-//! (a)): Rest your eyes, and with `LAMP_NUDGES_PRESENT` Sip of water too,
-//! are due when someone looks up after 45 minutes head down, and on a lamp
-//! that installed Quiet focus its word stands in for its whole `[budget]`
-//! group (`stands_in_for_group`). A lamp without it, or a sitting with no
-//! focus, is as before. Replayed from Quiet focus's own case, through the
-//! real loader and engine.
+//! (a)): on a lamp that installed Quiet focus its word stands in for its
+//! whole `[budget]` group (`stands_in_for_group`). Since the owner's 27 Nov
+//! "there should be no shared budget" the wellbeing nudges are in no budget
+//! group, so the word holds none of them back; the mechanism is held here
+//! with a Rest your eyes copy put in Quiet focus's `[budget]` group
+//! ([`grouped`]). Replayed from Quiet focus's own case, through the real
+//! loader and engine.
 use lamp_skills::{
     Call, Engine, Pushed, Recorded, Skill, load_each_with, load_with, read_recordings,
 };
@@ -101,13 +102,34 @@ fn never_head_down() -> Vec<Recorded> {
         .collect()
 }
 
-/// Head down from 3 minutes, the focus due at 48, a look up at 50: with both
-/// installed, Quiet focus's word then, and no Rest your eyes line in the
-/// sitting (lamp-9adf, 7 Nov: Rest your eyes spoke 5 s into the look up and
-/// took the wellbeing group's gap, so the word was refused).
+/// A Rest your eyes copy in Quiet focus's `[budget]` group "wellbeing", as
+/// every wellbeing nudge was before the owner's 27 Nov call.
+fn grouped(root: &Path) -> PathBuf {
+    copy(
+        root,
+        "rest-your-eyes",
+        &[(
+            "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\n",
+            "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"\n",
+        )],
+    )
+}
+
+/// Head down from 3 minutes, the focus due at 48, a look up at 50: with
+/// Quiet focus and a Rest your eyes in its group, Quiet focus's word then,
+/// and no Rest your eyes line in the sitting (lamp-9adf, 7 Nov: Rest your
+/// eyes spoke 5 s into the look up and took the wellbeing group's gap, so
+/// the word was refused).
 #[test]
-fn quiet_focus_word_stands_in_for_rest_your_eyes() {
-    let said = says(&["quiet-focus", "rest-your-eyes"], &case());
+fn quiet_focus_word_stands_in_for_a_member_of_its_group() {
+    let dir = tempfile::tempdir().unwrap();
+    let said = says_of(
+        vec![
+            loaded(&skills_root().join("quiet-focus")),
+            loaded(&grouped(dir.path())),
+        ],
+        &case(),
+    );
     assert_eq!(
         said.iter()
             .map(|(skill, _)| skill.as_str())
@@ -118,16 +140,16 @@ fn quiet_focus_word_stands_in_for_rest_your_eyes() {
     assert!((50 * 60..51 * 60).contains(&said[0].1), "{said:?}");
 }
 
-/// Each skill under `skills/` of the wellbeing `[budget]` group, turned on,
-/// with its `[present]` applied as the product's `LAMP_NUDGES_PRESENT=on`
-/// does.
+/// Each wellbeing skill under `skills/` (sharing `wellbeing_nudges`),
+/// turned on, with its `[present]` applied as the product's
+/// `LAMP_NUDGES_PRESENT=on` does.
 fn wellbeing_present() -> Vec<Skill> {
     let mut folders: Vec<PathBuf> = std::fs::read_dir(skills_root())
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|folder| {
             std::fs::read_to_string(folder.join("skill.toml"))
-                .is_ok_and(|toml| toml.contains("\n[budget]\ngroup = \"wellbeing\""))
+                .is_ok_and(|toml| toml.contains("\ntool = \"wellbeing_nudges\""))
         })
         .collect();
     folders.sort();
@@ -142,12 +164,11 @@ fn wellbeing_present() -> Vec<Skill> {
 }
 
 /// The replay on lamp-9adf (7 Nov) with the product's `[present]`: Sip of
-/// water, of the wellbeing group too, came due at the same look up, spoke
-/// first and spent the group's hour, so the word was refused. Every
-/// wellbeing skill is held while the word is to come: only Quiet focus
-/// speaks at the look up.
+/// water and Rest your eyes came due at the same look up. In no budget (the
+/// owner, 27 Nov) nothing is refused and nothing held for the word: Quiet
+/// focus's word and the nudges all speak when they look up.
 #[test]
-fn with_every_wellbeing_nudge_present_only_the_word_speaks_at_the_look_up() {
+fn with_every_wellbeing_nudge_present_the_word_and_the_nudges_speak_at_the_look_up() {
     let skills = wellbeing_present();
     let names: Vec<_> = skills.iter().map(|skill| skill.name.as_str()).collect();
     for name in ["quiet-focus", "rest-your-eyes", "sip-of-water"] {
@@ -159,12 +180,11 @@ fn with_every_wellbeing_nudge_present_only_the_word_speaks_at_the_look_up() {
         .filter(|(_, at_s)| (50 * 60..51 * 60).contains(at_s))
         .map(|(skill, _)| skill.as_str())
         .collect();
-    assert_eq!(at_look_up, ["quiet-focus"], "{said:?}");
-    assert!(
-        said.iter()
-            .all(|(_, at_s)| *at_s >= 50 * 60 || *at_s < 48 * 60),
-        "a wellbeing nudge spoke while the word was to come: {said:?}"
-    );
+    for name in ["quiet-focus", "rest-your-eyes", "sip-of-water"] {
+        assert!(at_look_up.contains(&name), "{name}: {said:?}");
+    }
+    // Head down from 3 to 50: no nudge before they look up.
+    assert!(said.iter().all(|(_, at_s)| *at_s >= 50 * 60), "{said:?}");
 }
 
 /// The reviewer's bound on #5704: a word that never comes does not hold the
@@ -190,13 +210,7 @@ fn a_word_that_never_comes_holds_the_group_once_at_most() {
             ("equals = \"at_desk\"", "equals = \"never\""),
         ],
     );
-    let runs = runs_of(
-        vec![
-            loaded(&never),
-            loaded(&skills_root().join("rest-your-eyes")),
-        ],
-        &case(),
-    );
+    let runs = runs_of(vec![loaded(&never), loaded(&grouped(dir.path()))], &case());
     let said: Vec<_> = runs
         .iter()
         .filter(|(run, _)| run.calls.iter().any(|call| matches!(call, Call::Say(_))))
@@ -229,13 +243,16 @@ fn rest_your_eyes_alone_still_speaks_in_that_sitting() {
 }
 
 /// Quiet focus installed, but never head down: no focus is pending, and
-/// Rest your eyes says its line at 45 minutes, as it would without it.
+/// Rest your eyes says its line once, past its 30 minutes (the owner, 27
+/// Nov) and before the focus would have come due at 48, as it would
+/// without it. (In this case it is said at 45, where the case's faces come
+/// every 1.5 s.)
 #[test]
 fn with_quiet_focus_and_no_focus_rest_your_eyes_still_speaks() {
     let said = says(&["quiet-focus", "rest-your-eyes"], &never_head_down());
     assert_eq!(said.len(), 1, "{said:?}");
     assert_eq!(said[0].0, "rest-your-eyes");
-    assert!((45 * 60..46 * 60).contains(&said[0].1), "{said:?}");
+    assert!((30 * 60..48 * 60).contains(&said[0].1), "{said:?}");
 }
 
 /// The reviewer's P3 on #5704: the wait line is said only once the held
@@ -249,8 +266,9 @@ fn no_wait_line_while_the_held_skills_while_does_not_hold() {
         dir.path(),
         "rest-your-eyes",
         &[(
-            "[active]",
-            "[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"never\"\n\n[active]",
+            "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\n",
+            "[[while]]\ntopic = \"voice/state\"\nfield = \"state\"\nequals = \"never\"\n\n\
+             [budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"\n",
         )],
     );
     let runs = runs_of(
@@ -346,10 +364,7 @@ fn rest_spoke(said: &[(String, u64)]) -> bool {
 fn a_word_in_another_group_holds_nothing_back() {
     let dir = tempfile::tempdir().unwrap();
     let word = decoy(dir.path(), "focus");
-    let said = says_of(
-        vec![loaded(&word), loaded(&skills_root().join("rest-your-eyes"))],
-        &case(),
-    );
+    let said = says_of(vec![loaded(&word), loaded(&grouped(dir.path()))], &case());
     assert!(rest_spoke(&said), "{said:?}");
 }
 
@@ -361,7 +376,13 @@ fn a_word_holds_no_warning_of_its_group() {
     let warning = copy(
         dir.path(),
         "rest-your-eyes",
-        &[("policy = \"nudge\"", "policy = \"warning\"")],
+        &[
+            ("policy = \"nudge\"", "policy = \"warning\""),
+            (
+                "[stop]\ntool = \"wellbeing_nudges\"\ngroup = \"wellbeing\"\n",
+                "[budget]\ngroup = \"wellbeing\"\nper_hour = 1\n\n[stop]\ntool = \"wellbeing_nudges\"\n",
+            ),
+        ],
     );
     let said = says_of(
         vec![loaded(&skills_root().join("quiet-focus")), loaded(&warning)],

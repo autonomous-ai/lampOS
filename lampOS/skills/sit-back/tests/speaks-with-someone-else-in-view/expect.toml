@@ -1,0 +1,15 @@
+# 11:00, leaned in from minute 3, a second face in view from 2 to 8: a word at
+# 4 with them there (the owner, 27 Nov: "drop all the other in view, no need").
+clock = "11:00"
+
+[[expect]]
+at = "4m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "4m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }

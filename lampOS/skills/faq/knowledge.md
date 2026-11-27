@@ -74,7 +74,7 @@ Reminders aren't in the app yet: you set them by voice.
 <!-- LAMP_APP_SCHEDULE: off -->
 
 ## nudges
-After a long sitting I give one short nudge at a time, never more than a couple an hour:
+After a long sitting I give short nudges, each when its time comes, at any hour:
 - a stretch after about 50 minutes (`stretch-break`).
 - a sip of water (`sip-of-water`), resting your eyes (`rest-your-eyes`), standing up (`stand-up`), a short break (`comfort-break`), sitting back when you lean in (`sit-back`), a word on how you sit when the desk noticing reads a minute as sitting badly, at most once every 15 minutes for each part (`posture`), and winding down in the hour before bed (`wind-down`).
 <!-- LAMP_NUDGES_PRESENT: on in the product -->

@@ -8,8 +8,9 @@ needs = ["eyes", "body", "light", "voice"]
 # installable skills"); it can be turned off by voice (`wellbeing_nudges`) or in the app.
 kind = "core"
 version = "1.0.0"
-# Three a day at most, counted from the local midnight.
-most_a_day = 3
+# No daily most, no hours and no budget shared with the other nudges (the
+# owner, 27 Nov: "drop all the max-per-day", "drop all the quiet hour",
+# "there should be no shared budget"): a person may work late.
 
 # What it may read and use, and nothing more: the faces, the voice's state,
 # a turn toward the face and its light. It says one short line, worded by the voice (the owner, 25 Oct).
@@ -26,14 +27,14 @@ near = 0.14               # at the desk, not across the room (Stretch break's li
 for = "30m"
 gap = "2m"                # looking away or leaning out of view does not end the sitting
 rearm = "leaves"          # once a sitting; again only after they have left
-cooldown = "45m"
+cooldown = "30m"          # the owner, 27 Nov: "the sip of water, make it 30m cooldown"
 wait = "10m"              # talking when the time comes: once the talk ends, within ten minutes
 
-[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+[[while]]                 # the lamp itself has not spoken for 10 s, as Posture waits (the owner, 27 Nov): not on top of its own last words
 topic = "voice/state"
 field = "state"
 not_equals = "speaking"
-for = "30s"
+for = "10s"
 
 [[while]]                 # never in the middle of a conversation
 topic = "voice/state"
@@ -58,27 +59,13 @@ field = "drank_s_ago"     # from the desk arrival when it saw nothing, so it hol
 above = 1799              # does. Without lamp-seen, or with it gone quiet, the topic is never said
 unknown = "holds_stale"   # or has run out, and it runs as before.
 
-[active]                  # only in the day's working hours
-from = "10:00"
-to = "17:00"
-
-[quiet]                   # never at night
-from = "22:00"
-to = "08:00"
-
-# One nudge an hour between the wellbeing skills.
-[budget]
-group = "wellbeing"
-per_hour = 1
-
-# Two nudges nobody noticed in a row, and it rests until tomorrow morning.
-[rest]
-after_ignored = 2
-
-# One function for the four wellbeing skills, so a session counts it once
-# (#1685): it stops the one that came last, or with all, every one.
+# One function for the wellbeing skills, so a session counts it once
+# (#1685): it stops the one that came last, or with all, every one. Shared by
+# its `group`, with no budget (the owner, 27 Nov), and with A meal check's and
+# Quiet focus's, whose `[budget]` group has the same name.
 [stop]
 tool = "wellbeing_nudges"
+group = "wellbeing"
 kind = "water"
 about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
 # In short, with LAMP_USE_SKILL_SUMMARY on (#6218); the same in every
@@ -103,26 +90,21 @@ say = "{sitting} They have sat at the desk for about half an hour. Suggest a sip
 
 # With LAMP_NUDGES_PRESENT=on (#5207, off unless set), these stand in for
 # the values above, each key whole: a sip after 30 minutes at the desk, and
-# again each 45 minutes while they stay, over the waking day the quiet hours
-# leave, six a day at most. The wellbeing group's two an hour, never within
-# 30 minutes of each other, keeps it from crowding the other nudges.
-[present]
-most_a_day = 6
-
+# again each 30 minutes while they stay (the owner, 27 Nov), at any hour.
 [present.trigger]
 topic = "humans/faces/tracked"
 when = "present"
 near = 0.14
 for = "30m"
 gap = "2m"
-cooldown = "45m"          # no rearm: again after 45 minutes while they stay;
+cooldown = "30m"          # no rearm: again after 30 minutes while they stay;
                           # talking then, every message after is a chance
 
 [[present.while]]
 topic = "voice/state"
 field = "state"
 not_equals = "speaking"
-for = "30s"
+for = "10s"
 
 [[present.while]]
 topic = "voice/state"
@@ -146,16 +128,6 @@ topic = "humans/doing"
 field = "drank_s_ago"
 above = 1799
 unknown = "holds_stale"
-
-[present.active]          # the waking day: the quiet hours hold the rest
-from = "08:00"
-to = "22:00"
-
-[present.budget]
-group = "wellbeing"
-per_hour = 2
-gap = "30m"
-give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back
 
 [[present.do]]
 body = { look_at = "face" }

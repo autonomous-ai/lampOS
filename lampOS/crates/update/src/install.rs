@@ -433,7 +433,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "music-sway",
     // The wellbeing nudges (#1685), each saying one short line since the
     // owner's 25 Oct "talk to the user": water, the eyes, standing up and
-    // winding down, with Stretch break's budget of one an hour between them.
+    // winding down, in no budget between them (the owner, 27 Nov).
     // Their one function, `wellbeing_nudges` (their `[stop]`), is a product
     // session's 32nd of its 32.
     "sip-of-water",
@@ -443,12 +443,12 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // A short break after a long sitting (#3504, #5207): V1's bathroom-break
     // reminder, shipped off by its own `enabled = false` and on by its
     // `[present]` with `LAMP_NUDGES_PRESENT=on`, which `lamp-skills.service`,
-    // `lamp-skills-manage@.service` and `lamp-cloud.service` set: after 90
-    // minutes. Its function is the nudges' one `wellbeing_nudges`, no new one.
+    // `lamp-skills-manage@.service` and `lamp-cloud.service` set: after 60
+    // minutes (the owner, 27 Nov). Its function is the nudges' one `wellbeing_nudges`, no new one.
     "comfort-break",
     // Sit back (#3694, #5208): V1's posture reminder brought back, a core
     // skill since its played check with a person on lamp-9adf (4 Nov). It
-    // shares the wellbeing nudges' function and their hour.
+    // shares the wellbeing nudges' function, in no budget.
     "sit-back",
     // Posture (#6543, the owner's call of 23 Nov, split from Sit back): V1's
     // posture reminder from the cloud's posture reading (`humans/posture`,

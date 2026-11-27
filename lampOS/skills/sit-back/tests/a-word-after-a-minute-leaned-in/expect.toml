@@ -1,0 +1,16 @@
+# 11:00, sat 3 minutes, then leaned in to the end: a word at minute 4, a
+# minute in (the owner, 27 Nov: "sit back is alarm after 1m like posture"),
+# and nothing after.
+clock = "11:00"
+
+[[expect]]
+at = "4m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "4m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }
