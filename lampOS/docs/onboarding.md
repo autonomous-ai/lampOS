@@ -947,10 +947,15 @@ switch off, nothing below changes anything.
   `failed` or `skipped`: only `done`, or `not_available` for missing
   hardware. A step that would end any other way is asked again
   (`Onboarding::finish`, the one place, `Onboarding::ask_again`): its own
-  failed or later line is never said, and after a quiet gap
-  (`walk_v2::reask_gap_us`: 15 s, then 30 s, 60 s, at most 2 minutes, so
-  Lamp never talks on alone) it is asked with a coached line, a different
-  one each time (`walk_v2::coach`): touch "Pet the top of my head, right
+  failed or later line is never said. Never stuck in silence: with
+  nothing said since the ask, its reminder or the lamp's latest words, a
+  walk step is asked again after a gap that grows gently
+  (`walk_v2::reask_gap_us`: 15 s, then 25, 40, and at most 60 s), with no
+  long silent give-up first (touch's 60 to 70 s give-up and the 90 s
+  give-up are not used with the switch on; the step's evidence still ends
+  it at any time). It is asked with a coached line, a different one each
+  time (`walk_v2::coach`), which stands for the step's own reminder from
+  then on: touch "Pet the top of my head, right
   here." / "Just a light tap on top." / "Touch the top of my head,
   gently."; where you sit, try a skill and make a skill each have three
   too. Who you are is asked with its own note again (its face part stays
@@ -963,6 +968,10 @@ switch off, nothing below changes anything.
   touch with no working head pads, "My head pads aren't working right now,
   so we'll skip touch."; where you sit with no camera, "My camera's off,
   so I'll learn where you sit later.".
+- **Said in the owner's language.** The coached, missing-hardware and
+  Call Lamp lines are in `in_language::LINES` (vi, ja, zh, ko, fr); the
+  impatience, skip, pause and carry-on lines are the walk's own in each
+  language (`walk_v2::talk_lines`, `walk_v2::carry_on_offer`).
 - **Call Lamp merged (phase 2).** One step: "Say 'Hey Lamp' three times,
   so I learn your voice from your seat and never miss you."
   (`walk_v2::NEAR_FIRST`, with its step counter). Three accepted calls,

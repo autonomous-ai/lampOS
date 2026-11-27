@@ -1218,6 +1218,155 @@ pub(super) const LINES: &[Line] = &[
         "음, 좋아요.",
         "Mmm, agréable.",
     ]),
+    // The walk v2's phase 2 (#8871): coached re-asks, missing hardware and
+    // Call Lamp.
+    ("I can't see you yet. Sit in front of me and look my way.", [
+        "Mình chưa thấy bạn. Ngồi trước mặt mình và nhìn về phía mình nhé.",
+        "まだ見えません。私の前に座って、こちらを見てください。",
+        "我还看不到你。坐到我前面，看着我。",
+        "아직 안 보여요. 제 앞에 앉아서 저를 봐 주세요.",
+        "Je ne vous vois pas encore. Asseyez-vous devant moi et regardez-moi.",
+    ]),
+    ("Come sit where you usually do, facing me.", [
+        "Lại ngồi chỗ quen thuộc của bạn, quay về phía mình nhé.",
+        "いつもの場所に座って、こちらを向いてください。",
+        "来你平时坐的地方坐下，面向我。",
+        "평소 앉는 자리에 앉아서 저를 향해 주세요.",
+        "Venez vous asseoir à votre place habituelle, face à moi.",
+    ]),
+    ("Just look at me from your seat for a moment.", [
+        "Chỉ cần nhìn mình từ chỗ bạn ngồi một chút thôi.",
+        "座ったまま、少しだけこちらを見てください。",
+        "坐在座位上看我一会儿就好。",
+        "앉은 자리에서 잠깐만 저를 봐 주세요.",
+        "Regardez-moi juste un instant depuis votre place.",
+    ]),
+    ("Pet the top of my head, right here.", [
+        "Vuốt đỉnh đầu mình nhé, ngay đây này.",
+        "頭のてっぺんをなでてください、ここです。",
+        "摸摸我的头顶，就是这里。",
+        "제 머리 위를 쓰다듬어 주세요, 바로 여기요.",
+        "Caressez le haut de ma tête, juste ici.",
+    ]),
+    ("Just a light tap on top.", [
+        "Chỉ cần chạm nhẹ lên đỉnh đầu thôi.",
+        "上を軽くトンとたたくだけで大丈夫です。",
+        "在顶上轻轻拍一下就好。",
+        "위쪽을 가볍게 톡 쳐 주기만 하면 돼요.",
+        "Juste une petite tape sur le dessus.",
+    ]),
+    ("Touch the top of my head, gently.", [
+        "Chạm nhẹ nhàng lên đỉnh đầu mình nhé.",
+        "頭のてっぺんに、そっと触れてください。",
+        "轻轻碰一下我的头顶。",
+        "제 머리 위를 살짝 만져 주세요.",
+        "Touchez doucement le haut de ma tête.",
+    ]),
+    ("Try it: Hey Lamp, turn blue.", [
+        "Thử đi: Hey Lamp, chuyển sang màu xanh dương.",
+        "やってみて：Hey Lamp、青にして。",
+        "试试看：Hey Lamp，变成蓝色。",
+        "해 보세요: Hey Lamp, 파란색으로 바꿔 줘.",
+        "Essayez : Hey Lamp, passe au bleu.",
+    ]),
+    ("Say 'Hey Lamp, turn blue', and watch my light.", [
+        "Nói 'Hey Lamp, chuyển sang màu xanh dương', rồi xem đèn của mình nhé.",
+        "「Hey Lamp、青にして」と言って、私の光を見てください。",
+        "说“Hey Lamp，变成蓝色”，然后看我的灯光。",
+        "'Hey Lamp, 파란색으로 바꿔 줘'라고 말하고 제 불빛을 보세요.",
+        "Dites « Hey Lamp, passe au bleu » et regardez ma lumière.",
+    ]),
+    ("Just ask me for a colour, like blue.", [
+        "Cứ bảo mình đổi màu, ví dụ màu xanh dương.",
+        "色をお願いしてみて。たとえば青。",
+        "让我换个颜色就行，比如蓝色。",
+        "색깔을 말해 보세요. 파란색처럼요.",
+        "Demandez-moi juste une couleur, comme le bleu.",
+    ]),
+    ("Try: remind me to drink water every 30 minutes.", [
+        "Thử nói: nhắc tôi uống nước mỗi 30 phút.",
+        "言ってみて：30分ごとに水を飲むよう知らせて。",
+        "试试说：每30分钟提醒我喝水。",
+        "이렇게 말해 보세요: 30분마다 물 마시라고 알려 줘.",
+        "Essayez : rappelle-moi de boire de l'eau toutes les 30 minutes.",
+    ]),
+    ("Tell me one thing to do for you, like a reminder.", [
+        "Nói mình một việc để làm giúp bạn, như một lời nhắc.",
+        "私にしてほしいことを一つ教えてください。たとえばリマインダー。",
+        "告诉我一件要帮你做的事，比如一个提醒。",
+        "제가 해 드릴 일 하나를 말해 주세요. 알림 같은 거요.",
+        "Dites-moi une chose à faire pour vous, comme un rappel.",
+    ]),
+    ("My head pads aren't working right now, so we'll skip touch.", [
+        "Cảm biến trên đầu mình đang không hoạt động, nên mình bỏ qua bước chạm nhé.",
+        "頭のセンサーが今は動いていないので、タッチは飛ばしますね。",
+        "我头上的感应区现在不能用，所以我们跳过触摸。",
+        "지금 머리 센서가 작동하지 않아서 터치는 건너뛸게요.",
+        "Les capteurs de ma tête ne marchent pas pour l'instant, alors on passe le toucher.",
+    ]),
+    ("My camera's off, so I'll learn where you sit later.", [
+        "Camera của mình đang tắt, nên mình sẽ học chỗ bạn ngồi sau nhé.",
+        "カメラがオフなので、座る場所はあとで覚えますね。",
+        "我的摄像头关着，所以之后再记住你坐在哪里。",
+        "카메라가 꺼져 있어서 앉는 자리는 나중에 배울게요.",
+        "Ma caméra est éteinte, alors j'apprendrai votre place plus tard.",
+    ]),
+    ("Say 'Hey Lamp' three times, so I learn your voice from your seat and never miss you.", [
+        "Nói 'Hey Lamp' ba lần nhé, để mình học giọng bạn từ chỗ bạn ngồi và không bao giờ bỏ lỡ bạn.",
+        "「Hey Lamp」と3回言ってください。座った場所からの声を覚えて、聞き逃さないように。",
+        "说三次“Hey Lamp”，让我从你的座位学会你的声音，再也不会错过你。",
+        "'Hey Lamp'를 세 번 말해 주세요. 앉은 자리에서 목소리를 배워 절대 놓치지 않을게요.",
+        "Dites « Hey Lamp » trois fois, pour que j'apprenne votre voix depuis votre place et ne vous manque jamais.",
+    ]),
+    ("Got it, two more.", [
+        "Được rồi, thêm hai lần nữa.",
+        "OK、あと2回。",
+        "好的，还有两次。",
+        "좋아요, 두 번 더요.",
+        "C'est noté, encore deux.",
+    ]),
+    ("One more.", [
+        "Thêm một lần nữa.",
+        "あと1回。",
+        "再一次。",
+        "한 번 더요.",
+        "Encore une.",
+    ]),
+    ("I didn't catch that. Try again when I stop talking.", [
+        "Mình chưa nghe rõ. Thử lại khi mình nói xong nhé.",
+        "聞き取れませんでした。私が話し終えたら、もう一度どうぞ。",
+        "我没听清。等我说完再试一次。",
+        "잘 못 들었어요. 제 말이 끝나면 다시 해 보세요.",
+        "Je n'ai pas bien entendu. Réessayez quand j'ai fini de parler.",
+    ]),
+    ("Wait till I finish, then say it.", [
+        "Đợi mình nói xong rồi hãy nói nhé.",
+        "私が話し終わるまで待ってから言ってください。",
+        "等我说完再说。",
+        "제 말이 끝날 때까지 기다렸다가 말해 주세요.",
+        "Attendez que j'aie fini, puis dites-le.",
+    ]),
+    ("Say 'Hey Lamp' a bit louder.", [
+        "Nói 'Hey Lamp' to hơn một chút nhé.",
+        "「Hey Lamp」をもう少し大きな声で。",
+        "“Hey Lamp”说得再大声一点。",
+        "'Hey Lamp'를 조금 더 크게 말해 주세요.",
+        "Dites « Hey Lamp » un peu plus fort.",
+    ]),
+    ("Come a little closer.", [
+        "Lại gần mình một chút nhé.",
+        "もう少し近くに来てください。",
+        "再靠近一点。",
+        "조금 더 가까이 와 주세요.",
+        "Approchez-vous un peu.",
+    ]),
+    ("Just say 'Hey Lamp'.", [
+        "Chỉ cần nói 'Hey Lamp'.",
+        "「Hey Lamp」と言うだけで大丈夫です。",
+        "只要说“Hey Lamp”就行。",
+        "'Hey Lamp'라고만 말하면 돼요.",
+        "Dites simplement « Hey Lamp ».",
+    ]),
     ("Can I remember your face? Then I'll know it's you, not a guest. It stays on this lamp.", [
         "Mình nhớ khuôn mặt bạn được không? Vậy mình sẽ biết là bạn, không phải khách. Nó chỉ ở trên đèn này.",
         "お顔を覚えてもいいですか？お客さんではなく、あなただとわかります。このLampの中だけに残ります。",
@@ -2543,6 +2692,11 @@ mod tests {
             .map(str::to_owned),
         );
         notes.extend(super::super::walk_v2::NOTES.map(str::to_owned));
+        notes.extend(
+            super::super::walk_v2::coached_notes()
+                .into_iter()
+                .map(str::to_owned),
+        );
         notes.push(super::super::walk_v2::MAKE_DONE.replace("{skill}", "drink water"));
         assert!(notes.len() > 60, "{}", notes.len());
         notes
