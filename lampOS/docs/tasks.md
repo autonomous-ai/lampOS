@@ -8796,19 +8796,34 @@ never have asked or taken an answer on a lamp).
   in, pair or connect a computer (or Harness), or said yes to the lamp's
   own offer, and never because an agent or computer isn't there: say so
   and offer instead. The voice also checks it in code before asking the
-  tasks part anything (`sign_in::may_start`). A START runs when the
+  tasks part anything (`sign_in::may_start`). A START runs while a
+  sign-in's code is kept (it then only gives back the same code, so "say
+  it again" or "what was the number?" need no word of it), or when the
   person's heard words:
-  - ask for a sign-in (`sign_in::asks_to_sign_in`): "sign … in" (within
-    three words), "signin", "login" or "log … in/on", said alone ("please
-    sign me in") or with a computer word (computer, laptop, Mac, MacBook,
-    PC, Harness, hand-over, or "the lamp", not the lamp called by name);
-    "pair", "connect", "link", "set up" or "hook up" with a computer word;
-    or "code" while a sign-in's code is kept ("say the code again");
-  - or are a plain yes (`agent_tasks::yes_to_a_question`, the confirm's
-    yes test) to the lamp's last line, which asked a question, was not
-    cut, was said at most `CONFIRM_WITHIN` (120 s) before, and offered a
-    sign-in in that question (its words after the last full stop: "sign …
-    in", "signing", "login", "pair", "connect").
+  - ask for a sign-in (`sign_in::asks_to_sign_in`): a sign-in word with
+    no agent named (`agent_tasks::names_an_agent`: any form of a name the
+    voice knows, or "agent"), as in "I want to sign in" or "help me sign
+    in", or with a computer word (computer, laptop, Mac, MacBook, PC,
+    Harness, hand-over, or "the lamp", not the lamp called by name); a
+    pairing word only with a computer word;
+  - or say yes (`sign_in::yes_to_the_offer`) to the lamp's last line,
+    which asked a question, was not cut, was said at most
+    `CONFIRM_WITHIN` (120 s) before, and offered a sign-in in that
+    question (its words after the last full stop), by the same words as
+    the ask: a plain yes (`agent_tasks::yes_to_a_question`, the confirm's
+    yes test), or any reply with a sign-in or pairing word ("Yeah, sign it
+    in.", "Sure, sign it in.").
+
+  A line with a word that refuses (`sign_in::refuses`: "no", "don't",
+  "dont", "not", "never", "later", "wait", "cancel", "stop", "không",
+  "đừng", "chưa", "để sau") is neither an ask nor a yes: "No, don't sign
+  it in" after the offer is refused.
+
+  The words, one set for both sides (`sign_in::sign_in_word`): sign-in
+  words are "sign … in/into/onto" or "signed … in/into/onto" (within three
+  words), "signing", "signin", "login", "log/logged … in/on/into/onto"; pairing words are "pair",
+  "pairing", "connect", "connecting", "link", "linking", "setup", "set …
+  up", "hook … up".
 
   Otherwise the call is refused with a final error, never retried: "Not
   started: the person did not ask to sign in or pair a computer, nor say
@@ -8821,9 +8836,17 @@ never have asked or taken an answer on a lamp).
   other English-only gates: with the owner's language set to another
   ([`language.rs`](../crates/voice/src/language.rs)) the check is off, and
   words not known for the request are not refused either (a false refusal
-  of the person's own ask is worse than none, as #6537). Tests:
+  of the person's own ask is worse than none, as #6537). So for a
+  Vietnamese owner nothing is refused: the confirm's yes has no Vietnamese
+  words either. Tests:
   `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
-  `a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`.
+  `a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`,
+  `the_code_asked_again_in_any_words_starts_while_one_is_kept`,
+  `a_sign_in_asked_in_plain_words_starts_unless_an_agent_is_named`,
+  `a_yes_to_an_offer_in_any_sign_in_words_starts`,
+  `a_sign_in_said_with_into_or_signed_starts`,
+  `a_yes_with_the_offers_verb_starts_and_a_no_never`,
+  `a_vietnamese_owners_ask_code_again_and_yes_are_never_refused`.
 - **The news, in the coordinator, from the tasks part**
   (`sign_in::news`, read every 2 s while a sign-in is open, every 10 s
   otherwise): a code whose atomic claim it wins (`code_told` was false
