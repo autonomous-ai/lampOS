@@ -874,3 +874,11 @@ the walk's order) and the update line, once each as its first audio is queued,
 from a thread of its own and at most one in 2 s, `Spoke`, with a fixed sentence
 as the reason: no task's text, no agent's answer and no name. A skill's say, a
 reminder and an answer are not told by it (lamp-skills tells the says).
+
+## `voice/turn_record`: a finished turn, without its words (#8726)
+
+| Topic | Kind | Published by | Intended reader |
+|---|---|---|---|
+| `voice/turn_record` | event, no period, no lifespan | `lamp-voice` (serve mode, with `LAMP_DOCTOR_TURNS=on`, off in every unit), one for each turn that finishes | `lamp-control`, which tells it as `turns.finished` to a running app that holds `turns` ([apps.md](apps.md), "Lamp Doctor's grants") |
+
+[`TurnRecord`](msgs.md): the turn's number, its time in whole minutes, heard to first sound in milliseconds, its outcome, counts (tool calls, timeouts, errors, words heard and said), yes/no signals, each failed call as a case (what it was to, how it failed, the HTTP status or the voice's fault category, the milliseconds waited, the request number) and the route and build. Every string in it is a name from a fixed list: it has no field for a word anyone said, a name or a speaker. The voice counts the words of its transcriptions as they pass and keeps none (`crates/voice/src/turn_ledger.rs`). The topic is made when the first turn finishes with the switch on, and nothing reads it unless an installed, running app holds `turns`. The failed calls of a turn happen in the second worker, a process of its own, which sends them to the coordinator as `ProviderOutput::Cases` just before the request's `TurnComplete`; the coordinator's ledger takes them into the record.

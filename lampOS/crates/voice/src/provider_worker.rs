@@ -1118,6 +1118,16 @@ pub enum ProviderOutput {
         request: u64,
         idle: bool,
     },
+    /// The failed calls and proofs of `request`, from the second worker (a
+    /// process of its own) to the coordinator, sent before the request's
+    /// `TurnComplete` (#8726, `turn_ledger`): the coordinator's ledger makes the
+    /// turn's record, and the calls fail in the worker. Numbers and fixed
+    /// names only.
+    Cases {
+        request: u64,
+        failed: Vec<lamp_msgs::doctor::FailedCall>,
+        proofs: Vec<lamp_msgs::doctor::Proof>,
+    },
     /// A holding answer (a short wait phrase, or a last sentence promising
     /// a check, `holding_answer::holding_only`) with no function call.
     /// Observed before its idle TurnComplete; no input or speech is granted.
@@ -1658,6 +1668,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::GenerationComplete { request }
             | ProviderOutput::Interrupted { request }
             | ProviderOutput::TurnComplete { request, .. }
+            | ProviderOutput::Cases { request, .. }
             | ProviderOutput::HoldingAnswer { request, .. }
             | ProviderOutput::RequestedAudio { request, .. }
         | ProviderOutput::Unclear { request, .. }

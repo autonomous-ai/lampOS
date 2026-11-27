@@ -55,7 +55,8 @@ MOST_DEPTH = 8
 MOST_PATH_BYTES = 1024
 GRANTS = (
     "body", "light", "speak", "look", "hear", "sound", "skills", "air", "device",
-    "camera", "microphone", "speaker", "notes", "speech", "volume", "remember",
+    "camera", "microphone", "speaker", "notes", "speech", "volume", "remember", "turns",
+    "report",
 )
 NPU_OPS = {"pose": "camera"}
 PHRASE_BYTES = 64

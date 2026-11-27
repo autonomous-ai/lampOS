@@ -880,6 +880,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::GenerationComplete { request }
         | ProviderOutput::Interrupted { request }
         | ProviderOutput::TurnComplete { request, .. }
+        | ProviderOutput::Cases { request, .. }
         | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::RequestedAudio { request, .. }
         | ProviderOutput::Unclear { request, .. }
