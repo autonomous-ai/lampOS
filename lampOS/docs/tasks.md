@@ -3292,6 +3292,12 @@ forwarded on the lamp").
   searches through its keyless pool alone, as before; lamp-tasks' start line
   says which (`web search through the lamp first` or `web search keyless
   only (no search token)`). An existing lamp gains it on its next start.
+  lamp-cloud makes the token as its forwarder starts, and lamp-tasks may
+  start first (no unit order between them; a round restarts the parts one
+  by one): the start's writes of Hermes' and OpenClaw's settings, on a
+  thread beside the start, first wait up to 120 s for it
+  (`runtime::SEARCH_TOKEN_WAIT`, a look every 2 s), then are written either
+  way. Each gateway reads its settings at its own start.
   Hermes's "Could not reach SearXNG at <url>" error names the URL, so the
   model may see the token when lamp-cloud is down: it is search-only and
   the route answers on loopback only.

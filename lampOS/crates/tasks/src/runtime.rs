@@ -4130,6 +4130,30 @@ pub fn set_up_openclaw(
     }
 }
 
+/// How long the agents' settings wait at the part's start for lamp-cloud's
+/// search token ([`wait_for_search_token`]): lamp-cloud makes it as its
+/// forwarder starts, and lamp-tasks may start first (no unit order between
+/// them; a round restarts the parts one by one).
+pub const SEARCH_TOKEN_WAIT: Duration = Duration::from_secs(120);
+/// How often that wait looks.
+pub const SEARCH_TOKEN_LOOK: Duration = Duration::from_secs(2);
+
+/// Whether `search_token` is there and not empty, looked at every `every`
+/// for up to `wait`; the settings are written either way, with web search
+/// through the lamp only when it is.
+pub fn wait_for_search_token(search_token: &Path, wait: Duration, every: Duration) -> bool {
+    let until = Instant::now() + wait;
+    loop {
+        if fs::metadata(search_token).is_ok_and(|file| file.is_file() && file.len() > 0) {
+            return true;
+        }
+        if Instant::now() >= until {
+            return false;
+        }
+        std::thread::sleep(every);
+    }
+}
+
 /// `LAMP_HERMES_ON_LAMP` (#5978): Hermes' settings written at the part's
 /// start ([`crate::hermes_config::write`]) under `hermes_home`, for
 /// lamp-cloud's forwarder, with its local token read from `token_path` and
@@ -5659,17 +5683,12 @@ pub fn serve<C: Clock>(
     {
         set_no_harness(&no_harness, &config, lamp_side.clone(), absent, home);
     }
-    if hermes_on {
-        eprintln!(
-            "{}",
-            set_up_hermes(
-                Path::new(HERMES_HOME),
-                Path::new(crate::hermes_config::TOKEN_PATH),
-                Path::new(crate::hermes_config::SEARCH_TOKEN_PATH)
-            )
-        );
-    }
-    if let Some(side) = lamp_side.as_ref().filter(|_| openclaw_on) {
+    // The agents' settings, beside the start: lamp-cloud makes the search
+    // token as its forwarder starts, and the parts start in no set order (a
+    // round restarts them one by one), so the writes first wait for it
+    // (`SEARCH_TOKEN_WAIT`); OpenClaw's then waits for its gateway to check
+    // the text, minutes at most (`openclaw_config::GATEWAY_WAITS`, #7268).
+    let openclaw = lamp_side.as_ref().filter(|_| openclaw_on).map(|side| {
         let skills = crate::openclaw_config::skills_on(
             std::env::var(crate::openclaw_config::SKILLS_SWITCH)
                 .ok()
@@ -5680,20 +5699,28 @@ pub fn serve<C: Clock>(
                 .ok()
                 .as_deref(),
         );
-        // Beside the start: the write waits for OpenClaw's gateway to check
-        // it, minutes at most (`openclaw_config::GATEWAY_WAITS`, #7268).
-        let home = side.home.clone();
+        (side.home.clone(), skills, v1)
+    });
+    if hermes_on || openclaw.is_some() {
         std::thread::spawn(move || {
-            eprintln!(
-                "{}",
-                set_up_openclaw(
-                    Path::new(OPENCLAW_STATE_DIR),
-                    &home,
-                    skills,
-                    v1,
-                    Path::new(crate::hermes_config::SEARCH_TOKEN_PATH),
-                )
-            )
+            let search = Path::new(crate::hermes_config::SEARCH_TOKEN_PATH);
+            wait_for_search_token(search, SEARCH_TOKEN_WAIT, SEARCH_TOKEN_LOOK);
+            if hermes_on {
+                eprintln!(
+                    "{}",
+                    set_up_hermes(
+                        Path::new(HERMES_HOME),
+                        Path::new(crate::hermes_config::TOKEN_PATH),
+                        search
+                    )
+                );
+            }
+            if let Some((home, skills, v1)) = openclaw {
+                eprintln!(
+                    "{}",
+                    set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &home, skills, v1, search)
+                );
+            }
         });
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
@@ -7549,6 +7576,41 @@ mod tests {
             read_targets(&path).unwrap().keys().collect::<Vec<_>>(),
             ["lamp"]
         );
+    }
+
+    /// lamp-cloud's search token made a moment after lamp-tasks' start (no
+    /// unit order between them): the start's write waits for it, so Hermes
+    /// searches through the lamp first without lamp-tasks started again; with
+    /// none, the wait ends at its bound.
+    #[test]
+    fn the_settings_wait_for_a_search_token_made_after_the_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let hermes = dir.path().join(".hermes");
+        let token = dir.path().join("hermes-token");
+        let search = dir.path().join("search-token");
+        fs::write(&token, "0123456789abcdef".repeat(4)).unwrap();
+        let later = search.clone();
+        let cloud = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            fs::write(later, "fedcba9876543210".repeat(4)).unwrap();
+        });
+        assert!(wait_for_search_token(
+            &search,
+            Duration::from_secs(10),
+            Duration::from_millis(20)
+        ));
+        cloud.join().unwrap();
+        assert!(
+            set_up_hermes(&hermes, &token, &search).ends_with("web search through the lamp first")
+        );
+        let none = dir.path().join("none");
+        let started = Instant::now();
+        assert!(!wait_for_search_token(
+            &none,
+            Duration::from_millis(200),
+            Duration::from_millis(20)
+        ));
+        assert!(started.elapsed() < Duration::from_secs(5));
     }
 
     /// #5978: Hermes' settings at the part's start: skipped with one line

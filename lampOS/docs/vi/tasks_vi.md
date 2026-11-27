@@ -4783,7 +4783,13 @@ người dùng được giữ và của ta không được thêm. Không có fil
 thêm gì (một `SEARXNG_URL` của ta bị bỏ đi) và Hermes tìm qua nhóm không cần
 khóa như trước; dòng khởi động của lamp-tasks nói rõ (`web search through
 the lamp first` hoặc `web search keyless only (no search token)`). Một đèn
-đang chạy có nó ở lần khởi động sau. Lỗi "Could not reach SearXNG at <url>"
+đang chạy có nó ở lần khởi động sau. lamp-cloud tạo token khi bộ chuyển tiếp
+của nó khởi động, và lamp-tasks có thể khởi động trước (giữa hai unit không có
+thứ tự; một vòng cập nhật khởi động lại từng phần một): việc ghi thiết lập của
+Hermes và OpenClaw lúc khởi động, trên một luồng bên cạnh, trước hết chờ token
+tối đa 120 s (`runtime::SEARCH_TOKEN_WAIT`, nhìn lại mỗi 2 s), rồi ghi dù có
+hay không. Mỗi gateway đọc thiết lập của nó khi chính nó khởi động.
+Lỗi "Could not reach SearXNG at <url>"
 của Hermes có ghi URL, nên model có thể thấy token khi lamp-cloud không
 chạy: token chỉ dùng để tìm kiếm và đường đó chỉ trả lời trên loopback.
 
