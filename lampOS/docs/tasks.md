@@ -779,6 +779,12 @@ minutes, not one, and:
   whole news to a quiet one. After a short line, the whole news follows
   only once the lamp answers someone again, not at anyone's next line nor
   at the next long pause of a quiet room (`TaskNews::short_unanswered`).
+- An answer counts for all of this only right after it (#8812): within
+  the reply window of 20 s from the end of its words
+  (`follows_on::WITHIN_US`), and until anyone's next line, whichever ends
+  first (`task_news::answer_counts`). An answer from minutes ago, two people
+  now talking, no longer lets news out at a pause of a second, turns its
+  short line into "By the way, ...", or lifts a busy room's hold.
 - Any news (but a sign-in's, which the person just asked for and may be
   typing in silence) is told only with someone there now: a face in view,
   or anyone heard speaking within about 15 s (`task_news::someone_there`,
@@ -796,6 +802,7 @@ minutes, not one, and:
 | Wait for a quiet room, at most | 10 min from when the voice had the news (60 s before #8783) | `task_news::WAITS_AT_MOST` |
 | Pause in talk it is told at | 5 s with nobody heard speaking and no turn (1 s before #8783) | `task_news::LONG_PAUSE_US` |
 | Pause after the lamp answered someone | 1 s with nobody heard speaking, the turn over as long | `task_news::PAUSE_US` (unchanged) |
+| An answer counts for news | 20 s from the end of its words, until anyone's next line | `follows_on::WITHIN_US`, `task_news::answer_counts` |
 | Someone there | a face, or anyone heard within 15 s (2 min before #8783) | `task_news::HEARD_WITHIN_US` |
 | A busy room's talk over | 10 s with nobody heard speaking and no turn | `task_news::TALK_OVER_US` |
 | After the lamp's own words | 3 s with nobody starting | `task_news::AFTER_LAMP_US` (unchanged) |

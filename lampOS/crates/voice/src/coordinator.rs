@@ -15157,7 +15157,8 @@ fn conversation_with_gate_inner(
         // lamp's own words, a busy room no longer holding it; the whole
         // news once the lamp answers someone after it. The lamp answering
         // someone ("Hey Lamp, ...") since it came in tells it before that,
-        // "By the way, ...", at the voice's pause for news. Only with
+        // "By the way, ...", at the voice's pause for news; the answer
+        // counts only just after it (`task_news::answer_counts`). Only with
         // someone there now (`task_news::someone_there`: a face, or speech
         // within about 15 s); else it waits, untold. And why news waiting
         // is held this tick, journaled once a reason, deciding nothing.
@@ -15190,7 +15191,8 @@ fn conversation_with_gate_inner(
         // `overdue_pause`: people's talk leaves room for news
         // (`task_news::talk_paused`, #8783), for all news waiting;
         // `overdue_there`: someone is there for it; `overdue_answered`: the
-        // lamp answered someone since it came in.
+        // lamp answered someone since it came in, just now
+        // (`task_news::answer_counts`).
         let (overdue_whole, overdue_short, overdue_pause, overdue_there, overdue_answered) =
             match task_news.as_mut().filter(|news| news.has_waiting()) {
                 Some(news) => {
@@ -15215,9 +15217,13 @@ fn conversation_with_gate_inner(
                     let there =
                         crate::task_news::someone_there(clock, present, last_speech_us, said_at_us)
                             || news.sign_in_waits();
-                    // The lamp answered someone since the news came in.
-                    let answered = answered_at_us
-                        .filter(|at| news.landed_us(clock).is_some_and(|landed| *at >= landed));
+                    // The lamp answered someone since the news came in,
+                    // and its answer still counts (`task_news::answer_counts`):
+                    // every use below reads only this.
+                    let answered = answered_at_us.filter(|at| {
+                        news.landed_us(clock).is_some_and(|landed| *at >= landed)
+                            && crate::task_news::answer_counts(*at, clock, said_at_us)
+                    });
                     // Past its wait, its short line only, whatever the room.
                     // After an answer, to a busy room, short; to one not
                     // busy, told as any news is, by the gates below.

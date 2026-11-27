@@ -265,6 +265,18 @@ pub fn talk_paused(
     paused && (answered || now_us.saturating_sub(last_turn_us.max(last_speech_us)) >= LONG_PAUSE_US)
 }
 
+/// Whether the lamp's answer to someone, its words ended at `answered_us`,
+/// still counts for news at `now_us` (#8812's HOLD, the first builder's
+/// P2): only right after it, within the reply window
+/// ([`crate::follows_on::WITHIN_US`]) and until anyone's next line
+/// (`said_at_us`, a line said ended after it), whichever ends first. An
+/// answer minutes old, two people now talking, is no one talking to the
+/// lamp.
+pub fn answer_counts(answered_us: u64, now_us: u64, said_at_us: Option<u64>) -> bool {
+    now_us.saturating_sub(answered_us) <= crate::follows_on::WITHIN_US
+        && said_at_us.is_none_or(|said| said <= answered_us)
+}
+
 /// Whether other people's talk is over, for a busy room's hold on news
 /// (#8783): nobody heard (`last_speech_us`) and no turn (`last_turn_us`)
 /// for [`TALK_OVER_US`] by `now_us`.
