@@ -127,7 +127,14 @@ against lamp-06c1.
   and V1's `PingPayload` fields V2 has. With `LAMP_CLOUD_TLS=on` the body
   also says `"mqtt_tls": true`, so the backend can hand the lamp its TLS
   broker; with the switch off or unset the key is left out and the body is
-  as before (#6031). A reply that carries a different
+  as before (#6031). With `LAMP_BEAT_ENGINES=on` (off unless set, #8881)
+  the body also says `engines.openclaw`, `engines.hermes` and `harness`,
+  each `{"version", "installed"}` with `version` left out unless known,
+  taken at each ping from lamp-update's kept `update/status` (the one
+  `update.status` answers from) only while it is fresh; versions and
+  `installed` only, never a path or another field. With the switch off, or
+  no or a stale status, each is left out and the body is byte for byte as
+  before. A reply that carries a different
   broker (`mqtt_server`, `mqtt_port`, `mqtt_usr`, `mqtt_pwd` and the
   channels) or a new `device_id` replaces the account: the connection is made
   again with it, and the rotated login is kept in `lamp-cloud`'s own state

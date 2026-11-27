@@ -150,9 +150,12 @@ pub async fn pings(
         if let Some(account) = account
             && let Some(url) = ping::url(&account)
         {
-            let payload = Payload::of(&me)
-                .with_tls(tls)
-                .with_engines(engines.is_some(), None);
+            let payload = Payload::of(&me).with_tls(tls).with_engines(
+                engines.is_some(),
+                engines
+                    .as_ref()
+                    .and_then(|bus| bus.latest(lamp_msgs::UpdateStatus::TOPIC).ok().flatten()),
+            );
             let result = once(&client, &url, &key, &payload).await;
             if let Some(login) = login.as_deref_mut() {
                 let answer = match &result {
