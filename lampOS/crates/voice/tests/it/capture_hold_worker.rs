@@ -1957,7 +1957,19 @@ impl Rig {
             if let Some(pause) = self.send_pause {
                 self.service_for(pause);
             }
-            self.accept(vec![0; RENDER_SAMPLES]);
+            // A worker that ended after the check has closed its socket, and
+            // the send is refused (ECONNREFUSED on Linux): the run is over,
+            // as a refused receive ends `take()`. `ended()` still says how it
+            // ended (#8466).
+            match self.try_accept(vec![0; RENDER_SAMPLES]) {
+                Err(error)
+                    if self.tolerate_fault
+                        && error.kind() == std::io::ErrorKind::ConnectionRefused =>
+                {
+                    break;
+                }
+                sent => sent.unwrap(),
+            }
             if self.send_pause.is_none() {
                 self.service_for(TICK);
             }
