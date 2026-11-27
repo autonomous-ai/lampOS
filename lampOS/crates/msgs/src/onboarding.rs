@@ -75,11 +75,24 @@ pub struct OnboardingPending {
     pub asking: Option<OnboardingStepAsked>,
 }
 
-/// The walk step asked (#8871): its name and when, in Unix ms.
+/// The walk step asked (#8871): its name and when, in Unix ms; for "how
+/// you sound", when its last accepted call was and the calls counted, so
+/// the app shows how many are left.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OnboardingStepAsked {
     pub step: String,
     pub at: u64,
+    /// The step's tries (#8871 phase 2): accepted so far, and needed.
+    /// Absent for every other step, and from an older voice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tries: Option<OnboardingTries>,
+}
+
+/// A step's tries counted (#8871 phase 2): `ok` of `need` accepted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnboardingTries {
+    pub ok: u8,
+    pub need: u8,
 }
 
 /// One walk step's end (#5979): its name, its outcome as the walk keeps it
@@ -90,6 +103,10 @@ pub struct OnboardingStepEnded {
     pub step: String,
     pub outcome: String,
     pub at: u64,
+    /// An `asked` step's tries ([`OnboardingStepAsked::tries`]): lamp-cloud
+    /// only, never on the heartbeat's ends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tries: Option<OnboardingTries>,
 }
 
 impl OnboardingPending {
@@ -331,6 +348,7 @@ mod tests {
                 step: "where_you_sit".into(),
                 outcome: "done".into(),
                 at: 1_762_675_160_000,
+                tries: None,
             }],
             ..OnboardingPending::default()
         };
@@ -367,6 +385,7 @@ mod tests {
                 step: "touch".into(),
                 outcome: "done".into(),
                 at: 6,
+                tries: None,
             }],
             walk_steps: Vec::new(),
             asking: None,
@@ -380,6 +399,7 @@ mod tests {
             asking: Some(OnboardingStepAsked {
                 step: "where_you_sit".into(),
                 at: 8,
+                tries: None,
             }),
             ..old.clone()
         };
@@ -390,6 +410,20 @@ mod tests {
             ),
             "{text}"
         );
+        // Phase 2's tries (#8871): added only when counted; an older
+        // voice's asked step reads with none.
+        let counted = OnboardingStepAsked {
+            step: "how_you_sound".into(),
+            at: 9,
+            tries: Some(OnboardingTries { ok: 1, need: 3 }),
+        };
+        assert_eq!(
+            serde_json::to_string(&counted).unwrap(),
+            r#"{"step":"how_you_sound","at":9,"tries":{"ok":1,"need":3}}"#
+        );
+        let older: OnboardingStepAsked =
+            serde_json::from_str(r#"{"step":"where_you_sit","at":8}"#).unwrap();
+        assert_eq!(older.tries, None);
         // An older reader: every field it knows, the new one passed over.
         #[derive(Deserialize)]
         struct Older {

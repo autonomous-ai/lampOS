@@ -1773,6 +1773,10 @@ impl Onboarding {
         walk_v2::extend(&mut definition);
         self.definition = Arc::new(definition);
         self.walk_v2 = true;
+        // Call Lamp merged (#8871 phase 2): three calls counted, no
+        // sentence part.
+        self.near.three_calls = true;
+        self.near.v2 = true;
     }
 
     pub(crate) fn with_definition(
@@ -2860,6 +2864,11 @@ impl Onboarding {
                 .map(|(step, at)| lamp_msgs::OnboardingStepAsked {
                     step: step.name().to_owned(),
                     at,
+                    // "How you sound"'s calls counted (#8871 phase 2).
+                    tries: (step == Step::HowYouSound).then(|| lamp_msgs::OnboardingTries {
+                        ok: u8::try_from(self.desired.near_call_tries.len()).unwrap_or(u8::MAX),
+                        need: lamp_near_call::TRIES as u8,
+                    }),
                 });
         }
         pending
@@ -2919,6 +2928,7 @@ impl Onboarding {
                         .as_str()?
                         .to_owned(),
                     at: kept.ended_at_unix_ms?,
+                    tries: None,
                 })
             })
             .collect();
@@ -5022,10 +5032,25 @@ impl Onboarding {
         if self.led.as_ref().is_some_and(|led| led.step == step) {
             self.led = None;
         }
+        let after = now_us.saturating_add(walk_v2::reask_gap_us(times));
         if step == Step::HowYouSound {
+            // Its calls start anew: a bar that couldn't be made from them
+            // is no start for the next.
             self.invalidate_near();
+            self.desired.near_call_tries.clear();
+            self.desired.near_call_prompts = 0;
+            self.desired.sentence_prompts = 0;
+            self.desired.near_call_unheard = 0;
+            self.desired.sentence_unheard = 0;
+            self.desired.near_call_given_back = false;
+            self.desired.sentence_given_back = false;
+            self.forget_near();
+            self.near.missed = 0;
+            self.near.miss = None;
+            self.near.retry_after_us = after;
+            self.save();
         }
-        self.reask = Some((step, now_us.saturating_add(walk_v2::reask_gap_us(times))));
+        self.reask = Some((step, after));
         self.reasked = Some(step);
         self.owed = None;
         self.owed_after = None;

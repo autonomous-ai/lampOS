@@ -439,10 +439,7 @@ pub fn judge(line: Line<'_>) -> Said {
     let words = line.heard.split_whitespace().count();
     // The walk Lamp leads by voice (#8871): an answer to its waiting ask
     // is said to it, from its own voice, as a yes awaited is.
-    if named(line)
-        || yes_awaited()
-        || crate::onboarding::walk_v2::holds_answer(line.second_voice)
-    {
+    if named(line) || yes_awaited() || crate::onboarding::walk_v2::holds_answer(line.second_voice) {
         return Said::Stands;
     }
     if line.going_on {

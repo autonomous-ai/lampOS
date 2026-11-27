@@ -3387,6 +3387,7 @@ mod tests {
             step: step.into(),
             outcome: outcome.into(),
             at,
+            tries: None,
         };
         Fake {
             onboarding_steps: Some((

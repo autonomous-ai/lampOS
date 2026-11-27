@@ -113,6 +113,11 @@ pub(crate) fn extend(definition: &mut super::skill::Definition) {
             words.reoffer = first.to_owned();
         }
     }
+    if let Some(words) = definition.steps.get_mut(&Step::HowYouSound) {
+        words.first = NEAR_FIRST.to_owned();
+        words.reoffer = NEAR_FIRST.to_owned();
+    }
+    definition.words.near_done = NEAR_DONE.to_owned();
     definition.words.sit_done = SIT_DONE.to_owned();
     definition.words.touch_done = Some(TOUCH_DONE.to_owned());
     definition.words.later = Some(LATER.to_owned());
@@ -132,7 +137,7 @@ pub(crate) const LATER: &str =
 
 // "Try a skill". The ask is a note for the model, so its answer to "turn
 // blue" knows why; the rest are the walk's own lines.
-pub(crate) const TRY_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Say 'Hey Lamp, turn blue.' See how easy asking is.\" When they ask for a light, in any words, set it at once with your light functions. Never call setup_step for this, except skipped if they ask to skip it: the lamp sees the light change itself.)";
+pub(crate) const TRY_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Say 'Hey Lamp, turn blue.' See how easy asking is.\" When they ask for a light, in any words, set it at once with your light functions. Never call setup_step for this: the lamp sees the light change itself.)";
 pub(crate) const TRY_REMIND: &str =
     "(Say only this, nothing before or after it: \"Just say: turn blue.\")";
 pub(crate) const TRY_DONE: &str = "(Say only this, nothing before or after it: \"See? Just ask.\")";
@@ -141,7 +146,7 @@ const TRY_SKIPPED: &str =
 const TRY_LATER: &str = "(Say only this, nothing before or after it: \"Earlier we skipped trying a skill. Let's try it now.\")";
 
 // "Make a skill".
-pub(crate) const MAKE_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Teach me something you'd like, for example 'remind me to drink water every 30 minutes'.\" Any skill they ask for counts, in their own words: call make_skill with their words. If what they ask is too vague to make, ask them one short question about what it should do and when. If they ask for ideas, say only: \"Or: turn the light warm at 8 pm, or tell me to stand up every hour.\" Never call setup_step for this, except skipped if they ask to skip it.)";
+pub(crate) const MAKE_FIRST: &str = "(Nobody has spoken. Say exactly this: \"Teach me something you'd like, for example 'remind me to drink water every 30 minutes'.\" Any skill they ask for counts, in their own words: call make_skill with their words. If what they ask is too vague to make, ask them one short question about what it should do and when. If they ask for ideas, say only: \"Or: turn the light warm at 8 pm, or tell me to stand up every hour.\" Never call setup_step for this.)";
 pub(crate) const MAKE_IDEAS: &str = "(Say only this, nothing before or after it: \"Or: turn the light warm at 8 pm, or tell me to stand up every hour.\")";
 /// The read-back, the walk's own once the skill is on: `{skill}` is its
 /// name and what it does ([`read_back`]).
@@ -298,6 +303,90 @@ pub(crate) fn coach(step: Step, times: u8) -> Option<&'static str> {
 /// talks on alone.
 pub(crate) fn reask_gap_us(times: u8) -> u64 {
     (15_000_000u64 << u32::from(times.saturating_sub(1).min(3))).min(120_000_000)
+}
+
+/// Why a call try was missed (#8871 phase 2), for its coaching.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Miss {
+    /// Said over the lamp's own words.
+    Over,
+    /// The name not heard.
+    Quiet,
+    /// The name heard, too weakly: from too far.
+    Far,
+    /// Anything else.
+    Other,
+}
+
+impl Miss {
+    pub(crate) fn of(why: &lamp_near_call::Rejected) -> Self {
+        use lamp_near_call::Rejected;
+        match why {
+            Rejected::LampSpoke => Self::Over,
+            Rejected::NoHearing => Self::Quiet,
+            Rejected::Unsure { .. } => Self::Far,
+            Rejected::TwoHearings | Rejected::NoLevel => Self::Other,
+        }
+    }
+}
+
+/// Call Lamp's lines (#8871 phase 2, the owner's), the walk's own words.
+pub(crate) const NEAR_FIRST: &str = "(Say only this, nothing before or after it: \"Say 'Hey Lamp' three times, so I learn your voice from your seat and never miss you.\")";
+const NEAR_TWO_MORE: &str = "Got it, two more.";
+const NEAR_ONE_MORE: &str = "One more.";
+pub(crate) const NEAR_DONE: &str = "(Say only this, nothing before or after it: \"That's me! Say 'Hey Lamp' whenever you need me.\")";
+const NEAR_MISSED: &str = "I didn't catch that. Try again when I stop talking.";
+const NEAR_OVER: &str = "Wait till I finish, then say it.";
+const NEAR_LOUDER: &str = "Say 'Hey Lamp' a bit louder.";
+const NEAR_CLOSER: &str = "Come a little closer.";
+/// After [`NEAR_JUST_AFTER`] misses: plainly the call, never "Just say
+/// 'Lamp'" (#8892: only "Hey Lamp" calls count).
+const NEAR_JUST: &str = "Just say 'Hey Lamp'.";
+const NEAR_JUST_AFTER: u8 = 6;
+
+/// The line after an accepted call, with `accepted` counted.
+pub(crate) fn near_countdown(accepted: usize) -> &'static str {
+    if accepted >= 2 {
+        NEAR_ONE_MORE
+    } else {
+        NEAR_TWO_MORE
+    }
+}
+
+/// The line after a missed call, the `missed`th in the step: coached by
+/// its cause; every third in a row the plain miss, so no line is said
+/// more than twice in a row; from [`NEAR_JUST_AFTER`] on, "Just say 'Hey
+/// Lamp'." in turn with them.
+pub(crate) fn near_coach(miss: Miss, missed: u8) -> &'static str {
+    if missed >= NEAR_JUST_AFTER && missed.is_multiple_of(2) {
+        return NEAR_JUST;
+    }
+    if missed.is_multiple_of(3) {
+        return NEAR_MISSED;
+    }
+    match miss {
+        Miss::Over => NEAR_OVER,
+        Miss::Quiet => NEAR_LOUDER,
+        Miss::Far => NEAR_CLOSER,
+        Miss::Other => NEAR_MISSED,
+    }
+}
+
+/// Whether a line begins with "Hey Lamp" (#8871 phase 2): while Call Lamp
+/// waits for a call, "Hey Lamp, what time is it?" is a call too.
+pub(crate) fn hey_lamp_first(text: &str) -> bool {
+    on() && plain(text).starts_with(" hey lamp ")
+}
+
+/// The model's note for a turn while the walk waits for its step (#8871
+/// phase 2): the setup isn't finished, so its answer to something else
+/// ends by bringing the person back. Nothing of which step; none paused,
+/// between asks or with the switch off.
+pub(crate) const STEER_NOTE: &str = "(Setup isn't finished yet. If they asked about something else, answer it in one short sentence, then gently bring them back to setup in a few words.)";
+
+pub(crate) fn steer_note() -> Option<String> {
+    (on() && state().is_some_and(|lines| lines.waits && !lines.paused))
+        .then(|| STEER_NOTE.to_owned())
 }
 
 /// The model's answer when it reports a walk step skipped (#8871 phase
@@ -1516,6 +1605,68 @@ mod tests {
         assert!(!refused_again());
         assert!(refused_again());
         assert!(!refused_again());
+    }
+
+    /// Old shapes unchanged (#8871 phase 2): state lines from before the
+    /// new fields read as before, the new ones defaulted.
+    #[test]
+    fn state_lines_from_before_phase_two_still_read() {
+        let old: StateLines =
+            serde_json::from_str(r#"{"which":"a","how_many":"b","done":"c"}"#).unwrap();
+        assert_eq!(
+            (old.which.as_str(), old.waits, old.paused),
+            ("a", false, false)
+        );
+        assert_eq!(old.talk, TalkLines::default());
+    }
+
+    /// The model is told to steer back only while the walk's ask waits.
+    #[test]
+    fn the_model_steers_back_only_while_the_walk_waits() {
+        set_on_for_test(true);
+        set_state(None);
+        assert_eq!(steer_note(), None);
+        let lines = state_lines(Step::Touch, 4, 7, None);
+        set_state(Some(StateLines {
+            waits: true,
+            ..lines.clone()
+        }));
+        assert_eq!(steer_note().as_deref(), Some(STEER_NOTE));
+        assert!(!STEER_NOTE.contains("touch") && !STEER_NOTE.contains("step 4"));
+        set_state(Some(StateLines {
+            waits: true,
+            paused: true,
+            ..lines.clone()
+        }));
+        assert_eq!(steer_note(), None, "paused");
+        set_state(Some(lines));
+        assert_eq!(steer_note(), None, "between asks");
+        set_on_for_test(false);
+        set_state(None);
+    }
+
+    /// While Call Lamp waits, "Hey Lamp" and a short sentence is a call;
+    /// "Lamp is broken" or a line with no "Hey Lamp" first is not, and
+    /// nothing is with the switch off. A miss is coached by its cause.
+    #[test]
+    fn hey_lamp_first_is_a_call_and_misses_are_coached_by_cause() {
+        set_on_for_test(true);
+        assert!(hey_lamp_first("Hey Lamp, what time is it?"));
+        assert!(hey_lamp_first("hey lamp"));
+        assert!(!hey_lamp_first("Lamp is broken."));
+        assert!(!hey_lamp_first("Okay hey lamp"));
+        set_on_for_test(false);
+        assert!(!hey_lamp_first("Hey Lamp, what time is it?"));
+        assert_eq!(
+            near_coach(Miss::Over, 1),
+            "Wait till I finish, then say it."
+        );
+        assert_eq!(near_coach(Miss::Quiet, 1), "Say 'Hey Lamp' a bit louder.");
+        assert_eq!(near_coach(Miss::Far, 2), "Come a little closer.");
+        assert_eq!(near_coach(Miss::Far, 3), NEAR_MISSED);
+        assert_eq!(near_coach(Miss::Quiet, 6), "Just say 'Hey Lamp'.");
+        assert_eq!(near_countdown(1), "Got it, two more.");
+        assert_eq!(near_countdown(2), "One more.");
     }
 
     /// The coached asks rotate, never the same twice in a row, and are

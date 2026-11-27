@@ -11677,7 +11677,9 @@ async fn spoken(
         && before
             .as_ref()
             .is_none_or(|before| before.trim().is_empty())
-        && (name_alone(&text) || (text.trim().is_empty() && marks.called.load(Ordering::Acquire)))
+        && (name_alone(&text)
+            || crate::onboarding::walk_v2::hey_lamp_first(&text)
+            || (text.trim().is_empty() && marks.called.load(Ordering::Acquire)))
     {
         drop(prepared.take());
         eprintln!(
@@ -11686,7 +11688,9 @@ async fn spoken(
         // Its words were the name (#3923): the step counts it as a call
         // when the detector missed it. A line with no words, which only the
         // detector's call made one, is not told: the detector heard it.
-        let worded = name_alone(&text);
+        // With the walk Lamp leads by voice (#8871 phase 2), "Hey Lamp"
+        // with a short sentence after it is a call too.
+        let worded = name_alone(&text) || crate::onboarding::walk_v2::hey_lamp_first(&text);
         if !worded || shared.emit(ProviderOutput::StepCallHeard { request }).await {
             shared
                 .emit(ProviderOutput::TurnComplete {
@@ -13457,6 +13461,10 @@ async fn spoken(
         // and ids, so "never mind the gold one" can drop one. None waiting
         // (always, with the switch off), nothing.
         .chain(crate::make_queue::note())
+        // The walk Lamp leads by voice not finished (#8871 phase 2): its
+        // answer to anything else brings the person back to the step, told
+        // only that, never a step list.
+        .chain(crate::onboarding::walk_v2::steer_note())
         // An app's live context lines (`LAMP_APP_MEMORY`, #7415), each a
         // quoted note with its source, by #7900's short-lived note: told
         // for this turn only, never kept; nothing while Lamp is private.
