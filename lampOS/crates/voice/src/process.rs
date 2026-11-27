@@ -3340,6 +3340,8 @@ fn second_route_worker_environment(
         // One simple rule: "Hey Lamp" and 20 s renewing (the product owner,
         // 27 Nov).
         crate::second_provider::SIMPLE_CALL_ENVIRONMENT,
+        crate::second_provider::caller_frame::SWITCH,
+        crate::second_provider::caller_frame::MODEL,
         // The lamp's own news gets the conversation's 20 s (the same day).
         crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
         // Short replies carry in a conversation (#8772).
@@ -3861,6 +3863,8 @@ mod tests {
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
             crate::second_provider::SIMPLE_CALL_ENVIRONMENT,
+            crate::second_provider::caller_frame::SWITCH,
+            crate::second_provider::caller_frame::MODEL,
             crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
             crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
@@ -5140,6 +5144,8 @@ mod tests {
                     "/etc/lampOS/person/name"
                 } else if name == crate::language::FILE_ENVIRONMENT {
                     "/etc/lampOS/setup/language"
+                } else if name == crate::second_provider::caller_frame::MODEL {
+                    "/var/lib/lampOS/models/caller-frame"
                 } else if name == crate::second_provider::REGION_FILE_ENVIRONMENT {
                     "/var/lib/lampos-cloud/region"
                 } else if name == crate::task_news::TOLD_ENVIRONMENT {
@@ -5176,6 +5182,7 @@ mod tests {
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT
                     || name == crate::second_provider::SIMPLE_CALL_ENVIRONMENT
+                    || name == crate::second_provider::caller_frame::SWITCH
                     || name == crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT
                     || name == crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
@@ -5436,6 +5443,8 @@ mod tests {
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_BUSY_FOLLOW_UP_RENEWS=on",
                     "LAMP_BUSY_NO_FACE_RENEWS=on",
+                    "LAMP_CALLER_FRAME_MODEL=/var/lib/lampOS/models/caller-frame",
+                    "LAMP_CALLER_FRAME_VAD=on",
                     "LAMP_CALL_WORDS_OVER_WAIT=on",
                     "LAMP_CARE_LINE=on",
                     "LAMP_CARE_LINES_FILE=/etc/lampOS/voice/care-lines.json",

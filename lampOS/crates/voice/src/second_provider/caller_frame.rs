@@ -15,8 +15,8 @@ use std::{
 
 use tokio::sync::{mpsc as queue, watch};
 
-pub(super) const SWITCH: &str = "LAMP_CALLER_FRAME_VAD";
-const MODEL: &str = "LAMP_CALLER_FRAME_MODEL";
+pub(crate) const SWITCH: &str = "LAMP_CALLER_FRAME_VAD";
+pub(crate) const MODEL: &str = "LAMP_CALLER_FRAME_MODEL";
 const RATE: usize = 16_000;
 const REFERENCE_SAMPLES: usize = 3 * RATE;
 const LINE_SECONDS: u64 = 12;
