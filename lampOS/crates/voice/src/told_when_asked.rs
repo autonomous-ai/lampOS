@@ -62,6 +62,9 @@ pub fn quiet_holds(quiet: bool, lifted: Option<u64>, now_ms: u64) -> bool {
 /// voice only, under one lock, so two named calls kept at once lose
 /// neither.
 pub fn keep(path: &Path, skill: &str, at_ms: u64) -> Result<(), String> {
+    // Serializes read-modify-write calls within the writing worker. Serve
+    // reads the resulting spoken-asks file; this mutex is not an interprocess
+    // lock.
     static KEEPING: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _held = KEEPING.lock().unwrap_or_else(|poison| poison.into_inner());
     let mut asks = read(path);

@@ -7,6 +7,8 @@ use super::*;
 thread_local! {
     /// Whether the last [`care_turn_with`] told its model
     /// [`crate::care_line::OWED_NOTE`].
+    // Test care_turn_with writes this thread's result; the care-turn assertions read
+    // it on that same thread.
     static OWED_TOLD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 

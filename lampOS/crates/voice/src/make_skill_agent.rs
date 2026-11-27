@@ -336,6 +336,7 @@ const OPENING_TAILS: [&str; 5] = ["now", "right now", "for you", "right away", "
 /// Every sentence of the opening's family ([`OPENING_HEADS`]), in plain
 /// form, built once.
 fn opening_family() -> &'static [String] {
+    // Immutable opening vocabulary cached independently per process.
     static FAMILY: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     FAMILY.get_or_init(|| {
         let mut tails = Vec::new();
@@ -508,14 +509,20 @@ fn on_with(value: Option<&str>) -> bool {
 
 /// The voice turns waiting on a make, each with its request and the
 /// sender its waiting line is told on ([`waiting_in_turn`]).
+// Worker-local agent make coordination; parent app makes use their own process and
+// explicit service paths.
 static IN_TURN: std::sync::Mutex<Vec<(u64, u64, tokio::sync::oneshot::Sender<()>)>> =
     std::sync::Mutex::new(Vec::new());
 /// The last [`InTurn`]'s number.
+// Worker-local agent make coordination; parent app makes use their own process and
+// explicit service paths.
 static IN_TURN_MADE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 std::thread_local! {
     /// The voice request whose turn waits on the make on this thread
     /// ([`set_made_for`]); 0 for none.
+    // set_made_for writes and made_for reads the executing thread's value. Other
+    // threads and processes have independent copies.
     static MADE_FOR: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
@@ -624,6 +631,9 @@ pub fn check_switches() -> Value {
 
 /// The tasks part's folder, as the second route's worker was given it
 /// (`--tasks-dir`).
+// Second worker task directory from --tasks-dir. Parent app makes build their Agent
+// from LAMP_TASKS_DIR directly; trial runs use that environment as an explicit
+// fallback when this process has no worker directory.
 static TASKS: OnceLock<PathBuf> = OnceLock::new();
 
 /// Kept by the second route's worker as it starts, with a tasks part.
@@ -1303,6 +1313,8 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn stub(engine: Option<&'static str>, answers: Answers) -> StubTasks {
+        // Stub constructors increment this process-wide counter for fixture
+        // directories; parallel test threads share the sequence.
         static MADE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let dir = Folder(PathBuf::from(format!(
             "/tmp/msa-{}-{}",

@@ -146,7 +146,12 @@ pub struct Agreed {
 mod kept {
     use super::{Agreed, Waiting};
     use std::sync::Mutex;
+    // The second worker's skill handlers update and read its approval wait
+    // here. Parent say-client admission also calls awaited, which reads a
+    // separate parent copy and does not observe worker updates.
     static WAITING: Mutex<Option<Waiting>> = Mutex::new(None);
+    // This second worker records the skill agreement and reads it when
+    // composing notes for its later turns.
     static AGREED: Mutex<Option<Agreed>> = Mutex::new(None);
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
         let mut waiting = WAITING
@@ -167,7 +172,11 @@ mod kept {
     use super::{Agreed, Waiting};
     use std::cell::RefCell;
     thread_local! {
+        // Test kept::waiting callers read and update this thread's waiting value
+        // through mirrored; other threads have separate slots.
         static WAITING: RefCell<Option<Waiting>> = const { RefCell::new(None) };
+        // Test callers read and update this thread's agreement through kept::agreed;
+        // other test threads have separate values.
         static AGREED: RefCell<Option<Agreed>> = const { RefCell::new(None) };
     }
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
@@ -500,6 +509,8 @@ fn code_awaited_file() -> Option<std::path::PathBuf> {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_code_awaited_file_here writes this thread's path; code_awaited_file
+    // reads it on the same thread.
     static CODE_AWAITED_HERE: std::cell::RefCell<Option<std::path::PathBuf>> =
         const { std::cell::RefCell::new(None) };
 }

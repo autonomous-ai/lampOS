@@ -33,6 +33,8 @@ use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 /// Only the exact value `on`. Off, `remember` keeps the model's text.
 pub const ENVIRONMENT: &str = "LAMP_MEMORY_KEEP_HEARD";
+// Each provider caches this switch from its own environment; its memory tools
+// and observation paths read the local value.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// The memory's own cap on a kept text (`lamp_memory::store::TEXT_BYTES`).

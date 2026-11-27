@@ -56,8 +56,12 @@ pub const FLUSH_EVERY: Duration = Duration::from_secs(60);
 const MOST_SEEN: usize = 32;
 
 /// Refused asks by voice in this process not yet in [`FILE`].
+// Refused counts are buffered per process; persistent counts are combined through the
+// counts file lock.
 static REFUSED_VOICE: AtomicU64 = AtomicU64::new(0);
 /// Refused asks from the app in this process not yet in [`FILE`].
+// Refused counts are buffered per process; persistent counts are combined through the
+// counts file lock.
 static REFUSED_APP: AtomicU64 = AtomicU64::new(0);
 
 /// `maker`'s refused asks not yet in [`FILE`].

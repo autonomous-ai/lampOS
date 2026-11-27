@@ -972,6 +972,8 @@ pub fn from_environment() -> Option<Language> {
 /// [`from_environment`], read once for this process: for checks made on
 /// every turn.
 pub fn at_start() -> Option<Language> {
+    // Serve and provider workers each initialize this language from their own
+    // environment; turn checks read the same process-local cache.
     static CHOSEN: std::sync::OnceLock<Option<Language>> = std::sync::OnceLock::new();
     *CHOSEN.get_or_init(from_environment)
 }

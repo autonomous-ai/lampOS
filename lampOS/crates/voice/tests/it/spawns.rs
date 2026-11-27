@@ -16,6 +16,8 @@
 //! but it is built only on Linux, where this race does not happen.
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+// Tests in this executable take an exclusive guard while spawning children or
+// a shared guard while checking socket closure; this lock is process-local.
 static SPAWNS: RwLock<()> = RwLock::new(());
 
 /// Held by a test that starts children, for as long as it may start one.

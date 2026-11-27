@@ -2971,6 +2971,8 @@ mod tests {
     #[test]
     fn a_reply_is_the_owners_only_if_the_owner_was_alone_at_every_piece() {
         use std::sync::atomic::{AtomicBool, Ordering};
+        // The test writes this process-local flag; its owner-alone callback reads the
+        // same atomic value.
         static ALONE: AtomicBool = AtomicBool::new(true);
         let (bus, root) = bus("line-scope");
         // The gate here has the input of the reply's own request or none:

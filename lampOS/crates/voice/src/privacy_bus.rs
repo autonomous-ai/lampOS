@@ -3012,6 +3012,8 @@ pub(crate) mod tests {
             transport::WorkerChannels,
             wire::Control,
         };
+        // Test ride_run reads and increments this shared test-process counter; calls
+        // on different threads use the same value.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let root = Root(PathBuf::from(format!(
             "/tmp/vpr-{}-{}",
@@ -3573,6 +3575,8 @@ pub(crate) mod tests {
 
     #[test]
     fn selected_endpoints_bind_and_read_a_real_bus() {
+        // Test selected_endpoints_bind_and_read_a_real_bus reads and increments this
+        // shared test-process counter; calls on different threads use the same value.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         // The lease is fresh for PRIVACY_FRESH_US on the host's clock. An
         // attempt in which the host stalled that long between the publish and
@@ -3639,6 +3643,8 @@ pub(crate) mod tests {
     #[test]
     fn the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second()
     {
+        // This test fixture reads and increments this shared test-process counter;
+        // calls on different threads use the same value.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         const LOST: &str = "privacy lease stream changed or lost a value";
         let sequence = |reader: &LeaseReader| reader.current.as_ref().map(|l| l.stamp.sequence);
@@ -3752,6 +3758,8 @@ pub(crate) mod tests {
     /// the reader's socket, as a lost one would leave it.
     #[test]
     fn after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second() {
+        // This test fixture reads and increments this shared test-process counter;
+        // calls on different threads use the same value.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         const LOST: &str = "privacy lease stream changed or lost a value";
         // As the kept-lease test: a host stall past a lease's 50 ms, or past
@@ -3913,6 +3921,8 @@ pub(crate) mod tests {
     /// and the refused input still ends the reader for good.
     #[test]
     fn the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire() {
+        // This test fixture reads and increments this shared test-process counter;
+        // calls on different threads use the same value.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         // The lease is fresh for PRIVACY_FRESH_US on the host's clock. An
         // attempt in which the host stalled that long before the watch found

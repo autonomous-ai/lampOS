@@ -133,6 +133,8 @@ mod tests {
     }
     impl Fixture {
         fn new() -> Self {
+            // Test new reads and increments this shared test-process counter; calls on
+            // different threads use the same value.
             static NEXT: AtomicU64 = AtomicU64::new(0);
             let root = std::env::temp_dir().join(format!(
                 "ring-unplug-{}-{}",

@@ -316,6 +316,8 @@ pub fn line_now() -> String {
 /// The requests of care turns, whose exchanges never reach the running
 /// summary or a talk note (`Thread::held_for`, the safety read's P1 on
 /// #7752): the latest few, by request id only.
+// Second worker-local summary exclusion for an answer; written and consumed within the
+// same worker boot.
 static HELD_FROM_SUMMARY: std::sync::Mutex<std::collections::VecDeque<u64>> =
     std::sync::Mutex::new(std::collections::VecDeque::new());
 

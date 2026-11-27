@@ -102,6 +102,8 @@ mod kept {
     use std::collections::VecDeque;
     use std::sync::{LazyLock, Mutex};
 
+    // This worker's hand-over calls add rows; its follower reads, expires and
+    // updates them from lamp-tasks IPC. Local forget paths also remove rows.
     static FOLLOWED: Mutex<VecDeque<Followed>> = Mutex::new(VecDeque::new());
 
     pub fn followed<R>(f: impl FnOnce(&mut VecDeque<Followed>) -> R) -> R {
@@ -111,6 +113,8 @@ mod kept {
     }
 
     pub fn on() -> bool {
+        // Each process reads the task-row switch from its own environment; the
+        // local hand-over and follower paths use that cache.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -125,7 +129,11 @@ mod kept {
     use std::collections::VecDeque;
 
     thread_local! {
+        // Test callers read and update this thread's rows through kept::followed;
+        // other test threads have separate values.
         static FOLLOWED: RefCell<VecDeque<Followed>> = RefCell::default();
+        // Test on_for_test writes this thread's switch; kept::on reads it on the same
+        // thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 
@@ -340,6 +348,8 @@ pub fn forgot_about(person: &str, matches: &impl Fn(&str) -> bool) {
 /// looking every [`LOOK_EVERY`] while any task is followed.
 #[cfg(not(test))]
 fn start_follower() {
+    // Starts the task-row follower once in this worker after a hand-over; the
+    // follower shares that worker's pending rows.
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| {
         let spawned = std::thread::Builder::new()

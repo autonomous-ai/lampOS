@@ -13,6 +13,8 @@
 use std::cell::RefCell;
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+// Flushing fixtures take shared guards in this test process; timing takes the
+// exclusive guard so local disk flushes cannot overlap its measurement.
 static FLUSHES: RwLock<()> = RwLock::new(());
 
 thread_local! {

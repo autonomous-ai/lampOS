@@ -94,6 +94,8 @@ const FOR_LEAST: Duration = Duration::from_secs(1);
 const FOR_MOST: Duration = Duration::from_secs(15);
 
 /// The window the worker was given, in ms ([`FOLLOW_UP_FOR`] until then).
+// Provider startup stores the received follow-up window; its admission logic
+// reads this worker's local duration.
 static FOR_MS: AtomicU64 = AtomicU64::new(FOLLOW_UP_FOR.as_millis() as u64);
 
 /// The worker's flags for the switch, from the coordinator's environment.

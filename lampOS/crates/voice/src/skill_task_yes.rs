@@ -639,6 +639,9 @@ pub const ASKED_WAITS_TURN: &str = "(Nobody has spoken. Say nothing, and call no
 
 /// Held while [`ASKED_FILE`] is checked and written ([`keep_one`]) or read
 /// and taken ([`take_kept`]): the say service's client threads ask at once.
+// Parent say-client threads take this process's mutex in keep_one. The second
+// worker takes its own copy in take_kept; the two locks do not serialize file
+// replacement against removal.
 static ASKED_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// The kept ask `kept` at `now_unix_ms` within [`ASKED_WITHIN_MS`]: one

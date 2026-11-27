@@ -61,6 +61,8 @@ pub struct Clock {
     base_ms: u64,
 }
 
+// Test/probe-only: Clock::install sets this process-wide clock once; memory
+// calls and local observation and summary threads read the installed clock.
 static CLOCK: OnceLock<Clock> = OnceLock::new();
 
 /// The clock went back: a probe's time only goes forward.
@@ -214,7 +216,12 @@ pub struct Drained {
 /// The id a barrier on the observation thread carries; a job from the
 /// memory always has `"job"`, which a barrier never has.
 const OBSERVE_BARRIER: &str = "lamp_memory_probe_barrier";
+// Test/probe-only: drain callers allocate barrier IDs from this shared process
+// counter, then enqueue those IDs to the local observation thread.
 static OBSERVE_SENT: AtomicU64 = AtomicU64::new(0);
+// Test/probe-only: the local observation thread advances this
+// completed-barrier ID; drain callers in the same process read it while
+// waiting.
 static OBSERVE_DONE: AtomicU64 = AtomicU64::new(0);
 
 /// On the observation thread: whether `input` is a probe's barrier, marked

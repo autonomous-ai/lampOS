@@ -1721,6 +1721,8 @@ mod tests {
     #[test]
     fn through_the_socket_two_thousand_letters_of_vietnamese_make_a_kept_skill() {
         use crate::make_skill_local::tests::{chat_at, good, keeping, manage_helper, service_sent};
+        // This test installs its model URL once in the test process; its scripted
+        // callback reads the same slot.
         static URL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
         fn scripted() -> Result<Chat, String> {
             chat_at(URL.get().expect("the scripted model is up").clone())()

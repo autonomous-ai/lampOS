@@ -134,6 +134,8 @@ pub struct Teller {
     asked: Mutex<Asked>,
 }
 
+// The second worker installs this teller; its sent-log loader thread and turn-
+// note readers share the same local cache.
 static TELLER: OnceLock<Arc<Teller>> = OnceLock::new();
 
 /// Start telling, once a process: with a made skill's writes on and the

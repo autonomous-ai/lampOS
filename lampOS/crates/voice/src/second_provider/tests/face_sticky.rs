@@ -69,6 +69,8 @@ fn a_held_name_runs_no_forget_correction_or_rule() {
 /// A fresh observation of `name`, as the refresh reads the eyes' known file.
 fn observation(name: &str) -> crate::known_faces::FaceObservation {
     use std::sync::atomic::{AtomicU64, Ordering};
+    // Test observation reads and increments this shared test-process counter; calls on
+    // different threads use the same value.
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let path = std::env::temp_dir().join(format!(
         "face-sticky-{}-{}",

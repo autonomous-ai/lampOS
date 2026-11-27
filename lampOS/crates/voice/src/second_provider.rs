@@ -293,6 +293,8 @@ fn kept_most() -> usize {
     if let Some(long) = tests::LONG_FOR_TEST.with(std::cell::Cell::get) {
         return most_kept(long);
     }
+    // This Second worker caches the unanswered-audio carry switch from its
+    // environment; its input-audio retention path reads the selected limit.
     static LONG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     most_kept(
         *LONG
@@ -1149,6 +1151,8 @@ pub const NAME_NOT_ANOTHERS_ENVIRONMENT: &str = "LAMP_NAME_NOT_ANOTHERS";
 
 /// [`NAME_NOT_ANOTHERS_ENVIRONMENT`] from this worker's environment, read once.
 pub(crate) fn not_anothers_on() -> bool {
+    // Cached from this process's environment; the second worker and its
+    // face-refresh thread read the same local value.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| {
         std::env::var(NAME_NOT_ANOTHERS_ENVIRONMENT).is_ok_and(|value| value == "on")
@@ -1502,6 +1506,8 @@ pub const CARRIED_LINES_KEEP_TALK_ENVIRONMENT: &str = "LAMP_CARRIED_LINES_KEEP_T
 /// [`CARRIED_LINES_KEEP_TALK_ENVIRONMENT`] on, read once from the
 /// environment ([`carried_lines_keep_talk_from`]).
 pub(crate) fn carried_lines_keep_talk() -> bool {
+    // This worker's output-retention path reads the cached switch when
+    // touching carried conversation activity.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| carried_lines_keep_talk_from(|name| std::env::var(name).ok()))
 }
@@ -10021,7 +10027,9 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
     match event {
         // Owed even for a retired request, as a failure is: an A/B scores
         // every request (#1686's follow-up).
-        ProviderOutput::Ready { .. }
+        ProviderOutput::ConversationState { .. }
+        | ProviderOutput::MachineNames { .. }
+        | ProviderOutput::Ready { .. }
         | ProviderOutput::TurnFailed { .. }
         | ProviderOutput::Stages { .. }
         | ProviderOutput::ReminderDeferred { .. }

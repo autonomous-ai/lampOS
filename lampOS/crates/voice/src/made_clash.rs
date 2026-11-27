@@ -398,12 +398,16 @@ struct Waiting {
 mod kept {
     use super::Waiting;
     use std::sync::Mutex;
+    // Second worker-local recent make choice state, shared with its tool threads;
+    // parent app make state is separate.
     static WAITING: Mutex<Option<Waiting>> = Mutex::new(None);
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
         f(&mut WAITING
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
+    // Second worker-local recent make choice state, shared with its tool threads;
+    // parent app make state is separate.
     static ENDED: Mutex<Option<std::time::Instant>> = Mutex::new(None);
     pub fn ended<R>(f: impl FnOnce(&mut Option<std::time::Instant>) -> R) -> R {
         f(&mut ENDED
@@ -418,7 +422,11 @@ mod kept {
     use super::Waiting;
     use std::cell::RefCell;
     thread_local! {
+        // In tests, waiting gives its callback mutable access to this thread's pending
+        // clash; the production mutex is a separate cfg branch.
         static WAITING: RefCell<Option<Waiting>> = const { RefCell::new(None) };
+        // In tests, ended gives its callback mutable access to this thread's end time;
+        // the production mutex is a separate cfg branch.
         static ENDED: RefCell<Option<std::time::Instant>> = const { RefCell::new(None) };
     }
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
@@ -469,6 +477,8 @@ pub fn set_ended(at: Option<Instant>) {
     kept::ended(|ended| *ended = at);
 }
 
+// Generates IDs for this tool worker's pending clashes; the counter is local
+// to the process and is not a cross-worker sequence.
 static IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// The line said for a clash when the turn that made it was cut: the model

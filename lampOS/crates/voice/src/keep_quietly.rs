@@ -69,6 +69,8 @@ use std::{
 
 /// Only the exact value `on`.
 pub const ENVIRONMENT: &str = "LAMP_KEEP_QUIETLY";
+// The second worker caches this switch from its environment; its admission and
+// quiet-keep paths read the local value.
 static ON: OnceLock<bool> = OnceLock::new();
 
 #[cfg(test)]
@@ -97,6 +99,7 @@ pub(crate) fn set_on_for_test(on: bool) {
 /// is the only face in view, or the line is carried in their conversation,
 /// without their mouth seen ([`alone`]). Only the exact value `on`.
 pub const ONE_FACE_ENVIRONMENT: &str = "LAMP_KEEP_QUIETLY_ONE_FACE";
+// Immutable configuration cached independently per process.
 static ONE_FACE_ON: OnceLock<bool> = OnceLock::new();
 
 #[cfg(test)]
@@ -153,6 +156,8 @@ const MOST_SEEN: usize = 64;
 
 /// The lines a known person's own face, and no other, was seen saying:
 /// each request with that person's memory id. In memory only, bounded.
+// Second worker-local quiet-keep evidence and feature configuration; request
+// identifiers belong to this worker.
 static SEEN: Mutex<VecDeque<(u64, String)>> = Mutex::new(VecDeque::new());
 
 /// Records whether `person` (a memory id) was seen saying request

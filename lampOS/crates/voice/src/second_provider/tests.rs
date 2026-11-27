@@ -15649,6 +15649,8 @@ async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
 
 thread_local! {
     /// `LAMP_CARRY_UNANSWERED_SOUND` for a test on this thread.
+    // The wordless-chain test sets this thread's override; kept_most reads it on the
+    // same thread.
     pub(super) static LONG_FOR_TEST: std::cell::Cell<Option<bool>> =
         const { std::cell::Cell::new(None) };
 }

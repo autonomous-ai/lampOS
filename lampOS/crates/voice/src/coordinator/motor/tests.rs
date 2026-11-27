@@ -34,7 +34,11 @@ const SCENARIO_FINISHED: u64 = u64::MAX;
 /// Host bound for one side waiting on the other; never a protocol deadline.
 const SCENARIO_WATCHDOG: Duration = Duration::from_secs(30);
 
+// The spawned inert-child test process sets this flag; its clock and gate read that
+// child's local copy.
 static STEPPED: AtomicBool = AtomicBool::new(false);
+// The inert-child test process advances this clock from scenario files; its clock and
+// gate read the local atomic, not a parent static.
 static STEPPED_NOW_US: AtomicU64 = AtomicU64::new(0);
 
 /// The child's clock: the parent's last step when stepped, the host otherwise.

@@ -81,8 +81,9 @@ pub fn speaks_itself(told: &Value) -> bool {
 /// (`lamp_skills::task_sure`, the first builder's 21:25 on #7363).
 pub const ANSWERS_WITHIN: std::time::Duration = crate::thread::GOING_ON_FOR;
 
-/// The made skills run now by the owner's voice, each with when: the say
-/// service's own record, so no other asker can stand for a run's answer.
+/// Coordinator-local run receipts, populated from `ProviderOutput::MadeRunNow`
+/// and read by this process's say service. Provider workers send the receipt
+/// instead of writing a separate local copy.
 static RAN_NOW: std::sync::Mutex<Vec<(String, std::time::Instant)>> =
     std::sync::Mutex::new(Vec::new());
 

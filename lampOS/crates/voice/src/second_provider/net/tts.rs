@@ -199,6 +199,8 @@ pub const OWN_VOICE_LOST_LINE: &str =
 
 /// The status ElevenLabs last refused the person's own voice with, 0 while
 /// it never was in this run (#8367): what `voice-keys` tells lamp-health.
+// TTS refusal handling writes this process-local status. The Second worker health
+// thread reads its own copy; parent speech-cache TTS has a separate copy.
 pub static OWN_VOICE_REFUSED: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(0);
 
 /// The person's own voice refused, once per process (#8394's lamp row: one
@@ -273,6 +275,8 @@ impl OwnVoiceLost {
 
 /// The process's one [`OwnVoiceLost`].
 pub(crate) fn own_voice_lost() -> Arc<OwnVoiceLost> {
+    // Tts constructors share this fallback state within one process. Parent
+    // speech-cache renderers and Second worker speech use independent copies.
     static ONE: std::sync::OnceLock<Arc<OwnVoiceLost>> = std::sync::OnceLock::new();
     ONE.get_or_init(Arc::default).clone()
 }

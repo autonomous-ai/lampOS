@@ -53,14 +53,20 @@ mod kept {
     use std::sync::{LazyLock, Mutex};
 
     pub fn on() -> bool {
+        // This worker caches the SDK-count feature switch from its
+        // environment; startup and count handling read it locally.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
     }
 
     /// When the voice started, and the latest forget that counts.
+    // This worker's count polling and forget handling share the cutoff; it
+    // begins at local initialization and advances when counts are forgotten.
     pub static SINCE: LazyLock<Mutex<u64>> = LazyLock::new(|| Mutex::new(super::super::unix_ms()));
     /// The count last put for each row key.
+    // This worker's count poller and forget handling share the last count
+    // stored for each row key.
     pub static PUT: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Mutex::default);
 
     pub fn with<R>(f: impl FnOnce(&mut u64, &mut HashMap<String, u64>) -> R) -> R {
@@ -77,8 +83,14 @@ mod kept {
     use std::collections::HashMap;
 
     thread_local! {
+        // Test on_for_test writes this thread's switch; kept::on reads it on the same
+        // thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
+        // Test kept::with reads and updates this thread's cursor through its caller;
+        // other test threads have separate values.
         static SINCE: Cell<u64> = const { Cell::new(0) };
+        // Test kept::with gives its caller read/write access to this thread's map;
+        // other test threads have separate values.
         static PUT: RefCell<HashMap<String, u64>> = RefCell::default();
     }
 
@@ -197,6 +209,8 @@ fn owner_ids() -> Vec<String> {
 
 #[cfg(test)]
 thread_local! {
+    // Test owners_for_test writes this thread's owners; owner_ids reads them on the
+    // same thread.
     static OWNERS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
@@ -214,6 +228,8 @@ pub fn owners_for_test(owners: &[&str]) {
 #[cfg(not(test))]
 pub fn start() {
     use std::sync::Once;
+    // Starts the SDK-count polling thread once in this second worker; that
+    // thread shares the local cutoff and stored-count map.
     static STARTED: Once = Once::new();
     if !on() {
         return;

@@ -281,6 +281,8 @@ impl Default for RoomReasons {
 }
 
 /// This process's [`RoomReasons`].
+// The Second worker's FaceCache::room_told updates and reads these process-local
+// counters for its journal entry.
 pub static ROOM_REASONS: RoomReasons = RoomReasons::new();
 
 /// The journal's words for a line admitted as the room's
@@ -845,6 +847,8 @@ const KEEPER_POLL: Duration = Duration::from_millis(50);
 /// lines than run at once, each a number, an id, and whether its exchange
 /// is journalled in their record (`LAMP_PERSON_SCOPE_ONE_FACE_READS`,
 /// [`one_face_record`]).
+// The second worker's scope leases mark or clear these requests; its memory
+// keep and finished-exchange paths read the same local records.
 static ONE_FACE_LINES: Mutex<std::collections::VecDeque<(u64, String, bool)>> =
     Mutex::new(std::collections::VecDeque::new());
 const ONE_FACE_LINES_MOST: usize = 64;
@@ -867,6 +871,8 @@ pub enum SaidAs {
 /// when its lease is gone, by a held line answering its words in its place
 /// ([`ScopeLease::answer_words_seen`], `second_provider::said_saying`). A
 /// narrow takes a line off.
+// Second worker-local scope evidence keyed by request; it is not cross-process
+// identity transport.
 static SETTLED_LINES: Mutex<std::collections::VecDeque<(u64, String, SaidAs)>> =
     Mutex::new(std::collections::VecDeque::new());
 
@@ -3410,6 +3416,8 @@ mod tests {
 
     /// [`seen`], the name read with the eyes' held mark (`LAMP_FACE_STICKY`).
     fn seen_held(cache: &FaceCache, name: &str, faces_in_view: Option<usize>) -> Instant {
+        // seen_held increments this process-wide counter for fixture files; parallel
+        // test threads share the sequence.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = std::env::temp_dir().join(format!(
             "memory-scope-held-{}-{}",

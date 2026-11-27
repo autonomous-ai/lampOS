@@ -173,15 +173,21 @@ impl Roles {
 // in one test never clears another's.
 #[cfg(test)]
 thread_local! {
+    // Test with_roles callers read and update this thread's roles; other test threads
+    // have separate values.
     static ROLES_FOR_TEST: std::cell::RefCell<Roles> =
         const { std::cell::RefCell::new(Roles::new()) };
 }
 
+// Set once by this worker's memory startup; its role tools, recall and prompt
+// builders read the same local feature flag.
 static ON: OnceLock<bool> = OnceLock::new();
 
 /// Each known person's role, by memory id, as their session's open read it
 /// or their own set or end changed it.
 #[cfg(not(test))]
+// This worker's memory role readers and updates share the cache; another route
+// worker has its own role cache.
 static ROLES: Mutex<Roles> = Mutex::new(Roles::new());
 
 #[cfg(not(test))]
@@ -196,6 +202,7 @@ fn with_roles<T>(f: impl FnOnce(&mut Roles) -> T) -> Option<T> {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_on_for_test writes and on_for_test reads this thread's override.
     static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 

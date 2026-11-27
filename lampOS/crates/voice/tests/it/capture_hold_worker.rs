@@ -920,6 +920,8 @@ impl Rig {
 /// a short session pays its first use. nextest runs each test in its own
 /// process, so every test here pays this once (#823).
 fn warm_up() {
+    // Test threads in this executable share this once guard; the first warm_up
+    // call runs the throwaway rigs and later calls reuse its completion.
     static WARM: Once = Once::new();
     WARM.call_once(|| {
         let signal = Signal::new(WARM_BLOCKS);

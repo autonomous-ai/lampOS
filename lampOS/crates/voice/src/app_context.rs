@@ -54,10 +54,13 @@ use std::time::Duration;
 /// The switch: `on` only. Off by default.
 pub const ENVIRONMENT: &str = "LAMP_APP_MEMORY";
 
+// Immutable configuration cached independently per process.
 static ON: OnceLock<bool> = OnceLock::new();
 
 #[cfg(test)]
 thread_local! {
+    // Test-thread override: set_on_for_test writes it and on reads the same thread's
+    // value.
     static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -77,6 +80,8 @@ pub(crate) fn set_on_for_test(on: bool) {
 }
 
 /// The live lines, one a source, in this process only.
+// The second worker's app-context subscriber and turn/tool paths share these
+// live lines; other processes send updates through apps/context on the bus.
 static LINES: Mutex<Option<ContextLines>> = Mutex::new(None);
 
 /// How long an app's spoken line is told after it played: long enough for
@@ -89,6 +94,9 @@ pub const SAID_FOR_MS: u64 = 2 * 60 * 1000;
 pub const SAID_MOST_CHARS: usize = lamp_msgs::app_fact::SAID_MOST_CHARS;
 
 /// What each app said last: its name, its words, told until when (Unix ms).
+// Process-local only: parent say settlement and child prompt preparation do not share
+// this state. Spoken app context needs an explicit privacy-scoped transport before
+// this can serve both.
 static SAID: Mutex<std::collections::BTreeMap<Source, (String, String, u64)>> =
     Mutex::new(std::collections::BTreeMap::new());
 
@@ -273,6 +281,9 @@ pub fn clear(source: &Source) {
 /// Whether Lamp is private now, as the engine last read the camera's and the
 /// microphone's permission (`Engine::privacy`), for the bus writer: none
 /// read yet counts as private.
+// Second worker Engine::privacy writes its copy; its app-context reader reads it.
+// Parent say settlement reads a separate copy, initially true and unwritten in
+// production. Say tests also write this process-wide flag through set_private.
 static PRIVATE: AtomicBool = AtomicBool::new(true);
 
 /// The engine's reading of the privacy switch (or a mute), for [`start`].
@@ -441,6 +452,8 @@ static SAID_HEARD: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsi
 /// voice's clock and privacy reading. The journal says the app and what was
 /// done, never a word of the line.
 pub fn start_telling(root: &Path) {
+    // App context subscription is started once in this process; it does not transport
+    // the parent say service's spoken-line memory.
     static STARTED: std::sync::Once = std::sync::Once::new();
     if !on() {
         return;
@@ -557,6 +570,8 @@ pub fn notes(now: u64, private: bool) -> Vec<String> {
 
 #[cfg(test)]
 thread_local! {
+    // Test-thread owner fixture: set_owners_for_test writes the list and owners reads
+    // it on that thread.
     static OWNERS_FOR_TEST: std::cell::RefCell<Option<Vec<String>>> =
         const { std::cell::RefCell::new(None) };
 }

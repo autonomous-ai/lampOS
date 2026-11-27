@@ -160,6 +160,8 @@ impl DidHistory {
     }
 }
 
+// Second worker-local history populated by the lamp/did bus, not by another process's
+// publisher statics.
 static KEPT: OnceLock<Arc<Mutex<DidHistory>>> = OnceLock::new();
 
 /// The history, if the voice keeps one (`LAMP_DID_KEEP=on` and a bus).

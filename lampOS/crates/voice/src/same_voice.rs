@@ -312,6 +312,8 @@ enum PrintsFor {
 /// once a process (the provider's arguments are made again at each
 /// restart).
 fn prints_for(value: Option<&str>, journal: &Journal) -> PrintsFor {
+    // Serve argument construction uses this local Once guard to journal an unknown
+    // prints policy once per process.
     static SAID: std::sync::Once = std::sync::Once::new();
     match value {
         None => PrintsFor::Every,

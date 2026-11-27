@@ -100,6 +100,7 @@ pub fn turns_on(value: Option<&str>, group: &str) -> bool {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_on_here writes this thread's override; on reads it on the same thread.
     static ON_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 

@@ -24,6 +24,8 @@ const FILE_MOST: u64 = 1_024;
 
 /// Each file's unfit value is said once a process.
 static VOICE_SAID: AtomicBool = AtomicBool::new(false);
+// Configuration readers in each process independently suppress repeated
+// invalid-character diagnostics with this flag.
 static CHARACTER_SAID: AtomicBool = AtomicBool::new(false);
 
 /// Whether the switch is on, as `var` says.

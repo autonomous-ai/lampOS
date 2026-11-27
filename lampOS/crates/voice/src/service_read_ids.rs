@@ -109,6 +109,8 @@ mod kept {
     use super::Kept;
     use std::sync::{LazyLock, Mutex};
 
+    // This worker records service reads and clears them on forgetting; its
+    // later write checks consult those local IDs.
     static KEPT: Mutex<Vec<Kept>> = Mutex::new(Vec::new());
 
     pub fn with<R>(f: impl FnOnce(&mut Vec<Kept>) -> R) -> R {
@@ -116,6 +118,8 @@ mod kept {
     }
 
     pub fn on() -> bool {
+        // Each process initializes this read-ID feature cache from its own
+        // environment; the local service guards read it.
         static ON: LazyLock<bool> =
             LazyLock::new(|| std::env::var(super::ENVIRONMENT).as_deref() == Ok("on"));
         *ON
@@ -129,7 +133,11 @@ mod kept {
     use std::cell::{Cell, RefCell};
 
     thread_local! {
+        // Test callers read and update this thread's IDs through kept::with; other
+        // test threads have separate values.
         static KEPT: RefCell<Vec<Kept>> = const { RefCell::new(Vec::new()) };
+        // Test on_for_test writes this thread's switch; kept::on reads it on the same
+        // thread.
         pub static ON: Cell<bool> = const { Cell::new(false) };
     }
 

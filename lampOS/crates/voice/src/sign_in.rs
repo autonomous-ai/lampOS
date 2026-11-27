@@ -160,6 +160,8 @@ struct Said {
     email: Option<String>,
     until: Option<Instant>,
 }
+// Serve sign-in news and provider sign-in handling update independent scrub
+// states; scrub callers read only their process's copy.
 static SAID: Mutex<Said> = Mutex::new(Said {
     code: None,
     email: None,
@@ -849,6 +851,8 @@ struct Marked {
     held: BTreeSet<u64>,
     lined: BTreeSet<u64>,
 }
+// This provider marks sign-in requests here; its transcript filters read and
+// update the same local sets.
 static MARKED: Mutex<Marked> = Mutex::new(Marked {
     requests: BTreeSet::new(),
     held: BTreeSet::new(),
@@ -856,10 +860,9 @@ static MARKED: Mutex<Marked> = Mutex::new(Marked {
 });
 
 std::thread_local! {
-    /// The Live session that heard a code or an account. The Live worker
-    /// runs on one thread (its current-thread runtime), which sees both
-    /// its connections and its words, so it is kept there: each test's
-    /// worker has its own.
+    /// The Live provider thread records sessions that heard a code or
+    /// account; its connection and transcript handlers read the same value.
+    /// Storage is per thread: workers running on one thread share it.
     static HELD_SESSION: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
 }
 

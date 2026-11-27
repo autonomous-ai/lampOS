@@ -990,6 +990,8 @@ impl Offer {
 }
 
 /// The one offer pending, shared by the worker's two routes.
+// Turn and lamp-answer callbacks update this route worker's offer; its
+// confirmation tool consumes the local offer state.
 static OFFERED: Mutex<Offer> = Mutex::new(Offer {
     said_in: None,
     answer_in: None,

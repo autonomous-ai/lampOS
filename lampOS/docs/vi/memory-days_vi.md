@@ -2491,3 +2491,77 @@ Cùng lúc, với `LAMP_LOOK_TOLD`, hàm nhìn nhận hai đối số tuỳ ch�
 trước ghi chú, kèm các mục bộ nhớ (`LAMP_SECOND_MEMORY_HITS`) cho câu hỏi trong
 phạm vi người hỏi; người được giữ nhờ khoảng trống không nhận mục nào. Model tự
 phán đoán ý nghĩa, không có danh sách từ.
+
+## Trạng thái qua ranh giới tiến trình provider
+
+Worker provider và bộ điều phối serve là các tiến trình riêng; mỗi tiến trình
+có `thread::THREAD` và bộ nhớ đệm tên máy tính riêng. Trạng thái được truyền
+qua kênh đầu ra provider hiện có, có thứ tự và cấp hạn mức
+([provider-flow-control.md](../provider-flow-control.md)), không thêm kết nối
+mạng hay công tắc tính năng.
+
+`ConversationState` chỉ mang thời điểm quan sát và hạn chót đơn điệu tùy chọn,
+không mang lời hội thoại hay tên người. Hạn chót tính từ lúc bắt đầu trao đổi
+mới nhất có lời đáp hợp lệ của đèn, sau lần đóng hội thoại gần nhất, cộng cửa
+sổ `GOING_ON_FOR` 45 giây; đúng tại hạn chót vẫn được tính là đang hội thoại.
+Bên nhận kiểm tra thời điểm và giới hạn rồi tự hết hạn, không cần gói báo hết
+hoạt động sau đó.
+
+Hai nơi quyết định hội thoại ở serve, khi bắt đầu tác vụ máy tính và xét âm
+thanh của skill, kết hợp bản sao của worker đang hoạt động với
+`THREAD.going_on(now)` riêng của tiến trình cha. Lần đóng ở cha ghi vào
+`Thread.closed_at` hiện có: thời điểm bắt đầu trao đổi ở worker, suy ra từ
+`until_us - 45 giây` bằng phép trừ bão hòa, phải nằm sau thời điểm đóng mới
+được tính. Trao đổi bắt đầu trước hoặc đúng lúc đóng vẫn bị đóng, dù bản chụp
+của nó đến sau với thời điểm quan sát mới hơn. Một trao đổi thực sự mới hơn
+ở worker có thể được tính lại đến hết hạn riêng, kể cả đúng tại hạn đó.
+Cách này dùng các trường hạn chót hiện có, không thêm trường đóng vào wire.
+Quyết định lấy `Instant` trước rồi mới đọc đồng hồ đơn điệu theo micro giây;
+khi quy đổi mốc đóng, thời gian đã trôi qua được làm tròn xuống và phép trừ
+bão hòa tránh tràn. Khoảng cách giữa hai lần đọc cùng phần làm tròn có thể
+đẩy mốc đóng về sau, nên trao đổi ngay tại ranh giới đó có thể vẫn bị loại
+một cách bảo thủ. Không dùng lại thời điểm cũ của vòng lặp. Khoảng cách giữa
+hai lần đọc không có giới hạn thời gian thực cố định.
+
+Một `ExactLine` được nói thành công qua `Reply::answer_say` chỉ thêm vào lịch
+sử riêng của cha và giữ đóng góp hội thoại cục bộ; dòng bị bỏ không thêm gì.
+`Thread::lamp` chỉ sửa bộ nhớ; `answer_say` không ghi tệp hội thoại dùng chung
+và không gửi lời này sang worker. Vì vậy dòng đó vẫn không có trong lịch sử
+yêu cầu model kế tiếp của worker. Cụ thể, nghe kỹ năng rút điện nói
+"Okay, I'll stay." không chứng minh yêu cầu chat tiếp theo biết câu đó.
+Việc truyền các câu cố định đã phát sang worker đang hoạt động được theo dõi
+ở [#8546](https://github.com/autonomous-ai/lampOS/issues/8546). Đường ghi và
+đọc lại bản chép hội thoại riêng được mô tả tại
+[conversation-thread.md](../conversation-thread.md#conversation-state-in-the-coordinator).
+
+Trong lúc khởi động ở trạng thái dự phòng, tuyến thứ hai chấp nhận metadata
+`ConversationState` và `MachineNames` ban đầu trước đầu vào, kể cả bản chụp
+hội thoại rỗng, với kiểm tra hợp lệ và kế toán hạn mức đầu ra như bình thường.
+Dữ liệu provider khác đến trước đầu vào vẫn là lỗi. Chỉ nhận metadata không
+cấp quyền phát đầu ra.
+
+`MachineNames` chuyển cờ bật và tên máy tính thành một phiên bản nhất quán.
+Mỗi mảnh đã tuần tự hóa tối đa 6.000 byte, tối đa 16 mảnh và toàn bộ bản chụp
+tối đa 65.536 byte. Bên nhận kiểm tra thứ tự mảnh, phiên bản, giới hạn và tên
+trước khi thay bản chụp hoàn chỉnh gần nhất. Bản truyền dở dang hay không hợp
+lệ không công bố bản đồ tên trộn lẫn. Kiểu riêng đã kiểm tra hợp lệ giúp bước
+cài đặt ở serve không nhận bản đồ thô hay tuần tự hóa lại toàn bộ bản chụp.
+Tắt tên cài bản đồ rỗng. Debug chỉ ghi số đếm và siêu dữ liệu, không ghi tên
+riêng tư.
+
+Cả worker Live và tuyến thứ hai công bố tối đa một gói trạng thái mỗi nhịp
+worker hiện có, dùng chung hạn mức đầu ra với âm thanh và sự kiện vòng đời.
+Khóa nguồn được thử mà không chờ, và không giữ khóa qua I/O truyền tải.
+Tranh chấp khóa hoặc thiếu hạn mức làm hoãn công bố; giới hạn công việc mỗi
+nhịp này không bảo đảm độ trễ đầu cuối.
+
+Mỗi worker dự phòng giữ bản sao hội thoại và phần ghép tên riêng. Chỉ trạng
+thái của worker đang hoạt động góp vào quyết định hội thoại và tên cho tin tác
+vụ ở serve. Đổi tuyến áp dụng trạng thái của worker được chọn, vẫn chịu mốc
+đóng của cha. Worker thay thế bắt đầu rỗng; khi đồng bộ, tên cũ ở cha được
+xóa. Đổi phiên model trong cùng lần khởi động giữ trạng thái; hủy yêu cầu
+không xóa bản chụp thuộc worker.
+Chỉ sau khi gửi `Ended` thành công thì nguồn mới ngừng công bố; cha từ chối
+trạng thái đến sau `Ended` trên kênh có thứ tự. Riêng sự kiện đó không xóa
+trạng thái đã hợp lệ: hạn hội thoại vẫn tự hết, còn tên giữ đến khi bản chụp
+đang hoạt động hoặc lần khởi động worker được thay thế.

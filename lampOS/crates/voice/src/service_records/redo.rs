@@ -88,6 +88,8 @@ const ASK_DEADLINE: std::time::Duration = std::time::Duration::from_millis(1_500
 
 #[cfg(not(test))]
 fn own_on() -> bool {
+    // Each process caches the redo switch from its own environment; redo
+    // admission also checks whether service records are enabled.
     static ON: std::sync::LazyLock<bool> =
         std::sync::LazyLock::new(|| std::env::var(ENVIRONMENT).as_deref() == Ok("on"));
     *ON
@@ -95,6 +97,8 @@ fn own_on() -> bool {
 
 #[cfg(test)]
 thread_local! {
+    // Test on_for_test writes this thread's switch; own_on reads it on the same
+    // thread.
     static ON: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -116,10 +120,13 @@ pub fn on() -> bool {
 }
 
 #[cfg(not(test))]
+// This worker's tool-catalogue construction records whether drafts are
+// offered; its redo handling reads that local declaration state.
 static DRAFTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 #[cfg(test)]
 thread_local! {
+    // In tests, drafts_listed writes and drafts_on reads this thread's own flag.
     static DRAFTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 

@@ -5,6 +5,8 @@ use lamp_audio::ownership::PlaybackCursor;
 use std::{cell::RefCell, rc::Rc};
 
 thread_local! {
+    // fixture_clock reads and refreshes this test-thread weak clock handle; another
+    // test thread has its own slot.
     static CLOCK: RefCell<std::rc::Weak<crate::scenario_clock::Scope>> =
         const { RefCell::new(std::rc::Weak::new()) };
 }

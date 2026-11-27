@@ -9,6 +9,8 @@ use lamp_voice::options::NoiseSuppression;
 use sha2::{Digest, Sha256};
 use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf, time::Duration};
 
+// Recorder fixtures share this test-process counter; Private::new consumes
+// each increment to make a distinct directory name.
 static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 /// The recorder syncs its files, so the folder holds `disk_flush::flushing`.
 struct Private(PathBuf, crate::disk_flush::Flushing);

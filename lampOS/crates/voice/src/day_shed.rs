@@ -166,6 +166,8 @@ pub struct Worker {
 }
 
 /// The worker's one reading, set at its start with its [`FLAG`].
+// Worker-local rate reading; the file is the explicit boundary used by the
+// coordinator.
 static WORKER: std::sync::OnceLock<Worker> = std::sync::OnceLock::new();
 
 /// At the worker's start, with its [`FLAG`]: the reading kept in [`FILE`].

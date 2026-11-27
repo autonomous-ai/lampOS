@@ -86,6 +86,8 @@ const RECOVER_AGAIN: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Whether [`ENVIRONMENT`] is `on`, read once.
 pub fn on() -> bool {
+    // Process-local history deletion switch/queue/worker; startup recovery uses the
+    // persistent journal.
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on"))
 }
@@ -456,6 +458,8 @@ fn write_whole(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 /// The voice's queue at [`FILE`], and the bell that wakes its sender.
 pub fn queue() -> &'static (Queue, Arc<tokio::sync::Notify>) {
+    // Process-local history deletion switch/queue/worker; startup recovery uses the
+    // persistent journal.
     static QUEUE: OnceLock<(Queue, Arc<tokio::sync::Notify>)> = OnceLock::new();
     QUEUE.get_or_init(|| (Queue::at(FILE), Arc::new(tokio::sync::Notify::new())))
 }
@@ -618,6 +622,8 @@ impl Worker {
     /// The voice's worker, on its queue at [`FILE`], pages read from the
     /// memory's socket.
     pub fn voices() -> &'static Self {
+        // Process-local history deletion switch/queue/worker; startup recovery uses
+        // the persistent journal.
         static WORKER: OnceLock<Worker> = OnceLock::new();
         WORKER.get_or_init(|| {
             let (queue, bell) = queue();

@@ -141,7 +141,11 @@ pub const REASONS: [&str; 16] = [
     "fingerprint",
 ];
 
+// Serve startup enables this flag; serve activity/privacy callbacks and its
+// nightly thread read the local value.
 static ON: AtomicBool = AtomicBool::new(false);
+// Serve and route workers initialize separate copies from their environments;
+// worker recall reads its own chapter switch.
 static CHAPTERS: AtomicBool = AtomicBool::new(false);
 
 /// Whether a recall is told chapters: [`CHAPTERS_ENVIRONMENT`] and
@@ -161,8 +165,14 @@ pub fn chapters_from_environment() {
     }
 }
 /// Speech, a line, or the slide closing: each moves it on.
+// Serve activity and privacy callbacks advance this counter; its nightly
+// thread checks the local count for interruptions.
 static STIRS: AtomicU64 = AtomicU64::new(0);
+// Serve activity callbacks record the last stir; the nightly thread in the
+// same process reads it to measure quiet time.
 static LAST_STIR_US: AtomicU64 = AtomicU64::new(0);
+// Serve privacy callbacks record when access opened; its nightly thread reads
+// this local timestamp before working.
 static OPEN_AT_US: AtomicU64 = AtomicU64::new(0);
 
 /// Someone spoke, or a line was handed on: the night stops at once and

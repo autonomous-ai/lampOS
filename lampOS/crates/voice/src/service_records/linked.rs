@@ -145,8 +145,12 @@ mod kept {
         atomic::{AtomicU64, Ordering},
     };
 
+    // Service-call process-local pending rows/outbox; background threads persist or
+    // pull through explicit service calls.
     pub static OUTBOX: LazyLock<(Mutex<Outbox>, Condvar)> =
         LazyLock::new(|| (Mutex::default(), Condvar::new()));
+    // Each process counts its own discarded records here. The parent BusOut health
+    // reader sees its own count, independently of drops in the Second worker.
     static DROPPED: AtomicU64 = AtomicU64::new(0);
 
     pub fn outbox<R>(f: impl FnOnce(&mut Outbox) -> R) -> R {
@@ -174,7 +178,11 @@ mod kept {
     use std::cell::{Cell, RefCell};
 
     thread_local! {
+        // Test callers read and update this thread's outbox through kept::outbox;
+        // other test threads have separate values.
         static OUTBOX: RefCell<Outbox> = RefCell::default();
+        // Test count_drop increments and dropped reads this thread's count; other test
+        // threads have separate counts.
         static DROPPED: Cell<u64> = const { Cell::new(0) };
     }
 
@@ -454,6 +462,8 @@ pub fn save_next(send: impl FnOnce(&Value) -> Option<Value>) -> super::Saved {
 /// memory down, it tries again after 1 s, doubling to [`RETRY_MOST`].
 #[cfg(not(test))]
 fn start_saver() {
+    // put attempts to start the linked-record saver once in its calling process; this
+    // guard is independent in other processes.
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| {
         let spawned = std::thread::Builder::new()

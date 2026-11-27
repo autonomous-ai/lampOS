@@ -3,20 +3,19 @@
 //! fails closed: a gap, a stale look, a second face in one look, an unknown
 //! face, a room that does not read quiet (`room/state`: another voice), a
 //! face away from the desk seen speaking, or camera or privacy off, and the
-//! line has no scope,
-//! so no computer is told it. No I/O: the state below is kept by the eyes'
-//! and the provider's own loops and only read here. The camera sees its frame
-//! only; someone out of frame can still hear (the grant's words say so).
+//! line has no scope, so no computer is told it. The coordinator's own
+//! background reader keeps the state below from the bus and eyes' known file;
+//! reply-scope checks do no I/O. The camera sees its frame only; someone out
+//! of frame can still hear (the grant's words say so).
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
-/// How long the cached known face stays proof after the provider's loop
-/// noted it (it notes every 500 ms; the cache drops a face over 4 s old
-/// before noting it, so the two windows add up to little more than 1 s
-/// past the cache's own).
+/// How long the cached known face stays proof after the coordinator's
+/// background reader noted it. The reader pauses [`EVERY`] (250 ms) between
+/// reads; this bound applies to its cached observation.
 pub const KNOWN_FRESH: Duration = Duration::from_secs(1);
 /// How often the owners' names are read again (a file read, off the reply path).
 const OWNERS_EVERY: Duration = Duration::from_secs(5);
@@ -104,7 +103,12 @@ const SPOKE_NOT_AT_DESK_WITHIN: Duration = Duration::from_secs(10);
 /// How often the evidence is read from the bus and the known file.
 const EVERY: Duration = Duration::from_millis(250);
 
+// Coordinator-local owner/room evidence. Its background bus/file reader
+// writes this cache; BusOut's reply-scope checks read it without file I/O.
 static KEPT: Mutex<Option<Kept>> = Mutex::new(None);
+// Coordinator-local recent face observations from its own bus reader.
+// Reply-scope checks read these observations and prune expired counts;
+// this is not the provider workers' face cache.
 static LOOKS: Mutex<Looks> = Mutex::new(Looks {
     counts: VecDeque::new(),
     newest: None,
@@ -118,6 +122,8 @@ static LOOKS: Mutex<Looks> = Mutex::new(Looks {
 /// eyes' known file here, in the process that publishes `voice/line`. It
 /// reads on a thread of its own; [`owner_alone_now`] only reads what it kept.
 pub fn keep(bus: lamp_bus::Bus) {
+    // Start this coordinator process's evidence reader once, even when a new
+    // BusOut is constructed; provider workers have separate process lifetimes.
     static STARTED: Once = Once::new();
     STARTED.call_once(|| {
         let known = std::env::var_os(crate::known_faces::ENVIRONMENT)
@@ -303,7 +309,9 @@ mod tests {
         vec![crate::known_faces::memory_person(OWNER)]
     }
 
-    /// The two tests that use the statics run one at a time, from empty.
+    /// Tests that use the statics run one at a time, from empty.
+    // Tests acquire this shared test-process mutex while reading or updating the scope
+    // statics.
     static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
     fn reset() {

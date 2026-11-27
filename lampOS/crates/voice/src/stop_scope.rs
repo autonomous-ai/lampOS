@@ -305,6 +305,8 @@ pub fn heard_words(request: u64, heard: bool) -> Option<String> {
 
 #[cfg(test)]
 thread_local! {
+    // Test set_heard_here writes this thread's override; heard_words reads it on the
+    // same thread.
     static HEARD_HERE: std::cell::RefCell<Option<Option<String>>> =
         const { std::cell::RefCell::new(None) };
 }

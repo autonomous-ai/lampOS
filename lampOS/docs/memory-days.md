@@ -2352,6 +2352,77 @@ or a cancel never gives a checkpoint. The clock, the observation pass and the
 summary thread are the process's, so a probe is one view to a process: a
 private view is a separate process loaded before its workers start.
 
+## State across the provider process boundary
+
+The provider's conversation thread and computer-name cache are process-local.
+Serve receives explicit state on the existing ordered, credited provider-output
+channel ([provider-flow-control.md](provider-flow-control.md)); this adds no
+network connection or feature switch and does not transfer transcript content.
+`ConversationState` carries only an observation time and an optional monotonic
+deadline. The deadline is the latest qualifying exchange's start plus the
+45-second `GOING_ON_FOR` window; equality at the deadline still counts as
+conversation. The parent validates the bounds and expires it locally.
+
+Serve's computer-task admission and skill-sound gates combine the active
+worker's mirror with the parent's own `THREAD.going_on(now)`. A parent close
+records the existing `Thread.closed_at`: the worker exchange start, derived as
+`until_us - 45 seconds` with saturating subtraction, must be strictly after
+that close to count. An exchange begun at or before the close remains closed,
+even if its snapshot arrives later with a later observation time. A genuinely
+newer worker exchange can count again until its own inclusive deadline. This
+uses the existing deadline fields; no close field is added to the wire.
+The decision samples `Instant` before the monotonic microsecond clock, then
+maps the close with elapsed time rounded down and saturating subtraction.
+The clock-read gap and rounding can move the cutoff later, conservatively
+excluding an exchange at that boundary; an old loop timestamp is not reused.
+That sampling gap has no fixed wall-time bound.
+
+A successfully played `ExactLine` enters only serve's local thread through
+`Reply::answer_say` and retains its local conversation contribution; a dropped
+line adds nothing. `Thread::lamp` changes memory only: `answer_say` neither
+writes the shared transcript file nor sends the line to the provider worker.
+The line therefore remains absent from the worker's next model-request
+history. In particular, hearing the unplug skill's "Okay, I'll stay." does
+not establish that the next chat request knows it. Carrying played fixed
+lines to the active worker is tracked in
+[#8546](https://github.com/autonomous-ai/lampOS/issues/8546). See
+[conversation-thread.md](conversation-thread.md#conversation-state-in-the-coordinator)
+for the separate transcript write/reload path.
+
+The standby second route accepts initial `ConversationState` and
+`MachineNames` metadata before input, including an empty conversation
+snapshot, with the normal validation and output-credit accounting. Other
+provider data before input remains an error. Metadata alone grants no output
+authority.
+
+`MachineNames` transfers the enabled flag and computer labels together as one
+revision. Each serialized chunk is at most 6,000 bytes, with at most 16 chunks
+and a 65,536-byte limit on the complete snapshot. The receiver validates chunk
+order, revision, bounds and labels before replacing its last complete
+snapshot. Partial or invalid transfers do not publish a mixed map. A completed
+snapshot has a private validated type, so installation in serve cannot accept
+a raw map or serialize the whole snapshot again. Disabling names installs an
+empty map. Debug output reports counts and metadata, not private labels.
+
+Both Live and second-route workers publish at most one state packet per
+existing worker tick, using the same output credits as audio and lifecycle
+events. Source locks are tried without waiting; no source lock is held across
+transport I/O. Contention or unavailable credits defer publication. This is a
+bound on work per tick, not an end-to-end latency guarantee.
+
+Each standby worker retains its own conversation mirror and name assembly.
+Only the active worker's mirror contributes to serve's conversation gates,
+and only its complete names are installed for the task-news consumer. Switching
+routes applies the selected worker's state under the parent's close cutoff.
+Replacing a worker boot starts empty and clears the old parent-side names
+when synchronized.
+A model-session change within the same boot retains its state. Request
+cancellation does not clear worker-scoped snapshots. Publication stops only
+after `Ended` is successfully sent, and the parent rejects state following
+ordered `Ended`. That event alone does not erase already validated names or
+conversation state: the conversation deadline expires locally, and names stay
+until the active snapshot or boot is replaced.
+
 ## Not shown
 
 Task 29's Mac client timings are recorded in

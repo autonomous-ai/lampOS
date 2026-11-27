@@ -49,6 +49,8 @@ fn clock_after(ms: u64) -> ClockSample {
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
+        // Test new reads and increments this shared test-process counter; calls on
+        // different threads use the same value.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = fs::canonicalize("/tmp").unwrap().join(format!(
             "sr-{}-{}",

@@ -427,6 +427,8 @@ thread_local! {
     static CARRIES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The turn, by its place in the next [`run_full`]'s turns, that the
     /// coordinator ends as only the lamp's name (`Called`), once.
+    // The called-line test sets this thread's turn marker; run_full_with_audio takes
+    // it on that thread.
     static CALLED_AT: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
     /// `LAMP_LIVE_FACT_CHECKED` ([`Engine::checking_live_facts`], #7605)
     /// for the next [`run_full`] on this thread, once.

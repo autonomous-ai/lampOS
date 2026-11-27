@@ -39,6 +39,9 @@ const NOTHING_FOR: Duration = Duration::from_millis(300);
 /// keep fixtures isolated without changing its production API.
 macro_rules! clock {
     () => {{
+        // One process-local atomic per expansion site, reused on later
+        // execution: Place::advance writes it; the tasks service and voice
+        // clock read that same atomic.
         static NOW_MS: AtomicU64 = AtomicU64::new(1_000);
         fn voice_clock() -> Option<BootClock> {
             Some(BootClock {

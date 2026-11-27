@@ -866,7 +866,9 @@ impl FixtureProvider {
 }
 fn output_request(event: &ProviderOutput) -> Option<u64> {
     match event {
-        ProviderOutput::Ready { .. }
+        ProviderOutput::ConversationState { .. }
+        | ProviderOutput::MachineNames { .. }
+        | ProviderOutput::Ready { .. }
         | ProviderOutput::TurnFailed { .. }
         | ProviderOutput::ReminderDeferred { .. }
         // A fixture keeps no input and never reports one.

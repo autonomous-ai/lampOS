@@ -87,6 +87,8 @@ pub const BASIS: &str = "long_make_told";
 const OPENS: &str = "(Nobody has spoken. [long-make ";
 
 std::thread_local! {
+    // Per-thread test override; production falls back to the environment when none is
+    // set.
     static HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
@@ -392,6 +394,8 @@ enum Phase {
 }
 
 /// The voice's makes that may run on, by request.
+// Make phases are local to the process running the make; persistent long-make state
+// uses the explicit file path.
 static PHASES: Mutex<Vec<(u64, Phase)>> = Mutex::new(Vec::new());
 
 fn phases() -> std::sync::MutexGuard<'static, Vec<(u64, Phase)>> {

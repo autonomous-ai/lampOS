@@ -518,6 +518,8 @@ mod tests {
         time::{Duration, Instant},
     };
 
+    // Test new reads and increments this shared test-process counter; calls on
+    // different threads use the same value.
     static NEXT: AtomicU64 = AtomicU64::new(1);
     struct Scratch(PathBuf);
     impl Scratch {

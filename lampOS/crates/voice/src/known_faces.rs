@@ -2106,12 +2106,16 @@ pub fn asks_to_remember(said: &str) -> bool {
 /// With `LAMP_FACE_QUESTION_NOT_ASK`: the second worker's faces, read for
 /// the one near face's track ([`reused_name`]); `None` until it starts, or
 /// without the bus.
+// Second worker-local face caches populated through its own face tracker, file or bus
+// readers; they are not the coordinator's mirror.
 static TRACKS: std::sync::Mutex<Option<std::sync::Arc<crate::speaking_faces::SpeakingFaces>>> =
     std::sync::Mutex::new(None);
 
 /// The name confirmed this session (said back and agreed, or spelled, in a
 /// save's checks) and the one near face (`boot/f3`) in view as it was
 /// ([`note_confirmed`]). Memory only; a forget clears it.
+// The Second worker's note_confirmed and forget_confirmed update this cache;
+// reused_name reads it in the same worker process.
 static CONFIRMED: std::sync::Mutex<Option<(String, String)>> = std::sync::Mutex::new(None);
 
 /// Gives [`reused_name`] the second worker's faces (`None`: no reuse).
@@ -2185,6 +2189,8 @@ pub const FACE_STICKY_ENVIRONMENT: &str = "LAMP_FACE_STICKY";
 #[cfg(test)]
 thread_local! {
     /// Tests: the held marks taken as written ([`held_marks_on`]).
+    // Face-question tests set this test-thread switch; held_marks_on reads it on the
+    // calling thread.
     static TEST_HELD_MARKS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -3999,6 +4005,8 @@ impl FaceObservation {
 /// Whether memory is keyed on the eyes' stable id
 /// ([`lamp_msgs::known::ENVIRONMENT`]), read once for the process.
 fn stable_ids() -> bool {
+    // Serve and provider workers each cache this stable-ID switch locally; their face
+    // readers consult their own process value.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(lamp_msgs::known::stable_ids)
 }
@@ -4075,6 +4083,8 @@ impl SeenIds {
     }
 }
 
+// Face observations populate this process's name-to-ID cache; memory-person
+// lookups read only that local cache.
 static SEEN_IDS: std::sync::Mutex<SeenIds> = std::sync::Mutex::new(SeenIds(Vec::new()));
 
 fn note_seen(name: &str, id: Option<&str>) {
@@ -4157,6 +4167,8 @@ pub const OWNER_EVERY: Duration = Duration::from_secs(10);
 /// The owner as [`keep_owner_fresh`] last found them, and how many forgets
 /// there have been, so a refresh begun before a forget never brings back
 /// the name it cleared.
+// The second worker refreshes its owner cache; each provider's owner readers,
+// rename handling, and forget handling use that provider's copy.
 static OWNER_NOW: std::sync::Mutex<(Option<String>, u64)> = std::sync::Mutex::new((None, 0));
 
 #[cfg(test)]
@@ -4199,6 +4211,8 @@ pub fn owner_forgotten() {
 /// Renames of the owner's face under way ([`OwnerRename`]), by onboarding
 /// file: how many are in flight, and how many have ended, so a refresh that
 /// overlapped one never drops the owner it was moving ([`refresh_owner`]).
+// Provider face-rename calls update local in-flight counts; the second
+// worker's owner-refresh thread checks its own copy.
 static OWNER_RENAMES: std::sync::Mutex<std::collections::BTreeMap<PathBuf, (u32, u64)>> =
     std::sync::Mutex::new(std::collections::BTreeMap::new());
 
@@ -4330,6 +4344,8 @@ impl Drop for OwnerRename {
 /// Started once per process, however many parts ask for it (the by-default
 /// name and the connected services).
 pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
+    // Second-worker callers use this process-local Once guard around
+    // keep_owner_fresh_now.
     static STARTED: std::sync::Once = std::sync::Once::new();
     STARTED.call_once(|| keep_owner_fresh_now(file, socket));
 }
@@ -4338,6 +4354,8 @@ pub fn keep_owner_fresh(file: Option<PathBuf>, socket: Option<PathBuf>) {
 /// `LAMP_NAME_NOT_ANOTHERS` (#8114, the first builder's 10:52): a word
 /// written for the lamp's name that is one of them ("Lynn") calls that
 /// person, not the lamp. Empty until read, or without the switch.
+// Second worker-local face caches populated through its own face tracker, file or bus
+// readers; they are not the coordinator's mirror.
 static FACE_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
 /// How many owner refreshes ([`OWNER_EVERY`]) pass between reads of
@@ -4544,6 +4562,8 @@ pub const AT_DESK_TALLEST: f32 = 0.6;
 
 /// Whether [`AT_DESK_ENVIRONMENT`] is exactly `on`, read once.
 pub fn at_desk_only() -> bool {
+    // Each process caches its own environment switch; local face-scope and
+    // owner-selection checks read that value.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var(AT_DESK_ENVIRONMENT).ok().as_deref() == Some("on"))
 }
@@ -4789,10 +4809,14 @@ impl FacesLately {
     }
 }
 
+// Second worker-local face caches populated through its own face tracker, file or bus
+// readers; they are not the coordinator's mirror.
 static FACES_LATELY: std::sync::Mutex<FacesLately> =
     std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None, None));
 
 /// [`FACES_LATELY`] counting near faces only ([`count_near_at_desk`]).
+// Second worker-local face caches populated through its own face tracker, file or bus
+// readers; they are not the coordinator's mirror.
 static NEAR_FACES_LATELY: std::sync::Mutex<FacesLately> =
     std::sync::Mutex::new(FacesLately(std::collections::VecDeque::new(), None, None));
 
@@ -4950,6 +4974,7 @@ pub const STICKY_ENVIRONMENT: &str = "LAMP_FACE_STICKY";
 
 /// [`STICKY_ENVIRONMENT`], read once for the process.
 pub fn sticky_on() -> bool {
+    // Immutable configuration cached independently per process.
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| sticky_from(|name| std::env::var(name).ok()))
 }
@@ -6343,6 +6368,8 @@ mod tests {
     /// An onboarding file whose setup owner is `owner`, beside a fresh
     /// folder, and its mailbox read.
     fn owner_file(owner: &str) -> (PathBuf, impl Fn() -> String) {
+        // owner_file increments this process-wide counter for fixture paths; parallel
+        // test threads share the sequence.
         static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let directory = std::env::temp_dir().join(format!(
             "lamp-voice-owner-{}-{}",

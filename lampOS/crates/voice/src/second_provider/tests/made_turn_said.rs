@@ -264,6 +264,8 @@ fn went_as(
 /// A lamp of the test's own with space facts made and on it (#7562's row
 /// on lamp-9adf, 18 Nov, requests 6 and 9).
 fn space_facts_made() -> (std::path::PathBuf, crate::made_skill::Keeping) {
+    // Test space_facts_made reads and increments this shared test-process counter;
+    // calls on different threads use the same value.
     static MADE: AtomicUsize = AtomicUsize::new(0);
     let (root, keeping) = crate::make_skill_local::tests::keeping(&format!(
         "turn-said-space-{}",

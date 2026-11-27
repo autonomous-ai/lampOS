@@ -38,6 +38,7 @@ pub const LINKED: &str = "Done: their face is now known as the person who set th
 
 #[cfg(test)]
 thread_local! {
+    // Test on_for_test writes this thread's override; on reads it on the same thread.
     static ON_FOR_TEST: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 

@@ -56,6 +56,8 @@ fn now() -> MonoTime {
 struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
+        // Root::new increments this test-process counter for fixture directory
+        // names; spawned workers receive paths, not this counter.
         static NEXT: AtomicU64 = AtomicU64::new(0);
         // Keep Unix socket names below the transport's path bound.
         let path = PathBuf::from(format!(
@@ -210,6 +212,9 @@ impl HeldUp {
 thread_local! {
     /// The running scenario's producer, for [`on_time`] to read once the
     /// scenario has failed and its rig is gone.
+    // Rig startup stores the producer handle on the scenario thread; on_time
+    // consumes it on that same thread after failure. The handle contains
+    // shared producer state.
     static RUNNING: RefCell<Option<HeldUp>> = const { RefCell::new(None) };
 }
 

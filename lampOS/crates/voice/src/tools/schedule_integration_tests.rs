@@ -23,6 +23,8 @@ const WALL: i64 = 1_791_964_800_000;
 struct Temp(PathBuf);
 impl Temp {
     fn new() -> Self {
+        // Test new reads and increments this shared test-process counter; calls on
+        // different threads use the same value.
         static SEQUENCE: AtomicU64 = AtomicU64::new(0);
         let path = fs::canonicalize("/tmp").unwrap().join(format!(
             "vs-{}-{}",

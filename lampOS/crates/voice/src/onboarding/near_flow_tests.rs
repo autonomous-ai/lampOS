@@ -18,6 +18,7 @@ const S: u64 = 1_000_000;
 const FLOOR: f32 = -60.0;
 
 thread_local! {
+    // Test set_clock writes and clock reads this thread's own time.
     static NOW_MS: Cell<u64> = const { Cell::new(0) };
 }
 fn clock() -> u64 {

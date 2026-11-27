@@ -42,6 +42,8 @@ const YOUNG_BOOT_GRACE: &str = "LAMP_VOICE_YOUNG_BOOT_GRACE";
 /// The roles that have said ready once in this process with the grace's
 /// switch on, each once: a worker of one of them started again is given no
 /// young-boot grace. With the switch off it is never touched.
+// The serve supervisor records ready worker roles and reads them on subsequent
+// spawns; this is not a child-owned readiness flag.
 static READY_ONCE: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 /// How long a worker whose peer went during startup is waited for to end
 /// ([`Worker::ended_or`]).
@@ -67,6 +69,8 @@ pub(crate) mod startup_clock {
     use std::{cell::Cell, time::Duration};
 
     thread_local! {
+        // Test move_on updates this thread's elapsed time; moved reads it on the same
+        // thread.
         static MOVED: Cell<Duration> = const { Cell::new(Duration::ZERO) };
     }
 
@@ -343,6 +347,28 @@ pub fn listed(role: &str) -> io::Result<lamp_voice_processes::WorkerRole> {
 }
 
 impl Worker {
+    /// A real child with already-bound channels, owned and reaped by the normal
+    /// Worker lifecycle. Used by isolated worker-loop process tests.
+    #[cfg(test)]
+    pub(crate) fn fixture_with_child(
+        channels: WorkerChannels,
+        child: Child,
+        boot: BootId,
+        role: &str,
+    ) -> Self {
+        Self {
+            channels,
+            child,
+            boot,
+            role: role.into(),
+            diagnostic_start: None,
+            ring_resources: None,
+            renewal_stall: RenewalStall::default(),
+            on_stop: None,
+            after_terminate: None,
+        }
+    }
+
     /// The worker's process id, for a test that reads how it runs (#1608).
     pub fn process_id(&self) -> u32 {
         self.child.id()
@@ -1560,6 +1586,8 @@ fn sound_session_worker_environment(
         .collect()
 }
 
+// Serve configuration sets this flag; its child-command builder reads it when
+// constructing the audio workers' sound-session environment.
 static DEVICES_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Said once at start by the coordinator: the options named a speaker or a microphone device, so the audio workers are

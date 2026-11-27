@@ -36,6 +36,8 @@ use std::sync::atomic::AtomicBool;
 /// How old a hearing is when it is said: see the module's notes.
 const AGO_US: u64 = 4_000_000;
 
+// Test one_at_a_time acquires this process-global flag; its guard's Drop releases it
+// for other test threads.
 static TAKEN: AtomicBool = AtomicBool::new(false);
 struct Turn;
 impl Drop for Turn {

@@ -74,6 +74,8 @@ async fn run_timed(
     slow: Option<Duration>,
     no_ask: bool,
 ) -> (Vec<Value>, Vec<Vec<Message>>, Vec<String>) {
+    // Test run_timed reads and increments this shared test-process counter; calls on
+    // different threads use the same value.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // Request numbers of their own: lines seen are the process's.
     let first = 9_000 + 100 * NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -674,6 +676,8 @@ async fn a_held_setup_saves_yes_on_their_one_face_line_runs_with_the_switch() {
     };
     let (engine, _, _) = scripted(Arc::new(Script::default()));
     let engine = engine.reading_said_from(Arc::new(move || said.clone()));
+    // This test fixture reads and increments this shared test-process counter; calls
+    // on different threads use the same value.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(7_301_000);
     #[derive(Clone, Copy, PartialEq)]
     enum Line {

@@ -456,14 +456,17 @@ impl Route {
                 None => break,
             }
         }
-        if self
-            .worker
-            .channels
-            .data
-            .receive::<ProviderOutput>()?
-            .is_some()
-        {
-            return Err(io::Error::other("second route output before input"));
+        for _ in 0..STANDBY_SLICE {
+            let Some(event) = self.worker.channels.data.receive::<ProviderOutput>()? else {
+                break;
+            };
+            self.flow.received()?;
+            match event {
+                ProviderOutput::ConversationState { .. } | ProviderOutput::MachineNames { .. } => {
+                    self.cloud.observe_state(&event, monotonic_us())?;
+                }
+                _ => return Err(io::Error::other("second route output before input")),
+            }
         }
         self.flow.replenish(0, &mut self.worker.channels.control)
     }
@@ -576,6 +579,12 @@ impl Route {
                 break;
             };
             self.flow.received()?;
+            if matches!(
+                event,
+                ProviderOutput::ConversationState { .. } | ProviderOutput::MachineNames { .. }
+            ) {
+                self.cloud.observe_state(&event, monotonic_us())?;
+            }
             if let ProviderOutput::Ended {
                 reason,
                 fault,
@@ -991,6 +1000,174 @@ pub(super) fn flush(
 mod tests {
     use super::*;
     use crate::provider_worker::{FailedStage, Fault};
+
+    /// Live's second route must accept boot-scoped state before any input. The
+    /// child runs the production worker loop with an empty Thread and no network.
+    #[test]
+    fn real_standby_startup_accepts_initial_empty_conversation() {
+        use super::super::second_thread_process_boundary::{
+            Directory, MODE, ROOT, Reap, STANDBY_TEST, TEST, spawn_child, wait,
+        };
+        use crate::transport::WorkerChannels;
+        let mode = std::env::var(MODE).unwrap_or_default();
+        if mode.is_empty() {
+            let root = Directory(std::env::temp_dir().join(format!(
+                "standby-ipc-{}-{}",
+                std::process::id(),
+                monotonic_us()
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            std::fs::set_permissions(
+                &root.0,
+                <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o700),
+            )
+            .unwrap();
+            let mut driver = Reap(spawn_child(STANDBY_TEST, "standby-driver", &root.0));
+            wait(&mut driver, Duration::from_secs(8));
+            return;
+        }
+        assert_eq!(mode, "standby-driver");
+        let root = std::path::PathBuf::from(std::env::var_os(ROOT).unwrap());
+        let parent_boot = lamp_turn_owner::BootId::new([71; 16]).unwrap();
+        let worker_boot = lamp_turn_owner::BootId::new([72; 16]).unwrap();
+        let channels =
+            WorkerChannels::bind(&root, "second", parent_boot, worker_boot, false).unwrap();
+        let child = spawn_child(TEST, "standby-worker", &root);
+        let mut worker = Worker::fixture_with_child(channels, child, worker_boot, "second");
+        let ready_by = Instant::now() + Duration::from_secs(2);
+        while !root.join("seeded").exists() {
+            assert!(
+                Instant::now() < ready_by,
+                "standby child never bound its channels"
+            );
+            worker.check_running().unwrap();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        worker.channels.connect(&root, "second", false).unwrap();
+        // Worker::spawn normally consumes Ready before constructing the route.
+        loop {
+            if let Some(event) = worker.channels.control.receive::<WorkerEvent>().unwrap() {
+                assert!(matches!(event, WorkerEvent::Ready), "{event:?}");
+                break;
+            }
+            assert!(Instant::now() < ready_by, "standby never announced Ready");
+            worker.check_running().unwrap();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let probe = worker.channels.data.install_probe().unwrap();
+        let mut route = Route::new(worker);
+        let mut owner = lamp_turn_owner::Controller::new(
+            parent_boot,
+            lamp_turn_owner::MonoTime::from_micros(monotonic_us()),
+        );
+        let mut startup = StartupEvents::default();
+        let until = Instant::now() + Duration::from_secs(1);
+        loop {
+            let snapshot = owner
+                .snapshot(lamp_turn_owner::MonoTime::from_micros(monotonic_us()))
+                .unwrap();
+            route.startup_tick(Some(snapshot), &mut startup).unwrap();
+            if probe.snapshot().unwrap().receive.count > 0 {
+                break;
+            }
+            assert!(
+                Instant::now() < until,
+                "no boot-scoped state reached startup"
+            );
+            route.worker_mut().check_running().unwrap();
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert_eq!(probe.snapshot().unwrap().send.count, 0, "no provider input");
+        assert!(!conversation_going_on(&route.cloud, monotonic_us()));
+        // Receipt alone is insufficient: startup must validate/install the
+        // snapshot, so a state older than the child's is now refused.
+        assert!(
+            route
+                .cloud
+                .observe_state(
+                    &ProviderOutput::ConversationState {
+                        snapshot: crate::provider_state::conversation::Snapshot {
+                            observed_at_us: 0,
+                            until_us: None,
+                        },
+                    },
+                    monotonic_us(),
+                )
+                .is_err()
+        );
+        route.worker_mut().shutdown().unwrap();
+    }
+
+    #[test]
+    fn standby_startup_credits_and_validates_metadata() {
+        let directory = SessionDirectory::create().unwrap();
+        let (worker, mut peer) = Worker::sleeping_fixture(&directory.path, "second");
+        let mut route = Route::new(worker);
+        let at = monotonic_us();
+        peer.data
+            .send(ProviderOutput::ConversationState {
+                snapshot: crate::provider_state::conversation::Snapshot {
+                    observed_at_us: at,
+                    until_us: Some(at + 1_000_000),
+                },
+            })
+            .unwrap();
+        peer.data
+            .send(ProviderOutput::MachineNames {
+                chunk: crate::provider_state::names::NamesChunk {
+                    revision: 1,
+                    index: 0,
+                    count: 1,
+                    enabled: false,
+                    pairs: Vec::new(),
+                },
+            })
+            .unwrap();
+        route
+            .startup_tick(None, &mut StartupEvents::default())
+            .unwrap();
+        assert!(conversation_going_on(&route.cloud, at));
+        assert!(matches!(
+            peer.control.receive::<Control>().unwrap(),
+            Some(Control::ProviderOutputCapacity { through: 4 })
+        ));
+        // A malformed next names revision must not be silently dropped.
+        peer.data
+            .send(ProviderOutput::MachineNames {
+                chunk: crate::provider_state::names::NamesChunk {
+                    revision: 2,
+                    index: 0,
+                    count: 0,
+                    enabled: false,
+                    pairs: Vec::new(),
+                },
+            })
+            .unwrap();
+        assert_eq!(
+            route
+                .startup_tick(None, &mut StartupEvents::default())
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidData
+        );
+    }
+
+    #[test]
+    fn standby_startup_still_refuses_output_that_requires_input() {
+        let directory = SessionDirectory::create().unwrap();
+        let (worker, mut peer) = Worker::sleeping_fixture(&directory.path, "second");
+        let mut route = Route::new(worker);
+        peer.data
+            .send(ProviderOutput::Ready { setup_us: 1 })
+            .unwrap();
+        assert_eq!(
+            route
+                .startup_tick(None, &mut StartupEvents::default())
+                .unwrap_err()
+                .to_string(),
+            "second route output before input"
+        );
+    }
 
     /// #1673: texts are answered where a second route's worker runs at all:
     /// standing by or as the only voice, and not with Gemini alone.

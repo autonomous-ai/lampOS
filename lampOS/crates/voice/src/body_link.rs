@@ -1054,6 +1054,8 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     fn listener() -> (UnixDatagram, PathBuf) {
+        // Listener fixtures increment this process-wide counter for their names;
+        // parallel test threads share the sequence.
         static NEXT: AtomicU32 = AtomicU32::new(0);
         let path = std::env::temp_dir().join(format!(
             "lamp-body-{}-{}.sock",

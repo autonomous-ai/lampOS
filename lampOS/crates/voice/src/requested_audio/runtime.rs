@@ -1407,6 +1407,8 @@ mod tests {
     struct Home(PathBuf);
     impl Home {
         fn new() -> Self {
+            // Test new reads and increments this shared test-process counter; calls on
+            // different threads use the same value.
             static NEXT: AtomicUsize = AtomicUsize::new(0);
             let path = std::env::temp_dir().join(format!(
                 "lamp-ra-{}-{}",

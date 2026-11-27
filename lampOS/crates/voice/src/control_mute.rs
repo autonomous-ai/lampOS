@@ -94,6 +94,8 @@ struct Shared {
 #[derive(Clone, Default)]
 pub struct ControlMutes(Arc<Shared>);
 
+// Serve creates this shared mute holder; its say-service clients and hand
+// controls clone the same process-local state.
 static PROCESS: OnceLock<ControlMutes> = OnceLock::new();
 
 impl ControlMutes {

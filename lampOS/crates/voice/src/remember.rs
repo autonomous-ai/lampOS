@@ -2290,6 +2290,8 @@ pub fn names_forget(said: &str, name: &str) -> bool {
     }
 }
 
+// This worker initializes the feature switch at memory startup; its forget
+// admission reads the same local value.
 static FORGET_ALL: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes an id and `forget_everything` is offered.
@@ -2608,6 +2610,8 @@ pub fn switch_forget_all(on: bool) -> bool {
 /// and a day or span finds what was kept on it too. Off, recall is as
 /// before.
 pub const RECALL_V2_ENVIRONMENT: &str = "LAMP_MEMORY_RECALL_V2";
+// This provider initializes the recall switch at memory startup; its local
+// recall handling reads the stored choice.
 static RECALL_V2: OnceLock<bool> = OnceLock::new();
 
 /// Whether recall's second version is on ([`RECALL_V2_ENVIRONMENT`]).
@@ -2628,6 +2632,8 @@ pub fn switch_recall_v2(on: bool) -> bool {
 /// `tiers/recall-adapter`). Off, the request is as before. An older Days
 /// refuses the field, so upgrade the voice and the memory together.
 pub const NEWER_FIRST_ENVIRONMENT: &str = "LAMP_MEMORY_NEWER_FIRST";
+// This provider initializes the ordering switch at memory startup; its local
+// memory reads use the stored choice.
 static NEWER_FIRST: OnceLock<bool> = OnceLock::new();
 
 /// Whether a search asks for newer corrections first
@@ -2647,6 +2653,8 @@ pub fn switch_newer_first(on: bool) -> bool {
 /// the model does not take it as done or booked (3 Nov Tiers-ideas plan,
 /// P2; adapted from memory-tiers). Off, the requests are as before.
 pub const STRENGTH_ENVIRONMENT: &str = "LAMP_MEMORY_STRENGTH";
+// This provider initializes the strength switch at memory startup; its local
+// memory handling reads the stored choice.
 static STRENGTH: OnceLock<bool> = OnceLock::new();
 
 /// Whether a search and a session note ask for strength
@@ -2667,6 +2675,8 @@ pub fn switch_strength(on: bool) -> bool {
 /// plan, P3; the owner profile of memory-tiers). Off, the request is as
 /// before.
 pub const PROFILE_ENVIRONMENT: &str = "LAMP_MEMORY_PROFILE";
+// This provider initializes the profile switch at memory startup; its local
+// profile reads use the stored choice.
 static PROFILE: OnceLock<bool> = OnceLock::new();
 
 /// Whether a session note asks for the profile band
@@ -2721,6 +2731,8 @@ fn tiers_ideas_fields(request: &mut Value, newer_first: bool, strength: bool, pr
 /// session's close. Off, every exchange is linked to every
 /// source the session was shown, as before.
 pub const LINK_USED_ENVIRONMENT: &str = "LAMP_MEMORY_LINK_USED";
+// This provider initializes the link-used switch at memory startup; its local
+// memory handling reads the stored choice.
 static LINK_USED: OnceLock<bool> = OnceLock::new();
 
 /// Whether an exchange links only to what its turn used.
@@ -2745,6 +2757,8 @@ pub fn switch_link_used(on: bool) -> bool {
 /// says so. The id is never told to anyone nor used to pick what is said.
 /// Off, nothing new is sent.
 pub const ROOM_SPEAKER_ENVIRONMENT: &str = "LAMP_MEMORY_ROOM_SPEAKER";
+// This provider initializes the room-speaker switch at memory startup; speaker
+// selection reads that process-local choice.
 static ROOM_SPEAKER: OnceLock<bool> = OnceLock::new();
 
 /// Whether the room's lines keep who said them ([`ROOM_SPEAKER_ENVIRONMENT`]).
@@ -2987,6 +3001,8 @@ pub const REMEMBER_ONCE_ENVIRONMENT: &str = "LAMP_MEMORY_REMEMBER_ONCE";
 /// lines of the second route carry each kept thing's id. Off, every function
 /// and answer is as before.
 pub const REPLACES_ENVIRONMENT: &str = "LAMP_MEMORY_REPLACES";
+// This provider initializes the replacement switch at memory startup; its
+// local memory updates read the stored choice.
 static REPLACES: OnceLock<bool> = OnceLock::new();
 
 /// What [`REPLACES_ENVIRONMENT`] adds to `remember`'s description.
@@ -3031,6 +3047,8 @@ pub fn switch_replaces(on: bool) -> bool {
 /// "plan" in 3 of 4 rounds, forgot nothing, and the lamp said so and
 /// stopped, the plant still kept. Off, every function is as before.
 pub const FORGET_ASKS_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ASKS";
+// This provider initializes the forget-asks switch at memory startup; its
+// local forget handling reads the stored choice.
 static FORGET_ASKS: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` asks about a kept thing near misheard words
@@ -3059,6 +3077,8 @@ pub const FORGET_ASKS_DESCRIBED: &str = " If nothing was forgotten and their wor
 /// `forget_mark` request) is given when the forget used its deadline.
 const FORGET_MARK_WITHIN: Duration = Duration::from_millis(250);
 pub const FORGET_ABOUT_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ABOUT";
+// This provider initializes the forget-about switch at memory startup; its
+// local forget handling reads the stored choice.
 static FORGET_ABOUT: OnceLock<bool> = OnceLock::new();
 
 /// Whether `forget` takes what it is about.
@@ -3085,6 +3105,8 @@ pub fn switch_forget_about(on: bool) -> bool {
 /// Another person's or the room's keep is never forgotten this way. Off,
 /// every forget is as before.
 pub const FORGET_JUST_KEPT_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_JUST_KEPT";
+// This worker initializes the switch at memory startup; its just-kept forget
+// path reads it locally.
 static FORGET_JUST_KEPT: OnceLock<bool> = OnceLock::new();
 
 /// Whether a bare forget takes the person's just kept thing
@@ -3442,9 +3464,13 @@ pub fn observe_on() -> bool {
 /// it failed or took longer than [`OBSERVE_DEADLINE`]. Called on the
 /// observation thread alone, never on a turn's path.
 pub type Observer = Box<dyn Fn(&Value) -> Option<Value> + Send + Sync>;
+// The second worker installs the observation callback; its memory observation
+// threads invoke that local callback.
 static OBSERVER: OnceLock<Observer> = OnceLock::new();
 /// The jobs waiting for the model, one at a time ([`observe_jobs`]), each
 /// with [`OBSERVE_FORGETS`] as it was at its conversation's first exchange.
+// Process-local: this provider days-writer creates and uses the observation
+// sender; the receiver runs in its own local thread.
 static OBSERVING: OnceLock<SyncSender<ObserveJob>> = OnceLock::new();
 /// A job for the observation pass: whose, the frozen job, [`OBSERVE_FORGETS`]
 /// as its conversation began, and that person's kept things the session was
@@ -3464,6 +3490,8 @@ type ObserveJob = (
 /// before a forget is closed with nothing kept: its words are never sent,
 /// or its proposals never given, after the person asked for them to go
 /// (reviewer-two's P2 on #3450).
+// Forget handling advances this worker's epoch; its queued observation work
+// checks the captured epoch before retaining results.
 static OBSERVE_FORGETS: AtomicU64 = AtomicU64::new(0);
 
 /// The journal's line for a job closed by a forget asked after its
@@ -4592,6 +4620,8 @@ fn about_same(one: &str, other: &str) -> bool {
 pub struct Carry(Mutex<Option<(Option<String>, String, Instant)>>);
 
 #[cfg(not(test))]
+// Process-local: spoken and typed memory tool handling share this provider
+// copy; tests use the separate thread-local carry below.
 static CARRY: OnceLock<Carry> = OnceLock::new();
 
 /// The process's [`Carry`]. A test's is its own thread's: tests run side by
@@ -4603,6 +4633,8 @@ fn carry() -> &'static Carry {
     #[cfg(test)]
     {
         thread_local! {
+            // In tests, carry initializes a separate Carry for each calling thread;
+            // that thread's carry callers read and update its value.
             static CARRY: &'static Carry = Box::leak(Box::default());
         }
         CARRY.with(|carry| *carry)
@@ -5448,6 +5480,8 @@ thread_local! {
     /// it was asked in ([`nothing_in_scope`]): the explicit outcome
     /// [`theirs_then_rooms`] goes on to the room's by, never the reply's
     /// text (the Reviewer-lead's P2 on #5022).
+    // Thread-local: this memory-tool call records and consumes its no-match
+    // result on the same provider thread.
     static NOTHING_IN_SCOPE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
@@ -7031,6 +7065,8 @@ enum Job {
 }
 
 /// The eyes' known file, when the voice has eyes that remember faces.
+// Memory startup records this worker's known-faces file path; person_now reads
+// the path and then the file.
 static KNOWN_FILE: OnceLock<PathBuf> = OnceLock::new();
 
 /// The memory's person id for a name the eyes know: `p-` and the first 16
@@ -7056,16 +7092,24 @@ pub const THEIRS: &str = " (What they ask you to keep, and what they say to you,
      marks \"theirs\" they told you themselves: with them you may say \"you told me\" about it, never about the rest.)";
 
 /// The writer thread's queue, once a memory has been named.
+// This worker's legacy memory startup installs the queue sender; its turn/tool
+// paths enqueue work for the local memory writer thread.
 static JOBS: OnceLock<SyncSender<Job>> = OnceLock::new();
 /// What a new session is told of the things the lamp was asked to keep.
+// This worker's legacy memory startup and writer update the cached note; its
+// session-building path reads that note.
 static NOTE: Mutex<String> = Mutex::new(String::new());
 /// Requests in which the lamp was asked to keep or forget something.
+// This worker's tool and turn paths mark requests excluded from journalling;
+// its memory hand-on checks the local request list.
 static KEPT_OUT: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
 /// Requests admitted held only by a known face's gap
 /// (`LAMP_FACE_GAP_HOLD`, [`held_by_gap`]): their line may be someone
 /// else's, so their reply never marks a dated follow-up (reviewer-two on
 /// #2894). Apart from [`KEPT_OUT`], which a remember or forget also sets
 /// and which must not stop a mark. The newest [`GAP_HELD_MOST`].
+// Process-local: second-worker admission writes these gaps; each worker reads
+// only its own set when handing finished exchanges to memory.
 static GAP_HELD: Mutex<VecDeque<u64>> = Mutex::new(VecDeque::new());
 const GAP_HELD_MOST: usize = 64;
 
@@ -7345,6 +7389,8 @@ pub fn name_with_face(name: &str) -> Option<ToolCall> {
 /// The memory ids [`keep_name_with_face`] kept a name for in this run, so a
 /// face saved twice in one "who you are" (a tester's 7071 lamp, 27 Oct)
 /// keeps it once.
+// Process-local: provider face-tool calls deduplicate name keeps here; their
+// local background keep threads remove failed entries.
 static NAMES_KEPT: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// The name a face was saved under while "who you are" was not yet done
@@ -7406,6 +7452,8 @@ fn is_kept_out(request: u64) -> bool {
 /// (`LAMP_CONVERSATION_CARRIES`), each with that person, with
 /// `LAMP_CARRIED_LINES_KEEP_TALK` ([`carried_line`]). The newest
 /// [`GAP_HELD_MOST`].
+// Process-local: the second worker records carried lines here; each worker
+// reads its own map during finished-exchange handoff.
 static CARRIED: Mutex<VecDeque<(u64, String)>> = Mutex::new(VecDeque::new());
 
 /// With `on` (`LAMP_CARRIED_LINES_KEEP_TALK`): request `request` was carried
@@ -8536,11 +8584,19 @@ pub fn days_from_environment() -> bool {
     std::env::var(DAYS_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+// This worker caches the memory-mode switch from its environment; memory
+// startup and accessors read that local choice.
 static DAYS_MODE: OnceLock<bool> = OnceLock::new();
+// Memory startup installs this worker's Days client; its tool and turn paths
+// use the client to reach the memory service.
 static DAYS: OnceLock<Option<DaysClient>> = OnceLock::new();
+// This worker marks its thread recap for removal at Days startup or after
+// forgetting; its thread accessor consumes the flag.
 static FORGET_THREAD: AtomicBool = AtomicBool::new(false);
 /// The requests whose forget was done ([`forgetting_reply`]): at most
 /// [`FORGOTTEN_REPLIES`], the oldest let go first.
+// Process-local: memory tools mark this worker's requests; the second worker
+// reads and retires its own marks when handling transcript output.
 static FORGOTTEN_REPLY_REQUESTS: OnceLock<Mutex<BTreeSet<u64>>> = OnceLock::new();
 /// How many requests [`FORGOTTEN_REPLY_REQUESTS`] holds: a turn that is
 /// retired may never say it is over, and request ids only grow.
@@ -8609,8 +8665,14 @@ pub(crate) const OVERFLOW_CLOSED_LINE: &str = "lamp-voice provider: a conversati
 /// Since start: conversations closed at [`SOURCE_IDS`], ends the memory
 /// refused for its input bound, and passes closed unsent with the
 /// observation queue full. The journal gives them as running counts.
+// This worker's Days writer increments and reports the count of conversations
+// closed at the source bound.
 static OVERFLOW_CLOSED: AtomicU64 = AtomicU64::new(0);
+// This worker's Days writer increments and reports the count of ends refused
+// for exceeding the memory input bound.
 static TOO_LARGE: AtomicU64 = AtomicU64::new(0);
+// Process-local: this provider days-writer increments and journals its own
+// failed observation-enqueue count.
 static OBSERVE_BUSY: AtomicU64 = AtomicU64::new(0);
 /// At most this many people's follow-ups wait for the lamp to ask
 /// ([`DaysContext::asking`]).
@@ -9845,6 +9907,8 @@ impl HitsPath {
 
 /// Turns whose hits told something, by [`HitsPath`], since the voice
 /// started: counts only, for the journal ([`hits_journal_line`]).
+// Process-local: the second worker memory-hits callback updates and reads
+// these journal counters.
 static HITS_BY_PATH: [AtomicU64; 3] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
 
 /// What each person's memory has told in hits on one local day, for the
@@ -9904,6 +9968,8 @@ impl HitsDay {
 }
 
 /// Today's hits totals for the voice's journal ([`hits_journal_line`]).
+// Process-local: the second worker memory-hits callback updates and reads
+// these daily disclosure totals.
 static HITS_DAY: Mutex<HitsDay> = Mutex::new(HitsDay {
     day: 0,
     people: Vec::new(),
@@ -10261,6 +10327,8 @@ fn hit_stop_words() -> &'static (
     std::collections::HashSet<String>,
     std::collections::HashSet<String>,
 ) {
+    // Process-local: second-worker memory-hit matching lazily initializes and
+    // reads this immutable folded-word cache.
     static FOLDED: OnceLock<(
         std::collections::HashSet<String>,
         std::collections::HashSet<String>,
@@ -24188,7 +24256,11 @@ mod tests {
     /// stays for the retry too.
     #[test]
     fn a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last() {
+        // This test resets the kept IDs; its memory fixture and assertions access the
+        // same test-process value across threads.
         static KEPT: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+        // This test installs the first reply; its memory fixture takes it from the
+        // same test-process value across threads.
         static FIRST: Mutex<Option<(&str, Value)>> = Mutex::new(None);
         let forget_once = json!({"op":"forget","id":12,"person":ASKED_OF,"selective":true});
         // Refused by the store, answered but not understood (lost: it may
@@ -28050,6 +28122,8 @@ mod tests {
         std::sync::Arc<std::sync::atomic::AtomicBool>,
         std::thread::JoinHandle<()>,
     ) {
+        // Test history_memory reads and increments this shared test-process counter;
+        // calls on different threads use the same value.
         static CALLS: AtomicU64 = AtomicU64::new(0);
         let socket = std::env::temp_dir().join(format!(
             "lamp-remember-history-{}-{}.sock",
@@ -28195,6 +28269,8 @@ mod tests {
     /// about tea", whose exchanges forget answers only after the forget's
     /// time ran out (a timeout).
     pub(crate) fn forget_about_for_history_test(person: &'static str, removed: Option<u64>) {
+        // Test forget_about_for_history_test writes this process-global value; its
+        // answer callback reads that same value.
         static REMOVED: AtomicU64 = AtomicU64::new(0);
         if let Some(removed) = removed {
             REMOVED.store(removed, Ordering::SeqCst);
@@ -28720,6 +28796,8 @@ mod tests {
         };
         // The first read, the keep's, has no light rule yet: one kept
         // already is not kept again (#4346).
+        // This test's memory fixture reads and increments one process-global counter,
+        // shared by its callback threads.
         static ROOM_READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let (socket, served) = memory_lines("light-rule", 8, |request| {
             match (request["op"].as_str(), request["person"].as_str()) {
@@ -28959,6 +29037,8 @@ mod tests {
     #[test]
     fn a_repeat_in_the_same_session_is_told_kept_already_claiming_no_earlier_session() {
         const MAI: &str = "p-0123456789abcdef";
+        // This test's memory fixture reads and increments one process-global counter,
+        // shared by its callback threads.
         static ASKED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let (socket, served) = memory("remember-once-same-session", 2, |request| {
             assert_eq!(request["once"], true, "{request}");
@@ -31390,6 +31470,8 @@ mod tests {
     /// after the forget, so the forgotten kept thing is never linked again.
     #[test]
     fn a_forget_about_then_a_fresh_session_resumes_without_the_forgotten_thing() {
+        // This test's memory fixture reads and sets one process-global flag, shared by
+        // its callback threads.
         static FORGOTTEN: AtomicBool = AtomicBool::new(false);
         let (socket, served) = memory("journal-resumes-about", 4, |request| {
             match request["op"].as_str() {
@@ -32199,6 +32281,8 @@ mod tests {
     /// active (no recall finds it). Kept already (`once`), the kept one's id.
     #[test]
     fn with_the_replaces_switch_a_thing_kept_this_session_is_told_by_id_and_replaced() {
+        // This test's answer callback reads and sets one process-global flag, shared
+        // by its callback threads.
         static REPLACED: AtomicBool = AtomicBool::new(false);
         fn answer(request: &Value) -> Value {
             let shown = |id: u64| {

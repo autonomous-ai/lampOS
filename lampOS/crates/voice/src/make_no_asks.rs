@@ -60,6 +60,8 @@ pub const ENVIRONMENT: &str = "LAMP_MAKE_NO_ASKS";
 
 thread_local! {
     /// [`ENVIRONMENT`] as a test of this thread sets it.
+    // Per-thread test override; production reads the environment when no override is
+    // installed.
     static HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 

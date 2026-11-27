@@ -142,6 +142,8 @@ fn loose(name: &str) -> String {
 /// ([`AROUND`], [`REQUESTS`], [`RUNS`]): a skill named "hello" or "start"
 /// is never run for a line that only greets or asks.
 fn plain_word(name: &str) -> bool {
+    // This process lazily derives an immutable lookup from the compiled word
+    // tables; callers share the local lookup.
     static PLAIN: std::sync::LazyLock<Vec<String>> = std::sync::LazyLock::new(|| {
         [AROUND, REQUESTS, RUNS]
             .iter()
@@ -1257,6 +1259,8 @@ mod tests {
 
     /// A folder of the test's own, with `tools` as its tools file.
     fn skills_folder(name: &str, tools: Value) -> std::path::PathBuf {
+        // Test skills_folder reads and increments this shared test-process counter;
+        // calls on different threads use the same value.
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let base = if std::path::Path::new("/private/tmp").is_dir() {
             std::path::PathBuf::from("/private/tmp")

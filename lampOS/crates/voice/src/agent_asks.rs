@@ -125,10 +125,16 @@ pub const NOT_ALONE_LINE: &str =
     "I have that for you, but someone else may be here. Ask me again when you're on your own.";
 
 /// The tasks part's directory (`--tasks-dir`), set by the worker.
+// Second worker-local ask coordination; tasks directory, admission and forget
+// generations are shared only with its own threads.
 static TASKS: OnceLock<PathBuf> = OnceLock::new();
 /// An ask with the agent now.
+// Second worker-local ask coordination; tasks directory, admission and forget
+// generations are shared only with its own threads.
 static ASKING: AtomicBool = AtomicBool::new(false);
 /// Bumped by [`forget`]: an answer of an older ask is never told.
+// Second worker-local ask coordination; tasks directory, admission and forget
+// generations are shared only with its own threads.
 static GENERATION: OnceLock<Arc<AtomicU64>> = OnceLock::new();
 
 #[cfg(test)]
@@ -178,6 +184,8 @@ pub fn set_tasks_dir(directory: PathBuf) {
 
 #[cfg(test)]
 thread_local! {
+    // Test-thread switches: set_on_here writes them; services_on and hard_on read the
+    // calling thread's overrides.
     static SWITCHES_HERE: std::cell::Cell<Option<(bool, bool)>> =
         const { std::cell::Cell::new(None) };
 }
@@ -667,6 +675,8 @@ mod tests {
     use std::sync::Mutex;
     use std::sync::mpsc;
 
+    // In this test process, listen installs the sender; told callbacks read the same
+    // mutex-protected slot.
     static TOLD: Mutex<Option<mpsc::Sender<Told>>> = Mutex::new(None);
     use super::ONE;
 
@@ -675,6 +685,8 @@ mod tests {
 
     impl Dir {
         fn new() -> Self {
+            // Fixture constructors increment this process-wide counter to choose their
+            // names; parallel test threads share the sequence.
             static NEXT: AtomicU64 = AtomicU64::new(0);
             let path = std::env::temp_dir().join(format!(
                 "va-{}-{}",
