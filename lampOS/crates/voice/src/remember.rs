@@ -19286,6 +19286,10 @@ mod tests {
     #[test]
     fn a_bare_forget_asks_which_before_running_a_guessed_id() {
         const MINH: &str = "p-be9688998f085098";
+        // The product's own budget for a call, not FIRST_READ: a loaded CI
+        // host held one of these calls up past 300 ms, and the client gave
+        // up (#8805).
+        const WITHIN: Duration = crate::tools::ASK_DEADLINE;
         let carry = Carry::default();
         let guarded = |id: u64, said: Option<&str>, person| {
             named_forget_with(
@@ -19323,22 +19327,12 @@ mod tests {
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
         let bare = |id: u64| json!({"source_id": id, HEARD_BARE: true});
-        let run = |args| {
-            client.run_at(
-                &call(FORGET, args),
-                FIRST_READ,
-                NOW,
-                Some(&EAST),
-                Some(MINH),
-            )
-        };
+        let run = |args| client.run_at(&call(FORGET, args), WITHIN, NOW, Some(&EAST), Some(MINH));
         // One thing shown: it is "that".
         assert_eq!(
             client.context.lock().unwrap().include(Some(MINH), &[4]),
             None
         );
-        // A loaded host holds the call up past FIRST_READ (#8805).
-        STALL_BEFORE_WRITE.with(|stall| stall.set(Duration::from_millis(400)));
         assert_eq!(run(bare(4)).0, json!({"forgotten": true}));
         // Three shown, none given last: nothing runs, the model asks.
         assert_eq!(
@@ -19388,14 +19382,12 @@ mod tests {
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
         let run =
-            |args, person| client.run_at(&call(FORGET, args), FIRST_READ, NOW, Some(&EAST), person);
+            |args, person| client.run_at(&call(FORGET, args), WITHIN, NOW, Some(&EAST), person);
         assert_eq!(
             client.context.lock().unwrap().include(Some(MINH), &[5, 6]),
             None
         );
         client.context.lock().unwrap().just_asked = Some((MINH.to_owned(), 5, 0, Instant::now()));
-        // And the call CI failed on (#8805).
-        STALL_BEFORE_WRITE.with(|stall| stall.set(Duration::from_millis(400)));
         assert_eq!(run(bare(5), Some(MINH)).0, json!({"forgotten": true}));
         // The room's: asked without naming anything kept, which may be anyone's.
         assert_eq!(client.context.lock().unwrap().include(None, &[2, 3]), None);
@@ -19410,7 +19402,7 @@ mod tests {
         // The one thing a recall just gave is "that".
         let recalled = client.run_at(
             &call(RECALL, json!({"about":"key"})),
-            FIRST_READ,
+            WITHIN,
             NOW,
             Some(&EAST),
             None,
@@ -28428,6 +28420,11 @@ mod tests {
                 {
                     break;
                 }
+                // As in [`memory_lines`]: a caller gone before its whole line
+                // was sent is no request (#8805).
+                if !line.ends_with('\n') {
+                    continue;
+                }
                 let request: Value = serde_json::from_str(&line).unwrap();
                 let wrote = (&stream).write_all(format!("{}\n", answer(&request)).as_bytes());
                 if (!records_on && request["op"] == "service_records_forget")
@@ -28471,6 +28468,12 @@ mod tests {
                 BufReader::new(stream.try_clone().unwrap())
                     .read_line(&mut line)
                     .unwrap();
+                // A caller whose deadline passed between its connect and its
+                // write (a loaded host) closes with nothing or part of a line
+                // sent: no request yet, so not read (#8805).
+                if !line.ends_with('\n') {
+                    continue;
+                }
                 let request: Value = serde_json::from_str(&line).unwrap();
                 let wrote = stream.write_all(format!("{}\n", answer(&request)).as_bytes());
                 if (!records_on && request["op"] == "service_records_forget")
