@@ -128,7 +128,7 @@ for = "5s"
 tool = "wellbeing_nudges"
 group = "wellbeing"
 kind = "posture"
-about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word for a short break, a mealtime question, a word to sit back, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
 when = "When asked to snooze, turn off or on again the lamp's wellbeing nudges (water, eyes, stand up, a break, a meal, sit back, wind down), or told they just had a drink. Not for reminders: cancel_reminder."
 
 [ask]
