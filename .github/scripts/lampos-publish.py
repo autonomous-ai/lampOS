@@ -19,6 +19,8 @@ import time
 
 REPO = "autonomous-ai/lampOS"
 CHANNEL = "lamp-voice"
+# manifest::IMAGE_UPDATER: the updater level a build with the image's files needs.
+IMAGE_UPDATER = 4
 HEAD = "lampos-lamp-voice"
 ENVELOPE = "lampos-manifest.json"
 ENABLE = "LAMPOS_UPDATE_PUBLISH"
@@ -330,6 +332,20 @@ class Publisher:
         require(manifest.get("channel") == CHANNEL, "verified manifest has wrong channel")
         return manifest
 
+    def require_image(self, manifest):
+        """A build carries the image's files (#7254 part 3c), each one listed as
+        shipped in deploy/image/shipped.json, with min_updater at least
+        IMAGE_UPDATER: without them a round has nothing to write."""
+        image = manifest.get("image")
+        require(isinstance(image, list) and image, "manifest carries no image files")
+        require(type(manifest.get("min_updater")) is int and manifest["min_updater"] >= IMAGE_UPDATER, "manifest with image files needs min_updater 4 or more")
+        listed = decode_json((self.source / "lampOS/deploy/image/shipped.json").read_bytes()).get("variants")
+        require(isinstance(listed, dict), "shipped.json has no variants")
+        for entry in image:
+            require(isinstance(entry, dict) and all(isinstance(entry.get(key), str) for key in ("variant", "path", "sha256")), "image entry is malformed")
+            shipped = listed.get(entry["variant"], {}).get(entry["path"], [])
+            require(entry["sha256"] in shipped, f"image file {entry['path']} ({entry['variant']}) is not listed as shipped")
+
     def prepare(self, retained):
         stage = self.work / "build"
         stage.mkdir()
@@ -355,6 +371,12 @@ class Publisher:
             # The product's pinned models (lampOS/docs/updates.md): a lamp fetches
             # them only where LAMP_UPDATE_MODELS=on.
             "--models", self.source / "lampOS/deploy/product/models.json",
+            # The image's own files (#7254 part 3c): robots/lamp's rootfs and each
+            # variant's override, each listed in --deploy's image/shipped.json or
+            # the updater refuses. A lamp writes them only where LAMP_UPDATE_IMAGE
+            # is on, except the journal's few (#8723). min_updater goes to
+            # IMAGE_UPDATER (4) at most, below the product's own.
+            "--image", self.source / "robots/lamp",
         )
         key = self.work / "signing.key"
         try:
@@ -371,6 +393,7 @@ class Publisher:
         finally:
             key.unlink(missing_ok=True)
         manifest = self.verified_manifest(stage / ENVELOPE)
+        self.require_image(manifest)
         require(manifest.get("commit") == self.sha and manifest["sequence"] == self.sequence and manifest.get("files_url") == url, "manifest identity differs from tested build")
         require(base64.b64decode(decode_json((stage / ENVELOPE).read_bytes())["manifest"]) == (stage / "manifest.json").read_bytes(), "envelope and manifest bytes differ")
         for name, expected in copied.items():

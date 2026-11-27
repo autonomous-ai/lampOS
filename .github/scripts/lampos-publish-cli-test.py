@@ -131,6 +131,12 @@ class CliTests(unittest.TestCase):
         pinned = json.loads((SOURCE / "lampOS/deploy/product/models.json").read_text())["models"]
         self.assertTrue(pinned)
         self.assertEqual(manifest["models"], pinned)
+        # The image's files (#7254 part 3c): carried, each listed as shipped, the
+        # updater level at least IMAGE_UPDATER, and the manifest under the cap a
+        # lamp reads (manifest::MOST_MANIFEST_BYTES, 256 KiB).
+        self.assertTrue(manifest["image"])
+        self.assertGreaterEqual(manifest["min_updater"], P.IMAGE_UPDATER)
+        self.assertLess(len(release["assets"]["manifest.json"]["data"]), 256 * 1024)
         self.assertTrue(any(call[1] == "check" for call in self.fake.updater_calls))
 
     def test_real_excluded_artifact_tampering_refuses_before_execution(self):

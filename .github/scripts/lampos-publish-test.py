@@ -208,6 +208,15 @@ class FakeCommands:
                 (stage / "lamp-station").write_bytes(b"unexpected development binary")
             entries = [{"name": file.name, **P.file_info(file)} for file in sorted(stage.glob("lamp-*")) if P.BINARY.fullmatch(file.name)]
             manifest = {"schema": 1, "channel": options["--channel"], "sequence": int(options["--sequence"]), "commit": options["--commit"], "files_url": options["--files-url"], "files": entries, "units": [{"lamp": "lamp-4ace", "unit": "lamp-voice.service", **P.file_info(stage / unit)}]}
+            if "--image" in options and self.fail != "no-image":
+                # What the real updater writes for the image's files: min_updater
+                # at least IMAGE_UPDATER, each file's sha256 among its shipped.
+                manifest["min_updater"] = max(P.IMAGE_UPDATER, 6)
+                manifest["image"] = [dict(entry) for entry in IMAGE_FIXTURE]
+                if self.fail == "image-unlisted":
+                    manifest["image"].append({"variant": "standard", "path": "/etc/asound.conf", "text": "new", "sha256": "e" * 64, "shipped": []})
+                if self.fail == "image-min-updater":
+                    manifest["min_updater"] = P.IMAGE_UPDATER - 1
             if self.fail == "wrong-manifest-sha":
                 manifest["commit"] = "c" * 40
             if self.fail == "bad-manifest-hash":
@@ -484,6 +493,11 @@ class CommandsTests(unittest.TestCase):
                 self.assertEqual(logged.getvalue(), "")
 
 
+IMAGE_FILE = "/etc/systemd/journald.conf.d/zz-lamp-journal.conf"
+IMAGE_SHA = "a" * 64
+IMAGE_FIXTURE = [{"variant": "standard", "path": IMAGE_FILE, "text": "journal", "sha256": IMAGE_SHA, "shipped": [IMAGE_SHA]}]
+
+
 class PublicationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="lampos-publish-test-")
@@ -498,6 +512,9 @@ class PublicationTests(unittest.TestCase):
         self.classification = self.root / "lampOS/deploy/package-binaries.json"
         self.classification.parent.mkdir(parents=True)
         self.classification.write_text(json.dumps(fixture_classification()))
+        shipped = self.root / "lampOS/deploy/image/shipped.json"
+        shipped.parent.mkdir(parents=True)
+        shipped.write_text(json.dumps({"about": "fixture", "variants": {"standard": {IMAGE_FILE: ["b" * 64, IMAGE_SHA]}}}))
         self.env = {P.ENABLE: "on", P.BOOTSTRAP: "off", P.SECRET: "not-a-real-key", "GH_TOKEN": "release-authorization-fixture", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": P.REPO, "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice", "GITHUB_SHA": SHA, "GITHUB_RUN_NUMBER": "10", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1"}
         self.fake = FakeCommands()
 
@@ -557,6 +574,24 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(len(made), 1)
         options = dict(zip(made[0][2::2], made[0][3::2]))
         self.assertEqual(Path(options["--models"]), self.root.resolve() / "lampOS/deploy/product/models.json")
+
+    def test_manifest_carries_the_images_files_and_each_is_listed_as_shipped(self):
+        self.publish()
+        made = [call for call in self.fake.updater_calls if call[1] == "manifest"]
+        options = dict(zip(made[0][2::2], made[0][3::2]))
+        self.assertEqual(Path(options["--image"]), self.root.resolve() / "robots/lamp")
+
+    def test_a_manifest_without_the_images_files_is_refused(self):
+        self.fake.fail = "no-image"
+        self.refused_unchanged("manifest carries no image files")
+
+    def test_an_image_file_not_listed_as_shipped_is_refused(self):
+        self.fake.fail = "image-unlisted"
+        self.refused_unchanged("is not listed as shipped")
+
+    def test_a_manifest_with_the_images_files_below_the_image_updater_is_refused(self):
+        self.fake.fail = "image-min-updater"
+        self.refused_unchanged("needs min_updater 4 or more")
 
     def test_excluded_bytes_are_verified_before_any_updater_execution(self):
         for name in sorted(EXCLUDED):

@@ -3040,6 +3040,16 @@ the round says so (`build N's image files are not written:
 LAMP_UPDATE_IMAGE=on is not set`). On, a profile or image file that can't be
 read is said, and the rest of the build goes on without the image's files.
 
+**Published builds carry the image (#7254 part 3c).** CI's publish
+(`.github/scripts/lampos-publish.py`) passes `--image robots/lamp`, so every
+published build carries the image's files and `min_updater` is at least
+`IMAGE_UPDATER` (the product's is higher). It refuses a manifest with none,
+with `min_updater` below 4, or with a file whose SHA-256 `shipped.json` doesn't
+list. The manifest grows from about 50 KB to about 200 KB, of the 256 KiB a lamp
+reads (`MOST_MANIFEST_BYTES`): each file ships once per variant, and
+`lamp-journal-keep` alone is about 66 KB of it. A new image file or variant
+needs this checked again (`lampos-publish-cli-test.py` asserts the cap).
+
 **The journal's files, with the switch off (#7254).** A lamp in a home gets
 the journal's size and the clean-shutdown keep from a round, without the
 whole image: `manifest::JOURNAL_FILES`, today journald's
