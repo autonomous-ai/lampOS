@@ -264,14 +264,11 @@ impl TtsCache {
 
     /// The file name's stem: hex SHA-256 of `voice|model|language|text`.
     pub fn key(&self, text: &str) -> String {
-        Sha256::digest(format!("{}|{text}", self.identity))
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect()
+        key_of(&self.identity, text)
     }
 
     fn path(&self, text: &str) -> PathBuf {
-        self.dir.join(format!("{}.wav", self.key(text)))
+        path_in(&self.dir, &self.identity, text)
     }
 
     /// `text`'s samples: from the cache, or rendered once and kept.
@@ -539,6 +536,45 @@ fn spec() -> hound::WavSpec {
     }
 }
 
+/// The file name's stem of `text` under `identity` ([`TtsCache::key`]).
+fn key_of(identity: &str, text: &str) -> String {
+    Sha256::digest(format!("{identity}|{text}"))
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn path_in(dir: &Path, identity: &str, text: &str) -> PathBuf {
+    dir.join(format!("{}.wav", key_of(identity, text)))
+}
+
+/// `text`'s samples if a cache in `dir` keeps them under `identity`
+/// (`voice|model|language`, [`TtsCache::identity`]), never rendered: for the
+/// second route's worker, which keeps no cache of its own and says an
+/// installed item's first-run line from here (`crate::install_told`).
+pub fn kept_under(dir: &Path, identity: &str, text: &str) -> Option<Vec<i16>> {
+    read(&path_in(dir, identity, text))
+}
+
+/// The identity `config` speaks as (`voice|model|language`), as the cache
+/// [`built_from_environment`] is keyed: the second route's worker reads a
+/// line kept by the voice with it ([`kept_under`]).
+pub fn identity_of(config: &crate::second_config::SecondConfig) -> String {
+    let (voice, model, language) = speaks_as(config);
+    format!("{voice}|{model}|{language}")
+}
+
+fn speaks_as(config: &crate::second_config::SecondConfig) -> (String, String, String) {
+    use crate::second_provider::net::{default_model, voice_name};
+    let voice = voice_name(config.tts_provider, config.tts_voice.as_deref()).to_owned();
+    let model = config
+        .tts_model
+        .clone()
+        .unwrap_or_else(|| default_model(config.tts_provider).to_owned());
+    let language = config.stt_language.clone().unwrap_or_default();
+    (voice, model, language)
+}
+
 /// A kept line, or none: missing or not one of ours is a miss.
 fn read(path: &Path) -> Option<Vec<i16>> {
     let reader = hound::WavReader::open(path).ok()?;
@@ -762,7 +798,6 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
 /// rings' clips through it (`crate::ring_clips`, #8708) and keeps no line
 /// of the speech cache.
 pub fn built_from_environment() -> Option<TtsCache> {
-    use crate::second_provider::net::{default_model, voice_name};
     let config = match crate::second_config::load_from_env().and_then(|config| {
         config
             .map(|config| config.with_environment(|name| std::env::var_os(name)))
@@ -775,12 +810,7 @@ pub fn built_from_environment() -> Option<TtsCache> {
             return None;
         }
     };
-    let voice = voice_name(config.tts_provider, config.tts_voice.as_deref()).to_owned();
-    let model = config
-        .tts_model
-        .clone()
-        .unwrap_or_else(|| default_model(config.tts_provider).to_owned());
-    let language = config.stt_language.clone().unwrap_or_default();
+    let (voice, model, language) = speaks_as(&config);
     // Another of the lamp's voices (#7485): the same service and model,
     // only its voice changed, for ElevenLabs, whose voices the lamp names.
     let render_in: Option<RenderIn> =

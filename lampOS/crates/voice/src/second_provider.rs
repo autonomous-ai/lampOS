@@ -19968,6 +19968,14 @@ async fn answer(
     {
         *asked = Some(Instant::now());
     }
+    // An installed item's first-run line (#7814): on an English lamp its
+    // words as written, no chat asked, from the speech cache's clip
+    // rendered as the install came when it is kept (the ruling on #8842:
+    // first sound within 2 s of the finish).
+    let first_run = written
+        .then(|| crate::install_told::said_with_no_chat(&said, shared.language))
+        .flatten()
+        .map(str::to_owned);
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten()
@@ -20084,6 +20092,23 @@ async fn answer(
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
+        }
+        if let Some(words) = first_run {
+            let clip = crate::install_told::kept_clip(&words);
+            eprintln!(
+                "lamp-voice second: request {request} is an installed item's first-run line; its words are said, no chat asked, {} (LAMP_INSTALL_FIRST_RUN)",
+                if clip.is_some() {
+                    "from the speech cache"
+                } else {
+                    "not in the speech cache: rendered as they come"
+                }
+            );
+            shared.emit(ProviderOutput::OwnWordsSaid { request }).await;
+            match clip {
+                Some(clip) => queue.push_clip(&words, clip).await?,
+                None => queue.push(words).await?,
+            }
+            return Ok(());
         }
         if let Some(words) = own {
             let whose = if quoted {

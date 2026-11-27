@@ -778,7 +778,20 @@ alone, checked, and keeps it across a sleep or a mute.
   own written turn (basis `first_run_told`), word for word, in the
   conversation's language; it stays in the conversation, so the person's
   answer within the 20 s window is a follow-up like any other and gets the
-  app's tools (`LAMP_FOLLOW_UPS`).
+  app's tools (`LAMP_FOLLOW_UPS`). On the second route an English lamp says
+  its words with no chat asked (`install_told::said_with_no_chat`); in
+  another language the model says it in theirs, as before.
+- **From the speech cache** (the first builder's ruling on #8842, comment
+  7212623876: the 2 s target is the first sound, from the install's
+  finish): the moment `store/installed` comes, before the pause or the
+  turn, both its wordings (the line, and "By the way, ...") are rendered
+  into the speech cache (`say::tts_cache`, which keeps the lamp's fixed
+  lines; bounded by its 64 files, oldest first, as every line there;
+  `install_told::arrived`). An English lamp only: another language's line
+  is the model's. An at-once line waits for that render at most 1.2 s after
+  the finish (`RENDER_HOLD_US`); the second route then plays the kept file
+  (`install_told::kept_clip`, the voice it speaks in only), or renders the
+  words as they come when it is not kept.
 - **At once**, when anyone was heard in the last minute
   (`install_told::HEARD_WITHIN_US`) or a face is in view as the news comes:
   said at the first free moment, within 2 s of the finish in a room not
@@ -791,7 +804,10 @@ alone, checked, and keeps it across a sleep or a mute.
   ready." (`install_told::by_the_way`), as #8812 tells task news. A face
   seen later never tells it: no camera-guessed arrival.
 - **Never into people's talk:** away from an answer, only after 5 s with
-  nobody heard (`TALK_PAUSE_US`) and 3 s after the lamp's own words. Never
+  no words heard (`TALK_PAUSE_US`) and 3 s after the lamp's own words. A
+  turn that heard no words leaves the pause alone (the same ruling): the
+  pause counts the speech last heard as a transcript with a word came
+  (`Moment::last_words_us`). Never
   while the keeper pauses the lamp, signed out, in the care hold, while a
   reminder waits or anything is owed, under way or being said; the
   conversation doesn't run with the privacy switch closed or asleep, so
@@ -801,8 +817,13 @@ alone, checked, and keeps it across a sleep or a mute.
   oldest let go first; one not said within 12 h is let go untold.
 - **The journal** says `lamp-voice: the owner installed app gym-coach: its
   first-run line handed to speech N ms after its install finished, at once`
-  (or `right after Lamp's answer`), never the line, and the trace records
-  `first_run_told` with `after_finish_ms`: the ROW measures the 2 s from it.
+  (or `right after Lamp's answer`), then `its words kept in the speech
+  cache` or `its words not kept yet`, never the line, and the trace records
+  `first_run_told` with `after_finish_ms` and `kept`. At its first sound
+  (the speaker's first write, as every turn's) one line says both: `its
+  first-run line handed to speech N ms and its first sound M ms after its
+  install finished, at once, from the speech cache` (or `rendered as it
+  came`): the ROW measures the 2 s from M.
   `lamp-cloud`'s line is `the owner installed app gym-coach: told on
   store/installed (first-run line: its own)`.
 

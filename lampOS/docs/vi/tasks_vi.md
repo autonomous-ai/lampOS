@@ -5193,7 +5193,19 @@ cho mỗi lần cài xong, không bao giờ cho một lần cập nhật
   của chính đèn (basis `first_run_told`), đúng từng chữ, bằng ngôn ngữ của
   cuộc trò chuyện; nó nằm trong cuộc trò chuyện, nên câu trả lời của người
   trong cửa sổ 20 s là một câu nối tiếp như mọi câu khác và có các tool của
-  app (`LAMP_FOLLOW_UPS`).
+  app (`LAMP_FOLLOW_UPS`). Trên route thứ hai, đèn tiếng Anh nói lời của nó
+  mà không hỏi chat (`install_told::said_with_no_chat`); ở ngôn ngữ khác,
+  model nói nó bằng ngôn ngữ của họ, như trước.
+- **Từ speech cache** (phán quyết của first builder trên #8842, comment
+  7212623876: mục tiêu 2 s là âm thanh đầu tiên, tính từ lúc cài xong): ngay
+  khi `store/installed` đến, trước khoảng lặng hay lượt nói, cả hai cách nói
+  của nó (câu nói, và "By the way, ...") được render vào speech cache
+  (`say::tts_cache`, nơi giữ các câu cố định của đèn; giới hạn 64 file, cũ
+  nhất bỏ trước, như mọi câu ở đó; `install_told::arrived`). Chỉ đèn tiếng
+  Anh: câu ở ngôn ngữ khác là của model. Một câu "ngay" chờ lần render đó
+  tối đa 1.2 s sau khi cài xong (`RENDER_HOLD_US`); route thứ hai rồi phát
+  file đã giữ (`install_told::kept_clip`, chỉ bằng giọng nó đang nói), hoặc
+  render lời khi chúng đến nếu chưa được giữ.
 - **Ngay lập tức**, khi có ai được nghe thấy trong một phút qua
   (`install_told::HEARD_WITHIN_US`) hoặc có một khuôn mặt trong khung hình
   lúc tin đến: nói ở lúc rảnh đầu tiên, trong vòng 2 s sau khi cài xong nếu
@@ -5207,7 +5219,10 @@ cho mỗi lần cài xong, không bao giờ cho một lần cập nhật
   kể tin công việc. Một khuôn mặt thấy sau đó không bao giờ khiến nó được kể:
   không có lần "đến nơi" do camera đoán.
 - **Không bao giờ chen vào lời người nói:** ngoài lúc vừa trả lời, chỉ sau
-  5 s không ai được nghe thấy (`TALK_PAUSE_US`) và 3 s sau lời của chính đèn.
+  5 s không nghe thấy lời nào (`TALK_PAUSE_US`) và 3 s sau lời của chính đèn.
+  Một lượt không nghe được lời nào không động đến khoảng lặng (cùng phán
+  quyết): khoảng lặng tính theo tiếng nói nghe được lần cuối khi một bản
+  chép có từ đến (`Moment::last_words_us`).
   Không bao giờ khi keeper tạm dừng đèn, khi đã đăng xuất, trong lúc giữ chăm
   sóc (care hold), khi một nhắc nhở đang chờ hay có gì đang nợ, đang chạy hay
   đang được nói; cuộc trò chuyện không chạy khi công tắc riêng tư đóng hay
@@ -5217,8 +5232,13 @@ cho mỗi lần cài xong, không bao giờ cho một lần cập nhật
   chờ, cái cũ nhất bị bỏ trước; cái nào chưa nói sau 12 h thì bỏ, không kể.
 - **Nhật ký** ghi `lamp-voice: the owner installed app gym-coach: its
   first-run line handed to speech N ms after its install finished, at once`
-  (hoặc `right after Lamp's answer`), không bao giờ ghi câu nói, và trace ghi
-  `first_run_told` với `after_finish_ms`: ROW đo 2 s từ đó. Dòng của
+  (hoặc `right after Lamp's answer`), rồi `its words kept in the speech
+  cache` hoặc `its words not kept yet`, không bao giờ ghi câu nói, và trace
+  ghi `first_run_told` với `after_finish_ms` và `kept`. Ở âm thanh đầu tiên
+  (lần ghi đầu tiên ra loa, như mọi lượt) một dòng ghi cả hai: `its
+  first-run line handed to speech N ms and its first sound M ms after its
+  install finished, at once, from the speech cache` (hoặc `rendered as it
+  came`): ROW đo 2 s từ M. Dòng của
   `lamp-cloud` là `the owner installed app gym-coach: told on
   store/installed (first-run line: its own)`.
 
