@@ -341,6 +341,13 @@ switch on:
   1.5 s from where the stall began (`STALL_RIDE_US`): the answer is cut,
   nothing is played, capture and the camera are given no authority, and a
   fresh, steady open reading reopens it and the conversation goes on. The
+  one exception is a snapshot that grants nothing (`privacy_bus::denied_only`:
+  the microphones and the camera Denied, no turn), such as a mute's or a
+  hand's revocation: it still reaches capture (`Rig::publish`,
+  `Rig::publish_hand_revocation`, #7224). It is no lease, so the hold's
+  point stands, and capture then knows the slide closed when the speaker it
+  answers ends on its own copy and refuses the reference link. A snapshot
+  with the microphone Denied but the camera Allowed or unread stays held. The
   reopen waits for the gate's 60 ms steady time (`REOPEN_STABLE_US`), and
   that wait counts inside the 1.5 s, so a stall under about 1.44 s is
   ridden; a longer one ends the voice as before, failing closed. Its

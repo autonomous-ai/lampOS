@@ -2640,8 +2640,9 @@ impl Rig {
         let privacy_controls = self.privacy_controls;
         for worker in [&mut self.capture, &mut self.privacy, &mut self.provider] {
             // A ridden gap's lapse holds here too (#2602, the first
-            // builder's P1 on #2623): no fresh lease for capture.
-            if held && worker.role == "capture" {
+            // builder's P1 on #2623): no fresh lease for capture. One that
+            // grants nothing is no lease: it reaches capture (#7224).
+            if held && worker.role == "capture" && !crate::privacy_bus::denied_only(snapshot) {
                 continue;
             }
             if let Err(error) = send_authority(worker, snapshot)
@@ -2686,8 +2687,11 @@ impl Rig {
             &mut self.privacy,
             &mut self.provider,
         ] {
-            // A ridden gap lets the capture's lease lapse (#2602).
-            if held && worker.role == "capture" {
+            // A ridden gap lets the capture's lease lapse (#2602). A
+            // snapshot that grants nothing (a mute's) still reaches capture,
+            // so capture knows the slide closed when the speaker it answers
+            // ends on its own copy and refuses its link (#7224).
+            if held && worker.role == "capture" && !crate::privacy_bus::denied_only(snapshot) {
                 continue;
             }
             if let Err(error) = send_authority(worker, snapshot)
