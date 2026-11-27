@@ -25,8 +25,9 @@
 //! (`LAMP_MEMORY_NIGHTLY`) shares the night's hours and its quiet and slide
 //! gates but keeps its own budget: with both switches set, a night may ask
 //! the relay up to twice the calls, bytes and tokens, both through
-//! memory's one-at-a-time socket. Which pass runs is the memory owner's
-//! call before `LAMP_MEMORY_TIERS` goes on.
+//! memory's one-at-a-time socket. The product sets both
+//! (`LAMP_MEMORY_NIGHTLY=on` and `LAMP_MEMORY_TIERS=shadow`, the owner's
+//! call of 27 Nov), so both passes run.
 //!
 //! A call is bounded by [`CALL_TIMEOUT`] and stops at once, the call in
 //! flight dropped and its job with it, when anyone speaks, a line is handed
