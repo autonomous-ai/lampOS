@@ -116,6 +116,69 @@ fn published_example_is_development_only_and_outputs_are_private_retained() {
 }
 
 #[test]
+fn public_development_json_nulls_survive_validation_and_reporting() {
+    let dir = directory();
+    let (m, r) = examples(&dir);
+    let mut manifest: Value = serde_json::from_slice(&fs::read(&m).unwrap()).unwrap();
+    manifest["sessions"][0]["data_origin"] = "public".into();
+    manifest["sessions"][0]["consent"] = Value::Null;
+    manifest["sessions"][0]["sync_error_us"] = Value::Null;
+    manifest["trials"][0]["distance_mm"] = Value::Null;
+    manifest["trials"][0]["bearing_deg"] = Value::Null;
+    manifest["trials"][0]["light"] = "unknown".into();
+    manifest["trials"][0]["noise"] = "unknown".into();
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    fs::write(&m, &bytes).unwrap();
+    let mut run: Value = serde_json::from_slice(&fs::read(&r).unwrap()).unwrap();
+    run["manifest_sha256"] = digest(&bytes).into();
+    fs::write(&r, serde_json::to_vec(&run).unwrap()).unwrap();
+    assert!(invoke(&["validate", m.to_str().unwrap()]).status.success());
+    let out = dir.join("public-score");
+    let result = invoke(&[
+        "score",
+        "head",
+        m.to_str().unwrap(),
+        r.to_str().unwrap(),
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        result.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let report: Value =
+        serde_json::from_slice(&fs::read(out.join("report.json")).unwrap()).unwrap();
+    assert_eq!(report["qualified"], false);
+    assert_eq!(report["counts"]["total"], 0);
+    assert_eq!(
+        report["raw_by_split"]["development"]["counts"]["correct"],
+        1
+    );
+    for field in [
+        "distance_mm",
+        "bearing_deg",
+        "light",
+        "noise",
+        "sync_error_us",
+        "collection_consent",
+    ] {
+        assert_eq!(
+            report["raw_by_split"]["development"]["metadata_unknown"][field],
+            1
+        );
+    }
+    assert_eq!(report["rows"][0]["distance_mm"], Value::Null);
+    assert_eq!(report["rows"][0]["bearing_deg"], Value::Null);
+    assert!(
+        report["rows"][0]["cell"]
+            .as_str()
+            .unwrap()
+            .contains("unknown-distance")
+    );
+}
+
+#[test]
 fn cd_reports_missing_evidence_without_promoting() {
     let dir = directory();
     let c = dir.join("comparison.json");

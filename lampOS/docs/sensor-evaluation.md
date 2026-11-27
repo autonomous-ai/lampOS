@@ -143,6 +143,14 @@ and public results remain useful standalone development numbers, with limits.
 Training permission is source-specific: do not extend a sensor's evaluation-
 only permission to another dataset or undo #8907's authorized generation work.
 
+Public/generated/invented **development** inputs may leave collection consent,
+clock error, distance and bearing null, and light/noise `unknown`, when those
+facts were never measured. The report counts missing metadata explicitly;
+no fabricated distance, consent or clock value is required. This path does
+not fill any real-person qualification cell. Real-person sessions, holdout
+requirements and every primary quality/timing bar remain unchanged. See the
+v2 adapter guide for the exact limited encoding.
+
 Reports retain raw classification by development/holdout, class and origin,
 physical/timely counts, confusion, missing coverage, speaker/session/condition
 slices, face-count and head/shoulder disagreement slices, p50/p95 and a

@@ -6,7 +6,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             id: format!("s{i}"),
             split: Split::Holdout,
             started_unix_s: 10_000 + (i / 6) * 10_000,
-            consent: true,
+            consent: Some(true),
             delete_after_unix_s: Some(100_000),
             retention: None,
             inventory_sha256: None,
@@ -14,7 +14,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             data_origin: None,
             clock_verified: None,
             clock_id: format!("clock{i}"),
-            sync_error_us: 1000,
+            sync_error_us: Some(1000),
             recording_sha256: "a".repeat(64),
         })
         .collect();
@@ -35,8 +35,8 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             shoulders_target: None,
             lamp_audio_start_us: None,
             planned_lamp_audio_end_us: None,
-            bearing_deg: 0.0,
-            distance_mm: 600,
+            bearing_deg: Some(0.0),
+            distance_mm: Some(600),
             light: "daylight".into(),
             noise: "quiet".into(),
             visible_faces: vec!["track1".into()],
@@ -109,8 +109,8 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                         &t.head_target
                     }
                     Sensor::Direction => {
-                        t.bearing_deg = f64::from([-60, -30, 0, 30, 60][(i / 12) % 5]);
-                        t.distance_mm = [600, 1200][(i / 60) % 2];
+                        t.bearing_deg = Some(f64::from([-60, -30, 0, 30, 60][(i / 12) % 5]));
+                        t.distance_mm = Some([600, 1200][(i / 60) % 2]);
                         t.noise = ["quiet", "background"][(i / 120) % 2].into();
                         if i < 240 {
                             "turn"
@@ -129,7 +129,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                         } else {
                             vec!["track1".into(), "track2".into()]
                         };
-                        t.distance_mm = [600, 1200][(cell / 2) % 2];
+                        t.distance_mm = Some([600, 1200][(cell / 2) % 2]);
                         t.light = ["daylight", "lamplight"][cell % 2].into();
                         match i % 40 {
                             0..=23 if t.visible_faces.len() == 2 && i % 2 == 1 => "track2",
@@ -193,7 +193,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                 asr_final_us: (sensor == Sensor::Addressed).then_some(t.end_us),
                 associated_us: mouth.then_some(t.end_us + 1000),
                 frame_work_us: mouth.then_some(10_000),
-                bearing_deg: Some(t.bearing_deg),
+                bearing_deg: t.bearing_deg,
                 framed_speaker_id: Some(t.speaker_id.clone()),
                 face_in_frame_us: Some(t.end_us + 900_000),
                 turns: Some(if c.expected == "no_turn" { 0 } else { 1 }),
@@ -378,9 +378,9 @@ fn duplicate_unknown_rows_and_changed_hash_are_invalid() {
 #[test]
 fn consent_split_and_capture_reuse_are_rejected() {
     let (mut m, _) = fixture(Sensor::Call);
-    m.sessions[0].consent = false;
+    m.sessions[0].consent = Some(false);
     assert!(m.validate().is_err());
-    m.sessions[0].consent = true;
+    m.sessions[0].consent = Some(true);
     m.sessions[0].split = Split::Development;
     assert!(m.validate().is_err());
     m.sessions[0].split = Split::Holdout;

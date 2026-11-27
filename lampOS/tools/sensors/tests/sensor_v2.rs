@@ -11,7 +11,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             id: format!("s{i}"),
             split: Split::Holdout,
             started_unix_s: 10_000 + (i / 6) * 10_000,
-            consent: true,
+            consent: Some(true),
             delete_after_unix_s: None,
             retention: Some("keep_all".into()),
             inventory_sha256: Some("1".repeat(64)),
@@ -19,7 +19,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             data_origin: Some(DataOrigin::RealPeople),
             clock_verified: Some(true),
             clock_id: format!("clock{i}"),
-            sync_error_us: 1000,
+            sync_error_us: Some(1000),
             recording_sha256: "a".repeat(64),
         })
         .collect();
@@ -40,8 +40,8 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             shoulders_target: None,
             lamp_audio_start_us: None,
             planned_lamp_audio_end_us: None,
-            bearing_deg: 0.0,
-            distance_mm: 600,
+            bearing_deg: Some(0.0),
+            distance_mm: Some(600),
             light: "daylight".into(),
             noise: "quiet".into(),
             visible_faces: vec!["track1".into(), "track2".into()],
@@ -118,8 +118,8 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                     }
                 }
                 Sensor::Direction => {
-                    t.bearing_deg = f64::from([-60, -30, 0, 30, 60][(i / 12) % 5]);
-                    t.distance_mm = [600, 1200][(i / 60) % 2];
+                    t.bearing_deg = Some(f64::from([-60, -30, 0, 30, 60][(i / 12) % 5]));
+                    t.distance_mm = Some([600, 1200][(i / 60) % 2]);
                     t.noise = ["quiet", "background"][(i / 120) % 2].into();
                     if i < 240 {
                         "turn"
@@ -130,7 +130,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                 }
                 Sensor::SpeakingFace => {
                     let cell = (i / 80) % 4;
-                    t.distance_mm = [600, 1200][cell / 2];
+                    t.distance_mm = Some([600, 1200][cell / 2]);
                     t.light = ["daylight", "lamplight"][cell % 2].into();
                     if i >= 400 {
                         t.visible_faces.truncate(1);
@@ -216,7 +216,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                 asr_final_us: (sensor == Sensor::Addressed).then_some(t.end_us),
                 associated_us: mouth.then_some(t.end_us + 1000),
                 frame_work_us: mouth.then_some(10_000),
-                bearing_deg: Some(t.bearing_deg),
+                bearing_deg: t.bearing_deg,
                 framed_speaker_id: Some(t.speaker_id.clone()),
                 face_in_frame_us: Some(t.end_us + 900_000),
                 turns: Some(if c.expected == "no_turn" { 0 } else { 1 }),
@@ -285,6 +285,155 @@ fn all_seven_current_rubrics_have_positive_qualification_examples() {
     }
 }
 
+fn external_replay() -> (Manifest, Run) {
+    let (mut m, mut r) = fixture(Sensor::SpeakingFace);
+    for session in &mut m.sessions {
+        session.split = Split::Development;
+        session.data_origin = Some(DataOrigin::Public);
+        session.consent = None;
+        session.clock_verified = Some(false);
+        session.sync_error_us = None;
+    }
+    for trial in &mut m.trials {
+        trial.bearing_deg = None;
+        trial.distance_mm = None;
+        trial.light = "unknown".into();
+        trial.noise = "unknown".into();
+    }
+    r.evidence = "replay".into();
+    for prediction in &mut r.predictions {
+        prediction.ready_us = None;
+        prediction.associated_us = None;
+        prediction.first_admission_us = None;
+        prediction.face_in_frame_us = None;
+        prediction.replay_elapsed_us = Some(1_000);
+    }
+    (m, r)
+}
+
+#[test]
+fn external_development_accepts_unknown_metadata_without_invented_values() {
+    for origin in [
+        DataOrigin::Public,
+        DataOrigin::Generated,
+        DataOrigin::Invented,
+    ] {
+        let (mut m, r) = external_replay();
+        for session in &mut m.sessions {
+            session.data_origin = Some(origin);
+        }
+        m.validate().unwrap();
+        let scored = report(&m, &r);
+        assert!(!scored.qualified);
+        assert_eq!(scored.counts.total, 0);
+        let raw = &scored.raw_by_split.as_ref().unwrap()["development"];
+        assert_eq!(raw.counts.total, 320);
+        assert_eq!(raw.counts.correct, 320);
+        for field in [
+            "distance_mm",
+            "bearing_deg",
+            "light",
+            "noise",
+            "sync_error_us",
+            "collection_consent",
+        ] {
+            assert_eq!(raw.metadata_unknown[field], 480);
+        }
+        assert!(scored.rows.iter().all(|row| row.distance_mm.is_none()
+            && row.bearing_deg.is_none()
+            && row.latency_upper_us.is_none()
+            && row.cell
+                == format!(
+                    "{}face-unknown-distance-unknown",
+                    row.visible_face_count.unwrap()
+                )));
+    }
+}
+
+#[test]
+fn external_development_unknown_outputs_still_fail_raw_accuracy() {
+    let (m, mut r) = external_replay();
+    r.predictions[0].output = "unknown".into();
+    let scored = report(&m, &r);
+    let raw = &scored.raw_by_split.unwrap()["development"];
+    assert_eq!((raw.counts.correct, raw.counts.total), (319, 320));
+    assert!(!scored.qualified);
+}
+
+#[test]
+fn unknown_clock_error_keeps_actual_admission_comparison_unknown() {
+    let (mut m, mut r) = fixture(Sensor::VoiceMatch);
+    for session in &mut m.sessions {
+        session.split = Split::Development;
+        session.data_origin = Some(DataOrigin::Public);
+        session.consent = None;
+        session.clock_verified = Some(false);
+        session.sync_error_us = None;
+    }
+    for prediction in &mut r.predictions {
+        prediction.first_admission_us = prediction.ready_us.map(|at| at + 1_000_000);
+    }
+    let scored = report(&m, &r);
+    assert!(!scored.qualified);
+    assert!(
+        scored
+            .rows
+            .iter()
+            .all(|row| row.ready_before_first_admission.is_none()
+                && row.latency_upper_us.is_none()
+                && !row.available
+                && !row.within_admission_budget)
+    );
+}
+
+#[test]
+fn external_unknown_metadata_cannot_be_promoted_or_applied_to_real_people() {
+    let (m, _) = external_replay();
+    let mut holdout = m.clone();
+    for session in &mut holdout.sessions {
+        session.split = Split::Holdout;
+    }
+    assert!(holdout.validate().is_err());
+    let mut real = m.clone();
+    for session in &mut real.sessions {
+        session.data_origin = Some(DataOrigin::RealPeople);
+    }
+    assert!(real.validate().is_err());
+    let mut false_clock = m.clone();
+    false_clock.sessions[0].clock_verified = Some(true);
+    assert!(false_clock.validate().is_err());
+    let mut zero = m;
+    zero.trials[0].distance_mm = Some(0);
+    assert!(zero.validate().is_err());
+}
+
+#[test]
+fn legacy_unknown_consent_geometry_and_clock_are_still_rejected() {
+    let (mut m, _) = fixture(Sensor::Call);
+    m.version = 1;
+    m.rubric_id = None;
+    for session in &mut m.sessions {
+        session.delete_after_unix_s = Some(100_000);
+        session.retention = None;
+        session.inventory_sha256 = None;
+        session.readme_sha256 = None;
+        session.data_origin = None;
+        session.clock_verified = None;
+    }
+    m.validate().unwrap();
+    let mut no_consent = m.clone();
+    no_consent.sessions[0].consent = None;
+    assert!(no_consent.validate().is_err());
+    let mut no_distance = m.clone();
+    no_distance.trials[0].distance_mm = None;
+    assert!(no_distance.validate().is_err());
+    let mut no_bearing = m.clone();
+    no_bearing.trials[0].bearing_deg = None;
+    assert!(no_bearing.validate().is_err());
+    m.sessions[0].sync_error_us = None;
+    assert!(m.validate().is_err());
+}
+
 #[test]
 fn version_two_requires_permanent_hashed_retention_and_explicit_rubric() {
     let (mut m, r) = fixture(Sensor::Call);
@@ -297,9 +446,9 @@ fn version_two_requires_permanent_hashed_retention_and_explicit_rubric() {
     m.sessions[0].readme_sha256 = Some("not-a-sha256".into());
     assert!(m.validate().is_err());
     m.sessions[0].readme_sha256 = Some("2".repeat(64));
-    m.sessions[0].consent = false;
+    m.sessions[0].consent = Some(false);
     assert!(m.validate().is_err());
-    m.sessions[0].consent = true;
+    m.sessions[0].consent = Some(true);
     m.rubric_id = Some("older-rules".into());
     assert!(m.validate().is_err());
     m.rubric_id = Some(V2_RUBRIC.into());
@@ -606,9 +755,9 @@ fn v2_qualification_needs_binary_and_verified_bounded_source_clocks() {
     m.sessions[0].clock_verified = None;
     assert!(!report(&m, &r).qualified);
     m.sessions[0].clock_verified = Some(true);
-    m.sessions[0].sync_error_us = 5_000;
+    m.sessions[0].sync_error_us = Some(5_000);
     assert!(report(&m, &r).qualified);
-    m.sessions[0].sync_error_us = 5_001;
+    m.sessions[0].sync_error_us = Some(5_001);
     assert!(!report(&m, &r).qualified);
     let (mut m, r) = fixture(Sensor::VoiceMatch);
     m.sessions[0].clock_verified = Some(false); // A reference, not a probe session.

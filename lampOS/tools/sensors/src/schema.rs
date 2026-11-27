@@ -49,7 +49,7 @@ pub struct Session {
     pub id: String,
     pub split: Split,
     pub started_unix_s: u64,
-    pub consent: bool,
+    pub consent: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delete_after_unix_s: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,7 +63,7 @@ pub struct Session {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clock_verified: Option<bool>,
     pub clock_id: String,
-    pub sync_error_us: u64,
+    pub sync_error_us: Option<u64>,
     pub recording_sha256: String,
 }
 
@@ -72,6 +72,17 @@ pub struct Session {
 pub enum Split {
     Development,
     Holdout,
+}
+
+impl Session {
+    fn external_development(&self, version: u32) -> bool {
+        version == 2
+            && self.split == Split::Development
+            && matches!(
+                self.data_origin,
+                Some(DataOrigin::Public | DataOrigin::Generated | DataOrigin::Invented)
+            )
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -95,8 +106,8 @@ pub struct Trial {
     pub lamp_audio_start_us: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub planned_lamp_audio_end_us: Option<u64>,
-    pub bearing_deg: f64,
-    pub distance_mm: u32,
+    pub bearing_deg: Option<f64>,
+    pub distance_mm: Option<u32>,
     pub light: String,
     pub noise: String,
     pub visible_faces: Vec<String>,
@@ -234,7 +245,9 @@ impl Manifest {
             if !token(&s.id)
                 || !sessions.insert(&s.id)
                 || !token(&s.clock_id)
-                || !s.consent
+                || (s.consent != Some(true) && !s.external_development(self.version))
+                || (s.sync_error_us.is_none()
+                    && (!s.external_development(self.version) || s.clock_verified == Some(true)))
                 || (self.version == 1
                     && (s
                         .delete_after_unix_s
@@ -266,6 +279,11 @@ impl Manifest {
         let mut development = BTreeSet::new();
         let mut holdout = BTreeSet::new();
         for t in &self.trials {
+            let external_development = self
+                .sessions
+                .iter()
+                .find(|s| s.id == t.session_id)
+                .is_some_and(|s| s.external_development(self.version));
             if !token(&t.id)
                 || !trials.insert(&t.id)
                 || !sessions.contains(&t.session_id)
@@ -273,9 +291,11 @@ impl Manifest {
                 || !token(&t.script_id)
                 || t.start_us >= t.end_us
                 || !captures.insert((&t.session_id, t.start_us, t.end_us))
-                || !t.bearing_deg.is_finite()
-                || !(-180.0..=180.0).contains(&t.bearing_deg)
-                || t.distance_mm == 0
+                || t.bearing_deg
+                    .is_some_and(|v| !v.is_finite() || !(-180.0..=180.0).contains(&v))
+                || (t.bearing_deg.is_none() && !external_development)
+                || t.distance_mm == Some(0)
+                || (t.distance_mm.is_none() && !external_development)
                 || (self.version == 1 && t.visible_faces.len() > 2)
                 || (self.version == 1
                     && (t.shoulders_target.is_some()
@@ -311,8 +331,10 @@ impl Manifest {
                     &t.head_target,
                     &["lamp", "screen", "phone", "other", "unknown"],
                 ) || (self.version == 2 && t.head_target == "away"))
-                || !one_of(&t.light, &["daylight", "lamplight"])
-                || !one_of(&t.noise, &["quiet", "background"])
+                || !(one_of(&t.light, &["daylight", "lamplight"])
+                    || external_development && t.light == "unknown")
+                || !(one_of(&t.noise, &["quiet", "background"])
+                    || external_development && t.noise == "unknown")
                 || !one_of(&t.condition, &["normal", "slow", "disconnected"])
                 || t.call_end_us
                     .is_some_and(|v| v < t.start_us || v > t.end_us)

@@ -34,6 +34,9 @@ status is still NOT QUALIFIED. Distinguish public benchmark mAP from exact
 speaking-face selection, generated voice identities from real holdout people,
 and frame samples from independent utterances. Missing EVALs have no invented
 number. Native tests, Clippy and source reviews are not accuracy measurements.
+For external development data, report unknown collection consent, geometry,
+clock error, light/noise as missing metadata using the v2 adapter path; never
+invent these fields to satisfy a physical holdout cell.
 
 For whole C/D, report the simple and plain build identities, played/live
 mode, planned counts by scenario, unknown/missing counts and exact audible

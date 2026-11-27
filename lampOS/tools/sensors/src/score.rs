@@ -37,6 +37,8 @@ pub struct Row {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_origin: Option<DataOrigin>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata_unknown: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub safe_abstention: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clock_verified: Option<bool>,
@@ -89,8 +91,8 @@ pub struct Row {
     pub condition: String,
     pub light: String,
     pub noise: String,
-    pub distance_mm: u32,
-    pub bearing_deg: f64,
+    pub distance_mm: Option<u32>,
+    pub bearing_deg: Option<f64>,
     pub overlap: bool,
     pub subject_correct: bool,
     pub subject_visible: bool,
@@ -136,6 +138,7 @@ pub struct RawSummary {
     pub by_class: BTreeMap<String, Counts>,
     pub confusion: BTreeMap<String, BTreeMap<String, usize>>,
     pub by_origin: BTreeMap<String, Counts>,
+    pub metadata_unknown: BTreeMap<String, usize>,
     pub inapplicable: usize,
     pub faults: usize,
     pub safe_abstentions: usize,
@@ -152,6 +155,9 @@ fn eligible(row: &Row) -> bool {
 fn raw_summary<'a>(rows: impl Iterator<Item = &'a Row>) -> RawSummary {
     let mut result = RawSummary::default();
     for row in rows {
+        for field in row.metadata_unknown.iter().flatten() {
+            *result.metadata_unknown.entry(field.clone()).or_default() += 1;
+        }
         result.safe_abstentions += usize::from(row.safe_abstention == Some(true));
         if row.applicable == Some(false) {
             result.inapplicable += 1;
@@ -299,22 +305,19 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
         let p = predictions.get(&c.id).copied();
         let ready = p.and_then(|p| p.ready_us);
         let latency = p.and_then(|p| p.ready_us.map(|at| at - p.input_end_us));
-        let upper = |value: u64| {
-            if v2 {
-                value.saturating_add(session.sync_error_us)
-            } else {
-                value
-            }
-        };
+        let source_error = if v2 { session.sync_error_us } else { Some(0) };
+        let upper = |value: u64| source_error.map(|error| value.saturating_add(error));
         let expiry = if run.sensor == Sensor::Addressed {
             100_000
         } else {
             500_000
         };
-        let mut available = latency.is_some_and(|v| upper(v) <= expiry)
+        let mut available = latency.is_some_and(|v| upper(v).is_some_and(|bound| bound <= expiry))
             && (!v2
                 || (session.clock_verified == Some(true)
-                    && session.sync_error_us <= V2_MAX_SYNC_ERROR_US));
+                    && session
+                        .sync_error_us
+                        .is_some_and(|e| e <= V2_MAX_SYNC_ERROR_US)));
         available &= p.is_some_and(|p| {
             p.input_end_us >= t.start_us
                 && (!matches!(
@@ -342,15 +345,15 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
         }
         let asr = p.and_then(|p| p.asr_final_us.zip(p.ready_us).map(|(at, ready)| ready - at));
         if run.sensor == Sensor::Addressed {
-            available &= asr.is_some_and(|v| upper(v) <= 100_000);
+            available &= asr.is_some_and(|v| upper(v).is_some_and(|bound| bound <= 100_000));
         }
         let association = p.and_then(|p| p.associated_us.map(|at| at - t.end_us));
         if run.sensor == Sensor::SpeakingFace {
-            available &= association.is_some_and(|v| upper(v) <= 5_000)
+            available &= association.is_some_and(|v| upper(v).is_some_and(|bound| bound <= 5_000))
                 && p.is_some_and(|p| {
-                    p.associated_us
-                        .is_some_and(|at| upper(at - p.input_end_us) <= 500_000)
-                        && p.frame_work_us.is_some()
+                    p.associated_us.is_some_and(|at| {
+                        upper(at - p.input_end_us).is_some_and(|bound| bound <= 500_000)
+                    }) && p.frame_work_us.is_some()
                 });
         }
         let output = match p {
@@ -358,10 +361,13 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             Some(_) if !available => "late_or_incomplete".to_owned(),
             Some(p) => p.output.clone(),
         };
-        let error = p.and_then(|p| p.bearing_deg).map(|v| {
-            let difference = (v - t.bearing_deg).abs();
-            difference.min(360.0 - difference)
-        });
+        let error = p
+            .and_then(|p| p.bearing_deg)
+            .zip(t.bearing_deg)
+            .map(|(value, truth)| {
+                let difference = (value - truth).abs();
+                difference.min(360.0 - difference)
+            });
         let face_delay = p
             .and_then(|p| p.face_in_frame_us)
             .zip(t.call_end_us)
@@ -369,7 +375,7 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
         let angle_correct = error.is_some_and(|v| v <= 15.0);
         let face_correct = p.is_some_and(|p| {
             p.framed_speaker_id.as_ref() == Some(&t.speaker_id)
-                && face_delay.is_some_and(|v| upper(v) <= 1_000_000)
+                && face_delay.is_some_and(|v| upper(v).is_some_and(|bound| bound <= 1_000_000))
                 && p.turns == Some(1)
         });
         let expected_output = if run.sensor == Sensor::BargeIn {
@@ -395,7 +401,8 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             p.is_some_and(|p| {
                 if c.expected == "interrupt" {
                     p.playback_stopped == Some(true)
-                        && stop_latency.is_some_and(|delay| upper(delay) <= 400_000)
+                        && stop_latency
+                            .is_some_and(|delay| upper(delay).is_some_and(|bound| bound <= 400_000))
                         && p.last_lamp_audio_us
                             .zip(p.observed_until_us)
                             .is_some_and(|(last, until)| until >= last)
@@ -444,15 +451,29 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             split: v2.then_some(session.split),
             applicable: v2.then_some(applicable),
             data_origin: session.data_origin,
+            metadata_unknown: v2.then(|| {
+                [
+                    ("collection_consent", session.consent != Some(true)),
+                    ("sync_error_us", session.sync_error_us.is_none()),
+                    ("bearing_deg", t.bearing_deg.is_none()),
+                    ("distance_mm", t.distance_mm.is_none()),
+                    ("light", t.light == "unknown"),
+                    ("noise", t.noise == "unknown"),
+                ]
+                .into_iter()
+                .filter(|(_, unknown)| *unknown)
+                .map(|(name, _)| name.to_owned())
+                .collect()
+            }),
             clock_verified: v2.then_some(session.clock_verified == Some(true)),
-            sync_error_us: v2.then_some(session.sync_error_us),
-            latency_upper_us: v2.then_some(latency.map(upper)).flatten(),
-            asr_to_result_upper_us: v2.then_some(asr.map(upper)).flatten(),
-            association_upper_us: v2.then_some(association.map(upper)).flatten(),
+            sync_error_us: v2.then_some(session.sync_error_us).flatten(),
+            latency_upper_us: v2.then_some(latency.and_then(upper)).flatten(),
+            asr_to_result_upper_us: v2.then_some(asr.and_then(upper)).flatten(),
+            association_upper_us: v2.then_some(association.and_then(upper)).flatten(),
             stop_latency_upper_us: (v2
                 && run.sensor == Sensor::BargeIn
                 && c.expected == "interrupt")
-                .then_some(stop_latency.map(upper))
+                .then_some(stop_latency.and_then(upper))
                 .flatten(),
             safe_abstention: v2.then_some(
                 applicable
@@ -489,9 +510,10 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             available,
             fault: c.fault,
             cell: format!(
-                "{}face-{}mm-{}",
+                "{}face-{}-{}",
                 t.visible_faces.len(),
-                t.distance_mm,
+                t.distance_mm
+                    .map_or_else(|| "unknown-distance".to_owned(), |mm| format!("{mm}mm")),
                 t.light
             ),
             latency_us: latency,
@@ -499,14 +521,15 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             ready_before_first_admission: p.and_then(|p| {
                 p.ready_us
                     .zip(p.first_admission_us)
-                    .map(|(ready, admission)| upper(ready) <= admission)
+                    .and_then(|(ready, admission)| upper(ready).map(|bound| bound <= admission))
             }),
             speech_end_to_result_us: ready.map(|at| at.saturating_sub(t.end_us)),
             asr_to_result_us: asr,
             frame_work_us: p.and_then(|p| p.frame_work_us),
             association_us: association,
-            within_admission_budget: ready
-                .is_some_and(|at| upper(at) <= t.end_us.saturating_add(100_000)),
+            within_admission_budget: ready.is_some_and(|at| {
+                upper(at).is_some_and(|bound| bound <= t.end_us.saturating_add(100_000))
+            }),
             bearing_error_deg: error,
             face_delay_us: face_delay,
             angle_correct,
@@ -571,7 +594,9 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
                 && used_holdout_sessions.iter().all(|id| {
                     let session = manifest.session(id);
                     session.clock_verified == Some(true)
-                        && session.sync_error_us <= V2_MAX_SYNC_ERROR_US
+                        && session
+                            .sync_error_us
+                            .is_some_and(|e| e <= V2_MAX_SYNC_ERROR_US)
                 }),
             format!(
                 "{} used holdout sessions; verified mapping and error <=5000 us required",
@@ -695,8 +720,8 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
                         let count = primary()
                             .filter(|r| {
                                 r.expected == "turn"
-                                    && r.bearing_deg == f64::from(bearing)
-                                    && r.distance_mm == distance
+                                    && r.bearing_deg == Some(f64::from(bearing))
+                                    && r.distance_mm == Some(distance)
                                     && r.noise == noise
                             })
                             .count();
@@ -733,11 +758,13 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
                         rate(
                             &mut checks,
                             &format!("2plus_faces-{distance}mm-{light}"),
-                            primary().filter(|r| r.distance_mm == distance && r.light == light),
+                            primary()
+                                .filter(|r| r.distance_mm == Some(distance) && r.light == light),
                             80,
                             95,
                         );
-                        let in_cell = |r: &&Row| r.distance_mm == distance && r.light == light;
+                        let in_cell =
+                            |r: &&Row| r.distance_mm == Some(distance) && r.light == light;
                         for slot in 0..2 {
                             let n = primary()
                                 .filter(in_cell)

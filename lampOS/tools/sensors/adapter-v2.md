@@ -39,6 +39,30 @@ and `raw_classification` remain primary **holdout-only**. A missing v2 live
 | Barge prediction | Output `stop`, `continue` or `unknown`; actual `last_lamp_audio_us`, `observed_until_us`, `playback_stopped`. Interrupt success requires actual early stop <=400000 us from acoustic trial start, including clock error. Natural completion is not a stop. Negative success requires full playback and observation with no stop. |
 | Run provenance | 40-hex `build_sha` names source revision/base. SHA-256 `producer_binary_sha256` is required to qualify v2. `source_patch_sha256` identifies the complete uncommitted source, including untracked source; omit only for the exact committed source. Model/config hashes are separate. |
 
+### Unknown public or generated development metadata
+
+Public benchmarks do not imply measured desk distance or collection-specific
+consent. For **v2 development sessions only**, with origin `public`,
+`generated` or `invented`, these unmeasured fields may honestly be null:
+session `consent` and `sync_error_us`, trial `distance_mm` and `bearing_deg`.
+Use `light:"unknown"` and `noise:"unknown"` when unlabelled. Keep
+`clock_verified:false` if no measured mapping exists. A zero distance is
+invalid; never fill unknowns with a fabricated 600 mm or consent assertion.
+
+The private source README records the actual dataset/access basis and limits;
+null consent makes no claim of collection consent or permission to reuse data.
+Real-person sessions and every holdout still require affirmative consent and
+known collection fields. Unknown clock error cannot coexist with a verified
+clock or produce a numeric latency upper bound. V1 remains strict.
+
+These inputs report raw development classification and `metadata_unknown`
+counts by field, including rows outside the primary task. They cannot fill
+any holdout distance/light cell or qualify a sensor. Missing/unknown predicted
+speaker labels still fail raw accuracy on every applicable primary line.
+Retain all known label provenance and keep replay readiness null. Earlier
+scorer binaries may reject this development-only extension; pin the updated
+source and actual executable in the EVAL rather than changing the data.
+
 Keep original source, complete patch, binary, model and configuration privately
 available for hash verification. A patch hash does not replace the base Git
 revision or binary hash. A source READ-OK does not establish measurement quality.
