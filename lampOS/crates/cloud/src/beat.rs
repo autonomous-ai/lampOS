@@ -591,4 +591,87 @@ mod tests {
         pinging.await.unwrap();
         assert!(ours(&lines).is_empty(), "{:?}", ours(&lines));
     }
+
+    /// #8874: a switch under a running pinger, and its next ping names the
+    /// new build. lamp-cloud started on build A; lamp-update then says the
+    /// lamp runs B, with no restart of lamp-cloud, and the next ping says B.
+    #[tokio::test]
+    async fn a_switch_under_a_running_pinger_and_its_next_ping_names_the_new_build() {
+        let dir = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(dir.path()).unwrap();
+        let places = crate::lamp::Places {
+            actions: dir.path().join("call.sock"),
+            proc: dir.path().join("proc"),
+            sys: dir.path().join("sys"),
+            etc: dir.path().join("etc"),
+            run: dir.path().join("run"),
+        };
+        let lamp = crate::lamp::bare(places, Some(bus.clone()), "812+460a1a1aa2b3");
+        let (identity_tx, me) = watch::channel(lamp.identity());
+        let (base, requests) = backend(Vec::new()).await;
+        let (accounts, watched) = watch::channel(Some(account(&base)));
+        let pinging = tokio::spawn(async move {
+            pings(
+                accounts,
+                me,
+                "voice-key".into(),
+                Duration::from_millis(20),
+                &mut |_: &str| {},
+                &mut |_: &Account| {},
+                &mut |_: &ping::Reply| {},
+                None,
+                None,
+            )
+            .await;
+        });
+        let pinged = |build: &str| {
+            let said = format!(r#""version":"{build}""#);
+            let requests = requests.clone();
+            async move {
+                while !requests
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|request| request.contains(&said))
+                {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+            }
+        };
+        let switching = async {
+            pinged("812+460a1a1aa2b3").await;
+            let mut says = bus
+                .publisher_declared(
+                    lamp_msgs::UpdateStatus::TOPIC,
+                    &lamp_msgs::UpdateStatus::declaration(),
+                    "update",
+                )
+                .unwrap();
+            says.publish_json(
+                lamp_ipc::monotonic_us(),
+                &lamp_msgs::UpdateStatus {
+                    running: Some(lamp_msgs::UpdateBuild {
+                        sequence: 813,
+                        commit: "9f00aa11bb22cc33dd44".into(),
+                    }),
+                    now: "idle".into(),
+                    last: None,
+                    harness: None,
+                    round: None,
+                    engines: None,
+                    refused: None,
+                },
+            )
+            .unwrap();
+            pinged("813+9f00aa11bb22").await;
+        };
+        tokio::select! {
+            () = crate::lamp::look(identity_tx, lamp, Duration::from_millis(20)) => {}
+            switched = tokio::time::timeout(Duration::from_secs(5), switching) => {
+                assert!(switched.is_ok(), "no ping named the new build");
+            }
+        }
+        drop(watched);
+        pinging.await.unwrap();
+    }
 }
