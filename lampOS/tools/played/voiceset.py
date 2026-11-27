@@ -14,13 +14,15 @@ A line's wait is seconds after it, or "6a": 6 s after the lamp is done with it (
 or its turn ended with none), as a person goes on. A ("bg", NAME, VOLUME, '') step plays make_noise.py's NAME bed
 under the rest of the scene. Each scene starts outside a conversation: VOICESET_GAP (30) seconds of quiet are left
 after the one before. Nothing here writes to the lamp's memory, puts it to sleep, turns privacy on or moves its
-body, so it is safe on a person's own lamp; run it in an empty room. Only `handover` asks for a computer's work:
-leave it out on a lamp with a computer paired. VOICESET_HEY_ONLY=1 scores the older groups by the product owner's
-rule of 26 Nov: a scene whose first line is answered but doesn't open with "Hey", "Hi" or "Hello" is then expected
-left alone (the r- groups are scored as written).
+body, so it is safe on a person's own lamp; run it in an empty room. Only `handover` asks for a computer's work, so
+it runs only when named (`handover`), never in a run that names no group. The older groups are scored by the
+product owner's rule of 26 Nov: a scene whose first line is answered but doesn't open with "Hey", "Hi" or "Hello" is
+expected left alone (the r- groups are scored as written); VOICESET_OCTOBER=1 scores them as written, for October's
+comparison. With PLAYED_WAV_DIR set, every line must have its rendered WAV: a run with any missing refuses to
+start and names the count, so one kit never mixes two voices.
 Writes $PLAYED_OUT/scenarios/voiceset-LABEL.tsv (a row a played line) and voiceset-LABEL.txt (the scorecard), and
 adds one row a group to $PLAYED_OUT/scenarios/voiceset-history.tsv, for runs compared day by day."""
-import os, re, statistics, subprocess, sys, time
+import hashlib, os, re, statistics, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLAYED = os.environ.get('PLAYED_OUT') or os.path.expanduser('~/lamp-played')
@@ -164,17 +166,6 @@ SCENES = [
                             (S, 'Which of the two did you like more?', 16, 'A'), (S, 'Remind me in two minutes to stretch.', 14, 'A'),
                             (S, 'And a good name for a hamster?', 14, 'A'), (S, 'What time is it?', 14, 'A'),
                             (S, 'Set a timer for one minute.', 80, 'A'), (S, 'Thanks, Lamp. See you later.', 60, 'A')]),
-    # October's day exactly (lampOS/tools/played/day.sh: its 12 lines, its gaps), for the owner's like-for-like
-    # comparison with October's 111 runs. ONLY on lamp-74ff with the owner's yes (25 Nov 22:3x): it writes "my favourite
-    # colour is green" to the lamp's memory and asks Claude Code on the office computer for a story each run. The
-    # night's last step asks the lamp to forget the colour. Not in the repo's set.
-    ('day', 'october-exact', [(S, 'Hey Lamp, good morning!', 14, 'A'), (S, 'Can you make your light a little warmer?', 14, 'A'),
-                              (S, 'What do you see right now?', 18, 'A'), (S, 'Remember that my favourite colour is green.', 14, 'A'),
-                              (S, 'Hey Lamp, can you ask Claude Code on my office computer to write a short story, about two hundred words, about a desk lamp that learns to sing?', 14, 'A'),
-                              (S, 'Yes. [[slnc 700]] Please start it.', 100, 'A'), (S, 'How is that task going?', 16, 'A'),
-                              (S, 'Remind me in two minutes to stretch.', 14, 'A'), (S, "What's my favourite colour?", 14, 'A'),
-                              (S, 'What time is it?', 14, 'A'), (S, 'Set a timer for one minute.', 80, 'A'),
-                              (S, 'Thanks, Lamp. See you later.', 60, 'A')]),
     # The same day as a person paces it (25 Nov 21:3x): each line 6 s after the lamp is done with the one before
     # (scenario.py's "6a"), the timer still rung out. October's fixed gaps let a line come 36 s after a short story.
     ('day', 'paced-day', [(S, 'Hey Lamp, good morning!', '6a', 'A'), (S, 'Can you make your light a little warmer?', '6a', 'A'),
@@ -655,8 +646,13 @@ def _hey_only(scene):
         return scene
     return (group, name, [(v, text, wait, 'Q' if exp == 'A' else exp) for v, text, wait, exp in lines])
 
-if os.environ.get('VOICESET_HEY_ONLY') == '1':
+# The product owner's rule of 26 Nov is the default (the Reviewer-lead's P2-c on #8673); VOICESET_OCTOBER=1 scores the
+# older groups as written, for a like-for-like comparison with October's runs.
+if os.environ.get('VOICESET_OCTOBER') != '1':
     SCENES = [_hey_only(scene) for scene in SCENES]
+
+# Groups played only when named on the command line.
+NAMED_ONLY = ('handover',)
 
 def main():
     if len(sys.argv) < 2:
@@ -672,9 +668,21 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     label = sys.argv[1]
     # A GROUP, or GROUP/SCENE for one scene of it (October's day alone, many times).
-    asked = sys.argv[2:] or list(dict.fromkeys(g for g, _, _ in SCENES))
+    # With no group named, every group but those only a named run plays (NAMED_ONLY: `handover` asks a paired
+    # computer for work; the Reviewer-lead's P2-a on #8673).
+    asked = sys.argv[2:] or [g for g in dict.fromkeys(g for g, _, _ in SCENES) if g not in NAMED_ONLY]
     groups = list(dict.fromkeys(a.split('/')[0] for a in asked))
     scenes_asked = {tuple(a.split('/', 1)) for a in asked if '/' in a}
+    # The Reviewer-lead's P2-b on #8673: with PLAYED_WAV_DIR set, every line played must be rendered there, or the run
+    # refuses to start and names the count; one kit never mixes a rendered voice with mac `say`.
+    wav_dir = os.environ.get('PLAYED_WAV_DIR')
+    if wav_dir:
+        missing = sum(1 for g, sc, lines in SCENES if g in groups
+                      and (not any(gg == g for gg, _ in scenes_asked) or (g, sc) in scenes_asked or g in asked)
+                      for v, text, _, _ in lines if v not in ('pause', 'bg') and text != 'pause'
+                      and not os.path.exists(f"{wav_dir}/{hashlib.sha256(f'{v}|{text}'.encode()).hexdigest()[:12]}.wav"))
+        if missing:
+            sys.exit(f'voiceset.py: {missing} line(s) have no rendered WAV in PLAYED_WAV_DIR; render them or unset it. Nothing was played.')
     tsv = open(f'{OUT}/voiceset-{label}.tsv', 'w')
     tsv.write('group\tscene\tvoice\tline\texpected\tanswered\tstopped\tok\tfirst_sound_s\theard\tlamp_said\n')
     results = []

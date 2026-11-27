@@ -22,10 +22,13 @@ SSH_ENV = dict(os.environ, LAMP_SSH_TIMEOUT='5')
 RATE = os.environ.get('LAMP_SAY_RATE', '185')
 
 def wav_for(voice, text):
-    # PLAYED_WAV_DIR (off by default): a line already rendered there as <sha12 of "voice|text">.wav (16 kHz 16-bit
-    # mono, e.g. ElevenLabs) is played as it is; any other line falls back to `say`.
+    # PLAYED_WAV_DIR (off by default): every line is played from its rendering there, <sha12 of "voice|text">.wav
+    # (16 kHz 16-bit mono, e.g. ElevenLabs); a line with none stops the run rather than fall back to `say`, so a
+    # rendered set never mixes in mac voices unseen (the Reviewer-lead's P2-b on #8673). Unset: `say`, as before.
     pre = os.environ.get('PLAYED_WAV_DIR') and f"{os.environ['PLAYED_WAV_DIR']}/{hashlib.sha256(f'{voice}|{text}'.encode()).hexdigest()[:12]}.wav"
-    if pre and os.path.exists(pre): return pre
+    if pre:
+        if os.path.exists(pre): return pre
+        sys.exit(f'scenario.py: no rendered WAV in PLAYED_WAV_DIR for a {voice} line; render it or unset PLAYED_WAV_DIR.')
     key = hashlib.sha256(f'{voice}|{RATE}|{text}'.encode()).hexdigest()[:16]
     path = f'{V}/prompts/generated/{key}.wav'
     if not os.path.exists(path):

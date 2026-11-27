@@ -482,11 +482,22 @@ the groups:
 ```sh
 export LAMP_HOST=<your lamp's address> LAMP_SSH_KEY=<your key file>
 lampOS/tools/played/make_noise.py              # once: the noise beds
-lampOS/tools/played/voiceset.py v1125          # every group (59, 432 scenes, 711 lines), about seven hours
-VOICESET_GAP=22 lampOS/tools/played/voiceset.py v1126 r-calls r-not-calls r-greeted   # the rule groups, about 30 minutes
-VOICESET_HEY_ONLY=1 lampOS/tools/played/voiceset.py v1126b calls calls-2            # older groups scored by "Hey Lamp" only
-lampOS/tools/played/voiceset.py d1125 day/october-day calls room
+lampOS/tools/played/voiceset.py --list         # 59 groups, 431 scenes, 699 lines (with `handover`)
+lampOS/tools/played/voiceset.py v1127          # every group but `handover` (58, 421 scenes, 689 lines), about seven hours
+VOICESET_GAP=22 lampOS/tools/played/voiceset.py v1127r r-calls r-not-calls r-greeted   # the rule groups, about 30 minutes
+lampOS/tools/played/voiceset.py v1127h handover                                    # only when named: asks a paired computer
+VOICESET_OCTOBER=1 lampOS/tools/played/voiceset.py o1127 calls calls-2              # older groups as written, for October's comparison
+lampOS/tools/played/voiceset.py d1125 day/paced-day calls room
 ```
+
+- **The rule scored.** Every group is scored by the product owner's rule of 26 Nov ("Hey Lamp" opens a
+  conversation): a scene whose first line is answered but doesn't open with "Hey", "Hi" or "Hello" is
+  expected left alone. `VOICESET_OCTOBER=1` scores the older groups as written.
+- **One voice per run.** With `PLAYED_WAV_DIR` set, a run refuses to start if any line it would play has no
+  rendered WAV, and names the count; `scenario.py` and `el-say.sh` never fall back to mac `say` for such a line.
+  `quiet-voices`, `delivery-2` and `pauses` carry mac `say` cues (`[[volm]]`, `[[rate]]`, `[[slnc]]`) that a
+  rendered WAV doesn't, so they test what they say only with mac voices until rendered with the same cue.
+- **Named only.** `handover` asks a paired computer for work, so it never runs in a run that names no group.
 
 - **Waits.** A line's wait is seconds after it, or `6a`: 6 s after the lamp
   is done with the line, its answer played to its last sample or its turn
