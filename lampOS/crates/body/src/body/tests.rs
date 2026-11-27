@@ -23225,3 +23225,63 @@ fn a_conversation_beginning_drops_a_queued_move() {
     );
     assert_eq!(report.gestures, 1, "{fates:?}");
 }
+
+/// #7513, `LAMP_BODY_REACH_MAP=shadow`: with the lamp's map given, a standing lamp writes exactly the goals it writes without it (the
+/// shadow only says), and it reaches the full height where the shadow judges.
+#[test]
+fn the_reach_map_shadow_changes_no_goal() {
+    let map: &'static crate::reach_map::ReachMap = Box::leak(Box::new(
+        crate::reach_map::ReachMap::parse(include_str!(
+            "../../../../sdk/js/examples/twin/reach-map-4ace.json"
+        ))
+        .unwrap(),
+    ));
+    let run_with = |reach_map: Option<&'static crate::reach_map::ReachMap>| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(25));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let seen_at = clock.time.clone();
+        let mut seen: Vec<(Duration, f32, [u16; 3])> = Vec::new();
+        run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                reach_map,
+                ..gesture_limits()
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Listening, 100)),
+            Asked::default,
+            |glimpse| seen.push((seen_at.get(), glimpse.stand, glimpse.goals)),
+        );
+        seen
+    };
+    let without = run_with(None);
+    let with = run_with(Some(map));
+    assert!(
+        with.iter().any(|step| step.1 >= 1.0),
+        "the lamp never stood at full height"
+    );
+    assert_eq!(with, without, "the shadow changed a goal");
+}
+
+#[test]
+fn the_product_unit_never_turns_the_reach_map_shadow_on() {
+    let unit = include_str!("../../../../deploy/product/lamp-body.service");
+    assert!(
+        !unit.contains("LAMP_BODY_REACH_MAP"),
+        "a product unit must not set the reach map"
+    );
+    let census = include_str!("../../../../docs/switches.md");
+    let row = census
+        .lines()
+        .find(|line| line.starts_with("| `lamp-body` LAMP_BODY_REACH_MAP"))
+        .expect("docs/switches.md lists LAMP_BODY_REACH_MAP");
+    assert!(
+        row.contains("`shadow`; off."),
+        "the census says it is off: {row}"
+    );
+    assert!(row.contains("off in the product"));
+}
