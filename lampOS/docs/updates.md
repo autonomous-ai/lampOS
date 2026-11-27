@@ -1834,8 +1834,9 @@ each round reads the owner's mark, `/etc/lampOS/setup/auto-update-off`
   quiet again at the voice's own boundary. `update/status`'s `round` says
   `asked` `auto`. With lamp-voice's `LAMP_UPDATE_AUTO_SAY=on` (off by
   default, the product owner, 27 Nov: the team ships builds often, and a lamp
-  telling each one bothers its owner; off, nothing is said unasked, day or
-  night, and someone who speaks during the round is still told), by day the
+  telling each one bothers its owner; off, nothing is said, day or night,
+  not even to someone who speaks during the round, and the first update after
+  setup still says its line as before), by day the
   voice says "I'm updating now. I'll be back in a minute." once even with
   nobody near, and the ring breathes while the
   build comes and swells once it is kept (`LAMP_RING_UPDATE`, on with this).

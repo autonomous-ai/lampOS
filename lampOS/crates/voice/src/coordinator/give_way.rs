@@ -22,12 +22,13 @@
 //! [`crate::language::UPDATE_DONE`] once, in the owner's language; at night
 //! nothing.
 //!
-//! Auto update's unasked lines (the one before by day and the done line)
-//! are said only with [`SAY_SWITCH`] `on`: off by default (the product
-//! owner, 27 Nov: the team ships builds often, and a lamp telling each one
-//! bothers its owner). Off, an Auto update round says nothing unasked, day or
-//! night; someone who speaks during it is still told it is updating, and the
-//! ring still shows it (`LAMP_RING_UPDATE`).
+//! Auto update's lines (the one before and the done line) are said only
+//! with [`SAY_SWITCH`] `on`: off by default (the product owner, 27 Nov: the
+//! team ships builds often, and a lamp telling each one bothers its owner).
+//! Off, an Auto update round says nothing, day or night, not even to someone
+//! who speaks during it (the product owner, 27 Nov: silent when off); a line
+//! heard is answered as any other, and the ring still shows the update
+//! (`LAMP_RING_UPDATE`). Update now's line is not this switch's.
 //!
 //! No switch of its own for Update now: lamp-update says this only with `LAMP_UPDATE_NOW`
 //! on, and lamp-cloud asks for it only with its own.
@@ -112,7 +113,7 @@ pub(super) struct GiveWay {
     /// An Auto update round this voice saw under way, by when it began, not
     /// yet ended.
     auto_round: Option<u64>,
-    /// Auto update's unasked lines are said ([`SAY_SWITCH`]).
+    /// Auto update's lines are said ([`SAY_SWITCH`]).
     tell: bool,
     /// That round's build came in by day, when (this voice's clock): the
     /// done line is owed.
@@ -234,8 +235,16 @@ impl GiveWay {
 
     /// The line a heard line is answered with while the round gives way:
     /// told to the worker as the first update's hold is.
+    /// Auto update with its switch off: none.
     pub(super) fn active_line(&self) -> Option<String> {
-        self.round.and_then(|_| Self::line())
+        self.round
+            .filter(|_| !self.silent())
+            .and_then(|_| Self::line())
+    }
+
+    /// Auto update's round with [`SAY_SWITCH`] off: nothing is said for it.
+    fn silent(&self) -> bool {
+        self.auto && !self.tell
     }
 
     /// The line, in the owner's language, as the walk's own lines are said.
@@ -245,9 +254,11 @@ impl GiveWay {
 
     /// Whether the line is owed now: a round giving way, someone near, and
     /// not said for this round yet.
-    /// Auto update's round by day (#8769) is owed with nobody near too.
+    /// Auto update's round by day (#8769) is owed with nobody near too, and
+    /// with its switch off never.
     pub(super) fn owed(&self, near: bool) -> bool {
-        (near || (self.auto && self.tell && !self.quiet_hours))
+        !self.silent()
+            && (near || (self.auto && self.tell && !self.quiet_hours))
             && self.round.is_some()
             && self.round != self.said_round
     }
@@ -338,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn with_its_switch_off_auto_update_says_nothing_unasked() {
+    fn with_its_switch_off_auto_update_says_nothing() {
         let auto = Some(UpdateRound::ASKED_AUTO);
         let mut way = GiveWay::default();
         way.take(
@@ -347,8 +358,22 @@ mod tests {
             0,
         );
         assert!(!way.owed(false), "by day, nothing to an empty room");
-        assert!(way.owed(true), "someone talking is still told");
-        assert!(way.active_line().is_some(), "a line heard is answered");
+        assert!(!way.owed(true), "nor to someone talking");
+        assert_eq!(way.active_line(), None, "a line heard is answered as any");
+        way.take(
+            Some(&switching(auto, Some(UpdateRound::WAITING_GIVE_WAY), 9)),
+            true,
+            0,
+        );
+        assert!(!way.owed(true), "at night, nothing either");
+        let now = Some(UpdateRound::ASKED_NOW);
+        way.take(
+            Some(&switching(now, Some(UpdateRound::WAITING_GIVE_WAY), 10)),
+            false,
+            0,
+        );
+        assert!(way.owed(true), "Update now's line is not this switch's");
+        assert!(way.active_line().is_some());
         let mut watching = switching(auto, None, 9);
         watching.now = "watching".into();
         way.take(Some(&watching), false, 0);
