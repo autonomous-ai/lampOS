@@ -21,7 +21,7 @@
 //! ([`STEADY_MOST_TURN_DEG`] for a meshed window with the switch),
 //! too new, or with jittering marks is `unknown`, never `no`.
 use lamp_msgs::{Speaking, SpeakingFrom, SpeakingState};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
 /// Where the eyes read whether to judge speaking. `on` only; with
@@ -273,7 +273,7 @@ pub struct Mouths {
 }
 
 /// The head at a look's frame, as [`Mouths::set_head_moved`] was told.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HeadAtFrame {
     Moving,
@@ -291,7 +291,7 @@ const UNKNOWN: Speaking = Speaking {
 
 /// The branch that returned this decision. Earlier gates take precedence;
 /// a metric that was not reached remains null rather than being recomputed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Reason {
     InvalidEyes,
@@ -312,7 +312,7 @@ pub enum Reason {
 }
 
 /// Numeric, ephemeral diagnostics only: no face id, marks, image or name.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MouthDiagnostic {
     /// This look's, in the detector's pixels.
     pub eyes_px: Option<f32>,
