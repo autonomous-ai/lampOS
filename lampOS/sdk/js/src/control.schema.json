@@ -700,6 +700,10 @@
               ]
             }
           ]
+        },
+        "queue": {
+          "description": "Wait for this computer's own move playing and start on the step it ends, with no ease back to the stand between (lamp-body's LAMP_BODY_MOVE_QUEUE; off there, behind another computer's motion or with nothing playing, the move is asked as without it). Anything that ends the move playing early drops this one (its done: dropped, \"dropped: the move it waited for did not play out\"); a newer queued move takes the place of one waiting. Absent: false.",
+          "type": "boolean"
         }
       },
       "required": [

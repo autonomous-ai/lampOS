@@ -1023,7 +1023,9 @@ export class FakeLamp {
           return this.refuse(ws, id, 'bad_request', 'frames: each frame is five whole counts');
         }
         const refusal = moveRefusal(request.step_ms, request.frames, this.appReach ? MOVE_FARTHEST : LAMP_FARTHEST);
-        if (refusal) return this.refuse(ws, id, 'bad_request', refusal);
+        if (refusal) return this.refuse(ws, id, 'bad_request', refusal);        // `queue` (wait for this computer's own move playing): a bool, as serde reads it; the fake's motions end at once,
+        // so a queued one is told as any move.
+        if ('queue' in request && typeof request.queue !== 'boolean') return this.refuse(ws, id, 'bad_request', 'queue: true or false');
       }
       // As lamp-control's protocol.rs for a light: its own limits, in its words.
       if (request.op === 'light') {
