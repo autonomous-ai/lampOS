@@ -46,6 +46,8 @@ struct Entry {
     step: Option<String>,
     settled_unix_ms: Option<u64>,
     told_unix_ms: Option<u64>,
+    /// Why it ended, when the lamp knows ([`Recent::reason`]).
+    reason: Option<String>,
 }
 
 /// The record, as last refreshed.
@@ -86,6 +88,7 @@ impl Now {
                 step: None,
                 settled_unix_ms: None,
                 told_unix_ms: None,
+                reason: None,
             });
             let line = tracker.line(task.task_id);
             if let Some(line) = line {
@@ -109,6 +112,7 @@ impl Now {
                     (line.map_or(entry.state, |line| line.state), now_unix_ms)
                 }
             };
+            entry.reason.clone_from(&task.reason);
             if state != entry.state {
                 entry.state = state;
                 entry.since_unix_ms = since;
@@ -194,7 +198,7 @@ fn render(kept: &[(u64, &Entry)], most_step: usize, all: usize, now_unix_ms: u64
                 .as_deref()
                 .and_then(|text| step(text, most_step))
                 .map(|text| json!({"untrusted": text}));
-            json!({
+            let mut line = json!({
                 "task": id,
                 "agent": entry.agent,
                 "target": entry.target,
@@ -205,7 +209,12 @@ fn render(kept: &[(u64, &Entry)], most_step: usize, all: usize, now_unix_ms: u64
                     .map(|at| now_unix_ms.saturating_sub(at)),
                 "last_step": step,
                 "told": entry.told_unix_ms.is_some(),
-            })
+            });
+            // Only where the lamp knows why (a person's stop).
+            if let Some(reason) = &entry.reason {
+                line["reason"] = reason.as_str().into();
+            }
+            line
         })
         .collect();
     json!({"tasks": tasks, "left_out": all - kept.len()})
@@ -232,6 +241,7 @@ mod tests {
             settled_ago_ms: None,
             told: false,
             told_ago_ms: None,
+            reason: None,
         }
     }
     fn settled(task: u64, state: &str, ago: u64) -> Recent {
@@ -273,6 +283,26 @@ mod tests {
     }
     fn bytes(value: &Value) -> usize {
         serde_json::to_vec(value).unwrap().len()
+    }
+
+    /// A task the person stopped (`stop`): `stopped`, with its `reason`,
+    /// so the voice tells it as ended, not failed. Any other has none.
+    #[test]
+    fn a_task_the_person_stopped_says_why() {
+        let empty = Tracker::started(T0);
+        let by_person = Recent {
+            reason: Some(crate::direct::STOPPED_BY_PERSON.into()),
+            ..settled(1, "stopped", 0)
+        };
+        let mut now = Now::new();
+        now.refresh(&[by_person, settled(2, "failed", 0)], &empty, T0);
+        let body = now.body(T0);
+        let tasks = body["tasks"].as_array().unwrap();
+        assert_eq!(tasks[1]["task"], 1);
+        assert_eq!(tasks[1]["state"], "stopped");
+        assert_eq!(tasks[1]["reason"], crate::direct::STOPPED_BY_PERSON);
+        assert_eq!(tasks[0]["task"], 2);
+        assert!(tasks[0].get("reason").is_none(), "{body}");
     }
 
     #[test]

@@ -370,6 +370,19 @@ pub const SWITCHED: &str =
 /// with at once ([`not_default_for`]): its gateway is not run, so waiting
 /// for it would only end in "not ready" minutes later.
 pub const NOT_DEFAULT: &str = "agent_not_lamp_default";
+/// Why a turn ended when the person stopped it (the tasks part's `stop`,
+/// [`Direct::stop`]): its observation's `answer` (state `stopped`), and the
+/// `reason` of its "tasks now" line and work record. A code, never words to
+/// say: the voice tells it as a task the person ended, never as a failure.
+pub const STOPPED_BY_PERSON: &str = "stopped_by_person";
+/// The longest a person's `stop` waits for the engine to confirm the abort
+/// (OpenClaw's `chat.abort`, Hermes's run `cancelled`) before it answers
+/// `unconfirmed` ([`Direct::stop`]).
+pub const STOP_CONFIRM_MOST: Duration = Duration::from_secs(30);
+/// The `stop` reply's word for a running direct turn while its stop is
+/// under way: the engine's answer to the service ([`stop_finish`] replaces
+/// it), never the voice's.
+pub const STOPPING: &str = "stopping";
 /// Sends failed in a row that make the session broken: reset, then the
 /// waiting turn tried once more.
 pub const BROKEN_SENDS: u32 = 2;
@@ -445,6 +458,33 @@ pub enum End {
     Answered(String),
     Failed(String),
     Aborted,
+    /// Aborted because the person asked, and the engine confirmed it
+    /// ([`Direct::stop`], [`STOPPED_BY_PERSON`]).
+    Stopped,
+}
+
+/// How a person's stop of a turn went ([`Direct::stop`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stop {
+    /// Ended by the stop: dropped from the queue, or aborted on the gateway
+    /// and confirmed there ([`End::Stopped`]).
+    Stopped,
+    /// The abort was sent; no confirmation came within the bound. The turn
+    /// is left as it is, for its engine's own end.
+    Unconfirmed,
+    /// Already ended (on its own, first, when they race), or not here.
+    NotRunning,
+}
+
+impl Stop {
+    /// The `stop` reply's word.
+    pub fn word(self) -> &'static str {
+        match self {
+            Stop::Stopped => "stopped",
+            Stop::Unconfirmed => "unconfirmed",
+            Stop::NotRunning => "not_running",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -467,6 +507,9 @@ struct Run {
     run: Option<RunId>,
     progress: Option<Progress>,
     end: Option<End>,
+    /// The person asked to stop it and the abort is out ([`Direct::stop`]):
+    /// its engine's abort is then their stop ([`End::Stopped`]).
+    stop_asked: bool,
 }
 
 impl Run {
@@ -671,7 +714,7 @@ impl Direct {
     }
 
     /// Whether `agent` is one of this session's turns and has ended.
-    fn ended(&self, agent: &str) -> bool {
+    pub(crate) fn ended(&self, agent: &str) -> bool {
         self.lock().find(agent).is_some_and(|run| run.end.is_some())
     }
 
@@ -789,6 +832,7 @@ impl Direct {
             run: Some(RunId("run-test".into())),
             progress: None,
             end: Some(end),
+            stop_asked: false,
         });
     }
 
@@ -1055,6 +1099,7 @@ impl Direct {
             run: None,
             progress: None,
             end: None,
+            stop_asked: false,
         });
         inner.prune();
         drop(inner);
@@ -1284,7 +1329,12 @@ impl Direct {
                 }
                 Some((End::Failed(why), Some(progress)))
             }
-            Ok(Outcome::Aborted { progress }) => Some((End::Aborted, Some(progress))),
+            // Aborted for the person's stop: their end ([`Direct::stop`]).
+            Ok(Outcome::Aborted { progress }) => {
+                let asked = inner.find(agent).is_some_and(|run| run.stop_asked);
+                let end = if asked { End::Stopped } else { End::Aborted };
+                Some((end, Some(progress)))
+            }
             Err(Error::TimedOut) => None,
             Err(error @ (Error::Lost(_) | Error::NotReady(_))) => {
                 drop(inner);
@@ -1341,6 +1391,120 @@ impl Direct {
             );
         }
         self.end(agent, End::Aborted);
+    }
+
+    /// The person's stop of `agent`'s turn (the tasks part's `stop`). One
+    /// still queued here is dropped at once ([`End::Stopped`]). One handed
+    /// over is aborted on its gateway, on a thread of its own, and its end
+    /// waited for, at most `within`, on the turns' condition: neither the
+    /// session nor the turns are held while it waits, so the pump goes on
+    /// and reads the run's end; its engine's abort is then the person's stop
+    /// (`stop_asked`, [`Self::after_wait`]). Its own end first (answered,
+    /// failed) is the one kept, never a second: `NotRunning`. No end within
+    /// `within`, or the abort refused: `Unconfirmed`, and the turn is left to
+    /// its engine. The kept session is never reset for a stop.
+    pub fn stop(self: &Arc<Self>, agent: &str, within: Duration) -> Stop {
+        let until = Instant::now() + within;
+        let (name, run) = {
+            let mut inner = self.lock();
+            let Some(entry) = inner.find_mut(agent) else {
+                return Stop::NotRunning;
+            };
+            if entry.end.is_some() {
+                return Stop::NotRunning;
+            }
+            let name = entry.name.clone();
+            match entry.run.clone() {
+                // Not handed over: dropped; one being handed over right now
+                // is aborted at once by `hand_over`, which finds it ended.
+                None => {
+                    entry.end = Some(End::Stopped);
+                    drop(inner);
+                    self.changed.notify_all();
+                    eprintln!("tasks: {name}: stopped by the person before it was handed over");
+                    return Stop::Stopped;
+                }
+                Some(run) => {
+                    entry.stop_asked = true;
+                    (name, run)
+                }
+            }
+        };
+        let (said, heard) = std::sync::mpsc::channel();
+        let me = self.clone();
+        let who = agent.to_owned();
+        let id = run.clone();
+        let spawned = std::thread::Builder::new()
+            .name(format!("{}-stop", self.engine.argument()))
+            .spawn(move || {
+                let mut session = me.session();
+                let aborted = session.abort(&id);
+                if aborted.is_err() {
+                    // Not taken: the run's own end is its engine's again,
+                    // cleared before the pump (waiting on this session) reads it.
+                    me.not_stopping(&who);
+                }
+                drop(session);
+                let _ = said.send(aborted);
+                me.changed.notify_all();
+            });
+        if let Err(error) = spawned {
+            self.not_stopping(agent);
+            eprintln!("tasks: {name}: the person's stop not started: {error}");
+            return Stop::Unconfirmed;
+        }
+        let mut inner = self.lock();
+        let refused = loop {
+            match inner.find(agent).map(|entry| entry.end.clone()) {
+                None => return Stop::NotRunning,
+                Some(Some(End::Stopped)) => {
+                    drop(inner);
+                    eprintln!(
+                        "tasks: {name}: stopped by the person; run {} aborted",
+                        run.0
+                    );
+                    return Stop::Stopped;
+                }
+                Some(Some(_)) => {
+                    drop(inner);
+                    eprintln!("tasks: {name}: ended on its own before the person's stop took");
+                    return Stop::NotRunning;
+                }
+                Some(None) => {}
+            }
+            if let Ok(Err(error)) = heard.try_recv() {
+                break Some(error);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+            inner = self
+                .changed
+                .wait_timeout(inner, Duration::from_millis(50))
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
+        };
+        if let Some(entry) = inner.find_mut(agent) {
+            entry.stop_asked = false;
+        }
+        drop(inner);
+        match refused {
+            Some(error) => eprintln!(
+                "tasks: {name}: the person's stop was not taken by the gateway ({error}); left to its engine"
+            ),
+            None => eprintln!(
+                "tasks: {name}: the person's stop was sent; no confirmation in {} s, left to its engine",
+                within.as_secs()
+            ),
+        }
+        Stop::Unconfirmed
+    }
+
+    /// `agent`'s abort is no longer the person's stop.
+    fn not_stopping(&self, agent: &str) {
+        if let Some(entry) = self.lock().find_mut(agent) {
+            entry.stop_asked = false;
+        }
     }
 
     /// Waits for `agent`'s end until `until` or `cancelled` (then aborted,
@@ -1675,7 +1839,7 @@ pub fn skill_turn(
             ran.map(|()| 0)
         }
         Some(End::Failed(why)) => Err(why),
-        Some(End::Aborted) | None => {
+        Some(End::Aborted | End::Stopped) | None => {
             if began.elapsed() >= run.deadline || Instant::now() >= until {
                 Err(format!(
                     "the run was ended at its deadline, {} s",
@@ -2019,7 +2183,7 @@ pub fn state_of(queued: bool, phase: Option<&Phase>, end: Option<&End>) -> &'sta
         // An end with no answer is no answer to tell: failed, never an idle
         // agent the store would wait on for ever.
         (Some(End::Answered(_) | End::Failed(_)), _) => "failed",
-        (Some(End::Aborted), _) => "stopped",
+        (Some(End::Aborted | End::Stopped), _) => "stopped",
         // Not yet handed over: starting. Handed over, the gateway has it:
         // working from then on, its first event or not (ee17, 13:58:48: the
         // bus read `starting` while `get_progress` read `working`).
@@ -2160,6 +2324,7 @@ pub fn listed_of(
         run: progress.map(|p| p.run.clone()),
         progress: progress.cloned(),
         end: end.cloned(),
+        stop_asked: false,
     })
 }
 
@@ -2172,6 +2337,8 @@ fn observation_of_run(run: &Run) -> Observation {
         Some(End::Failed(why)) if why == lamp_agent_gateway::DROPPED || why == SWITCHED => {
             (why.clone(), false)
         }
+        // Stopped by the person: the code the store and the voice read.
+        Some(End::Stopped) => (STOPPED_BY_PERSON.to_owned(), false),
         _ => (String::new(), false),
     };
     Observation {
@@ -2205,7 +2372,29 @@ pub fn observation_of(agent: &str, progress: Option<&Progress>, end: Option<&End
         run: progress.map(|p| p.run.clone()),
         progress: progress.cloned(),
         end: end.cloned(),
+        stop_asked: false,
     })
+}
+
+/// The engine's `stop` reply `body` for a running direct turn
+/// ([`STOPPING`], with its `agent`) finished: the turn stopped
+/// ([`Direct::stop`], within `within`) and the reply's `stop` the outcome.
+/// Any other body is given back as it is.
+pub fn stop_finish(mut body: serde_json::Value, within: Duration) -> serde_json::Value {
+    if body["stop"] != STOPPING {
+        return body;
+    }
+    let agent = body
+        .as_object_mut()
+        .and_then(|object| object.remove("agent"))
+        .and_then(|agent| agent.as_str().map(str::to_owned));
+    let said = agent
+        .as_deref()
+        .and_then(|agent| lamp_owns(agent).map(|direct| direct.stop(agent, within)))
+        .unwrap_or(Stop::NotRunning);
+    body["stop"] = said.word().into();
+    body["data"]["stop"] = said.word().into();
+    body
 }
 
 #[cfg(test)]

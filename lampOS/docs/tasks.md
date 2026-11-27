@@ -857,6 +857,7 @@ inspection evidence, not a playback grant.
 | `forget_sessions` | none | Trusted (#6274): the index of the sessions the lamp started (`sessions-started.json`) removed, for the owner's "forget everything"; answers `forgotten` |
 | `confirm` | `guard`, `id`, `prepared_digest`, `session_id` | Trusted person's spoken confirmation |
 | `cancel` | `guard`, `id` | Only before dispatch attempt |
+| `stop` | `guard`, `id` | The person's "stop that task", guarded as `cancel`: `{"id","stop"}`, also as `data`, with `stopped`, `unconfirmed`, `not_started`, `remote` or `not_running`; may wait up to 30 s (["A person's stop of a running task"](#a-persons-stop-of-a-running-task-stop)) |
 | `observe` | `guard`, `id` | Explicit `show` of the bound accepted agent |
 | `claim_speech` | `guard`, `id`, `observation_id`, `text`, `session_id` | Trusted one-time playback grant |
 | `ack_speech` | `guard`, `id`, `observation_id`, `claim_id`, `text_digest`, `session_id`, `played:true` | Trusted completed-playout attestation |
@@ -6889,6 +6890,68 @@ session (`<scenario>::openclaw`, `<scenario>::hermes`): hand-over, progress,
 queue, stuck, drop, skill run, make; and adds Hermes's own:
 its context bounds and turns backstop, its launcher words, its wait for its own
 session's readiness. Not yet on a lamp: the whole path (no Hermes lamp row).
+
+#### A person's stop of a running task (`stop`)
+
+The voice's "stop that task" is the tasks part's `stop` op:
+`{"op":"stop","guard":<guard>,"id":<task id>}`, guarded exactly as `cancel`
+(the store's id, its current revision, a fresh request id), on the request
+socket or the voice's. The reply is the usual `ok` envelope with
+`{"id":<id>,"stop":<outcome>}`, given both at the top level and as `data`:
+
+| `stop` | When | What happened |
+|---|---|---|
+| `stopped` | A direct task (the lamp's own OpenClaw or Hermes, this section) at work, or still queued in the direct session | Aborted on its gateway (OpenClaw's `chat.abort`, Hermes's `POST /v1/runs/{id}/stop`) and the engine confirmed it: the run ended aborted. One still queued here is dropped and never sent. The task ends `stopped` |
+| `unconfirmed` | The abort was sent, and no end came within `direct::STOP_CONFIRM_MOST` (30 s) | Nothing is marked: the task stays as its engine says (still at work, or whatever it reports later). Journal: `tasks: <id>: the person's stop was sent; no confirmation in <s> s, left to its engine` |
+| `not_started` | Prepared, or queued for its hand-over | Dropped as `cancel` drops it (`cancelled`), never handed over; the same request again gets the same answer |
+| `remote` | Harness has it (another computer, a paired computer, a dispatch still being created, or the lamp's own agent with its direct switch off) | Nothing is sent: the lamp cannot stop it from here |
+| `not_running` | No such task, or it already ended (answered, failed, stopped, given on) | Nothing changes |
+
+A task being handed over right now (`attempting`, or a start being checked)
+is refused `busy`: asked again a moment later, it has one of the outcomes
+above.
+
+The wait for the engine's confirmation is bounded by
+`direct::STOP_CONFIRM_MOST` (30 s). The store answers at once that the task
+is the direct session's (`stopping`, never seen by the voice); the service's
+owner then hands the stop to a thread of its own (`direct::stop_finish`), so
+the store, its other requests and the direct session's pump never wait for
+it. `Direct::stop` sends the abort on its own thread too and waits on the
+session's turns without holding the session or any lock, at most the bound,
+for the run's end. The request socket gives a `stop` up to
+`runtime::STOP_REQUEST_DEADLINE` (32 s) instead of the usual 1.1 s, so a
+client of `stop` must wait that long.
+
+A stop racing the run's own end leaves one end only: the first end the run
+gets is kept (`run.end` is set once). When the abort is confirmed first, the
+turn ends `direct::End::Stopped`; when the run answered or failed first, that
+end stays and the stop answers `not_running`; a late answer after a stop
+changes nothing.
+
+A run the person stopped is read into the store as an observation with state
+`stopped` and the answer `stopped_by_person` (`direct::STOPPED_BY_PERSON`, a
+code, never words to say). "Tasks now" gives it as `state:"stopped"` with
+`"reason":"stopped_by_person"`, and its work record as `state:"stopped"`,
+`done:true`, `"reason":"stopped_by_person"` and no answer. So the voice's task
+news can tell it as a task the person ended, never as a failure. No other
+task has a `reason`.
+
+The kept session is never reset or replaced by a stop: only that run is
+aborted, and the next turn goes into the same conversation
+(`a_person_stops_a_running_turn_and_the_kept_session_stays`). The one
+session's pane path (`one_session.rs`) is not touched.
+
+Tests: `direct::tests::{a_person_stops_a_running_turn_and_the_kept_session_stays,
+a_stop_the_engine_never_confirms_is_unconfirmed_after_the_bound,
+a_stop_racing_the_runs_own_end_leaves_one_end,
+a_turn_stopped_before_it_is_handed_over_is_never_sent}` (each for OpenClaw and
+Hermes); `engine::tests::{a_stop_before_the_task_began_is_not_started,
+a_stop_of_a_harness_task_is_remote_and_of_an_ended_one_not_running,
+a_stop_of_a_running_direct_task_is_stopped_by_the_person,
+a_stop_never_confirmed_is_unconfirmed_and_the_task_runs_on}`;
+`now::tests::a_task_the_person_stopped_says_why`;
+`works::tests::a_task_the_person_stopped_is_over_with_its_reason`;
+`tests/runtime.rs::stop_over_the_socket_says_how_it_went`.
 
 ### The limit accepted for Monday: a running skill's grants inside the gateway
 

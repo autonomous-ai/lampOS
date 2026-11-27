@@ -206,6 +206,10 @@ pub struct TaskWork {
     /// keeps its end, so its elapsed time is its own. None while not over,
     /// or when the store cannot date it.
     pub ended_ago_ms: Option<u64>,
+    /// Why it ended, when the lamp knows: the person stopped it
+    /// ([`crate::direct::STOPPED_BY_PERSON`]). Given as the record's
+    /// `reason`, in place of an answer.
+    pub reason: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -236,13 +240,15 @@ struct Work {
     /// `working` then, as before; the voice's 20 s line reads this
     /// (`hand_wait.rs`).
     waiting: bool,
+    /// Why it ended, when the lamp knows: the person stopped it.
+    reason: Option<String>,
 }
 
 impl Work {
     fn render(&self, now_ms: u64) -> Value {
         let done = self.state.over();
         let end = self.ended_ms.unwrap_or(now_ms).max(self.started_ms);
-        json!({
+        let mut record = json!({
             "id": self.id,
             "kind": self.kind,
             "who": self.who,
@@ -261,7 +267,12 @@ impl Work {
                 .session
                 .as_ref()
                 .map(|(machine, agent)| json!({"machine": machine, "agent": agent})),
-        })
+        });
+        // Only where the lamp knows why (a person's stop).
+        if let Some(reason) = &self.reason {
+            record["reason"] = reason.as_str().into();
+        }
+        record
     }
 
     /// Into `state`; its end (`end_ms`) kept the first time it is over.
@@ -383,6 +394,7 @@ impl Board {
                     answer: None,
                     session: None,
                     waiting,
+                    reason: None,
                 });
             }
             let Some(work) = self.find(&id) else {
@@ -403,6 +415,7 @@ impl Board {
             work.waiting = waiting;
             work.shown_tools = task.tools;
             work.answer.clone_from(&task.answer);
+            work.reason.clone_from(&task.reason);
             if let Some((machine, agent)) = &task.session {
                 work.session = Some((cut(machine, MOST_ID_CHARS), cut(agent, MOST_ID_CHARS)));
             }
@@ -532,6 +545,7 @@ mod tests {
             session: None,
             started_ago_ms: None,
             ended_ago_ms: None,
+            reason: None,
         }
     }
     fn none(_: u64) -> Option<(Option<State>, Option<u64>, bool)> {
@@ -650,6 +664,27 @@ mod tests {
         assert_eq!(done["elapsed_s"], 60);
         // Still one record.
         assert_eq!(board.list(10, T0 + 90_000).len(), 1);
+    }
+
+    /// A task the person stopped (`stop`): over, `stopped`, with its
+    /// `reason` and no answer; never `failed`.
+    #[test]
+    fn a_task_the_person_stopped_is_over_with_its_reason() {
+        let mut board = Board::new();
+        board.tasks(&[task(5, None)], none, T0);
+        let stopped = TaskWork {
+            reason: Some(crate::direct::STOPPED_BY_PERSON.into()),
+            ..task(5, Some(State::Stopped))
+        };
+        board.tasks(&[stopped], none, T0 + 2_000);
+        let record = board.get("5", T0 + 3_000).unwrap();
+        assert_eq!(record["state"], "stopped");
+        assert_eq!(record["done"], true);
+        assert_eq!(record["reason"], crate::direct::STOPPED_BY_PERSON);
+        assert_eq!(record["answer"], Value::Null);
+        // Any other record says no reason.
+        board.tasks(&[task(6, Some(State::Failed))], none, T0);
+        assert!(board.get("6", T0).unwrap().get("reason").is_none());
     }
 
     #[test]

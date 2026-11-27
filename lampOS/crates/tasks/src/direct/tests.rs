@@ -47,6 +47,12 @@ pub(crate) struct FakeState {
     size_reads: u32,
     /// Hermes's own count of its kept session: turns, tokens.
     counts: (u64, u64),
+    /// `abort` is taken and answers, but the gateway never ends the run
+    /// (OpenClaw's "nothing to abort", a Hermes stop that never lands).
+    abort_ignored: bool,
+    /// The run ends answered with these words just as the abort comes: a
+    /// stop racing the run's own end, which the end wins.
+    answered_at_abort: Option<String>,
 }
 
 #[derive(Clone, Default)]
@@ -63,6 +69,18 @@ impl Fake {
         let fake = Fake::default();
         fake.state().engine = Some(engine);
         fake
+    }
+    /// The runs aborted, in order.
+    pub(crate) fn aborted(&self) -> Vec<RunId> {
+        self.state().aborted.clone()
+    }
+    /// The kept session's resets.
+    pub(crate) fn resets(&self) -> u32 {
+        self.state().resets
+    }
+    /// Aborts taken from now on, but the run never ended by them.
+    pub(crate) fn ignore_aborts(&self) {
+        self.state().abort_ignored = true;
     }
     fn hermes(&self) -> bool {
         self.state().engine == Some(Engine::Hermes)
@@ -180,6 +198,19 @@ impl AgentSession for Fake {
     fn abort(&mut self, run: &RunId) -> Result<(), Error> {
         let mut state = self.state();
         state.aborted.push(run.clone());
+        if state.abort_ignored {
+            return Ok(());
+        }
+        if let Some(text) = state.answered_at_abort.clone() {
+            if let Some((progress, outcome)) = state.runs.get_mut(run) {
+                progress.phase = Phase::Done;
+                outcome.get_or_insert(Outcome::Answered {
+                    text,
+                    progress: progress.clone(),
+                });
+            }
+            return Ok(());
+        }
         if let Some((progress, outcome)) = state.runs.get_mut(run) {
             *outcome = Some(Outcome::Aborted {
                 progress: progress.clone(),
@@ -267,11 +298,15 @@ both_engines!(
     a_handed_over_run_reads_working_before_its_first_event,
     a_make_with_no_run_id_still_has_a_task_id,
     the_bus_status_follows_a_direct_run_without_ps,
+    a_person_stops_a_running_turn_and_the_kept_session_stays,
+    a_stop_the_engine_never_confirms_is_unconfirmed_after_the_bound,
+    a_stop_racing_the_runs_own_end_leaves_one_end,
+    a_turn_stopped_before_it_is_handed_over_is_never_sent,
 );
 
-struct Started {
-    direct: Arc<Direct>,
-    fake: Fake,
+pub(crate) struct Started {
+    pub(crate) direct: Arc<Direct>,
+    pub(crate) fake: Fake,
     told: Arc<Mutex<Vec<String>>>,
     stop: Arc<AtomicBool>,
 }
@@ -610,6 +645,7 @@ fn how_far_along_mid_run_with_tool_progress(engine: Engine) {
         session: Some((MACHINE.into(), agent.clone())),
         started_ago_ms: Some(30_000),
         ended_ago_ms: None,
+        reason: None,
     };
     // As `works_refresh`: the records brought up to date, then the steps.
     crate::works::with(|board| {
@@ -1095,6 +1131,144 @@ fn gateway_down_then_up(engine: Engine) {
         lamp.direct.observe(&second).unwrap().answer == "Up again."
     });
     assert_eq!(lamp.told.lock().unwrap().len(), 1);
+}
+
+/// A spoken turn handed over and at work on `lamp`: its agent id.
+fn running_turn(lamp: &Started, engine: Engine, words: &str) -> String {
+    until("ready", || lamp.direct.is_ready());
+    let before = lamp.fake.state().sent.len();
+    let agent = joined(lamp.direct.spoken_launch(&launch(kind(engine), words)));
+    until("sent", || lamp.fake.state().sent.len() == before + 1);
+    until("handed over", || {
+        lamp.direct.observe(&agent).unwrap().state == "working"
+    });
+    agent
+}
+
+/// The person's "stop that task" (the tasks part's `stop`): the running
+/// turn aborted on its gateway, confirmed, and ended `stopped` with
+/// [`STOPPED_BY_PERSON`] as its last words; the kept session is never reset
+/// for it, and the next turn goes into the same one. A late answer from
+/// the gateway changes nothing: one end.
+fn a_person_stops_a_running_turn_and_the_kept_session_stays(engine: Engine) {
+    let lamp = started(Fake::of(engine));
+    let agent = running_turn(&lamp, engine, "Plan my trip");
+    let said = lamp.direct.stop(&agent, Duration::from_secs(5));
+    assert_eq!(said, Stop::Stopped);
+    assert_eq!(said.word(), "stopped");
+    assert_eq!(lamp.fake.state().aborted, vec![lamp.fake.run_of(1)]);
+    let seen = lamp.direct.observe(&agent).unwrap();
+    assert_eq!(seen.state, "stopped");
+    assert_eq!(seen.answer, STOPPED_BY_PERSON);
+    let row = lamp.direct.listed();
+    assert_eq!(row[0].state, "stopped");
+    // Never a fresh conversation for a stop.
+    assert_eq!(lamp.fake.state().resets, 0);
+    assert_eq!(lamp.direct.resets(), 0);
+    // A late answer is not a second end.
+    lamp.fake.answer(&lamp.fake.run_of(1), "Too late.");
+    std::thread::sleep(Duration::from_millis(50));
+    let seen = lamp.direct.observe(&agent).unwrap();
+    assert_eq!(
+        (seen.state.as_str(), seen.answer.as_str()),
+        ("stopped", STOPPED_BY_PERSON)
+    );
+    // Stopped again: it has ended.
+    assert_eq!(
+        lamp.direct.stop(&agent, Duration::from_secs(1)),
+        Stop::NotRunning
+    );
+    assert_eq!(
+        lamp.direct.stop("not-a-turn", Duration::from_secs(1)),
+        Stop::NotRunning
+    );
+    // The next turn goes into the same kept session.
+    let next = running_turn(&lamp, engine, "And the hotel");
+    lamp.fake.answer(&lamp.fake.run_of(2), "The Metropole.");
+    until("answered", || {
+        lamp.direct.observe(&next).unwrap().state == "idle"
+    });
+    assert_eq!(lamp.fake.state().resets, 0);
+}
+
+/// The gateway takes the abort but never ends the run: `unconfirmed` once
+/// the bound passes, never sooner, and the turn is not marked stopped; it
+/// goes on to whatever its engine says (here, its answer).
+fn a_stop_the_engine_never_confirms_is_unconfirmed_after_the_bound(engine: Engine) {
+    let lamp = started(Fake::of(engine));
+    let agent = running_turn(&lamp, engine, "Plan my trip");
+    lamp.fake.state().abort_ignored = true;
+    let began = Instant::now();
+    let said = lamp.direct.stop(&agent, Duration::from_millis(300));
+    let took = began.elapsed();
+    assert_eq!(said, Stop::Unconfirmed);
+    assert!(took >= Duration::from_millis(300), "{took:?}");
+    assert!(took < Duration::from_secs(3), "{took:?}");
+    assert_eq!(lamp.fake.state().aborted.len(), 1);
+    assert_eq!(lamp.direct.observe(&agent).unwrap().state, "working");
+    lamp.fake.answer(&lamp.fake.run_of(1), "Hanoi on the 3rd.");
+    until("answered", || {
+        lamp.direct.observe(&agent).unwrap().state == "idle"
+    });
+    assert_eq!(
+        lamp.direct.observe(&agent).unwrap().answer,
+        "Hanoi on the 3rd."
+    );
+}
+
+/// The run ends on its own just as the stop comes: its own end is the one
+/// kept, the stop says `not_running`, and nothing says stopped.
+fn a_stop_racing_the_runs_own_end_leaves_one_end(engine: Engine) {
+    let lamp = started(Fake::of(engine));
+    let agent = running_turn(&lamp, engine, "Plan my trip");
+    lamp.fake.state().answered_at_abort = Some("Hanoi on the 3rd.".into());
+    assert_eq!(
+        lamp.direct.stop(&agent, Duration::from_secs(5)),
+        Stop::NotRunning
+    );
+    let seen = lamp.direct.observe(&agent).unwrap();
+    assert_eq!(
+        (seen.state.as_str(), seen.answer.as_str()),
+        ("idle", "Hanoi on the 3rd.")
+    );
+}
+
+/// A turn still queued here (its gateway not ready) is dropped by a stop:
+/// ended stopped by the person, never sent, nothing aborted.
+fn a_turn_stopped_before_it_is_handed_over_is_never_sent(engine: Engine) {
+    let fake = Fake::of(engine);
+    fake.state().not_ready = u32::MAX;
+    let lamp = started(fake);
+    let agent = lamp
+        .direct
+        .enqueue(
+            "lamp-0123456789abcdef0123456789abcdef",
+            TurnKind::Spoken,
+            "Plan my trip",
+        )
+        .unwrap();
+    assert_eq!(
+        lamp.direct.stop(&agent, Duration::from_secs(5)),
+        Stop::Stopped
+    );
+    let seen = lamp.direct.observe(&agent).unwrap();
+    assert_eq!(
+        (seen.state.as_str(), seen.answer.as_str()),
+        ("stopped", STOPPED_BY_PERSON)
+    );
+    lamp.fake.state().not_ready = 0;
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(lamp.fake.state().sent.is_empty());
+    assert!(lamp.fake.state().aborted.is_empty());
+}
+
+/// A started lamp session of `engine` with one spoken turn at work, for a
+/// store test on this thread ([`set_test_lamp`]): the session with its
+/// fake, and the turn's agent id. Dropped, its pump stops.
+pub(crate) fn lamp_running(engine: Engine) -> (Started, String) {
+    let lamp = started(Fake::of(engine));
+    let agent = running_turn(&lamp, engine, "Plan my trip");
+    (lamp, agent)
 }
 
 /// The lamp's session for a store test on this thread, owning `agent`

@@ -1485,6 +1485,9 @@ pub struct Recent {
     /// How long ago it was told, when that was in this boot; else how long
     /// ago it settled, the earliest the telling can have been.
     pub told_ago_ms: Option<u64>,
+    /// Why its settled answer ended it, when the lamp knows: the person
+    /// stopped it ([`crate::direct::STOPPED_BY_PERSON`]).
+    pub reason: Option<String>,
 }
 
 /// One harness to close ([`Engine::begin_close`]): closed only if a read just
@@ -2243,6 +2246,14 @@ impl<P: Persistence> Engine<P> {
                 "Tasks changed; inspect current state without silently retrying a mutation.",
             ));
         }
+        // The person's stop of a task already handed over, or one not
+        // here: answered from what is known, the store unchanged. One not
+        // yet begun is dropped below, as `cancel` drops it.
+        if let Request::Stop { id, .. } = request
+            && let Some(said) = self.stop_without_change(*id)
+        {
+            return self.reply(said?);
+        }
         let mut next = self.state.clone();
         let at = next_audit(&mut next, now)?;
         match request {
@@ -2397,7 +2408,7 @@ impl<P: Persistence> Engine<P> {
                 task.dispatch.confirmed = Some(at.clone());
                 task.updated = at.clone();
             }
-            Request::Cancel { id, .. } => {
+            Request::Cancel { id, .. } | Request::Stop { id, .. } => {
                 let task = &mut next.tasks[find(&self.state, *id)?];
                 if !matches!(
                     task.dispatch.state,
@@ -2544,6 +2555,58 @@ impl<P: Persistence> Engine<P> {
     /// A read's reply with this store's identity, as every reply has it.
     pub fn identified(&self, body: Value) -> Result<Value, Error> {
         self.reply(body)
+    }
+    /// The person's `stop` of task `id` where the store does not change:
+    /// none for one not yet begun (dropped as `cancel` drops it). A direct
+    /// task at work is the direct session's to stop (`stopping`, with its
+    /// agent, finished by the service with [`crate::direct::stop_finish`]);
+    /// one Harness has is `remote`, nothing sent; one over or unknown,
+    /// `not_running`; one being handed over now, refused `busy`.
+    fn stop_without_change(&self, id: u64) -> Option<Result<Value, Error>> {
+        let Some(task) = self.state.tasks.iter().find(|task| task.id == id) else {
+            return Some(Ok(stop_body(id, "not_running")));
+        };
+        let said = match task.dispatch.state {
+            DispatchState::Prepared | DispatchState::Queued => return None,
+            DispatchState::Attempting | DispatchState::Uncertain => {
+                return Some(Err(err(
+                    "busy",
+                    "The task is being handed over now; ask again in a moment.",
+                )));
+            }
+            DispatchState::Pending => "remote",
+            DispatchState::NotSent | DispatchState::Cancelled | DispatchState::Invalidated => {
+                "not_running"
+            }
+            DispatchState::Accepted => {
+                // Settled (a question is not: its agent waits, at work).
+                let over = given_on(task)
+                    || task.observations.last().is_some_and(|seen| {
+                        settled(&seen.data) && seen.data.state != "needs-input"
+                    });
+                let agent = task.dispatch.agent_id.as_deref();
+                match agent
+                    .and_then(|agent| crate::direct::lamp_owns(agent).map(|direct| (agent, direct)))
+                {
+                    Some((agent, direct)) if !over && !direct.ended(agent) => {
+                        let mut body = stop_body(id, crate::direct::STOPPING);
+                        body["agent"] = agent.into();
+                        return Some(Ok(body));
+                    }
+                    Some(_) => "not_running",
+                    None if over => "not_running",
+                    // The lamp's own agent spoken to directly, its run gone
+                    // here (pruned, or from before a restart): over.
+                    None if task.target_alias == crate::runtime::LAMP_TARGET
+                        && crate::direct::lamp_for(engine_of(task)).is_some() =>
+                    {
+                        "not_running"
+                    }
+                    None => "remote",
+                }
+            }
+        };
+        Some(Ok(stop_body(id, said)))
     }
     fn reply(&self, body: Value) -> Result<Value, Error> {
         let response = identity(body, self.store_id(), self.revision());
@@ -3270,7 +3333,9 @@ impl<P: Persistence> Engine<P> {
                     words: cut(&task.launch.prompt, MOST_WORDS_CHARS),
                     state,
                     tools: newest.map_or(0, |seen| seen.data.tools),
+                    // A person's stop has no answer: its reason says it.
                     answer: settled_seen
+                        .filter(|seen| !stopped_by_person(&seen.data))
                         .map(|seen| seen.data.answer.as_str())
                         .filter(|answer| !answer.trim().is_empty())
                         .map(|answer| cut(answer, MOST_ANSWER_CHARS)),
@@ -3290,6 +3355,9 @@ impl<P: Persistence> Engine<P> {
                         .map(|at| now.monotonic_ms.saturating_sub(at.monotonic_ms)),
                     // When the store first saw it over, if in this boot:
                     // its settled observation, else its dispatch's end.
+                    reason: settled_seen
+                        .filter(|seen| stopped_by_person(&seen.data))
+                        .map(|_| crate::direct::STOPPED_BY_PERSON.to_owned()),
                     ended_ago_ms: state.filter(|state| state.over()).and_then(|_| {
                         settled_seen.map_or_else(|| ago(&task.updated), |seen| ago(&seen.observed))
                     }),
@@ -3345,6 +3413,9 @@ impl<P: Persistence> Engine<P> {
                     // A telling that cannot be dated (an earlier boot) is
                     // taken as at the settle time: the earliest it can be.
                     told_ago_ms: told_at.and_then(|at| ago(at).or(settled_ago_ms)),
+                    reason: newest
+                        .filter(|seen| stopped_by_person(&seen.data))
+                        .map(|_| crate::direct::STOPPED_BY_PERSON.to_owned()),
                 })
             })
             .collect()
@@ -3758,6 +3829,16 @@ fn observation_metadata(observed: &Observed) -> Value {
         "speech":observed.speech.as_ref().map(|s|json!({"claim_id":s.claim_id,"text_digest":s.text_digest,"state":s.state,"claimed":s.claimed,"finished":s.finished})),"told":observed.told,"completion":"unverified"})
 }
 
+/// The `stop` op's answer for task `id`: `stop` the outcome, given at the
+/// top level and as `data` (the voice reads `data.stop`).
+fn stop_body(id: u64, stop: &str) -> Value {
+    json!({"id":id,"stop":stop,"data":{"id":id,"stop":stop}})
+}
+/// Whether an observation is a run the person stopped (`stop`): state
+/// `stopped`, its answer [`crate::direct::STOPPED_BY_PERSON`].
+fn stopped_by_person(value: &Observation) -> bool {
+    value.state == "stopped" && value.answer == crate::direct::STOPPED_BY_PERSON
+}
 fn receipt_effect<'a>(state: &'a State, request: &Request) -> Result<&'a Audit, Error> {
     let task = match request {
         Request::Prepare { guard, .. } => state
@@ -3766,6 +3847,7 @@ fn receipt_effect<'a>(state: &'a State, request: &Request) -> Result<&'a Audit, 
             .find(|task| task.prepare_request_id == guard.request_id),
         Request::Confirm { id, .. }
         | Request::Cancel { id, .. }
+        | Request::Stop { id, .. }
         | Request::Observe { id, .. }
         | Request::ClaimSpeech { id, .. }
         | Request::AckSpeech { id, .. }
@@ -3776,7 +3858,9 @@ fn receipt_effect<'a>(state: &'a State, request: &Request) -> Result<&'a Audit, 
     match request {
         Request::Prepare { .. } => Ok(&task.created),
         Request::Confirm { .. } => task.dispatch.confirmed.as_ref().ok_or_else(storage),
-        Request::Cancel { .. } => task.dispatch.finished.as_ref().ok_or_else(storage),
+        Request::Cancel { .. } | Request::Stop { .. } => {
+            task.dispatch.finished.as_ref().ok_or_else(storage)
+        }
         Request::Observe { .. } => Ok(&task.read.as_ref().ok_or_else(storage)?.requested),
         Request::ClaimSpeech { observation_id, .. } | Request::AckSpeech { observation_id, .. } => {
             let observed = &task.observations
@@ -3843,6 +3927,16 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
                 return Err(storage());
             }
             Ok(json!({"id":id,"cancelled":true,"remote_cancelled":false}))
+        }
+        Request::Stop { id, .. } => {
+            if state.tasks[find(state, *id).map_err(|_| storage())?]
+                .dispatch
+                .state
+                != DispatchState::Cancelled
+            {
+                return Err(storage());
+            }
+            Ok(stop_body(*id, "not_started"))
         }
         Request::Observe { id, .. } => {
             let task = &state.tasks[find(state, *id).map_err(|_| storage())?];
@@ -4720,6 +4814,176 @@ mod tests {
         }
     }
 
+    fn stop(engine: &mut Engine<Memory>, id: u64, at: u64) -> Result<Value, Error> {
+        let request = Request::Stop {
+            guard: guard(engine, "stop"),
+            id,
+        };
+        engine.handle(&request, &clock(at), false)
+    }
+
+    /// The `stop` op's reply word, as the voice reads it (`data.stop`).
+    fn stop_word(reply: &Value) -> &str {
+        assert_eq!(reply["data"]["id"], reply["id"], "{reply}");
+        assert_eq!(reply["data"]["stop"], reply["stop"], "{reply}");
+        reply["data"]["stop"].as_str().unwrap()
+    }
+
+    /// The person's "stop that task" before it began (prepared, or queued
+    /// for its yes's hand-over): dropped as `cancel` drops it, `not_started`,
+    /// the same answer to the same request again, never handed over.
+    #[test]
+    fn a_stop_before_the_task_began_is_not_started() {
+        let parsed = Request::parse(
+            br#"{"op":"stop","guard":{"store_id":"s","revision":0,"request_id":"r"},"id":1}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.name(), "stop");
+        assert!(!parsed.trusted() && parsed.guard().is_some());
+        for confirm in [false, true] {
+            let (mut engine, _) = opened();
+            let id = if confirm {
+                queued(&mut engine, 0)
+            } else {
+                prepare(&mut engine, 0)
+            };
+            let request = Request::Stop {
+                guard: guard(&engine, "stop"),
+                id,
+            };
+            let reply = engine.handle(&request, &clock(1), false).unwrap();
+            assert_eq!(stop_word(&reply), "not_started");
+            assert_eq!(reply["id"], id);
+            assert_eq!(dispatch(&engine, id), DispatchState::Cancelled);
+            assert_eq!(engine.handle(&request, &clock(2), false).unwrap(), reply);
+            assert!(engine.begin_launch(&clock(2)).unwrap().is_none());
+        }
+    }
+
+    /// A stop of a task Harness has (another computer's, or the lamp's
+    /// without its direct session): `remote`, nothing sent anywhere, the
+    /// store as it was. One unknown or already over: `not_running`.
+    #[test]
+    fn a_stop_of_a_harness_task_is_remote_and_of_an_ended_one_not_running() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 10);
+        // A lamp session that does not own the task's agent.
+        let (lamp, _turn) =
+            crate::direct::tests::lamp_running(lamp_agent_gateway::Engine::Openclaw);
+        crate::direct::set_test_lamp(Some(lamp.direct.clone()));
+        let revision = engine.revision();
+        let reply = stop(&mut engine, id, 20);
+        let unknown = stop(&mut engine, 999, 20);
+        crate::direct::set_test_lamp(None);
+        let reply = reply.unwrap();
+        assert_eq!(stop_word(&reply), "remote");
+        assert_eq!(engine.revision(), revision);
+        assert!(lamp.fake.aborted().is_empty());
+        assert_eq!(dispatch(&engine, id), DispatchState::Accepted);
+        assert_eq!(stop_word(&unknown.unwrap()), "not_running");
+        // Finished with an answer: over.
+        observe(&mut engine, id, "Lumi, Sunny and Archie.", 30);
+        assert_eq!(
+            stop_word(&stop(&mut engine, id, 40).unwrap()),
+            "not_running"
+        );
+    }
+
+    /// A task handed to the lamp's own OpenClaw or Hermes directly, at
+    /// work: the store's `stop` says it is the direct session's
+    /// (`stopping`, its agent), and the service finishes it there
+    /// (`direct::stop_finish`, as `runtime`'s owner does on a thread of
+    /// its own): aborted, confirmed, `stopped`. Its end is read into the
+    /// store as `stopped` with `stopped_by_person`, which "tasks now" and
+    /// the work record give as its `reason`: over, never failed. The
+    /// kept session is never reset.
+    #[test]
+    fn a_stop_of_a_running_direct_task_is_stopped_by_the_person() {
+        for engine_kind in [
+            lamp_agent_gateway::Engine::Openclaw,
+            lamp_agent_gateway::Engine::Hermes,
+        ] {
+            let (mut engine, _) = opened();
+            let (lamp, agent) = crate::direct::tests::lamp_running(engine_kind);
+            let id = queued(&mut engine, 10);
+            engine.begin_launch(&clock(10)).unwrap().unwrap();
+            engine
+                .finish_launch(
+                    id,
+                    LaunchOutcome::Joined {
+                        agent_id: agent.clone(),
+                        session: None,
+                    },
+                    &clock(10),
+                )
+                .unwrap();
+            crate::direct::set_test_lamp(Some(lamp.direct.clone()));
+            let reply = stop(&mut engine, id, 20).unwrap();
+            assert_eq!(reply["stop"], crate::direct::STOPPING, "{reply}");
+            let reply = crate::direct::stop_finish(reply, std::time::Duration::from_secs(5));
+            assert_eq!(stop_word(&reply), "stopped", "{engine_kind:?}");
+            assert!(reply.get("agent").is_none(), "{reply}");
+            assert_eq!(lamp.fake.aborted().len(), 1);
+            assert_eq!(lamp.fake.resets(), 0);
+            // The store reads the end at once, as the service's turn does.
+            let mut pushed = std::collections::BTreeSet::new();
+            engine.push_direct_ended(&clock(30), &mut pushed).unwrap();
+            let job = engine.begin_observation(&clock(30)).unwrap().unwrap();
+            let seen = lamp.direct.observe(&agent).unwrap();
+            engine.finish_observation(&job, seen, &clock(31)).unwrap();
+            // Asked again: it has ended.
+            let again = stop(&mut engine, id, 32);
+            crate::direct::set_test_lamp(None);
+            assert_eq!(stop_word(&again.unwrap()), "not_running");
+            let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+            let newest = &task.observations.last().unwrap().data;
+            assert_eq!(newest.state, "stopped");
+            assert_eq!(newest.answer, crate::direct::STOPPED_BY_PERSON);
+            assert_eq!(task.observations.len(), 1, "one end");
+            let recent = engine.recent(&clock(33));
+            assert_eq!(recent[0].settled.as_deref(), Some("stopped"));
+            assert_eq!(
+                recent[0].reason.as_deref(),
+                Some(crate::direct::STOPPED_BY_PERSON)
+            );
+            let works = engine.works(&clock(33), None);
+            assert_eq!(works[0].state, Some(crate::works::State::Stopped));
+            assert_eq!(
+                works[0].reason.as_deref(),
+                Some(crate::direct::STOPPED_BY_PERSON)
+            );
+            assert_eq!(works[0].answer, None);
+        }
+    }
+
+    /// A stop the engine never confirms: `unconfirmed` at the bound, the
+    /// task not marked stopped (its agent still at work).
+    #[test]
+    fn a_stop_never_confirmed_is_unconfirmed_and_the_task_runs_on() {
+        let (mut engine, _) = opened();
+        let (lamp, agent) =
+            crate::direct::tests::lamp_running(lamp_agent_gateway::Engine::Openclaw);
+        lamp.fake.ignore_aborts();
+        let id = queued(&mut engine, 10);
+        engine.begin_launch(&clock(10)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: agent.clone(),
+                    session: None,
+                },
+                &clock(10),
+            )
+            .unwrap();
+        crate::direct::set_test_lamp(Some(lamp.direct.clone()));
+        let reply = stop(&mut engine, id, 20).unwrap();
+        let reply = crate::direct::stop_finish(reply, std::time::Duration::from_millis(200));
+        crate::direct::set_test_lamp(None);
+        assert_eq!(stop_word(&reply), "unconfirmed");
+        assert_eq!(lamp.direct.observe(&agent).unwrap().state, "working");
+    }
+
     #[test]
     fn pending_creation_is_unresolved_and_cannot_be_observed_by_name() {
         let (mut engine, _) = opened();
@@ -4958,6 +5222,7 @@ mod tests {
                 settled_ago_ms: None,
                 told: false,
                 told_ago_ms: None,
+                reason: None,
             }]
         );
         assert_eq!(engine.revision(), revision);

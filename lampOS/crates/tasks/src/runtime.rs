@@ -45,6 +45,11 @@ use std::{
 pub const READ_DEADLINE: Duration = Duration::from_millis(300);
 pub const REQUEST_DEADLINE: Duration = Duration::from_millis(1100);
 pub const CLIENT_DEADLINE: Duration = Duration::from_millis(1200);
+/// A `stop`'s bound on the request socket, in place of [`REQUEST_DEADLINE`]:
+/// it waits up to [`crate::direct::STOP_CONFIRM_MOST`] for the engine's
+/// confirmation, and a little more for its reply.
+pub const STOP_REQUEST_DEADLINE: Duration =
+    Duration::from_secs(crate::direct::STOP_CONFIRM_MOST.as_secs() + 2);
 pub const STALE_AFTER: Duration = Duration::from_millis(1500);
 /// How often the part says how it is on `diagnostics` while nothing changes
 /// ([`Config::report_every`] on a lamp).
@@ -3292,7 +3297,34 @@ fn owner<C: Clock>(
                         machines_due = Instant::now();
                     }
                     requests = requests.saturating_add(1);
-                    let _ = work.response.try_send(answer);
+                    match answer {
+                        // A person's stop of a direct task at work: the
+                        // wait for its engine's confirmation (up to
+                        // `direct::STOP_CONFIRM_MOST`) runs on a thread of
+                        // its own, never on this loop.
+                        Ok(body) if body["stop"] == crate::direct::STOPPING => {
+                            let response = work.response.clone();
+                            let spawned =
+                                thread::Builder::new()
+                                    .name("tasks-stop".into())
+                                    .spawn(move || {
+                                        let _ = response.try_send(Ok(crate::direct::stop_finish(
+                                            body,
+                                            crate::direct::STOP_CONFIRM_MOST,
+                                        )));
+                                    });
+                            if let Err(error) = spawned {
+                                eprintln!("tasks: the person's stop not started: {error}");
+                                let _ = work.response.try_send(Err(EngineError {
+                                    code: "busy",
+                                    message: "The stop could not be started; ask again.",
+                                }));
+                            }
+                        }
+                        answer => {
+                            let _ = work.response.try_send(answer);
+                        }
+                    }
                     if engine.failed() {
                         return Err(io::Error::other("Tasks storage failed; restart required"));
                     }
@@ -5114,11 +5146,20 @@ fn serve_client(mut stream: UnixStream, accepted: Instant, route: Route, owner: 
     if stream.set_nonblocking(true).is_err() {
         return;
     }
+    // The reply's write bound: past a `stop`'s longer wait too.
+    let mut write_by = accepted + CLIENT_DEADLINE;
     let reply = match read_line(&mut stream, MAX_LINE_BYTES, accepted + READ_DEADLINE) {
         Ok(line) => match Request::parse(&line) {
             Ok(request) => {
                 let (tx, rx) = mpsc::sync_channel(1);
-                let deadline = accepted + REQUEST_DEADLINE;
+                // A person's stop waits for its engine's confirmation.
+                let bound = if matches!(request, Request::Stop { .. }) {
+                    STOP_REQUEST_DEADLINE
+                } else {
+                    REQUEST_DEADLINE
+                };
+                let deadline = accepted + bound;
+                write_by = deadline + (CLIENT_DEADLINE - REQUEST_DEADLINE);
                 match owner.try_send(Work {
                     request,
                     route,
@@ -5163,7 +5204,7 @@ fn serve_client(mut stream: UnixStream, accepted: Instant, route: Route, owner: 
             bytes = b"{\"ok\":false,\"error\":\"reply_bound\"}".to_vec();
         }
         bytes.push(b'\n');
-        let _ = write_bytes(&mut stream, &bytes, accepted + CLIENT_DEADLINE);
+        let _ = write_bytes(&mut stream, &bytes, write_by);
     }
 }
 

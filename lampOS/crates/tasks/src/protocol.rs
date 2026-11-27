@@ -104,6 +104,16 @@ pub enum Request {
         guard: Guard,
         id: u64,
     },
+    /// The person's "stop that task": a running direct task (the lamp's own
+    /// OpenClaw or Hermes, [`crate::direct`]) aborted on its engine and
+    /// ended `stopped_by_person` once the engine confirms; one not yet
+    /// begun dropped as `cancel` drops it. Guarded as `cancel` is.
+    /// Answered `{"id","stop"}`: `stopped`, `unconfirmed`, `not_started`,
+    /// `remote` or `not_running` (`docs/tasks.md`, "Stopping a task").
+    Stop {
+        guard: Guard,
+        id: u64,
+    },
     Observe {
         guard: Guard,
         id: u64,
@@ -224,6 +234,7 @@ impl Request {
             Self::Prepare { guard, .. }
             | Self::Confirm { guard, .. }
             | Self::Cancel { guard, .. }
+            | Self::Stop { guard, .. }
             | Self::Observe { guard, .. }
             | Self::ClaimSpeech { guard, .. }
             | Self::AckSpeech { guard, .. }
@@ -289,6 +300,7 @@ impl Request {
             Self::Session { .. } => "session",
             Self::ForgetSessions {} => "forget_sessions",
             Self::Cancel { .. } => "cancel",
+            Self::Stop { .. } => "stop",
             Self::Observe { .. } => "observe",
             Self::ClaimSpeech { .. } => "claim_speech",
             Self::AckSpeech { .. } => "ack_speech",

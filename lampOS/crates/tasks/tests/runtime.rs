@@ -765,6 +765,43 @@ fn model_cannot_confirm_and_restart_keeps_exact_dispatch_without_resending() {
     assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1);
 }
 
+/// The person's "stop that task" over the request socket (`stop`, guarded
+/// as `cancel`): one only prepared is dropped (`not_started`) and never
+/// handed over; one Harness has on another computer is `remote`, nothing
+/// sent; one unknown is `not_running`. Each reply carries `data.stop`.
+#[test]
+fn stop_over_the_socket_says_how_it_went() {
+    let s = Running::new(false);
+    let prepared = s.prepare();
+    let stopped = s.ask(json!({"op":"stop","guard":s.guard(),"id":prepared["id"]}));
+    assert_eq!(stopped["ok"], true, "{stopped}");
+    assert_eq!(stopped["data"]["stop"], "not_started", "{stopped}");
+    assert_eq!(stopped["data"]["id"], prepared["id"]);
+    assert_eq!(
+        s.get(&prepared["id"])["task"]["dispatch"]["state"],
+        "cancelled"
+    );
+    let unknown = s.ask(json!({"op":"stop","guard":s.guard(),"id":999}));
+    assert_eq!(unknown["data"]["stop"], "not_running", "{unknown}");
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    let remote = s.ask(json!({"op":"stop","guard":s.guard(),"id":prepared["id"]}));
+    assert_eq!(remote["data"]["stop"], "remote", "{remote}");
+    assert_eq!(
+        s.get(&prepared["id"])["task"]["dispatch"]["state"],
+        "accepted"
+    );
+    // Guarded as `cancel`: a stale revision is refused.
+    let mut stale = s.guard();
+    stale["revision"] = json!(0);
+    let refused = s.ask(json!({"op":"stop","guard":stale,"id":prepared["id"]}));
+    assert_eq!(refused["error"], "conflict", "{refused}");
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1);
+}
+
 #[test]
 fn who_can_be_given_work_is_read_on_the_request_socket_and_runs_nothing() {
     let s = Running::new(false);

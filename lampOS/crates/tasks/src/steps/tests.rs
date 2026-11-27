@@ -816,6 +816,7 @@ fn a_work_record_gets_its_step_and_the_bus_the_whole_step() {
             session: None,
             started_ago_ms: None,
             ended_ago_ms: None,
+            reason: None,
         }],
         |_| None,
         WALL,
