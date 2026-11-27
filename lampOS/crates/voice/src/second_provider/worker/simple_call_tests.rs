@@ -1,0 +1,295 @@
+//! `LAMP_SIMPLE_CALL`, the product owner on 27 Nov 2026: "we just start with
+//! a simple 'hey lamp' + 20s renewing. then we'll slowly add one thing at a
+//! time and always make sure the quality is good.", and then "keep it
+//! strictly 'Hey Lamp'. reason: false positive. someone may say Lamp or a
+//! word similar to it."
+//!
+//! With the switch a call is only a line whose words open with "Hey Lamp"
+//! (or a tap), and a hearing of the name alone never is, at any score. A line
+//! begun within 20 s of the end of the lamp's last words is answered whatever
+//! the camera, the room, the voices or its length, and every answer renews
+//! the window. Any other line is held. Without the switch, as before: on
+//! lamp-dbda (stable 16443) 21 lines were answered as "someone is turned to
+//! the lamp" between 15:02 and 15:42 that day, with no "Hey Lamp".
+use super::*;
+use lamp_msgs::SpeakingState::{No, Yes};
+
+const S: u64 = 1_000_000;
+
+/// A heeding as the product's second route judges (`LAMP_SPOKEN_TO`,
+/// `LAMP_SAID_TO_ME`), with the switch or without it; the lamp's last words
+/// ended `ended_ago_s` before now, or it never spoke.
+fn heeding(simple: bool, ended_ago_s: Option<u64>) -> Heeding {
+    let mut heeding = Heeding::new(true, false, None, None);
+    heeding.as_the_only_voice(false, true, false);
+    heeding.hearing_only_said_to_me();
+    if simple {
+        heeding.taking_simple_calls();
+    }
+    heeding.said_until_us = ended_ago_s.map(|ago| monotonic_us().saturating_sub(ago * S));
+    heeding
+}
+
+/// The eyes seeing one face turned to the lamp, facing and looking at it,
+/// its mouth read as `speaking` in five looks through the line.
+fn one_face(heeding: &mut Heeding, speaking: lamp_msgs::SpeakingState) {
+    use lamp_msgs::{Face, Faces, Speaking};
+    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+    let now = Instant::now();
+    for look in 0..5u64 {
+        let faces = Faces {
+            faces: vec![Face {
+                pitch: Some(0.05),
+                looking: Some(true),
+                id: "f1".into(),
+                xmin: 0.4,
+                ymin: 0.3,
+                xmax: 0.5,
+                ymax: 0.45,
+                confidence: 1.0,
+                yaw: Some(0.1),
+                facing: Some(true),
+                speaking: Some(Speaking {
+                    state: speaking,
+                    score: 0.0,
+                    from: None,
+                }),
+                follows: None,
+            }],
+        };
+        eyes.look(
+            now + Duration::from_millis(200 + look * 400),
+            Some((("b", look + 1), &faces)),
+        );
+    }
+    heeding.seeing_speaking_faces(eyes, None);
+}
+
+/// The signs of a line: a face turned to the lamp or none, in `room`, with
+/// lamp-name's hearings of the name.
+fn signs(turned: Option<bool>, room: crate::room_told::Room, names: Vec<(u64, f32)>) -> Signs {
+    Signs {
+        room,
+        going_on: false,
+        lamp_asked: false,
+        turned,
+        names,
+        near: false,
+        continues_from: None,
+        soft_lead_us: 0,
+    }
+}
+
+/// The verdict on `heard`, said from `began_us` for 2.2 s (`None`: let out).
+fn judged(
+    heeding: &mut Heeding,
+    request: u64,
+    began_us: u64,
+    heard: &str,
+    signs: Signs,
+) -> Option<&'static str> {
+    let verdict = heeding.heed_signs(request, (began_us, began_us + 2_200_000), heard, signs);
+    *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    verdict
+}
+
+/// Out of a conversation, one person facing the lamp, seen speaking a
+/// question with no "Hey Lamp": answered without the switch (the facing
+/// door), held with it.
+#[test]
+fn simple_call_holds_a_facing_question_out_of_the_window() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let facing = |simple: bool| {
+        let mut heeding = heeding(simple, None);
+        one_face(&mut heeding, Yes);
+        let now = monotonic_us();
+        let signs = signs(Some(true), Room::Unknown, vec![]);
+        judged(&mut heeding, 9, now, "What time is it?", signs)
+    };
+    assert_eq!(facing(false), None, "off: let in by the face");
+    assert_eq!(
+        facing(true),
+        Some(crate::second_provider::SIMPLE_HELD),
+        "on: a face is no call"
+    );
+}
+
+/// Strictly "Hey Lamp" in the words: a call with no face and no hearing,
+/// in any case and with any punctuation. A hearing of the name alone, at any
+/// score, is none: "Hey man", "Hey Lynn" and a bare "Lamp, …" heard at
+/// 0.999 at the line's start are held.
+#[test]
+fn simple_call_is_strictly_hey_lamp_in_the_words() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let call = |simple: bool, heard: &str, score: Option<f32>| {
+        let mut heeding = heeding(simple, None);
+        let now = monotonic_us();
+        let names = score
+            .map(|score| vec![(now + 100_000, score)])
+            .unwrap_or_default();
+        judged(
+            &mut heeding,
+            9,
+            now,
+            heard,
+            signs(None, Room::Unknown, names),
+        )
+    };
+    for heard in [
+        "Hey Lamp, what time is it?",
+        "Hey, lamp. What time is it?",
+        "Hi Lamp, set a timer for five minutes.",
+        "Um, hello Lamp, are you there?",
+    ] {
+        assert_eq!(call(true, heard, None), None, "{heard}");
+    }
+    for heard in [
+        "Hey man, what time is it?",
+        "Hey Lynn, are you there?",
+        "Lamp, what time is it?",
+        "Hey lamb, what time is it?",
+        "What time is it?",
+    ] {
+        assert_eq!(
+            call(true, heard, Some(0.999)),
+            Some(crate::second_provider::SIMPLE_HELD),
+            "{heard}"
+        );
+    }
+    // Off, the same bare "Lamp, …" heard at 0.999 at its start is a call.
+    assert_eq!(call(false, "Lamp, what time is it?", Some(0.999)), None);
+}
+
+/// In the window, 5 s after the lamp's words: every line is answered, with
+/// no face, a face read silent, in a busy room, and a word or two ("Yes.",
+/// "Sixty four."). Without the switch a short line a face was read silent
+/// through is held.
+#[test]
+fn simple_call_answers_every_line_in_the_window() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let line = |simple: bool, heard: &str, silent_face: bool, room: Room| {
+        let mut heeding = heeding(simple, Some(5));
+        if silent_face {
+            one_face(&mut heeding, No);
+        }
+        let turned = silent_face.then_some(true);
+        let now = monotonic_us();
+        judged(&mut heeding, 9, now, heard, signs(turned, room, vec![]))
+    };
+    for (heard, silent_face, room) in [
+        ("And what about tomorrow?", false, Room::Unknown),
+        ("Yes.", false, Room::Unknown),
+        ("Sixty four.", false, Room::Quiet),
+        ("Yes.", true, Room::Quiet),
+        ("Can you make it shorter", true, Room::Busy),
+        ("Sixty four.", false, Room::Busy),
+    ] {
+        assert_eq!(
+            line(true, heard, silent_face, room),
+            None,
+            "{heard}, silent face {silent_face}, {room:?}"
+        );
+    }
+    assert!(
+        line(false, "Yes.", true, Room::Quiet).is_some(),
+        "off: a short line the face was read silent through is held"
+    );
+}
+
+/// 25 s after the lamp's last words, no "Hey Lamp": held, face or none.
+#[test]
+fn simple_call_holds_a_line_past_the_window() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, Some(25));
+    let now = monotonic_us();
+    assert_eq!(
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "And what about tomorrow?",
+            signs(None, Room::Unknown, vec![])
+        ),
+        Some(crate::second_provider::SIMPLE_HELD)
+    );
+}
+
+/// Every answer renews the window: a follow-up 15 s after the lamp's words,
+/// its answer, then a follow-up 15 s after that answer (35 s after the
+/// first words) are answered; a line 30 s after the last answer is held.
+#[test]
+fn simple_call_renews_the_window_with_every_answer() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, Some(15));
+    let now = monotonic_us();
+    let none = || signs(None, Room::Unknown, vec![]);
+    assert_eq!(judged(&mut heeding, 9, now, "And tomorrow?", none()), None);
+    // Its answer's words end 5 s from now.
+    heeding.lamp_did(crate::second_provider::Did::Said(9, now + 5 * S));
+    assert_eq!(
+        judged(&mut heeding, 10, now + 20 * S, "And the day after?", none()),
+        None
+    );
+    assert_eq!(
+        judged(&mut heeding, 11, now + 50 * S, "And the day after?", none()),
+        Some(crate::second_provider::SIMPLE_HELD)
+    );
+}
+
+/// The lamp's own news opens the window as an answer does: a reply 10 s
+/// after it began, 7 s after its words ended, is answered.
+#[test]
+fn simple_call_answers_a_reply_to_the_lamps_news() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, None);
+    let now = monotonic_us();
+    heeding.lamp_did(crate::second_provider::Did::Spoke(now));
+    heeding.lamp_did(crate::second_provider::Did::Said(7, now + 3 * S));
+    assert_eq!(
+        judged(
+            &mut heeding,
+            9,
+            now + 10 * S,
+            "Okay, thanks. Remind me later.",
+            signs(None, Room::Unknown, vec![])
+        ),
+        None
+    );
+}
+
+/// A bare "Hey Lamp." is a call, and its next line within 20 s is answered:
+/// after the lamp's "Yes?", and as the line going on from the call before
+/// the lamp said anything (`continues_from`).
+#[test]
+fn simple_call_answers_the_line_after_a_bare_hey_lamp() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let none = || signs(None, Room::Unknown, vec![]);
+    // After the lamp's "Yes?".
+    let mut heeding = heeding(true, None);
+    let now = monotonic_us();
+    assert_eq!(judged(&mut heeding, 9, now, "Hey Lamp.", none()), None);
+    heeding.lamp_did(crate::second_provider::Did::Said(9, now + 3 * S));
+    assert_eq!(
+        judged(&mut heeding, 10, now + 5 * S, "What time is it?", none()),
+        None
+    );
+    // Going on from the call, the lamp still waiting for it.
+    let mut heeding = self::heeding(true, None);
+    let now = monotonic_us();
+    assert_eq!(judged(&mut heeding, 9, now, "Hey Lamp.", none()), None);
+    let goes_on = Signs {
+        continues_from: Some(9),
+        ..none()
+    };
+    assert_eq!(
+        judged(&mut heeding, 10, now + 2 * S, "What time is it?", goes_on),
+        None
+    );
+}
