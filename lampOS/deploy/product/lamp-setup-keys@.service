@@ -4,7 +4,8 @@
 # redirect) and kept only if it works, root's, 0600, in the folder the voice loads whole; then the
 # voice is restarted once it has rested 1 s (KEY_CHANGE_QUIET, #8710) and no update is at work
 # (holding lamp-update's lock through the restarts), waiting at most 30 minutes; for a model key,
-# lamp-cloud after 45 s more of rest (an update's QUIET, so the reply it holds is relayed first),
+# lamp-cloud 5 s after the voice's restart, with no rest waited for (CLOUD_AFTER_REPLY, so the reply
+# it holds is relayed first while the link is up),
 # whose forwarder loads the key by LoadCredential= only at its start (#8735).
 # A key is never journalled.
 [Unit]
