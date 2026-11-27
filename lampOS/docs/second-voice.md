@@ -6285,15 +6285,20 @@ after a take-over, but now for every turn:
       "hi" or "hello" and then "Lamp" written as such, in any case and with
       any punctuation (`attention::opens_with_hey_lamp`: "Hey Lamp, …",
       "Hey, lamp.", "Hi Lamp"; never "Hey man", "Hey Lynn", "Hey lamb" or a
-      bare "Lamp, …"), a line whose head was tapped, or a turn a computer
-      opened (`Attention::simple_called`). A line going on from a call keeps
-      its words, so "Hey Lamp." and the question said after it are one call.
-      A hearing of the name by `lamp-name` never counts, at any score.
+      bare "Lamp, …"), or a line whose head was tapped
+      (`Attention::simple_called`); a turn a computer opened is no call. A
+      line going on from a call keeps its words, so "Hey Lamp." and the
+      question said after it are one call, and a line begun within
+      `CALL_CARRIES_FOR` (15 s) of a call, before the lamp said anything
+      back, is the call's. A hearing of the name by `lamp-name` never
+      counts, at any score.
     - **The window**: a line begun within `follows_on::WITHIN_US` (20 s) of
       the end of the lamp's last words, measured to the line's start
       (`said_until_us`), is answered, whatever the camera, the room, the
       voices or its length. Every answer's words move that end on, the lamp's
-      own news's too, so the window renews.
+      own news's too, so the window renews; a stop closes it. A line with no
+      words in it (a sound, a cough, room noise) is never answered, but for a
+      tap: `no words heard in it (LAMP_SIMPLE_CALL)`.
     - **Anything else** is held, `not "Hey Lamp", and no conversation going
       on (LAMP_SIMPLE_CALL)`, and never answered.
     - **Set aside**: `said_to_me` and the turned-silent rules
@@ -6304,7 +6309,14 @@ after a take-over, but now for every turn:
       be people's talk, the chains that kept an answer from renewing, the made
       skill's said-start face check (`holds_said_start`), and the model's
       `not_for_me`: it isn't offered (`tools.decline` off), and every line is
-      told `SIMPLE_NOTE`, "this was said to you: answer it".
+      told `SIMPLE_NOTE`, "this was said to you: answer it". Read as off
+      through `second_provider::unless_simple`: the second look, the name
+      note, the room's facts, the cut-in notes and wordless asks, the other
+      language, and talk over the lamp's own line; in code, the decline in
+      words, the cut ask, the cut-word joins, the first seconds' quiet, and
+      the busy room's floor hold. Every short utterance goes to the worker in
+      any room for the rule to judge. `LAMP_WAIT_KEEPS_ANSWER` stays: it keeps
+      a waiting answer from a short noise and decides no line.
     - **Unchanged**: endpointing, the echo strip, a spoken stop while the lamp
       speaks, privacy and mute, quiet hours, the tools, memory, the body and
       `lamp-name` itself.

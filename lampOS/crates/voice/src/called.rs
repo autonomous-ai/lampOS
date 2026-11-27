@@ -56,8 +56,8 @@ pub const NOTE_HEARD_AS: &str = "(For you to know, not to answer: your own ears 
 /// The provider worker's arguments for those switches in the environment.
 pub fn arguments_from_environment() -> Vec<String> {
     let mut flags = arguments(
-        std::env::var(ENVIRONMENT).ok().as_deref(),
-        std::env::var(BUSY_ENVIRONMENT).ok().as_deref(),
+        crate::second_provider::unless_simple(std::env::var(ENVIRONMENT).ok()).as_deref(),
+        crate::second_provider::unless_simple(std::env::var(BUSY_ENVIRONMENT).ok()).as_deref(),
     );
     flags.extend(heard_as_arguments(
         &flags,
@@ -99,7 +99,7 @@ pub fn note(heard_as: bool) -> &'static str {
 /// Whether the environment switches it on, for the coordinator, which
 /// then takes no second look at a request the model was told in.
 pub fn on() -> bool {
-    std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
+    crate::second_provider::unless_simple(std::env::var(ENVIRONMENT).ok()).as_deref() == Some("on")
 }
 
 /// Take a leading `--name-note`, and `--name-note-busy-face` after it, off
