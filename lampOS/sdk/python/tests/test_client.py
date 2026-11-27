@@ -1281,6 +1281,22 @@ def test_the_fake_refuses_a_move_whose_frames_lamp_control_cannot_parse_and_keep
     run(go())
 
 
+def test_a_move_may_say_it_waits_for_the_one_playing_sent_only_when_asked(tmp_path):
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                async with lamp.lease("body", for_ms=5000):
+                    await lamp.move(PLAYABLE, 500)
+                    await lamp.move(PLAYABLE, 500, queue=True)
+                    with pytest.raises(errors.BY_CODE["bad_request"]):
+                        await lamp.request("move", step_ms=500, frames=PLAYABLE, queue="yes")
+                moves = fake.asked("move")
+                assert "queue" not in moves[0] and moves[1]["queue"] is True
+
+    run(go())
+
+
 def test_the_fake_refuses_a_move_the_body_would_drop_with_its_words_before_the_lease(tmp_path):
     from lampos.moves import move_refusal
 

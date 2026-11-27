@@ -328,7 +328,15 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
         Op::SoundUpload {
             name, part, parts, ..
         } => format!("{}, part {part} of {parts}", word(name)),
-        Op::Move { step_ms, frames } => format!("{} frames, step_ms {step_ms}", frames.len()),
+        Op::Move {
+            step_ms,
+            frames,
+            queue,
+        } => format!(
+            "{} frames, step_ms {step_ms}{}",
+            frames.len(),
+            if *queue { ", queued" } else { "" }
+        ),
         Op::Express { feeling, strength } => format!("{}, strength {strength:.2}", word(feeling)),
         Op::Light {
             colour: Some(colour),

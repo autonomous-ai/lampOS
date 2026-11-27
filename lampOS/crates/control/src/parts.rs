@@ -414,12 +414,27 @@ impl Lamp {
         name: &str,
         send: impl FnOnce(&mut Self) -> Result<Value, Error>,
     ) -> Result<Value, Error> {
+        self.motion_sending_as(client, re, name, false, send)
+    }
+
+    /// As [`Self::motion_sending`], for a move that may wait for this
+    /// computer's own move playing (`queue`): its `done` waits longer to
+    /// begin ([`crate::motion_done::QUEUED_BEGIN_WITHIN_US`]).
+    fn motion_sending_as(
+        &mut self,
+        client: &str,
+        re: u64,
+        name: &str,
+        queued: bool,
+        send: impl FnOnce(&mut Self) -> Result<Value, Error>,
+    ) -> Result<Value, Error> {
         if let Some(motions) = &self.motions {
-            let told = motions.lock().expect("motions").sent(
+            let told = motions.lock().expect("motions").sent_as(
                 client,
                 self.asking,
                 re,
                 name,
+                queued,
                 (self.clock)(),
             );
             for (client, done) in told {
@@ -1580,11 +1595,19 @@ impl Parts for Lamp {
             Op::Gesture { name } => self.motion_sending(client, re, name, |lamp| {
                 lamp.motion(json!({"gesture": name}), client)
             }),
-            Op::Move { step_ms, frames } => self.motion_sending(client, re, MOVE_NAME, |lamp| {
-                lamp.motion(
-                    json!({"move": {"name": MOVE_NAME, "step_ms": step_ms, "frames": frames}}),
-                    client,
-                )
+            Op::Move {
+                step_ms,
+                frames,
+                queue,
+            } => self.motion_sending_as(client, re, MOVE_NAME, *queue, |lamp| {
+                let mut ask =
+                    json!({"move": {"name": MOVE_NAME, "step_ms": step_ms, "frames": frames}});
+                // Waits for this computer's own move playing, under the
+                // body's LAMP_BODY_MOVE_QUEUE; the body judges the rest.
+                if *queue {
+                    ask["queue"] = json!(true);
+                }
+                lamp.motion(ask, client)
             }),
             Op::Light {
                 colour: Some(colour),
@@ -1932,6 +1955,18 @@ mod tests {
         let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
         assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));
         assert_eq!(sent["priority"], "skill");
+        assert_eq!(
+            sent.get("queue"),
+            None,
+            "a move unqueued says nothing of it"
+        );
+        lamp.act("c_1", 3, &op(r#"{"id":3,"op":"move","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]],"queue":true}"#), 10_000_000).unwrap();
+        let length = body.recv(&mut buffer).unwrap();
+        let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+        assert_eq!(
+            (sent["queue"].clone(), sent["replace"].clone()),
+            (json!(true), json!(true))
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

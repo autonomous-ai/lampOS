@@ -277,6 +277,21 @@ test('the fake refuses a move the body would drop, with its words, before the le
   });
 });
 
+test('a move may say it waits for the one playing (queue), sent only when asked; the fake refuses a queue not true or false', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      await lamp.move(PLAYABLE, 500);
+      await lamp.move(PLAYABLE, 500, { queue: true });
+      await lamp.move(PLAYABLE, 500, { queue: 'no' });
+      await assert.rejects(lamp.request('move', { step_ms: 500, frames: PLAYABLE, queue: 'yes' }), (error) => error instanceof byCode.bad_request && error.why === 'queue: true or false');
+    }, { forMs: 5000 });
+    const moves = fake.asked('move');
+    assert.equal('queue' in moves[0], false);
+    assert.equal(moves[1].queue, true);
+    assert.equal('queue' in moves[2], false, "only true queues: 'no' is a move as before");
+  });
+});
+
 const LIGHT_REFUSALS = [
   [{ rgb: '#ff8000', for_ms: 1000, fade_ms: 500 }, 'fade_ms: from 1000 to 60000'],
   [{ rgb: '#ff8000', for_ms: 1000, fade_ms: 60001 }, 'fade_ms: from 1000 to 60000'],

@@ -626,8 +626,17 @@ pub enum Op {
     Look { at: LookAt },
     /// A move of its own: five joints a frame (pitch, roll, yaw, shoulder,
     /// elbow, in the body's counts from home), starting and ending at home.
+    /// `queue`: wait for this computer's own move playing and start on the
+    /// step it ends, with no ease back to the stand between (lamp-body's
+    /// `LAMP_BODY_MOVE_QUEUE`; off there, or behind anything else, it is a
+    /// move as before).
     #[serde(rename = "move")]
-    Move { step_ms: u32, frames: Vec<[i32; 5]> },
+    Move {
+        step_ms: u32,
+        frames: Vec<[i32; 5]>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        queue: bool,
+    },
     /// A recorded move of the client's pushed skills, by name (their
     /// `moves/NAME.json`), `skill` saying which when two have the name.
     #[serde(rename = "play")]
@@ -1160,7 +1169,9 @@ impl Op {
                     return Err("at: yaw and pitch, finite degrees".to_owned());
                 }
             }
-            Self::Move { step_ms, frames } => {
+            Self::Move {
+                step_ms, frames, ..
+            } => {
                 if !STEP_MS.contains(step_ms) {
                     return Err(format!(
                         "step_ms: from {} to {}",
@@ -1640,6 +1651,28 @@ mod tests {
         parse(frame)
             .unwrap_or_else(|refused| panic!("{frame}: {refused:?}"))
             .op
+    }
+
+    /// A move's `queue` is read, absent is false, and anything but a bool is refused.
+    #[test]
+    fn a_move_may_say_it_waits_for_the_one_playing() {
+        let frames = format!("[[0,0,0,0,0],{}[0,0,0,0,0]]", "[20,0,30,0,0],".repeat(4));
+        let queued = op(&format!(
+            r#"{{"id":1,"op":"move","step_ms":500,"frames":{frames},"queue":true}}"#
+        ));
+        assert!(matches!(queued, Op::Move { queue: true, .. }), "{queued:?}");
+        let plain = op(&format!(
+            r#"{{"id":2,"op":"move","step_ms":500,"frames":{frames}}}"#
+        ));
+        assert!(matches!(plain, Op::Move { queue: false, .. }), "{plain:?}");
+        // Said back without it when false, as the schema's other optional fields.
+        assert!(!serde_json::to_string(&plain).unwrap().contains("queue"));
+        assert!(
+            parse(&format!(
+                r#"{{"id":3,"op":"move","step_ms":500,"frames":{frames},"queue":"yes"}}"#
+            ))
+            .is_err()
+        );
     }
 
     fn why(frame: &str) -> (Option<u64>, String) {

@@ -1848,6 +1848,8 @@ impl Door {
                             .iter()
                             .map(|frame| frame.map(i32::from))
                             .collect(),
+                        // A recorded move plays as asked today: it never waits.
+                        queue: false,
                     },
                     Err(why) => return refuse(ErrorCode::Refused, why),
                 }

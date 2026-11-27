@@ -22,6 +22,11 @@ use serde_json::{Value, json};
 pub const BEGIN_WITHIN_US: u64 = 10_000_000;
 /// The same, for the docs.
 pub const BEGIN_WITHIN: &str = "10 s";
+/// How long a queued move (`move` with `queue`) may wait to begin: the move
+/// it waits for may play up to 10 s first, then the stand-up's room.
+pub const QUEUED_BEGIN_WITHIN_US: u64 = 20_000_000;
+/// The same, for the docs.
+pub const QUEUED_BEGIN_WITHIN: &str = "20 s";
 /// The why of a playing motion the body ended with no why of its own while
 /// a newer motion of that name waits: the door's own `replace`. The
 /// product body names no why for it on `body/gesture` (lamp-75c9, 9 Nov).
@@ -50,6 +55,8 @@ struct Pending {
     name: String,
     sent_us: u64,
     began_us: Option<u64>,
+    /// A queued move: it may wait [`QUEUED_BEGIN_WITHIN_US`] to begin.
+    queued: bool,
 }
 
 /// The door's motions waiting for the body's word.
@@ -83,6 +90,20 @@ impl Motions {
         name: &str,
         now_us: u64,
     ) -> Vec<Told> {
+        self.sent_as(client, connection, re, name, false, now_us)
+    }
+
+    /// As [`Self::sent`], `queued` for a move that waits for this computer's
+    /// own move playing: it may take [`QUEUED_BEGIN_WITHIN_US`] to begin.
+    pub fn sent_as(
+        &mut self,
+        client: &str,
+        connection: Option<u64>,
+        re: u64,
+        name: &str,
+        queued: bool,
+        now_us: u64,
+    ) -> Vec<Told> {
         let mut told = Vec::new();
         while self.pending.len() >= MOST_PENDING {
             if let Some(old) = self.pending.pop_front() {
@@ -96,6 +117,7 @@ impl Motions {
             name: name.to_owned(),
             sent_us: now_us,
             began_us: None,
+            queued,
         });
         told
     }
@@ -178,7 +200,14 @@ impl Motions {
         let mut kept = VecDeque::with_capacity(self.pending.len());
         for motion in self.pending.drain(..) {
             let late = match motion.began_us {
-                None => now_us.saturating_sub(motion.sent_us) >= BEGIN_WITHIN_US,
+                None => {
+                    now_us.saturating_sub(motion.sent_us)
+                        >= if motion.queued {
+                            QUEUED_BEGIN_WITHIN_US
+                        } else {
+                            BEGIN_WITHIN_US
+                        }
+                }
                 Some(began) => now_us.saturating_sub(began) >= END_WITHIN_US,
             };
             if late {
@@ -217,7 +246,14 @@ impl Motions {
         let (how, why) = match motion.began_us {
             None => (
                 "dropped",
-                format!("the body did not begin it within {BEGIN_WITHIN}"),
+                format!(
+                    "the body did not begin it within {}",
+                    if motion.queued {
+                        QUEUED_BEGIN_WITHIN
+                    } else {
+                        BEGIN_WITHIN
+                    }
+                ),
             ),
             Some(_) => (
                 "cut_short",
@@ -239,6 +275,64 @@ mod tests {
 
     fn said(name: &str, state: &str) -> Value {
         json!({"name": name, "state": state})
+    }
+
+    /// A queued move behind the same computer's move (both named `control`): at the join the body says the first `over`
+    /// and the second `began` on one step; the first is finished, the second plays on to its own `over`. Waiting for the
+    /// first, it may take 20 s to begin, not 10.
+    #[test]
+    fn a_queued_move_is_told_after_the_one_it_waited_for_and_may_wait_longer_to_begin() {
+        let mut motions = Motions::default();
+        motions.sent("c_1", None, 1, "control", 0);
+        motions.said(&said("control", "began"), S / 10);
+        assert!(
+            motions
+                .sent_as("c_1", None, 2, "control", true, S)
+                .is_empty()
+        );
+        // 12 s after it was sent it has not begun (the first plays on): not lapsed, as a plain motion would be at 10 s.
+        assert!(motions.lapse(12 * S).is_empty());
+        let join = 9 * S;
+        assert_eq!(
+            motions.said(&said("control", "over"), join),
+            [(
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 1, "how": "finished"})
+            )]
+        );
+        assert!(motions.said(&said("control", "began"), join).is_empty());
+        assert_eq!(
+            motions.said(&said("control", "over"), join + 5 * S),
+            [(
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 2, "how": "finished"})
+            )]
+        );
+        // One never begun is dropped after 20 s, said so.
+        motions.sent_as("c_1", None, 3, "control", true, 30 * S);
+        assert!(motions.lapse(49 * S).is_empty());
+        assert_eq!(
+            motions.lapse(50 * S),
+            [(
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 3, "how": "dropped", "why": "the body did not begin it within 20 s"})
+            )]
+        );
+        // The body dropping the one waiting (the first ended early) tells it dropped, with the body's why.
+        motions.sent("c_1", None, 4, "control", 60 * S);
+        motions.said(&said("control", "began"), 60 * S);
+        motions.sent_as("c_1", None, 5, "control", true, 61 * S);
+        let told = motions.said(
+            &json!({"name": "control", "state": "dropped", "why": "dropped: the move it waited for did not play out"}),
+            62 * S,
+        );
+        assert_eq!(
+            told,
+            [(
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 5, "how": "dropped", "why": "dropped: the move it waited for did not play out"})
+            )]
+        );
     }
 
     #[test]
