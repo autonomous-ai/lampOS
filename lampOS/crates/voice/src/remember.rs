@@ -16091,6 +16091,10 @@ fn exchange_guarded(
         // connection. Refuse promptly rather than spin or block in connect.
         Err(_) => return None,
     }
+    // A test can hold this caller up once between its connect and its write
+    // ([`tests::STALL_BEFORE_WRITE`]), as a loaded host does (#8805).
+    #[cfg(test)]
+    tests::stall_before_write();
     // With `LAMP_HISTORY_FORGET=on`, a forget asks the memory to keep what
     // it removes until the worker has it queued (#7771).
     let mut bytes = serde_json::to_vec(&*crate::history_forget::asking(line)).ok()?;
@@ -16349,6 +16353,22 @@ fn owner_forgets_rows_of(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    thread_local! {
+        /// How long the next memory exchange on this thread is held up
+        /// between its connect and its write: none unless a test says so.
+        /// Per thread, so only that test's own calls stall (#8805).
+        pub(super) static STALL_BEFORE_WRITE: std::cell::Cell<Duration> =
+            const { std::cell::Cell::new(Duration::ZERO) };
+    }
+
+    /// The exchange on this thread held up once ([`STALL_BEFORE_WRITE`]).
+    pub(super) fn stall_before_write() {
+        let takes = STALL_BEFORE_WRITE.with(|stall| stall.replace(Duration::ZERO));
+        if !takes.is_zero() {
+            std::thread::sleep(takes);
+        }
+    }
 
     /// The second read's P2 on #8215: a plain yes runs the one-face forget
     /// in code only when the lamp's last question offered it alone.
@@ -19317,6 +19337,8 @@ mod tests {
             client.context.lock().unwrap().include(Some(MINH), &[4]),
             None
         );
+        // A loaded host holds the call up past FIRST_READ (#8805).
+        STALL_BEFORE_WRITE.with(|stall| stall.set(Duration::from_millis(400)));
         assert_eq!(run(bare(4)).0, json!({"forgotten": true}));
         // Three shown, none given last: nothing runs, the model asks.
         assert_eq!(
@@ -19372,6 +19394,8 @@ mod tests {
             None
         );
         client.context.lock().unwrap().just_asked = Some((MINH.to_owned(), 5, 0, Instant::now()));
+        // And the call CI failed on (#8805).
+        STALL_BEFORE_WRITE.with(|stall| stall.set(Duration::from_millis(400)));
         assert_eq!(run(bare(5), Some(MINH)).0, json!({"forgotten": true}));
         // The room's: asked without naming anything kept, which may be anyone's.
         assert_eq!(client.context.lock().unwrap().include(None, &[2, 3]), None);
