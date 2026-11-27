@@ -433,17 +433,23 @@ pub const REACH_MAP_FILE: &str = "LAMP_BODY_REACH_MAP_FILE";
 pub const REACH_MAP_PATH: &str = "/var/lib/lampos-body/reach-map.json";
 /// Counts the shadow keeps off the map's edges (the page guard's margin).
 pub const SHADOW_MARGIN: f64 = 48.0;
+/// A pose that went outside is back inside only this many counts farther in, so one riding the edge is said once, not every step.
+pub const HYSTERESIS: f64 = 8.0;
 
 /// What a value of [`REACH_MAP`] asks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Off,
+    /// Says in the journal when the pose to write is outside the map; holds nothing.
     Shadow,
+    /// Holds a goal that would put the pose outside it ([`ReachMap::refused`]); says so in the journal as the shadow does.
+    On,
 }
 
 pub fn mode_from(value: Option<&str>) -> Mode {
     match value {
         Some("shadow") => Mode::Shadow,
+        Some("on") => Mode::On,
         _ => Mode::Off,
     }
 }
@@ -452,6 +458,33 @@ impl ReachMap {
     /// Whether a lamp pose (its own counts) is outside the map's safe poses, [`SHADOW_MARGIN`] counts in.
     pub fn outside(&self, lamp: Pose) -> bool {
         !self.is_safe(self.to_map_counts(lamp), SHADOW_MARGIN)
+    }
+
+    /// The pose to write when the map refuses (`goal` and `held` in the lamp's counts): `goal` when it is inside; else the first of
+    /// each joint alone (pitch, shoulder, elbow), then each pair, then all three, put back to `held` (where it was last written) that
+    /// leaves the pose inside; and `goal` as asked when none does (the lamp is outside already: it is never trapped).
+    pub fn refused(&self, goal: Pose, held: Pose) -> Pose {
+        if !self.outside(goal) {
+            return goal;
+        }
+        let joints = ["pitch", "shoulder", "elbow"];
+        let back = |pose: Pose, joint: &str| with(pose, joint, get(held, joint));
+        for joint in joints {
+            let one = back(goal, joint);
+            if !self.outside(one) {
+                return one;
+            }
+        }
+        for a in 0..3 {
+            for b in a + 1..3 {
+                let two = back(back(goal, joints[a]), joints[b]);
+                if !self.outside(two) {
+                    return two;
+                }
+            }
+        }
+        let all = back(back(back(goal, "pitch"), "shoulder"), "elbow");
+        if !self.outside(all) { all } else { goal }
     }
 
     /// The map for lamp `unit`, or why not: the file names this lamp, and the stand pose is inside it.
@@ -480,7 +513,12 @@ impl Shadow {
     /// Judges the pose about to be written; `Some(true)` when it has just gone outside the map, `Some(false)` when it is back
     /// inside, `None` when nothing changed.
     pub fn judge(&mut self, map: &ReachMap, pose: Pose) -> Option<bool> {
-        let outside = map.outside(pose);
+        // Out as soon as it is outside; back in only HYSTERESIS counts farther in.
+        let outside = if self.outside {
+            !map.is_safe(map.to_map_counts(pose), SHADOW_MARGIN + HYSTERESIS)
+        } else {
+            map.outside(pose)
+        };
         (outside != self.outside).then(|| {
             self.outside = outside;
             outside
@@ -642,7 +680,8 @@ mod tests {
     #[test]
     fn the_shadow_speaks_on_a_change_only_and_the_mode_is_off_unless_shadow() {
         assert_eq!(mode_from(Some("shadow")), Mode::Shadow);
-        for other in [None, Some(""), Some("on"), Some("Shadow"), Some("off")] {
+        assert_eq!(mode_from(Some("on")), Mode::On);
+        for other in [None, Some(""), Some("ON"), Some("Shadow"), Some("off")] {
             assert_eq!(mode_from(other), Mode::Off, "{other:?}");
         }
         let map = ReachMap::parse(MAP).unwrap();
@@ -670,6 +709,63 @@ mod tests {
             ReachMap::for_lamp(MAP, "lamp-75c9", stand)
                 .unwrap_err()
                 .contains("not this lamp")
+        );
+    }
+
+    #[test]
+    fn a_refused_pose_goes_back_where_it_was_written_and_a_lamp_outside_is_never_trapped() {
+        let map = ReachMap::parse(MAP).unwrap();
+        let stand = Pose {
+            shoulder: 2_657.0,
+            elbow: 2_602.0,
+            pitch: 1_772.0,
+        };
+        let folded = Pose {
+            shoulder: 2_048.0,
+            elbow: 2_047.0,
+            pitch: 1_950.0,
+        };
+        assert!(!map.outside(stand) && map.outside(folded));
+        // Inside: as asked, whatever was held.
+        assert_eq!(map.refused(stand, folded), stand);
+        // Only the pitch goes out: that joint alone is put back where it was written, the others are as asked.
+        let wild = Pose {
+            pitch: 4_000.0,
+            ..stand
+        };
+        assert!(map.outside(wild));
+        assert_eq!(map.refused(wild, stand), stand);
+        // The arm goes out (folded elbow with the head at the stand's pitch): the arm joint that makes it is put back, not the pitch.
+        let arm_out = Pose {
+            elbow: 2_047.0,
+            ..stand
+        };
+        assert!(map.outside(arm_out));
+        let back = map.refused(arm_out, stand);
+        assert!(!map.outside(back), "{back:?}");
+        assert_eq!(back.pitch, stand.pitch);
+        // Written outside already (the lamp is outside): no goal can be held to a pose that is outside, so it is as asked.
+        let wild_folded = Pose {
+            pitch: 4_000.0,
+            ..folded
+        };
+        assert_eq!(map.refused(wild_folded, folded), wild_folded);
+        // The hysteresis: out at the edge, back in only HYSTERESIS counts farther in.
+        let mut shadow = Shadow::default();
+        let (_, run) = map.limits(stand, "pitch", 0.0).unwrap();
+        let at = |pitch: f64| Pose { pitch, ..stand };
+        assert_eq!(
+            shadow.judge(&map, at(run - SHADOW_MARGIN + 1.0)),
+            Some(true)
+        );
+        assert_eq!(
+            shadow.judge(&map, at(run - SHADOW_MARGIN - 1.0)),
+            None,
+            "inside by one count is not back inside"
+        );
+        assert_eq!(
+            shadow.judge(&map, at(run - SHADOW_MARGIN - HYSTERESIS - 1.0)),
+            Some(false)
         );
     }
 }

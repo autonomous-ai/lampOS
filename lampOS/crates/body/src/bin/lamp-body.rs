@@ -162,11 +162,19 @@ struct StandingChoice {
 
 #[cfg(unix)]
 /// `LAMP_BODY_REACH_MAP=shadow`: the lamp's own map, read once and kept for the run, or ONE line why not (the body is as before).
-fn reach_map_shadow_of(arguments: &Arguments) -> Option<&'static lamp_body::reach_map::ReachMap> {
+fn reach_map_shadow_of(
+    arguments: &Arguments,
+) -> Option<(&'static lamp_body::reach_map::ReachMap, bool)> {
     use lamp_body::reach_map as map;
-    if map::mode_from(std::env::var(map::REACH_MAP).ok().as_deref()) != map::Mode::Shadow {
+    let mode = map::mode_from(std::env::var(map::REACH_MAP).ok().as_deref());
+    if mode == map::Mode::Off {
         return None;
     }
+    let word = if mode == map::Mode::On {
+        "on"
+    } else {
+        "shadow"
+    };
     let Some(standing) = arguments.standing.as_ref() else {
         eprintln!(
             "lamp-body: LAMP_BODY_REACH_MAP=shadow but this lamp has no --stand: the map is not read"
@@ -179,7 +187,7 @@ fn reach_map_shadow_of(arguments: &Arguments) -> Option<&'static lamp_body::reac
     let text = match map::read_trusted(std::path::Path::new(&path), 0) {
         Ok(text) => text,
         Err(why) => {
-            eprintln!("lamp-body: LAMP_BODY_REACH_MAP=shadow but the map is not used: {why}");
+            eprintln!("lamp-body: LAMP_BODY_REACH_MAP={word} but the map is not used: {why}");
             return None;
         }
     };
@@ -190,13 +198,20 @@ fn reach_map_shadow_of(arguments: &Arguments) -> Option<&'static lamp_body::reac
     };
     match map::ReachMap::for_lamp(&text, arguments.unit_id.as_str(), stand) {
         Ok(found) => {
+            let on = mode == map::Mode::On;
             eprintln!(
-                "lamp-body: LAMP_BODY_REACH_MAP=shadow: the map {path} is read; poses outside it are said, nothing is held"
+                "lamp-body: LAMP_BODY_REACH_MAP={word}: the map {path} is read; poses outside it are said, {}",
+                if on {
+                    "and the goals that would leave it are held"
+                } else {
+                    "nothing is held"
+                }
             );
-            Some(Box::leak(Box::new(found)))
+            let found: &'static map::ReachMap = Box::leak(Box::new(found));
+            Some((found, on))
         }
         Err(why) => {
-            eprintln!("lamp-body: LAMP_BODY_REACH_MAP=shadow but the map is not used: {why}");
+            eprintln!("lamp-body: LAMP_BODY_REACH_MAP={word} but the map is not used: {why}");
             None
         }
     }
@@ -1764,7 +1779,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
 #[cfg(unix)]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // The lamp's own reach map, for the shadow (`LAMP_BODY_REACH_MAP=shadow`), read before `arguments` is taken apart.
-    let reach_map = reach_map_shadow_of(&arguments);
+    let (reach_map, reach_refuse) =
+        reach_map_shadow_of(&arguments).map_or((None, false), |(map, refuse)| (Some(map), refuse));
     use lamp_body::stop_signal::StopSignal;
     use lamp_body::{
         body::{Limits, Stop, Tuning},
@@ -2177,6 +2193,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // The head's tilt, for a lamp that has stood up.
     let limits = Limits {
         reach_map,
+        reach_refuse,
         yaw_unset: arguments.reach.is_none(),
         stand_roll: arguments.stand_roll.map_or(folded.stand_roll, f32::from),
         head_stall_load: arguments.head_stall_load.unwrap_or(limits.head_stall_load),

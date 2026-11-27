@@ -1423,6 +1423,11 @@ pub struct Limits {
     /// write is outside it ([`crate::reach_map::Shadow`]). Nothing is held. `None` is the body as before.
     #[serde(skip)]
     pub reach_map: Option<&'static crate::reach_map::ReachMap>,
+    /// `LAMP_BODY_REACH_MAP=on` (#7513): with the map, a goal that would put the pose outside it (the other joints at their goals) is
+    /// held where its joint was last written: refuse-only, never a goal the body would not have written, never held from a pose that
+    /// is already outside (the lamp is not trapped). Off: the map only says ([`Limits::reach_map`], shadow).
+    #[serde(skip)]
+    pub reach_refuse: bool,
     /// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501), with its bounds; `None`
     /// is the body as before.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1637,6 +1642,7 @@ impl Limits {
         yaw_unset: false,
         app_reach: false,
         reach_map: None,
+        reach_refuse: false,
         strain_guard: None,
         energy: false,
         presence: false,
@@ -9527,40 +9533,59 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         if limp_base && let Some(last) = report.last {
             goals[2] = last[Joint::BaseYaw.index()].position;
         }
+        // Under `LAMP_BODY_REACH_MAP=shadow|on`: the pose about to be written is judged against the lamp's own map, once per change said
+        // in the journal (only at full height: the folded pose and the way up are not the map's, and not on a step that lets go again,
+        // which writes nothing). `on` also holds a goal that would put the pose outside where its joint was last written (the other
+        // joints at their goals, per pose), unless the lamp is outside already: `ReachMap::refused`. Shadow holds nothing.
+        if let Some(map) = limits.reach_map
+            && slump_again.is_none()
+            && standing.is_some()
+            && stand >= 1.0
+        {
+            let asked = crate::reach_map::Pose {
+                shoulder: f64::from(arm_goals[0]),
+                elbow: f64::from(arm_goals[1]),
+                pitch: f64::from(goals[0]),
+            };
+            let held = limits.reach_refuse.then(|| {
+                let held = crate::reach_map::Pose {
+                    shoulder: f64::from(arm_written[0]),
+                    elbow: f64::from(arm_written[1]),
+                    pitch: f64::from(written[0]),
+                };
+                map.refused(asked, held)
+            });
+            if let Some(went_outside) = reach_shadow.judge(map, asked) {
+                eprintln!(
+                    "lamp-body: step {}: reach map ({}): the pose to write (shoulder {}, elbow {}, pitch {}) is {} the lamp's map; {}",
+                    report.steps,
+                    if limits.reach_refuse { "on" } else { "shadow" },
+                    arm_goals[0],
+                    arm_goals[1],
+                    goals[0],
+                    if went_outside {
+                        "OUTSIDE"
+                    } else {
+                        "back inside"
+                    },
+                    if limits.reach_refuse && went_outside {
+                        "the goals that leave it are held where they were written"
+                    } else {
+                        "nothing is held"
+                    }
+                );
+            }
+            if let Some(refused) = held {
+                // Only the joints the pure rule put back: `refused` never moves a joint to a goal it was not asked or last written.
+                goals[0] = refused.pitch as u16;
+                arm_goals = [refused.shoulder as u16, refused.elbow as u16];
+            }
+        }
         still_steps = if goals != written || arm_goals != arm_written {
             0
         } else {
             still_steps.saturating_add(1)
         };
-        // Under `LAMP_BODY_REACH_MAP=shadow`: say, once per change, that the pose about to be written is outside the lamp's own map
-        // (only at full height: the folded pose and the way up are not the map's, and not on a step that lets go again, which writes
-        // nothing). Nothing is held.
-        if let Some(map) = limits.reach_map
-            && slump_again.is_none()
-            && standing.is_some()
-            && stand >= 1.0
-            && let Some(went_outside) = reach_shadow.judge(
-                map,
-                crate::reach_map::Pose {
-                    shoulder: f64::from(arm_goals[0]),
-                    elbow: f64::from(arm_goals[1]),
-                    pitch: f64::from(goals[0]),
-                },
-            )
-        {
-            eprintln!(
-                "lamp-body: step {}: reach map (shadow): the pose to write (shoulder {}, elbow {}, pitch {}) is {} the lamp's map; nothing is held",
-                report.steps,
-                arm_goals[0],
-                arm_goals[1],
-                goals[0],
-                if went_outside {
-                    "OUTSIDE"
-                } else {
-                    "back inside"
-                }
-            );
-        }
         // A step that lets go again (a hand stopped the lamp coming up)
         // asks nothing new of the joints first: from a stand older than
         // the slump, the arm would be sent up into the hand.
