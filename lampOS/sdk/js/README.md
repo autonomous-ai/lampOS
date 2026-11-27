@@ -496,22 +496,29 @@ await requestPublic(app.id);                       // only once approved; staff 
   `device_key_refused` (sign in again), `app_not_found`, `app_not_approved`,
   `app_already_public`, and the day's limits `developer_daily_limit` (10
   accepted uploads), `developer_attempt_limit` (30 attempts) and
-  `developer_public_limit` (3 public asks): try again tomorrow. `store` or
-  `unreachable`: the Store is busy, temporarily off or out of reach, so try
-  again later. What to do about each is in the Python SDK's
+  `developer_public_limit` (3 public asks): try again tomorrow. Also
+  `skill_version_exists`, `skill_name_reserved`, `listing_invalid`,
+  `skill_media_invalid` and `developer_upload_in_progress`. `store`,
+  `unreachable`, `developer_upload_disabled` or
+  `developer_upload_unavailable`: the Store is busy, uploads are off, or it
+  is out of reach, so try again later. What to do about each is in the Python SDK's
   [The Store's refusals](../python/README.md#the-stores-refusals).
 - **Signed at approval:** the tar you send is unsigned; a reviewer approves
-  it and the Store signs it then, never the developer. Until then it is
-  `pending` and `unlisted`; a new icon or cover waits for review too. An
+  it and the Store signs it then, never the developer. Until then a first
+  version is `pending` and `unlisted`; a new version of an app that is
+  already public stays public in its listing and still waits for review.
+  A new icon or cover waits for review too. An app's `id` is a 24-character
+  hex string. An
   app's `review_status` is `pending`, `approved` or `rejected` (with
   `review_note`), its `visibility` `unlisted` or `public`, and
   `public_requested` says whether going public was asked for.
 - **Going public:** `requestPublic` works only for an approved app, tells
   staff and changes nothing by itself. Staff decide, after a test on a lamp
   and the first builder's yes.
-- **A new version** raises `version` in `app.json` above the one listed and
-  is submitted again; `min_build` is the lowest lamp build the app installs
-  on. The walkthrough from `lamp app pack` to listed is the Python SDK's
+- **A new version:** raise `version` in `app.json`: the Store refuses a
+  version it already has with different bytes (`skill_version_exists`), and
+  a lamp installs only a newer version than it has. `min_build` is the
+  lowest lamp build the app installs on. The walkthrough from `lamp app pack` to listed is the Python SDK's
   [Your first app, from pack to listed](../python/README.md#your-first-app-from-pack-to-listed).
 
 ### Push it to your own lamp

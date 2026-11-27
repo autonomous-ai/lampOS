@@ -433,7 +433,7 @@ lamp app check gym-coach            # as the Store's reader checks it, less the 
 lamp app pack gym-coach             # writes gym-coach-1.0.0.tar, unsigned: the Store signs it at approval
 lamp app submit gym-coach --icon icon.png --cover cover.png --title "Gym coach"
 lamp app status                     # each app: id, name and version, review, listing, the reviewer's note
-lamp app request-public 42          # only for an approved app: asks staff to make it public
+lamp app request-public 6b09147be088d3093a133674   # only for an approved app: asks staff to make it public
 lamp app studio                     # the same, as a page on this computer
 ```
 
@@ -462,15 +462,18 @@ lamp app studio                     # the same, as a page on this computer
   attempts. Sending the same bytes again answers the same app, not a
   duplicate. Only apps are taken here.
 - **`lamp app status [ID]`** lists your apps, or one, a line each:
-  `42  gym-coach 1.0.0  pending  unlisted`, then the reviewer's note.
+  `6b09147be088d3093a133674  gym-coach 1.0.0  pending  unlisted`, then the reviewer's note.
+  An app's id is a 24-character hex string.
 - **`lamp app request-public ID`** asks for an approved app to go public.
 
 ### Review, signing and going public
 
 - **The package is unsigned until approval.** `pack` and `submit` never
   sign; a developer never signs. A reviewer approves the app and **the
-  Store signs it at approval**. Until then it is waiting for review and
-  not listed. A new icon or cover waits for review too.
+  Store signs it at approval**. Until then a first version is `pending`
+  and `unlisted`. A new version of an app that is already public comes in
+  public (it keeps the app's listing) but still waits for review like any
+  version. A new icon or cover waits for review too.
 - **What `status` shows:** the review, `pending` (waiting for a reviewer),
   `approved` or `rejected` (the reviewer's note says why: fix it and submit
   again); the listing, `unlisted` or `public`; and `public asked` once going
@@ -479,16 +482,17 @@ lamp app studio                     # the same, as a page on this computer
   `lamp app request-public ID`. The ask tells staff and changes nothing by
   itself; asking again changes nothing. Staff decide, after a test on a lamp
   and the first builder's yes. The developer can only ask.
-- **A new version:** raise `version` (`MAJOR.MINOR.PATCH`) in `app.json`
-  above the one listed, pack and submit again; it is reviewed and signed
-  like the first. A lamp installs only a newer version than it has (the
-  same one is "already installed", an older one "is older than the one
-  installed").
+- **A new version:** raise `version` (`MAJOR.MINOR.PATCH`) in `app.json`:
+  the Store refuses a version it already has with different bytes, and a
+  lamp installs only a newer version than it has. Pack and submit again; it
+  is reviewed and signed like the first.
 - **`min_build`:** the lowest lamp build (the sequence before the `+` in
   `lamp.build`) the app runs on; a lamp below it refuses to install the app.
   An app that uses a newer manifest field (`help`, `npu`, `tools`) sets
   `min_build` to a build that reads it, or older lamps refuse the manifest
-  ([docs/apps.md](../../docs/apps.md)).
+  ([docs/apps.md](../../docs/apps.md)). Coming: the Store will offer a lamp
+  below the newest version's `min_build` the newest older version it can
+  run, so the app does not disappear for older lamps.
 
 ### The Store's refusals
 
@@ -500,13 +504,18 @@ do; its `code` is the Store's `error_code`:
 | `authentication_error` | not signed in, or the sign-in ran out: `lamp login` again |
 | `device_key_refused` | a lamp's key was used: `lamp login` with your own Autonomous account |
 | `lampos_package_invalid` | the Store's check refused the package; its reason leads the message (`lamp app check` prints the same): fix what it names and submit again |
-| `skill_name_exists` | the name is another account's: change `name` in `app.json` |
-| `developer_app_only` | a skill (format 1): push it through the lamp (`lamp skill push`) |
+| `skill_version_exists` | that version is in the Store with other bytes: raise `version` in `app.json` |
+| `skill_name_exists` | another account owns that name: choose another `name` in `app.json` |
+| `skill_name_reserved` | the name is a lampOS built-in's: choose another `name` |
+| `developer_app_only` | the upload takes apps (format 2) only: a skill is sent from a lamp (`lamp skill push`) |
+| `listing_invalid` | the title or description is too long, or holds markup or a control character: fix it |
+| `skill_media_invalid` | the icon or cover is not a PNG of the right size (1024x1024, 1600x900): fix it |
+| `developer_upload_in_progress` | this account is already sending one: wait and try again |
 | `app_not_found` | no app of yours has that id: `lamp app status` lists yours |
 | `app_not_approved` | asked to go public before approval: wait for the review |
 | `app_already_public` | public already: nothing to do |
 | `developer_daily_limit`, `developer_attempt_limit`, `developer_public_limit` | the day's limits per account (10 accepted uploads, 30 attempts, 3 asks to go public) are used: try again tomorrow |
-| `store`, `unreachable` | the Store is busy, temporarily off or out of reach: try again later |
+| `store`, `unreachable`, `developer_upload_disabled`, `developer_upload_unavailable` | the Store is busy, uploads are off or unavailable, or it is out of reach: try again later |
 | `bad_request` | refused here before sending (art, title, description, size): fix what it names |
 
 ### Your first app, from pack to listed
@@ -518,7 +527,7 @@ lamp login                          # you@example.com, then the emailed code
 lamp app submit gym-coach-1.0.0.tar --icon icon.png --cover cover.png
 lamp app status                     # pending, unlisted: a reviewer reads it next
 # once approved (status says approved), and the Store has signed it:
-lamp app request-public 42          # staff test it on a lamp; once they say yes, status says public
+lamp app request-public 6b09147be088d3093a133674   # staff test it on a lamp; once they say yes, status says public
 ```
 
 A rejection's note says what to change: fix it, raise `version` if the

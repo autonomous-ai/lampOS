@@ -157,11 +157,13 @@ Store), and apps have been submitted from it. Every SDK app goes to the Store
 this way: `lamp login` (the developer's Autonomous account, an emailed code;
 the token kept 0600 in `~/.config/lampos/store.json`), `lamp app check`,
 `lamp app pack`, `lamp app submit`, `lamp app status`,
-`lamp app request-public`. A submitted app waits for review, unlisted; a
+`lamp app request-public`. A first version waits for review, unlisted (a
+new version of a public app keeps its listing and still waits for review); a
 reviewer approves it and the Store signs it then; it goes public only when
 staff say yes to the developer's ask, after a test on a lamp. A new version
-raises `version` above the one listed, and `min_build` (above) is the lowest
-lamp build it installs on. The Python SDK README's
+raises `version`: the Store refuses a version it already has with different
+bytes, and a lamp installs only a newer version than it has. `min_build`
+(above) is the lowest lamp build it installs on. The Python SDK README's
 [Publish your app](../sdk/python/README.md#publish-your-app) has every
 command, the review states, the Store's refusals with what to do about each,
 and a first app's walkthrough from `lamp app pack` to listed.
