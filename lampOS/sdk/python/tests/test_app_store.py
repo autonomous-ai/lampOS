@@ -336,6 +336,30 @@ def test_the_stores_refusal_is_said_with_its_reason(fake, tmp_path, capsys):
     assert "today's 10 accepted uploads" in capsys.readouterr().err
 
 
+# Each refusal the Python README's table lists, with the words it promises.
+REFUSALS = {
+    "skill_version_exists": "raise `version` in app.json",
+    "skill_name_exists": "change `name` in app.json",
+    "skill_name_reserved": "a lampOS built-in's: change `name` in app.json",
+    "developer_app_only": "`lamp skill push`",
+    "listing_invalid": "the title or description is too long, or holds markup or a control character",
+    "skill_media_invalid": "icon 1024x1024, cover 1600x900",
+    "developer_upload_in_progress": "already sending an upload: wait for it, then try again",
+    "developer_upload_disabled": "uploads are off for now: try again later",
+    "developer_upload_unavailable": "upload is unavailable for now: try again later",
+}
+
+
+@pytest.mark.parametrize("code", sorted(REFUSALS))
+def test_each_refusal_says_what_to_do(fake, tmp_path, capsys, code):
+    login(fake)
+    fake.refuse_with = (code, "raw words")
+    assert main(["app", "submit", str(make_app(tmp_path)), *fake.args()]) == 1
+    err = capsys.readouterr().err
+    assert REFUSALS[code] in err, err
+    assert "(the Store: raw words)" in err
+
+
 def test_no_sign_in_sends_nothing(fake, tmp_path, capsys):
     assert main(["app", "submit", str(make_app(tmp_path)), *fake.args()]) == 1
     assert "run `lamp login`" in capsys.readouterr().err
