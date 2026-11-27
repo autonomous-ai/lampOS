@@ -6,10 +6,22 @@
 |---|---|---|
 | devops007-P1 | Link the ARM64 run's test binaries with lld. Closed: the trial's 34% was runner variance; Tests measured 8 s on a lamp-voice edit (#2495 closed) | #1806 |
 | devops007-P2 | No lamp-voice ARM64 push run is cancelled while it waits. Done: #2513, merged 21 Oct as `f09b7633c` | #1806 |
+| devops007-P3 | Renew lamp-voice's ARM64 cache once it is 2 hours old, not only for a new Cargo.lock. #8877 (draft until its ARM64 run is green) | #8009 |
 
 ## Found, not mine
 
 - **The clippy cache crowds out ARM64's** (21 Oct 12:4x +07). Since #2465 each lamp-voice clippy run saves about 2.2 GB, three in four minutes (12:43–12:47), against ARM64's 1.1 GB and the repository's 10 GB, which GitHub evicts least recently used first. `gh api repos/autonomous-ai/lampOS/actions/caches` shows it. Posted on #1806.
+
+## 2026-11-27 16:10 +0700 — pull requests' ARM64 build from a 2-day-old cache, #8877
+
+Ready for lamp-voice: no (#8877 is a draft until its ARM64 run is green)
+
+Asked by its person: why run 45957439867 (train-1291, #8861) took 31.5 min.
+- **Where the time went:** 24m 31s of it is the build job's `cargo nextest archive --release --workspace` (the release job, 12.8 min, runs beside it). Every crate printed "Compiling" by 4.7 min; the 20 min after are the test targets and linking 303 binaries.
+- **Why:** it restored lamp-voice's cache `fee90fad1`, saved 25 Nov 11:41 UTC, 246 commits behind its base, so all 39 workspace crates were rebuilt. The `cache` job renews only when no cache has the current `Cargo.lock` hash (#8009's fix, #8143), and the lock has not changed since.
+- **Measured, from the API:** the same step took 15 to 16.5 min in the hour after that save, 18.8 min 5 hours after, 22 to 25 min on 10 pull request runs on 27 Nov. A fresh cache saves about 8 to 9 min; about 15 min remains (test targets and links of the crates above a change).
+- **#8877** (`0bbad1fcd`, `devops007/arm64-cache-fresh`), CI only: a reusing push also renews when the newest cache is 2 hours old or more. actionlint 1.7.12: 0 findings; the step's script run against the live API in its three cases. Not run: the job itself, which runs only on a lamp-voice push.
+- **Next, if asked:** fewer test binaries to link (303 now), the larger part of the 15 min left.
 
 ## 2026-10-21 15:15 +0700 — #2513 merged, its first round
 
