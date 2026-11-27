@@ -437,11 +437,13 @@ fn every_provider_event_consumes_one_credit_including_repeated_ready_and_old_aud
         },
         audio(1, PACKET_SAMPLES),
         ProviderOutput::Transcript {
+            input_request: None,
             request: Some(7),
             text: "reply".into(),
             finished: false,
         },
         ProviderOutput::Transcript {
+            input_request: None,
             request: None,
             text: "input".into(),
             finished: true,

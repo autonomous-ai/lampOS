@@ -2821,6 +2821,7 @@ fn a_carried_line_is_kept_out_of_the_journal_whether_or_not_it_saves() {
         assert!(lease.scope().unwrap().held(), "{request}: still held");
         super::super::worker::keep_admitted(
             &ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "Got it, the Pine Hill Hotel.".to_owned(),
                 finished: true,
@@ -6202,6 +6203,7 @@ fn a_carried_line_read_as_theirs_is_still_kept_out_of_the_journal() {
     assert!(crate::remember::kept_out(request));
     super::super::worker::keep_admitted(
         &ProviderOutput::Transcript {
+            input_request: None,
             request: Some(request),
             text: "Your doctor is on Tuesday.".to_owned(),
             finished: true,

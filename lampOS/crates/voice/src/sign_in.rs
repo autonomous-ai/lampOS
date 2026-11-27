@@ -2966,6 +2966,7 @@ mod tests {
         // The lamp's words, in pieces split mid-group: one line, once.
         let lamp = |request: u64, text: &str| {
             let mut output = ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: text.into(),
                 finished: false,

@@ -157,6 +157,26 @@ struct Script {
 struct FinishGate {
     entered: tokio::sync::Notify,
     resume: tokio::sync::Notify,
+    /// Optional request-specific delay, so a later listener can finish normally.
+    only: Option<u64>,
+    left: tokio::sync::Notify,
+    outcomes: Mutex<Vec<(u64, bool)>>,
+}
+
+struct FinishWait {
+    gate: Arc<FinishGate>,
+    request: u64,
+    completed: bool,
+}
+impl Drop for FinishWait {
+    fn drop(&mut self) {
+        self.gate
+            .outcomes
+            .lock()
+            .unwrap()
+            .push((self.request, self.completed));
+        self.gate.left.notify_one();
+    }
 }
 
 struct ScriptListener {
@@ -194,11 +214,20 @@ impl Listener for ScriptListener {
         self.samples.fetch_add(samples.len(), Ordering::Relaxed);
         Ok(())
     }
-    fn finish(self: Box<Self>, _request: u64) -> BoxFuture<'static, net::Result<String>> {
+    fn finish(self: Box<Self>, request: u64) -> BoxFuture<'static, net::Result<String>> {
         Box::pin(async move {
-            if let Some(gate) = self.finish_gate {
+            if let Some(gate) = self
+                .finish_gate
+                .filter(|gate| gate.only.is_none_or(|only| only == request))
+            {
+                let mut waiting = FinishWait {
+                    gate: gate.clone(),
+                    request,
+                    completed: false,
+                };
                 gate.entered.notify_one();
                 gate.resume.notified().await;
+                waiting.completed = true;
             }
             if let Some(after) = self.finish_after {
                 tokio::time::sleep(after).await;
@@ -513,6 +542,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
         let (label, last) = match event {
             ProviderOutput::Started { request, .. } => (format!("started:{request}"), false),
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text,
                 finished,
@@ -523,6 +553,7 @@ async fn turn_within(engine: &mut Engine, wait: Duration) -> Vec<String> {
             // The words' end (`finished`) and the request's times, each
             // checked by its own test.
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(_),
                 text,
                 finished: true,
@@ -616,7 +647,7 @@ async fn a_slow_second_speech_piece_keeps_order_until_release_or_retirement() {
                 let event = engine.next().await;
                 let waiting_for_second = matches!(
                     &event,
-                    ProviderOutput::Transcript { request: Some(1), text, finished: false }
+                    ProviderOutput::Transcript { input_request: None, request: Some(1), text, finished: false }
                         if text == " Let me explain."
                 );
                 events.push(event);
@@ -699,6 +730,7 @@ async fn a_slow_second_speech_piece_keeps_order_until_release_or_retirement() {
             .map(|event| match event {
                 ProviderOutput::Started { request: 1, .. } => "started".to_owned(),
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(1),
                     text,
                     finished,
@@ -3630,6 +3662,7 @@ async fn a_later_decline_keeps_an_executed_scoped_requested_audio_call() {
                     ..
                 } => labels.push("started"),
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text,
                     finished: true,
@@ -5695,6 +5728,7 @@ async fn the_lamps_words_end_with_a_finished_piece_as_the_live_routes_do() {
             .iter()
             .filter_map(|event| match event {
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(_),
                     text,
                     finished,
@@ -17191,6 +17225,7 @@ async fn a_story_held_at(
     tokio::time::timeout(Duration::from_secs(2), async {
         loop {
             if let ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(_),
                 text,
                 finished: false,
@@ -18911,6 +18946,7 @@ async fn a_line_that_cuts_the_story_is_asked_with_the_story_as_heard() {
             let mut thread = thread.lock().unwrap();
             match event {
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text,
                     finished,
@@ -20177,7 +20213,7 @@ async fn called_fallback_does_not_supply_words_for_a_music_identity() {
         }
         assert!(outputs.iter().any(|event| matches!(
             event,
-            ProviderOutput::Transcript { request: None, text, finished: true } if text == words
+            ProviderOutput::Transcript { input_request: None, request: None, text, finished: true } if text == words
         )));
         assert!(outputs.iter().any(|event| matches!(
             event,
@@ -21459,6 +21495,7 @@ fn heard_words(outputs: &[ProviderOutput]) -> Vec<&str> {
         .iter()
         .filter_map(|output| match output {
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text,
                 finished: true,
@@ -21896,6 +21933,7 @@ async fn prepared_music_held_as_unclear_cannot_offer_and_written_sorry_has_no_gr
                     ..
                 } => Some("started"),
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text,
                     finished: true,
@@ -23508,4 +23546,157 @@ fn only_the_routes_own_look_is_told_the_head_did_not_move() {
     let kept = super::look_turn_note(true, Some("the keys".into())).unwrap();
     assert!(kept.contains("the keys"));
     assert!(!kept.contains(super::HEAD_STILL_NOTE));
+}
+
+#[test]
+fn input_request_ids_off_keeps_the_exact_legacy_wire_shape() {
+    let event = final_input_transcript(false, 71, "unchanged final words".into());
+    let wire = serde_json::to_value(&event).unwrap();
+    assert_eq!(
+        wire,
+        json!({"kind":"transcript","request":null,"text":"unchanged final words","finished":true})
+    );
+    let read: ProviderOutput = serde_json::from_value(wire).unwrap();
+    assert!(matches!(
+        read,
+        ProviderOutput::Transcript {
+            request: None,
+            input_request: None,
+            finished: true,
+            ..
+        }
+    ));
+}
+
+#[tokio::test(start_paused = true)]
+async fn input_request_ids_real_final_path_keeps_words_and_excludes_count_only() {
+    let _one = crate::provider_worker::tests::one_thread();
+    for (on, count_only) in [(false, false), (true, false), (true, true)] {
+        let words = "Could you explain this again?";
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(words.into())].into()),
+            chats: Mutex::new([vec![text("Certainly."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.announcing(false).recording_input_request_ids(on);
+        engine.submit(start(71));
+        if count_only {
+            engine.submit(ProviderInput::CountOnly {
+                request: 71,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(audio(71, 0));
+        engine.submit(end(71));
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                match engine.next().await {
+                    ProviderOutput::Transcript {
+                        request: None,
+                        input_request,
+                        text,
+                        finished,
+                    } => {
+                        assert_eq!(text, words);
+                        assert!(finished);
+                        assert_eq!(input_request, (on && !count_only).then_some(71));
+                        break;
+                    }
+                    ProviderOutput::TurnFailed { .. } => panic!("scripted final ASR failed"),
+                    _ => {}
+                }
+            }
+        })
+        .await
+        .expect("existing final-ASR event arrives");
+        engine.stop_through(71);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn input_request_ids_delayed_listener_never_relabels_old_words_as_new_request() {
+    let _one = crate::provider_worker::tests::one_thread();
+    let gate = Arc::new(FinishGate {
+        only: Some(71),
+        ..FinishGate::default()
+    });
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("earlier request words".into()),
+                Ok("later request words".into()),
+            ]
+            .into(),
+        ),
+        finish_gate: Some(gate.clone()),
+        chats: Mutex::new([vec![text("Certainly."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.announcing(false).recording_input_request_ids(true);
+    engine.submit(start(71));
+    engine.submit(audio(71, 0));
+    engine.submit(end(71));
+    tokio::time::timeout(Duration::from_secs(2), gate.entered.notified())
+        .await
+        .expect("request 71 is inside the real Listener::finish future");
+    assert!(
+        gate.outcomes.lock().unwrap().is_empty(),
+        "71 has not completed or canceled yet"
+    );
+
+    engine.submit(start(72));
+    assert_eq!(engine.begun_last, Some((72, 1)));
+    // The old final can become available only after the new request starts.
+    gate.resume.notify_one();
+    engine.submit(audio(72, 0));
+    engine.submit(end(72));
+    let mut earlier = 0;
+    let mut later = 0;
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            match engine.next().await {
+                ProviderOutput::Transcript {
+                    request: None,
+                    input_request,
+                    text,
+                    finished,
+                } => {
+                    assert!(finished);
+                    match text.as_str() {
+                        "earlier request words" => {
+                            assert_eq!(input_request, Some(71));
+                            earlier += 1;
+                        }
+                        "later request words" => {
+                            assert_eq!(input_request, Some(72));
+                            later += 1;
+                        }
+                        _ => panic!("unexpected scripted input text"),
+                    }
+                }
+                ProviderOutput::TurnComplete { request: 72, .. } => break,
+                ProviderOutput::TurnFailed { .. } => panic!("scripted turn failed"),
+                _ => {}
+            }
+        }
+    })
+    .await
+    .expect("the new spoken turn completes");
+    tokio::time::timeout(Duration::from_secs(2), gate.left.notified())
+        .await
+        .expect("the old finalization future reaches a terminal state");
+    assert_eq!(
+        later, 1,
+        "72's own final must arrive, so this is not a no-output pass"
+    );
+    assert!(earlier <= 1);
+    if earlier == 0 {
+        assert!(
+            gate.outcomes.lock().unwrap().contains(&(71, false)),
+            "absence of old text requires observed cancellation of its pending finalization"
+        );
+    }
+    engine.stop_through(72);
 }

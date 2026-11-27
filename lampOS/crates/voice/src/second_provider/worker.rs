@@ -4083,6 +4083,7 @@ pub fn serve(
         },
         runner.clone(),
     )
+    .recording_input_request_ids(crate::second_provider::input_request_ids_on())
     .with_after_forget_instruction(forget_character)
     .with_memory_scope(boots.own, face_cache.clone(), scoped_runner, scoped_system)
     .reading_the_lease_for_the_name(lease_system)
@@ -16621,6 +16622,7 @@ fn keep_scoped(
     let now = Instant::now();
     match event {
         ProviderOutput::Transcript {
+            input_request: _,
             request: None,
             text,
             finished,
@@ -26195,6 +26197,7 @@ mod tests {
         assert!(crate::remember::forgetting_reply(request));
         super::keep_scoped(
             &ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "I forgot the peanut allergy.".into(),
                 finished: true,
@@ -26248,6 +26251,7 @@ mod tests {
         ] {
             super::keep_scoped(
                 &ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text,
                     finished: false,
@@ -26295,11 +26299,13 @@ mod tests {
         ] {
             for event in [
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text: heard.into(),
                     finished: true,
                 },
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text: said.into(),
                     finished: true,
@@ -26400,6 +26406,7 @@ mod tests {
             ),
         ));
         let words = |request: u64, text: &str| ProviderOutput::Transcript {
+            input_request: None,
             request: Some(request),
             text: text.into(),
             finished: false,
@@ -28357,16 +28364,19 @@ mod tests {
         let request = 7;
         for event in [
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text: "What should I drink?".into(),
                 finished: true,
             },
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "Try some tea.".into(),
                 finished: false,
             },
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "It is calm.".into(),
                 finished: false,
@@ -28528,11 +28538,13 @@ mod tests {
             }
             for event in [
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text: words.into(),
                     finished: true,
                 },
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text: "Noted.".into(),
                     finished: true,
@@ -28623,11 +28635,13 @@ mod tests {
         crate::thread::count_only(Some(7));
         for event in [
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text: format!("I sit by the {MARKER} window"),
                 finished: true,
             },
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(7),
                 text: format!("A {MARKER} window, lovely."),
                 finished: false,
@@ -28643,11 +28657,13 @@ mod tests {
         crate::thread::count_only(None);
         for event in [
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text: "What should I drink?".into(),
                 finished: true,
             },
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(8),
                 text: "Try some tea.".into(),
                 finished: false,
@@ -28697,11 +28713,13 @@ mod tests {
         let request = 41;
         for event in [
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text: "Where did I put the spare key?".into(),
                 finished: true,
             },
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "Under the blue mat.".into(),
                 finished: true,
@@ -28801,11 +28819,13 @@ mod tests {
         let request = 43;
         for event in [
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text: "Where did I put the spare key?".into(),
                 finished: true,
             },
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "Under the blue mat.".into(),
                 finished: true,

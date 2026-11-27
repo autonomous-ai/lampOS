@@ -3340,6 +3340,7 @@ fn second_route_worker_environment(
         // One simple rule: "Hey Lamp" and 20 s renewing (the product owner,
         // 27 Nov).
         crate::second_provider::SIMPLE_CALL_ENVIRONMENT,
+        crate::second_provider::INPUT_REQUEST_IDS_ENVIRONMENT,
         // The lamp's own news gets the conversation's 20 s (the same day).
         crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
         // Short replies carry in a conversation (#8772).
@@ -3629,7 +3630,13 @@ fn second_route_worker_environment(
     ]
     .into_iter()
     .filter(|_| role == "second")
-    .filter_map(|name| var(name).map(|value| (name, value)))
+    .filter_map(|name| {
+        let value = var(name)?;
+        // This is a wire capability as well as a test switch. An old
+        // coordinator never forwards it after env_clear; off omits it.
+        (name != crate::second_provider::INPUT_REQUEST_IDS_ENVIRONMENT || value == "on")
+            .then_some((name, value))
+    })
     .collect()
 }
 
@@ -3861,6 +3868,7 @@ mod tests {
             crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT,
             crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT,
             crate::second_provider::SIMPLE_CALL_ENVIRONMENT,
+            crate::second_provider::INPUT_REQUEST_IDS_ENVIRONMENT,
             crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT,
             crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT,
             crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT,
@@ -5176,6 +5184,7 @@ mod tests {
                     || name == crate::second_provider::NAME_FACE_OR_WORDS_ENVIRONMENT
                     || name == crate::second_provider::NAME_HEY_ONLY_ENVIRONMENT
                     || name == crate::second_provider::SIMPLE_CALL_ENVIRONMENT
+                    || name == crate::second_provider::INPUT_REQUEST_IDS_ENVIRONMENT
                     || name == crate::second_provider::ONE_REPLY_WINDOW_ENVIRONMENT
                     || name == crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT
                     || name == crate::second_provider::NAME_NOT_ANOTHERS_ENVIRONMENT
@@ -5666,6 +5675,7 @@ mod tests {
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
+                    "LAMP_TEST_INPUT_REQUEST_IDS=on",
                     "LAMP_TIMER_ASKS_HOW_LONG=on",
                     "LAMP_TOLD_WHEN_ASKED=on",
                     "LAMP_TURNED_FACE_SPEAKS=on",
@@ -6043,3 +6053,23 @@ pub(crate) mod ring_startup_tests;
 
 #[cfg(test)]
 mod switch_census_tests;
+
+#[cfg(test)]
+mod input_request_ids_tests {
+    use super::*;
+    #[test]
+    fn input_request_ids_capability_only_reaches_second_on_exact_opt_in() {
+        let name = crate::second_provider::INPUT_REQUEST_IDS_ENVIRONMENT;
+        for role in ["second", "provider", "capture", "speaker"] {
+            for value in [None, Some("off"), Some("ON"), Some("true"), Some("on")] {
+                let vars = second_route_worker_environment(role, |key| {
+                    (key == name).then(|| value.map(Into::into)).flatten()
+                });
+                assert_eq!(
+                    vars.iter().any(|(key, _)| *key == name),
+                    role == "second" && value == Some("on")
+                );
+            }
+        }
+    }
+}

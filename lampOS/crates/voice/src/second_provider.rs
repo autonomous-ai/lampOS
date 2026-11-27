@@ -1135,6 +1135,22 @@ pub(crate) const SIMPLE_HELD: &str =
 /// in it (a sound, a cough, room noise), and no tap.
 pub(crate) const SIMPLE_NO_WORDS: &str = "no words heard in it (LAMP_SIMPLE_CALL)";
 
+/// Preserve the existing input event while optionally binding its own request.
+fn final_input_transcript(on: bool, request: u64, text: String) -> ProviderOutput {
+    ProviderOutput::Transcript {
+        request: None,
+        input_request: on.then_some(request),
+        text,
+        finished: true,
+    }
+}
+
+/// Test-only metadata on an existing final-ASR event, never admission.
+pub const INPUT_REQUEST_IDS_ENVIRONMENT: &str = "LAMP_TEST_INPUT_REQUEST_IDS";
+pub(crate) fn input_request_ids_on() -> bool {
+    std::env::var(INPUT_REQUEST_IDS_ENVIRONMENT).as_deref() == Ok("on")
+}
+
 /// Whether [`SIMPLE_CALL_ENVIRONMENT`] is on in this process.
 pub fn simple_call_on() -> bool {
     std::env::var(SIMPLE_CALL_ENVIRONMENT).is_ok_and(|value| value == "on")
@@ -2182,6 +2198,7 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    input_request_ids: bool,
     /// [`Engine::opening`]: the rule told of a computer's turn.
     opened: Option<Opened>,
     /// Where each judged turn's verdict is said, when it is.
@@ -4714,6 +4731,7 @@ async fn play_words(
 ) -> Option<(usize, Option<Vec<i16>>)> {
     if !shared
         .emit(ProviderOutput::Transcript {
+            input_request: None,
             request: Some(request),
             text: line.to_owned(),
             finished: false,
@@ -5195,6 +5213,7 @@ async fn say_resumed(shared: &Shared, request: u64, english: &'static str, rest:
         next = begin(&mut speech, pieces.next());
         if !shared
             .emit(ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: format!(" {piece}"),
                 finished: false,
@@ -5642,6 +5661,14 @@ fn room(change: impl FnOnce(&mut crate::room_told::RoomTold)) {
 }
 
 impl Engine {
+    /// Enabled only by a coordinator that understands the optional field.
+    pub(crate) fn recording_input_request_ids(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.input_request_ids = on;
+        }
+        self
+    }
+
     /// `system` is asked for the system message at the start of each
     /// turn's chat (character, memory note and conversation so far).
     pub fn new(
@@ -5681,6 +5708,7 @@ impl Engine {
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                input_request_ids: false,
                 opened: None,
                 verdicts: None,
                 decisions: None,
@@ -11703,6 +11731,7 @@ async fn spoken(
         drop(prepared.take());
         if shared
             .emit(ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text,
                 finished: true,
@@ -11760,11 +11789,11 @@ async fn spoken(
         thread.line_heard(request, std::time::Instant::now());
     }
     if !shared
-        .emit(ProviderOutput::Transcript {
-            request: None,
-            text: text.clone(),
-            finished: true,
-        })
+        .emit(final_input_transcript(
+            shared.input_request_ids,
+            request,
+            text.clone(),
+        ))
         .await
     {
         return;
@@ -24935,6 +24964,7 @@ async fn answer(
                 whole.push(' ');
                 whole.push_str(&text);
                 let words = ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text: if std::mem::replace(&mut after, true) {
                         format!(" {text}")
@@ -25135,6 +25165,7 @@ async fn answer(
         // first builder, 19 Oct, lamp-4ace).
         if after {
             let done = ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: String::new(),
                 finished: true,
@@ -25210,6 +25241,7 @@ async fn answer(
             // the lamp's words line by line ends this one too.
             let _ = shared
                 .emit(ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text: String::new(),
                     finished: true,

@@ -2049,6 +2049,7 @@ fn transcript_without_spoken_pcm_cannot_turn_a_cue_into_confirmation() {
         let offer = test.load(1);
         let request = test.reply.as_ref().unwrap().owner.turn();
         let words = ProviderOutput::Transcript {
+            input_request: None,
             request: Some(request),
             text: "Sure, I will play music.".into(),
             finished: true,

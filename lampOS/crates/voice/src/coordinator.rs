@@ -6979,6 +6979,7 @@ fn conversation_with_gate_inner(
     let mut answer_sounded_for: Option<crate::admission::CandidateId> = None;
     // The turn whose speech last ended and when, and the turn for which the
     // floor was last held, so that the record says so once.
+    let trace_input_request_ids = crate::second_provider::input_request_ids_on();
     let mut speech_ended: Option<(u64, u64)> = None;
     let mut floor_held_for: Option<u64> = None;
     // The turn the lamp last ended, for speech that goes on with it
@@ -9267,6 +9268,7 @@ fn conversation_with_gate_inner(
             if let (
                 Some(hold),
                 ProviderOutput::Transcript {
+                    input_request: _,
                     request: None,
                     text,
                     finished,
@@ -9745,6 +9747,7 @@ fn conversation_with_gate_inner(
                 // played: the answer ends as soon as it shows, or as the
                 // words are in.
                 ProviderOutput::Transcript {
+                    input_request: _,
                     request,
                     text,
                     finished,
@@ -9792,6 +9795,7 @@ fn conversation_with_gate_inner(
                     }
                 }
                 ProviderOutput::Transcript {
+                    input_request,
                     request,
                     text,
                     finished,
@@ -10066,7 +10070,14 @@ fn conversation_with_gate_inner(
                     };
                     record(
                         trace,
-                        json!({"kind":"transcript","turn":request,"text":text,"finished":finished,"at_us":monotonic_us(),"input_correlation":if request.is_none(){"unreliable; session scoped"}else{"output lineage"}}),
+                        transcript_trace(
+                            request,
+                            input_request,
+                            text,
+                            finished,
+                            monotonic_us(),
+                            trace_input_request_ids,
+                        ),
                     )?
                 }
                 ProviderOutput::Interrupted { request } => {
@@ -16628,6 +16639,28 @@ impl AnswerAudio {
     }
 }
 
+/// Existing transcript row plus opt-in identity only. Never infer from the
+/// current reply: an earlier request may finish STT after a later one starts.
+fn transcript_trace(
+    request: Option<u64>,
+    input_request: Option<u64>,
+    text: String,
+    finished: bool,
+    at_us: u64,
+    enabled: bool,
+) -> serde_json::Value {
+    let mut row = json!({"kind":"transcript","turn":request,"text":text,"finished":finished,"at_us":at_us,"input_correlation":if request.is_none(){"unreliable; session scoped"}else{"output lineage"}});
+    if enabled
+        && request.is_none()
+        && finished
+        && let Some(input) = input_request
+    {
+        row["input_request"] = json!(input);
+        row["input_correlation"] = json!("second-route final ASR request");
+    }
+    row
+}
+
 /// Whether `output` carries the person's words: a transcript of what was
 /// heard (no request) with at least one word in it: talk, which ends the
 /// quiet the lamp's own unasked turns wait for (`last_turn_us`), as the
@@ -21547,6 +21580,7 @@ mod tests {
         );
         source.extend([
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(1),
                 text: "done".into(),
                 finished: true,
@@ -23650,3 +23684,34 @@ mod optional_ring_tests;
 #[cfg(test)]
 #[path = "coordinator/renewal_stall_tests.rs"]
 mod renewal_stall_tests;
+
+#[cfg(test)]
+mod input_request_ids_tests {
+    use super::*;
+    #[test]
+    fn input_request_ids_trace_is_opt_in_metadata_only() {
+        let old = transcript_trace(None, None, "same words".into(), true, 123, false);
+        assert_eq!(
+            old,
+            transcript_trace(None, Some(71), "same words".into(), true, 123, false)
+        );
+        let linked = transcript_trace(None, Some(71), "same words".into(), true, 123, true);
+        assert!(linked["turn"].is_null());
+        assert_eq!(linked["input_request"], 71);
+        assert_eq!(linked["text"], old["text"]);
+        assert_eq!(linked["at_us"], old["at_us"]);
+        assert_eq!(linked["finished"], old["finished"]);
+        assert_eq!(
+            transcript_trace(None, None, "same words".into(), true, 123, true),
+            old
+        );
+        let output = transcript_trace(Some(71), Some(72), "reply".into(), true, 123, true);
+        assert!(output.get("input_request").is_none());
+        assert_eq!(output["input_correlation"], "output lineage");
+        assert!(
+            transcript_trace(None, Some(71), "partial".into(), false, 123, true)
+                .get("input_request")
+                .is_none()
+        );
+    }
+}

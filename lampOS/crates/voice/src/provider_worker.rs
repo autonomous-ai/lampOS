@@ -1104,7 +1104,12 @@ pub enum ProviderOutput {
         samples: Vec<i16>,
     },
     Transcript {
+        /// Output lineage only; None still means input, even with correlation.
         request: Option<u64>,
+        /// Test-only second-route input identity. Absent without the explicit
+        /// coordinator capability; old readers reject unknown fields.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        input_request: Option<u64>,
         text: String,
         finished: bool,
     },
@@ -7328,6 +7333,7 @@ fn push_text(
         }
         let tail = text.split_off(split);
         push(ProviderOutput::Transcript {
+            input_request: None,
             request,
             text,
             finished: false,
@@ -7335,6 +7341,7 @@ fn push_text(
         text = tail;
     }
     push(ProviderOutput::Transcript {
+        input_request: None,
         request,
         text,
         finished,
@@ -8093,6 +8100,7 @@ pub(crate) mod tests {
             waiting_for_barrier: true,
         }));
         queue.push_back(Outbound::Output(ProviderOutput::Transcript {
+            input_request: None,
             request: None,
             text: "unattributed".into(),
             finished: true,
@@ -16765,4 +16773,52 @@ pub(crate) mod tests {
     mod policy_holds;
     /// The lamp speaks when spoken to (#829, step 2): tests only.
     mod spoken_to;
+}
+
+#[cfg(test)]
+mod input_request_ids_tests {
+    use super::*;
+    #[test]
+    fn input_request_ids_do_not_change_retired_output_pruning() {
+        let mut output = VecDeque::from([
+            Outbound::Output(ProviderOutput::Transcript {
+                request: None,
+                input_request: Some(7),
+                text: "input".into(),
+                finished: true,
+            }),
+            Outbound::Output(ProviderOutput::Transcript {
+                request: Some(7),
+                input_request: None,
+                text: "output".into(),
+                finished: true,
+            }),
+        ]);
+        prune_retired_output(&mut output, 7);
+        assert_eq!(output.len(), 1);
+        assert!(matches!(
+            output.front(),
+            Some(Outbound::Output(ProviderOutput::Transcript {
+                request: None,
+                input_request: Some(7),
+                ..
+            }))
+        ));
+    }
+    #[test]
+    fn input_request_ids_new_reader_accepts_old_sender() {
+        let old = r#"{"kind":"transcript","request":null,"text":"old","finished":true}"#;
+        let event: ProviderOutput = serde_json::from_str(old).unwrap();
+        assert!(matches!(
+            event,
+            ProviderOutput::Transcript {
+                input_request: None,
+                ..
+            }
+        ));
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(old).unwrap(),
+            serde_json::to_value(event).unwrap()
+        );
+    }
 }

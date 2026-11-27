@@ -970,6 +970,7 @@ fn cancelled_request_tails_are_filtered_without_swallowing_new_requests_or_link_
                 samples: vec![17; 240],
             },
             ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "Let me look".into(),
                 finished: false,
@@ -1004,6 +1005,7 @@ fn cancelled_request_tails_are_filtered_without_swallowing_new_requests_or_link_
         ProviderOutput::Ready { setup_us: 12 },
         ended_output(),
         ProviderOutput::Transcript {
+            input_request: None,
             request: None,
             text: "session-scoped evidence".into(),
             finished: true,

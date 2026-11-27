@@ -1039,6 +1039,7 @@ impl Peers {
         if pieces {
             for piece in text.split_inclusive(' ') {
                 queued.push_back(ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text: piece.into(),
                     finished: false,
@@ -1046,6 +1047,7 @@ impl Peers {
             }
         } else {
             queued.push_back(ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text: text.into(),
                 finished: true,
@@ -1154,6 +1156,7 @@ impl Peers {
                         Written::Dots => {
                             queued.push_back(started);
                             queued.push_back(ProviderOutput::Transcript {
+                                input_request: None,
                                 request: Some(request),
                                 text: "...".into(),
                                 finished: true,
@@ -1252,7 +1255,7 @@ impl Peers {
                         }
                         let queued = &mut self.peers[index].queued;
                         if self.script.late_words_first {
-                            queued.push_back(ProviderOutput::Transcript {
+                            queued.push_back(ProviderOutput::Transcript { input_request: None,
                                 request: None,
                                 text: "an earlier line".into(),
                                 finished: true,
@@ -1270,6 +1273,7 @@ impl Peers {
                             self.peers[index]
                                 .queued
                                 .push_back(ProviderOutput::Transcript {
+                                    input_request: None,
                                     request: None,
                                     text: text.into(),
                                     finished: true,
@@ -1390,6 +1394,7 @@ impl Peers {
                             self.peers[index]
                                 .queued
                                 .push_back(ProviderOutput::Transcript {
+                                    input_request: None,
                                     request: Some(request),
                                     text: text.into(),
                                     finished: true,
@@ -1409,6 +1414,7 @@ impl Peers {
                     let queued = &mut self.peers[index].queued;
                     for (at, piece) in self.script.live_hears.iter().enumerate() {
                         queued.push_back(ProviderOutput::Transcript {
+                            input_request: None,
                             request: None,
                             text: (*piece).into(),
                             finished: at + 1 == self.script.live_hears.len(),
@@ -1416,6 +1422,7 @@ impl Peers {
                     }
                     if let Some(text) = self.script.live_says {
                         queued.push_back(ProviderOutput::Transcript {
+                            input_request: None,
                             request: Some(request),
                             text: text.into(),
                             finished: false,
@@ -1490,6 +1497,7 @@ impl Peers {
                             match answer {
                                 Live::LookSilent => {
                                     queued.push_back(ProviderOutput::Transcript {
+                                        input_request: None,
                                         request: Some(request),
                                         text: "...".into(),
                                         finished: true,

@@ -112,6 +112,7 @@ async fn chats_after_a_cut_of(
         let at = std::time::Instant::now();
         match event {
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text,
                 finished,
@@ -283,6 +284,7 @@ fn keep(thread: &Mutex<Thread>, event: &ProviderOutput) {
     let at = std::time::Instant::now();
     match event {
         ProviderOutput::Transcript {
+            input_request: None,
             request: None,
             text,
             finished,
@@ -721,6 +723,7 @@ async fn a_played_answer_after_words_let_go_keeps_the_conversation_going() {
         let mut thread = crate::thread::THREAD.lock().unwrap();
         match event {
             ProviderOutput::Transcript {
+                input_request: None,
                 request: None,
                 text,
                 finished,

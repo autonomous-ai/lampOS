@@ -14,6 +14,20 @@ from #1378. The code is the source of
 truth; this page is a census of it, to be kept up as switches are added, turned
 on or removed.
 
+## Test-only input request correlation
+
+`LAMP_TEST_INPUT_REQUEST_IDS=on` is an explicit, default-off second-route
+collection switch for #8845. No product unit sets it. It adds `input_request`
+metadata to the existing final input transcript trace, preserving `turn: null`,
+words, ordering, redaction and observation time. It changes no admission rule.
+The coordinator forwards only exact `on` to its second worker after clearing
+the inherited environment. This is also the wire capability: older
+coordinators do not forward it; older workers omit the field. Never enable it
+by injecting environment into an independently launched worker paired with an
+older coordinator, whose strict decoder cannot accept the new field.
+See [the C2 collection contract](sensor2-c2-correlation.md). No device or
+qualification result is claimed here.
+
 ## How to read it
 
 - **Values and default:** what the code accepts, and what happens when the

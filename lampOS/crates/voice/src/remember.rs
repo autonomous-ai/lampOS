@@ -24894,11 +24894,13 @@ mod tests {
             assert_eq!(lease.scope().unwrap().person(), Some(a.as_str()));
             for event in [
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text: words.into(),
                     finished: true,
                 },
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text: reply.into(),
                     finished: true,
@@ -28514,6 +28516,7 @@ mod tests {
         drop(thread);
         crate::second_provider::worker::keep(
             &crate::provider_worker::ProviderOutput::Transcript {
+                input_request: None,
                 request: Some(request),
                 text: "Done, canary-3609 is forgotten.".into(),
                 finished: true,
@@ -29869,11 +29872,13 @@ mod tests {
             );
             for event in [
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text: words.into(),
                     finished: true,
                 },
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text: "Noted.".into(),
                     finished: true,
@@ -29998,11 +30003,13 @@ mod tests {
             assert_eq!(lease.scope().unwrap().person(), Some(a.as_str()));
             for event in [
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: None,
                     text: words.into(),
                     finished: true,
                 },
                 ProviderOutput::Transcript {
+                    input_request: None,
                     request: Some(request),
                     text: "Understood.".into(),
                     finished: true,
