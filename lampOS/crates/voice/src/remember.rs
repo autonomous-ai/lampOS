@@ -19285,6 +19285,20 @@ mod tests {
     /// follow-up just asked about.
     #[test]
     fn a_bare_forget_asks_which_before_running_a_guessed_id() {
+        bare_forget_asks_which(Duration::ZERO, "");
+    }
+
+    /// The same calls on a loaded host (#8805): each forget CI failed on is
+    /// held up 400 ms between its connect and its write, past `FIRST_READ`,
+    /// and still answers within the product's own budget.
+    #[test]
+    fn a_bare_forget_held_up_on_a_loaded_host_still_answers() {
+        bare_forget_asks_which(Duration::from_millis(400), "-held");
+    }
+
+    /// [`a_bare_forget_asks_which_before_running_a_guessed_id`]'s calls, the
+    /// two CI failed on held up for `stall` ([`STALL_BEFORE_WRITE`]).
+    fn bare_forget_asks_which(stall: Duration, tag: &str) {
         const MINH: &str = "p-be9688998f085098";
         // The product's own budget for a call, not FIRST_READ: a loaded CI
         // host held one of these calls up past 300 ms, and the client gave
@@ -19318,12 +19332,14 @@ mod tests {
         let again = guarded(4, Some("forget it"), Some(MINH));
         assert!(again.is_none_or(|again| again.args.get(HEARD_BARE).is_none()));
 
-        let (socket, served) = memory("bare-forget-asks", 2, |request| {
-            match request["op"].as_str() {
+        let (socket, served) = memory(
+            &format!("bare-forget-asks{tag}"),
+            2,
+            |request| match request["op"].as_str() {
                 Some("forget") => json!({"ok":true,"removed":1}),
                 _ => json!({"ok":false}),
-            }
-        });
+            },
+        );
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
         let bare = |id: u64| json!({"source_id": id, HEARD_BARE: true});
@@ -19333,6 +19349,7 @@ mod tests {
             client.context.lock().unwrap().include(Some(MINH), &[4]),
             None
         );
+        STALL_BEFORE_WRITE.with(|held| held.set(stall));
         assert_eq!(run(bare(4)).0, json!({"forgotten": true}));
         // Three shown, none given last: nothing runs, the model asks.
         assert_eq!(
@@ -19370,15 +19387,17 @@ mod tests {
         drop(client);
         std::fs::remove_file(&socket).unwrap();
 
-        let (socket, served) = memory("bare-forget-asked", 4, |request| {
-            match request["op"].as_str() {
+        let (socket, served) = memory(
+            &format!("bare-forget-asked{tag}"),
+            4,
+            |request| match request["op"].as_str() {
                 Some("forget") => json!({"ok":true,"removed":1}),
                 Some("search") => json!({"ok":true,"entries":[
                     {"kind":"kept","id":3,"at_unix_ms":NOW-DAY,"text":"the spare key is in the red box"}
                 ]}),
                 _ => json!({"ok":false}),
-            }
-        });
+            },
+        );
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
         let run =
@@ -19388,6 +19407,7 @@ mod tests {
             None
         );
         client.context.lock().unwrap().just_asked = Some((MINH.to_owned(), 5, 0, Instant::now()));
+        STALL_BEFORE_WRITE.with(|held| held.set(stall));
         assert_eq!(run(bare(5), Some(MINH)).0, json!({"forgotten": true}));
         // The room's: asked without naming anything kept, which may be anyone's.
         assert_eq!(client.context.lock().unwrap().include(None, &[2, 3]), None);
