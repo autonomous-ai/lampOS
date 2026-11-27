@@ -5696,6 +5696,7 @@ pub fn serve(
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.taking_simple_calls();
             }
+            engine = engine.taking_simple_calls();
         }
         // Short replies carry (`LAMP_SHORT_REPLIES_CARRY=on`, #8772, the
         // product owner's rule of 26 Nov 2026).
@@ -10743,15 +10744,18 @@ impl Heeding {
 
     /// With [`Self::taking_simple_calls`], the verdict on a line begun at
     /// `began_us`: let out when it calls the lamp (its words open with "Hey
-    /// Lamp", a tap, a turn a computer opened), is the lamp's own turn, or
-    /// begins within [`crate::follows_on::WITHIN_US`]
+    /// Lamp" as the lamp's language writes it, a head tap, or a turn a
+    /// computer opened within 8 s of its `turn.start`), is the lamp's own
+    /// turn, or begins within [`crate::follows_on::WITHIN_US`]
     /// (20 s) of the end of the lamp's last words, measured to its start, as
     /// every answer's words move it on; held otherwise, and never answered.
     ///
     /// A line with no words in it (a sound, a cough, room noise) is never
-    /// answered, but for a tap; and a line begun within [`CALL_CARRIES_FOR`]
-    /// (15 s) of a call let out, before the lamp has said anything back, is
-    /// the call's ("Hey Lamp, what's the weather" … "in Hanoi").
+    /// answered, but for a tap or a computer's turn; and a line begun within
+    /// [`CALL_CARRIES_FOR`] (15 s) of a call let out (`called_at`) is the
+    /// call's ("Hey Lamp, what's the weather" … "in Hanoi"), whatever the
+    /// lamp said since: an answer doesn't clear it, only a stop or a new
+    /// call moves it.
     fn simple_verdict(
         attention: &crate::attention::Attention,
         said_until_us: Option<u64>,
@@ -10768,7 +10772,7 @@ impl Heeding {
         });
         if attention.judged_own() {
             Verdict::Play("the lamp began this turn itself")
-        } else if attention.head_was_tapped() {
+        } else if attention.tapped() {
             Verdict::Play(SIMPLE_CALLED)
         } else if !heard.chars().any(char::is_alphanumeric) {
             Verdict::Hold(crate::second_provider::SIMPLE_NO_WORDS)

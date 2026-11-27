@@ -12123,7 +12123,22 @@ async fn spoken(
         && !(asked_by_the_lamp || answer_awaited || task_answer)
         && text.chars().any(char::is_alphanumeric)
         && a_yes_held(&shared);
-    let answers = asked_by_the_lamp || carried_sound || answer_awaited || task_answer || yes_held;
+    // `LAMP_SIMPLE_CALL` (#8892, Reviewer-three's P2): a short sound with a
+    // word in it, not a filler, is judged by the one rule
+    // (`worker::Heeding::simple_verdict`), whose window runs from the end of
+    // the lamp's last words to the line's own start, and whose call carries
+    // 15 s: never the thread's 45 s (`sound_carries`), counted from its first
+    // stored answer, which a long answer or a late transcript outlasts.
+    let simple_judges = marked
+        && shared.simple_call
+        && text.chars().any(char::is_alphanumeric)
+        && !filler_only(&text);
+    let answers = asked_by_the_lamp
+        || carried_sound
+        || answer_awaited
+        || task_answer
+        || yes_held
+        || simple_judges;
     if carried_sound {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it, in a conversation going on: judged as a line (LAMP_SHORT_REPLIES_CARRY)"
@@ -12143,6 +12158,10 @@ async fn spoken(
     } else if yes_held {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it while the lamp waits for a yes or no of its own asking: judged as a line (#7698)"
+        );
+    } else if simple_judges {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound with a word in it: judged by the one rule (LAMP_SIMPLE_CALL)"
         );
     }
     let held = marked && !answers;
