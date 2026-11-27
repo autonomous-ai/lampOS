@@ -1049,8 +1049,9 @@ request the lamp has acted on ([tools.md](tools.md)).
 Not shown: a person asking. How the levels look to someone in the room,
 and whether level 5 is a useful light under a ceiling of 24, a camera
 cannot say: it saturates on the ring. The light is not restored after the
-board restarts, unless `LAMP_LIGHT_KEEP=on` (above; not yet seen on a
-lamp).
+board restarts, unless `LAMP_LIGHT_KEEP=on` (above; on in the product
+since #8836; #8747 leg C showed it kept over a voice restart, and #8836's
+ROW, a 5-minute restart leg, is owed).
 
 Seen through the office iMac's camera on lamp-4ace on 2026-10-12 with a
 ceiling of 40: across eight stills of the resting face the dark centre of
