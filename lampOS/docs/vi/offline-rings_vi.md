@@ -31,7 +31,9 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
   vào một lần reo (`Offer::also`) phát lần lượt từng đoạn.
 - **Dọn dẹp:** cuối mỗi lượt đọc kho (khoảng mỗi giây), đoạn âm thanh có id
   không còn trong Schedule bị xoá (đã nói, bị huỷ, id cũ của một lần sửa,
-  người đó bị `Forget`), và mọi đoạn của một `store_id` khác. Tạo thất bại
+  người đó bị `Forget`), và mọi đoạn của một `store_id` khác. Khi công tắc
+  tắt, mọi đoạn âm thanh bị xoá lúc giọng nói hoặc tiến trình con Schedule
+  của nó khởi động (#8894). Tạo thất bại
   (mất mạng) thì thử lại sau 60 s, rồi gấp đôi mỗi lần, tối đa mỗi giờ một
   lần.
 - **Không có đoạn âm thanh riêng** (đặt khi mất mạng, hoặc tạo thất bại):
@@ -54,11 +56,15 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
 - **Khôi phục cài đặt gốc xoá chúng (điểm thêm 1):** các đoạn âm thanh là lời
   nhắc của người dùng dưới dạng âm thanh, nên
   `/var/lib/lampOS/voice/ring-clips` nằm trong kế hoạch reset của sản phẩm.
-- **Tắt công tắc thì không dọn gì (P3 2 của Reviewer-lead trên #8800):** các
-  đoạn âm thanh chỉ được dọn khi công tắc bật, nên nếu tắt công tắc, đoạn âm
-  thanh của một lời nhắc đã xoá (đã nói, bị huỷ, bị sửa, hoặc người đó bị
-  `Forget`) vẫn còn đến lần khôi phục cài đặt gốc. Khôi phục cài đặt gốc vẫn
-  xoá hết.
+- **Tắt công tắc thì mọi đoạn âm thanh bị xoá (#8894, P3 2 của Reviewer-lead
+  trên #8800):** khi công tắc tắt, mọi đoạn âm thanh bị xoá lúc giọng nói
+  hoặc tiến trình con Schedule của nó khởi động. Tiến trình con xoá mọi tệp
+  trong thư mục khi khởi động; nếu tắt nói của Schedule thì tiến trình con
+  không bao giờ chạy, nên chính giọng nói xoá lúc khởi động. Tắt công tắc cần
+  khởi động lại, nên đoạn âm thanh của một lời nhắc đã xoá (đã nói, bị huỷ,
+  bị sửa, hoặc người đó bị `Forget`) không bao giờ còn lại. Mỗi lần khởi động
+  chỉ đọc thư mục một lần, ghi một dòng nhật ký nếu có tệp bị xoá, không tạo
+  gì và không dùng mạng. Khôi phục cài đặt gốc vẫn xoá hết.
 - **Mỗi vòng không đọc đĩa vô ích (P3 1 của Twelve trên #8687):** chưa thấy
   phiên nào thì không đọc đoạn âm thanh nào; một mục đã thấy đang chờ thì
   không đọc lại ở các vòng sau, và việc chờ chỉ được ghi nhật ký một lần.
