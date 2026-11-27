@@ -8,6 +8,25 @@ Cảm biến dùng bản tái hiện mã nguồn mở của kiến trúc Persona
 
 Trên tuyến thoại thứ hai, phép đo cần `LAMP_SIMPLE_CALL=on`, `LAMP_CALLER_FRAME_VAD=on` và `LAMP_CALLER_FRAME_MODEL` trỏ tới thư mục mô hình cục bộ. Tiến trình giám sát chỉ chuyển công tắc và đường dẫn mô hình cho worker của tuyến thoại thứ hai. Các unit của sản phẩm để cảm biến tắt. Báo cáo tách câu ngắn 1–3 từ và câu dài trong môi trường yên tĩnh hoặc có tiếng ồn. Kết quả chưa xác định vẫn nằm trong mẫu số. Cần giữ đúng ít nhất 114/120 câu của người gọi và loại đúng ít nhất 114/120 câu của người khác trên bộ thu thực tế. Thời gian suy luận khi phát lại trên máy tính và độ trễ đo trực tiếp ở đèn được ghi riêng. Tệp âm thanh của người thật và nhãn riêng tư được lưu cục bộ cùng README và mã SHA-256.
 
+## Kết quả trên tập giọng giữ lại của ElevenLabs và Gemini
+
+Trong 1.108 cặp, mô hình theo khung giữ đúng **457/554 câu của người gọi (82,5%)** và loại đúng **88/554 giọng khác (15,9%)**. CAM++ với điều kiện độ dài đang dùng giữ đúng 0/554 và loại đúng 84/554 (15,2%). Khi có nhiễu +5 dB, mô hình theo khung loại đúng **0/277 giọng khác**. Cảm biến tiếp tục tắt và chưa đủ điều kiện đưa vào bộ xét chung. [EVAL và mã băm](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496)
+
+| Câu nói tiếp và môi trường | CAM++ đúng, cùng người / người khác | Theo khung, giữ đúng | Theo khung, loại đúng |
+|---|---|---:|---:|
+| 1–3 từ, yên tĩnh | 0/121 · 12/121 | 71/121 (58,7%) | 34/121 (28,1%) |
+| 1–3 từ, +5 dB | 0/121 · 12/121 | 120/121 (99,2%) | 0/121 (0%) |
+| Từ 4 từ, yên tĩnh | 0/156 · 31/156 | 111/156 (71,2%) | 54/156 (34,6%) |
+| Từ 4 từ, +5 dB | 0/156 · 29/156 | 155/156 (99,4%) | 0/156 (0%) |
+
+Kho gốc có 44.981 tệp WAV 16 kHz một kênh. Kế hoạch còn 19 câu Gemini chưa tạo được. Phép đo chính dùng 68 tiếng gọi “Hey Lamp” riêng biệt và 277 câu nói tiếp, gồm 60 câu một từ, tám câu hai từ và 53 câu ba từ. Mỗi câu được ghép với mẫu của đúng người và của người khác, trong môi trường yên tĩnh và có nhiễu. Công cụ của dự án mô phỏng phòng và micrô. Đã đối chiếu cả hai đầu mỗi cặp với bảng kê gốc. Tất cả giọng huấn luyện và 4.500 tệp OpenAI chỉ được lưu trong kho gốc. [Nguồn và mã băm bộ dữ liệu](https://github.com/autonomous-ai/lampOS/issues/8907#issuecomment-7224058425)
+
+Cả tám giọng ElevenLabs và năm trong sáu giọng Gemini có tiếng gọi “Hey Lamp” đứng riêng. Với giọng còn lại, phép đo bổ sung dùng 19 câu nói tiếp để so với người khác. Mô hình theo khung loại đúng 10/76 cặp, trong đó 0/38 cặp có nhiễu. Hai đoạn chỉ chứa lời gọi, được kiểm tra độc lập và cắt từ câu gọi dài của giọng này, cho kết quả giữ đúng 35/38 câu của cùng người. CAM++ loại đúng 12/76 và giữ đúng 0/38 ở hai phép đo bổ sung. Khi dùng đoạn mở đầu dài hơn của cùng giọng và cùng phong cách ở một phép đối chứng riêng, CAM++ giữ đúng 0/554 và loại đúng 252/554 (45,5%).
+
+Trên máy Mac, mô hình theo khung mất 3,062 ms ở cặp đầu, p50/p95 là 2,915/7,918 ms ở 1.107 cặp sau. CAM++ đủ độ dài để chạy ở 210 cặp, mất 79,338 ms ở cặp đầu và 76,652/86,900 ms ở p50/p95 sau đó. Thời gian nạp tệp mô hình tương ứng là 2,158 ms và 866,426 ms. Phép đo bắt đầu khi cả hai đoạn PCM đã có trong bộ nhớ. Bộ chấm chung đã đối chiếu đủ 2.216 kết quả của hai phương pháp. Bản ghi micrô vật lý của lượt D do trưởng nhóm giữ trên máy thu. [Hướng dẫn đối chiếu lượt D](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224605726)
+
+## Kết quả phát triển trên giọng macOS và LibriSpeech
+
 Trên 288 cặp giọng tổng hợp của macOS, bộ phân loại theo khung giữ đúng 134/144 câu của người gọi (93,1%) và loại đúng 40/144 câu của người khác (27,8%). Trên 288 cặp từ 12 người đọc LibriSpeech, hai con số là 124/144 (86,1%) và 42/144 (29,2%). Trong nhiễu +5 dB, cả hai bộ đều nhận nhầm toàn bộ giọng người khác. Với cả 144 câu có nhiễu, đổi đoạn mẫu của người gọi sang đoạn mẫu của người khác vẫn cho cùng tỷ lệ khung giọng đích là 1,00. Trong môi trường yên tĩnh, mẫu đúng có điểm cao hơn trên 56/72 câu tổng hợp và 46/72 câu LibriSpeech. Cảm biến chưa đạt ngưỡng để đưa vào bộ xét chung. [Kết quả theo từng điều kiện và độ trễ](../verification/caller-frame-8849/bench.md)
 
 Tiến trình mô hình có thể nạp trọng số ngay khi nhận được mẫu tiếng gọi hợp lệ. Trên đèn, cần đo tỷ lệ kết quả có trong 100 ms sau lúc người dùng nói xong và trước quyết định đầu tiên. Mục tiêu cho p95 thời gian suy luận sau khi đã nạp mô hình là 500 ms. Quyết định nhận câu không chờ mô hình.

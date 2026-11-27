@@ -34,4 +34,6 @@ The voice supervisor passes the frame switch and model path only to the second-r
 
 ## Decision for the combined judge
 
+The held-out provider run kept 82.5% of same callers and rejected 15.9% of other voices. In +5 dB noise the frame sensor rejected none of the 277 other-voice trials. It stays off. [Primary EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496)
+
 The quality bar is 95% of same callers kept and 95% of other voices rejected on the agreed physical holdout. For 120 examples in each class that is 114 correct in each. Report the short (1–3 words) and longer lines separately in quiet and noisy conditions, with the whole denominator in each cell. The lead tests the sensor by itself, then compares the played voice set and a real-person session against stable before any addition to the judge. [Evaluation record](https://github.com/autonomous-ai/lampOS/issues/8849) · [Shared reviewer scoring](https://github.com/autonomous-ai/lampOS/pull/8885)

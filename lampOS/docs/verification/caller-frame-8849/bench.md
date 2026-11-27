@@ -2,6 +2,25 @@
 
 The simple base admits every ordinary in-window follow-up. The percentages below describe the **sensor’s own explicit classifications**. “Kept” means a same-caller pair classified as same. “Rejected” means another speaker classified as different. Wrong and unknown answers both count as misses. Each comparator receives identical PCM.
 
+## Held-out ElevenLabs and Gemini voices
+
+On 1,108 paired comparisons the frame model kept **457/554 same callers (82.5%)** and rejected **88/554 other voices (15.9%)**. The guarded whole-line model kept 0/554 and rejected 84/554 (15.2%). The frame model rejected **0/277 other voices in +5 dB noise**. Sensor 6 stays off and outside the combined judge. [EVAL, raw counts and report hashes](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496)
+
+| Follow-up and condition | Guarded CAM++ same / other correct | Frames same kept | Frames other rejected |
+|---|---|---:|---:|
+| 1–3 words, quiet | 0/121 · 12/121 | 71/121 (58.7%) | 34/121 (28.1%) |
+| 1–3 words, +5 dB | 0/121 · 12/121 | 120/121 (99.2%) | 0/121 (0%) |
+| 4+ words, quiet | 0/156 · 31/156 | 111/156 (71.2%) | 54/156 (34.6%) |
+| 4+ words, +5 dB | 0/156 · 29/156 | 155/156 (99.4%) | 0/156 (0%) |
+
+The complete release contains 44,981 original 16 kHz mono WAVs. Its plan lists 19 additional Gemini renders that were never delivered. The primary used 68 separate literal “Hey Lamp” openings and 277 ordinary probes, including 60 one-word, eight two-word and 53 three-word recordings. Both ends of every pair came from held-out ElevenLabs or Gemini voices. Each probe used its true enrollment and an impostor under the same quiet or noisy condition. The microphone and room response were simulated with the repository acoustic tools. All 4,500 already-rendered OpenAI files and all training voices remain in the original archive. [Provider data and release digest](https://github.com/autonomous-ai/lampOS/issues/8907#issuecomment-7224058425)
+
+All eight ElevenLabs test voices and five of six Gemini test voices supplied bare openings. The remaining voice supplied 19 ordinary probes in a separate other-voice check. Frames rejected 10/76 of its impostor comparisons, including 0/38 in noise. Two independently verified wake-only cuts from its compound openings gave 35/38 same-caller comparisons correct. Guarded CAM++ rejected 12/76 impostors and kept 0/38 same callers on that supplement. Those opportunities have separate denominators. In a separate whole-line control, longer same-voice, same-style compound references gave guarded CAM++ 0/554 callers kept and 252/554 other speakers rejected (45.5%).
+
+On the benchmark Mac, the frame model’s first paired inference took 3.062 ms and warm p50/p95 were 2.915/7.918 ms (1,107 warm pairs). Guarded CAM++ reached inference on 210 pairs. Its first eligible result took 79.338 ms and warm p50/p95 were 76.652/86.900 ms. Model-file load took 2.158 ms for frames and 866.426 ms for CAM++. These timings start with both PCM buffers available. The team lead’s run D provides a separate physical microphone check. The digital run contributes zero qualifying real-person pairs. [Run D handoff](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224605726)
+
+The official #8885 scorer reconciled all 2,216 method-by-pair predictions. The private corpus inventory SHA-256 is `907573417595c3347c56f9a152fb00a0dc5b9ac3f46014bf92071af7d16f873a`. Archive `sensor6-8849-20261127` holds the complete provider tar, original and processed WAVs, acoustic stages and noise stems, source metadata, posteriors, timing, executables and all failed attempts. Real people’s recordings stay on their collecting Mac.
+
 ## Development runs before the provider holdout
 
 Each row has 36 same-caller and 36 other-caller pairs. The whole-line comparator abstained on all 576 opportunities across both runs because every isolated enrollment was shorter than its 1.5-second minimum. The unguarded diagnostic shows the classifications the same CAM++ weights produce if forced to process those short clips.
