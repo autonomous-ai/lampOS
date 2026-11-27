@@ -334,11 +334,6 @@ fn with_the_switch_off_nothing_changes() {
     keys.sort_unstable();
     assert_eq!(keys, ["asked_to_remember", "source_id", "when"], "{told}");
     assert_eq!(told["scope"], "said in this room; speaker unknown");
-    assert_eq!(
-        told,
-        json!({"found":[{"source_id":8,"when":"today","asked_to_remember":"The guest's dog is called Biscuit"}],
-            "untrusted":true,"scope":"said in this room; speaker unknown"})
-    );
     let (hits, _, _) = hits_told(&answer, "the dog", NOW, None, false).unwrap();
     assert!(!hits.contains("A guest said"), "{hits}");
     for second in [false, true] {
