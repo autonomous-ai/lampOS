@@ -201,6 +201,11 @@ struct Rig {
     /// Linux a send that finds it gone drops its `CaptureStopped` unread
     /// (`a_refused_send_drops_what_the_gone_peer_had_sent`, #1359).
     ending: bool,
+    /// A pause between `speaker_only`'s `worker_running()` check and its
+    /// send, spent servicing the worker in place of the tick after the send
+    /// (#8466). A worker that ends in it has closed its socket before the
+    /// send: the window a loaded runner opens by chance, opened every time.
+    send_pause: Option<Duration>,
     /// The microphone's first `configure`, when the test holds it.
     held: Option<HeldCall>,
     /// Where a gone speaker's link is bound ([`Rig::speaker_gone`]): a
@@ -423,6 +428,7 @@ impl Rig {
             fault: None,
             refused: None,
             ending: false,
+            send_pause: None,
             held,
             gone: None,
             _alone: alone,
@@ -1948,14 +1954,24 @@ impl Rig {
     fn speaker_only(&mut self, ms: u64) {
         let until = Instant::now() + Duration::from_millis(ms);
         while Instant::now() < until && self.worker_running() {
+            if let Some(pause) = self.send_pause {
+                self.service_for(pause);
+            }
             self.accept(vec![0; RENDER_SAMPLES]);
-            let next = Instant::now() + TICK;
-            while Instant::now() < next {
-                self.service();
-                sleep(Duration::from_micros(300));
+            if self.send_pause.is_none() {
+                self.service_for(TICK);
             }
         }
         self.origin += Duration::from_millis(ms);
+    }
+
+    /// Service the worker for `span`, as a tick's wait does.
+    fn service_for(&mut self, span: Duration) {
+        let next = Instant::now() + span;
+        while Instant::now() < next {
+            self.service();
+            sleep(Duration::from_micros(300));
+        }
     }
 
     /// For `ms` the speaker sends nothing and the microphone holds nothing,
@@ -2058,6 +2074,7 @@ fn a_microphone_gone_mid_run_and_not_back_in_10_s_ends_the_run() {
     rig.stream(&signal, 50);
     rig.settle(0);
     rig.tolerate_fault = true;
+    rig.send_pause = Some(Duration::from_millis(20));
     let gone_at = Instant::now();
     // More failed opens than 10 s of tries at 250 ms.
     rig.microphone_gone(60);
@@ -2130,6 +2147,7 @@ fn a_microphone_gone_during_a_stalls_gap_and_not_back_in_10_s_ends_the_run() {
     rig.stream(&signal, 50);
     rig.settle(0);
     rig.tolerate_fault = true;
+    rig.send_pause = Some(Duration::from_millis(20));
     // More failed opens than 10 s of tries at 250 ms.
     for _ in 0..60 {
         rig.device.fail_next(OPEN_CALL, NODEV);
