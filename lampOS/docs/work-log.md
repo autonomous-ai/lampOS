@@ -1,5 +1,10 @@
 Ready for lamp-voice: no
 
+## 27 November 2026 — sensor 6 on the simple-call base
+
+- Draft #8927 measures a standalone, default-off caller-conditioned Personal VAD from `1b3fc5360b9dc9d70064c52acccebb62fa3d4351` on #8892 at `0dbbfc95bbea6ddf397308e1a8ef1933c5d19dcb`. It uses the spoken opening “Hey Lamp.” The simple base continues to decide ordinary lines, confirmations and renewal. [Draft sensor PR](https://github.com/autonomous-ai/lampOS/pull/8927)
+- The generated/public development replays kept 134/144 and 124/144 same-caller pairs and rejected 40/144 and 42/144 other-caller pairs. Every one of the 144 noisy impostor pairs matched the caller. Sensor 6 stays out of the combined judge. The overnight evaluation uses the held-out ElevenLabs/Gemini voices and the lead’s played microphone run on Mac 2. Archive `sensor6-8849-20261127` retains the original data, failed runs, raw scores, timings, READMEs and digests. [Development EVAL and hashes](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7222294409)
+
 ## 27 November 2026 — voice match for ordinary follow-ups
 
 - The lead incorporated Second’s worker regression into the P0 fix. “And times two?” is admitted and renews with scores of 0.26, 0.29, 0.30 and no print, both with and without a carried 0.26. The regression checks renewal at +31 s and expiry 21 s after the second answer. Train 1291 carried the fix into build 16492. The owner’s ruling on confirmations is separate. [P0 PR #8843](https://github.com/autonomous-ai/lampOS/pull/8843) · [Merged train](https://github.com/autonomous-ai/lampOS/pull/8861)
