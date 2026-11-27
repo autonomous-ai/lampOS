@@ -1,18 +1,19 @@
 //! A guest's words in the room's memory (`LAMP_MEMORY_GUEST_MARKED`,
 //! #8639, the memory owner's calls of 27 Nov 2026, 17:42 and 17:58).
 //!
-//! A *guest line* is a heard line admitted as the room's with the camera
-//! allowed, an unknown face in view at the last refresh, no known face seen
-//! within the last two minutes (`memory_scope::NO_FACE_QUIET`), after the
-//! eyes have matched an enrolled face once since the voice started
-//! ([`crate::memory_scope::FaceCache::guest`], the Reviewer-lead's P1 on
-//! #8903). A session person's line is never one: admission reads none, and
-//! the session's verdict clears the mark (`second_provider::session_judged`,
-//! ask 2). Nobody in view, a known face in view, a one-turn misread (a known
-//! face seen moments before), no face enrolled, or none matched yet is never
-//! one: the line stays the owner's, as today. The marks are kept by request
-//! id alone (ask 5): every admitted line sets or clears its own, so an id
-//! used again in a later session finds its own mark, never an older line's.
+//! A *guest line* is a heard line admitted with the camera allowed while
+//! an unknown face is in view beside a known one, freshly matched, in the
+//! same look ([`crate::memory_scope::FaceCache::guest`]): the memory owner's
+//! "unknown face only" (27 Nov 17:42) as the first builder narrowed it
+//! (21:06 on #8903, option b), so the owner is there with them. The
+//! cache's current view only, no window. An unknown face alone (an owner
+//! the eyes miss), nobody in view, the owner alone, or a one-turn misread
+//! is never one: the line stays the owner's, as today. Only a guest line
+//! written as the room's is marked: the known person's own line, seen
+//! speaking, stays theirs, and a session person's has its mark cleared
+//! (`second_provider::session_judged`). The marks are kept by request id
+//! alone: every admitted line sets or clears its own, so an id used again
+//! in a later session finds its own mark, never an older line's.
 //!
 //! A guest's words are kept in the room's memory, as today, and now marked
 //! as a guest's: the room's `append_linked` and `remember` carry

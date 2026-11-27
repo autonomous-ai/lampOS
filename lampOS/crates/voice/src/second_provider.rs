@@ -6205,13 +6205,20 @@ impl Engine {
             // through the line arms nothing (El's P2 on #3108).
             let late = heard && self.memory_camera_allowed && self.scopes_context();
             // A guest line (#8639, `LAMP_MEMORY_GUEST_MARKED`): heard with
-            // the camera allowed, an unknown face in view and no known face
-            // seen in the last two minutes. Read in the same pass, no wait.
+            // the camera allowed, an unknown face in view beside a known one
+            // (the first builder's option b, 21:06 on #8903). Read in the
+            // same pass, no wait.
             let mut guest = false;
             let scope = if heard && self.memory_camera_allowed {
                 let now = std::time::Instant::now();
                 let scope = cache.snapshot(now);
                 guest = !scope.held() && cache.guest(now);
+                if guest && crate::remember::guest::on() {
+                    eprintln!(
+                        "lamp-voice second: request {request}: an unknown face beside a known one{}",
+                        crate::remember::guest::journal(guest)
+                    );
+                }
                 // With `LAMP_FACE_GAP_HOLD`, why the line is or isn't
                 // held: counts and ms only (c0a4's run on #2449).
                 if let Some(told) = cache.gap_told(now) {
@@ -6226,10 +6233,7 @@ impl Engine {
                 // empty, whatever the switches (the sticky plan's T0): a
                 // reason, ms and counts, never a name.
                 if let Some(told) = cache.room_told(now) {
-                    eprintln!(
-                        "lamp-voice second: request {request}: memory scope the room's: {told}{}",
-                        crate::remember::guest::journal(guest)
-                    );
+                    eprintln!("lamp-voice second: request {request}: memory scope the room's: {told}");
                 }
                 // A line held only by a gap is never journalled, whether or
                 // not its exchange is filed by its scope

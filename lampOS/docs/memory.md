@@ -5671,24 +5671,30 @@ The memory owner's calls (asked in this session, posted on #8639):
   model-facing lines say *guest*; a guest's kept facts expire after 30 days,
   as their exchanges do. A guest still hears the household's room notes, as
   today. "Forget what my guest said" is not built.
+- **27 Nov 2026, 21:06, the first builder's ruling on #8903 (c7220367618),
+  option b:** "a line is a guest's only while an unknown face is in view
+  **alongside** a known one, so the owner is there with them. An unknown
+  face alone stays the owner's." It narrows the memory owner's "unknown
+  face only" call, which the owner can widen later.
 
-**Who is a guest.** A heard line admitted as the room's with the camera
-allowed, at least one face in view at the face cache's last refresh, no known
-face freshly seen within `NO_FACE_QUIET` (120 s, `RoomReason::NeverKnown`),
-and not held by a gap (`FaceCache::guest`, read in the same pass as the
-snapshot, no lock waited for; `remember::guest::mark_line` holds the newest
-16 guest lines by request id). Nobody in view, a known face in view (alone
-or beside an unknown one), and a known face seen within the 120 s (a one-turn
-misread) are never guests: those lines stay the owner's. Nor is anyone a
-guest before the eyes have matched an enrolled face once since the voice
-started (`FaceCache::named_once`, never set back; the Reviewer-lead's P1 on
-#8903, option b, with no new window): on a lamp with no face enrolled, or
-before the owner is first matched after a start, every line is the room's,
-kept and unmarked, as before. A match is of an enrolled face, so it also
-holds that one is enrolled. A line the session person (`LAMP_SESSION_PERSON`)
-takes as theirs has its mark cleared (`session_judged`). The marks are kept
-by request id alone: every admitted line sets its own mark or clears it, so
-a request id used again finds its own.
+**Who is a guest.** A heard line admitted with the camera allowed while
+the face cache names a known face, freshly matched (not held by a gap, not
+the eyes' held name), and its last refresh saw at least two faces in view:
+an unknown face beside a known one, so the owner is there with them
+(`FaceCache::guest`, the cache's current view, no window, no lock waited
+for; `remember::guest::mark_line` holds the newest 16 guest lines by
+request id). An unknown face alone (an owner the eyes miss: backlight, a
+profile, back at the desk in the evening, even after an earlier match and
+over 120 s unmatched), no face enrolled, two unknown faces, nobody in view,
+the owner alone, and a one-turn misread are never guests: those lines stay
+the owner's, kept and unmarked, as today. Only a guest line written as the
+room's is marked: the known person's own line, seen speaking, stays theirs,
+and a line the session person (`LAMP_SESSION_PERSON`) takes as theirs has
+its mark cleared (`session_judged`). The journal says `request N: an unknown
+face beside a known one, a guest: marked for the room's memory
+(LAMP_MEMORY_GUEST_MARKED)`. The marks are kept by request id alone: every
+admitted line sets its own mark or clears it, so a request id used again
+finds its own.
 
 **What is kept.** A guest's words are kept in the room's memory as before
 (the 30-day raw exchange, and a room kept fact), now marked: the room's
@@ -5741,9 +5747,8 @@ name. Off, nothing is marked and every word is as before.
 
 | Limit | Value | Where |
 |---|---|---|
-| A known face seen lately (call 1's 2 min) | 120 s | `memory_scope::NO_FACE_QUIET` |
-| Faces in view for a guest | at least 1 at the last refresh | `FaceCache::guest` |
-| An enrolled face matched first | once since the voice started (no window) | `FaceCache::named_once` |
+| Faces in view for a guest | at least 2 at the last refresh, one of them a known face freshly matched | `FaceCache::guest` |
+| A time window for a guest | none: the cache's current view only | `FaceCache::guest` |
 | Guest lines held by request id | the newest 16 | `remember::guest::LINES_HELD` |
 | A guest's exchanges | 30 days | `--keep-days 30`, `lamp-memory.service` |
 | A guest's kept facts | 30 days, the same day as the exchanges | `Days::maintain` |

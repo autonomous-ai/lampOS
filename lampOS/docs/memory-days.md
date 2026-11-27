@@ -1566,6 +1566,15 @@ The memory owner's calls (asked in this session, posted on #8639):
   model-facing lines say *guest*; a guest's kept facts expire after 30 days,
   as their exchanges do. A guest still hears the household's room notes, as
   today. "Forget what my guest said" is not built.
+- **27 Nov 2026, 21:06, the first builder's ruling on #8903 (c7220367618),
+  option b:** "a line is a guest's only while an unknown face is in view
+  **alongside** a known one, so the owner is there with them. An unknown
+  face alone stays the owner's." It narrows the memory owner's "unknown
+  face only" call, which the owner can widen later.
+
+A guest's line is one the voice admits with an unknown face in view beside
+a known one (the voice's `FaceCache::guest`); an unknown face alone is never
+one.
 
 A guest's room line and kept fact carry a `speakers` row `guest`: no new
 column, table or migration, `user_version` unchanged, and never a person's

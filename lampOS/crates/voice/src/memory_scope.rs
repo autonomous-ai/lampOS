@@ -333,11 +333,6 @@ pub struct FaceCache {
     /// The eyes' known file as the last refresh read it; `None` before the
     /// first ([`Self::known_file_read`]).
     known_mark: Mutex<Option<KnownMark>>,
-    /// Whether a refresh has named an enrolled face since this cache was
-    /// made, at the voice's start: never set back, not by a privacy change
-    /// or a forget. Only then can an unknown face be a guest
-    /// ([`Self::guest`], the Reviewer-lead's P1 on #8903, option b).
-    named_once: AtomicBool,
 }
 impl FaceCache {
     /// The lamp has answered a turn of `scope`'s at `at`: a gap is held only
@@ -408,30 +403,24 @@ impl FaceCache {
     }
 
     /// Whether a line admitted now is a guest's (#8639,
-    /// `LAMP_MEMORY_GUEST_MARKED`; the memory owner's call of 27 Nov 17:42):
-    /// the cache names nobody, at least one face was in view at the last
-    /// refresh, and no known face was freshly seen within [`NO_FACE_QUIET`]
-    /// ([`RoomReason::NeverKnown`], as [`Self::room_told`] reads it).
-    /// Nobody in view, a known face, or a one-turn misread (a known face
-    /// seen moments ago) is no guest. Nor is anyone before the eyes have
-    /// matched an enrolled face once since the voice started (the
-    /// Reviewer-lead's P1 on #8903, option b, no new window): on a lamp with
-    /// no face enrolled, or before the owner is first matched, every line is
-    /// the room's, kept and unmarked, as before. A match is of an enrolled
-    /// face, so this also holds that one is enrolled. No lock is waited for:
-    /// a busy lock reads as no guest.
+    /// `LAMP_MEMORY_GUEST_MARKED`): the memory owner's "unknown face only"
+    /// (27 Nov 17:42) as the first builder narrowed it (21:06 on #8903,
+    /// option b): an unknown face in view beside a known one, so the owner
+    /// is there with them. The cache names a known face, freshly matched
+    /// (not held by a gap, not the eyes' held name), and the last refresh
+    /// saw at least two faces in view. The cache's current view only: no
+    /// window. An unknown face alone (an owner the eyes miss: backlight, a
+    /// profile), nobody in view, the owner alone, or a one-turn misread is
+    /// no guest, and stays the room's or the owner's, unmarked. A write of a
+    /// guest line is marked only when it is the room's: the known person's
+    /// own line, seen speaking, stays theirs. No lock is waited for.
     pub fn guest(&self, now: Instant) -> bool {
-        if !self.named_once.load(Ordering::Acquire) || self.snapshot(now).person().is_some() {
+        let snapshot = self.snapshot(now);
+        if snapshot.person().is_none() || snapshot.held() || snapshot.sticky() {
             return false;
         }
         // `in_view` holds the faces plus one; 0 when not known.
-        if self.in_view.load(Ordering::Acquire) < 2 {
-            return false;
-        }
-        let Ok(seen) = self.last_seen_until.try_lock() else {
-            return false;
-        };
-        seen.is_none_or(|until| now.saturating_duration_since(until) >= NO_FACE_QUIET)
+        self.in_view.load(Ordering::Acquire) >= 3
     }
 
     /// Acquire before starting the source read, never after it completes.
@@ -491,11 +480,10 @@ impl FaceCache {
         *self.cold_at.lock().unwrap() = Some(at);
     }
 
-    /// For tests: an enrolled face was matched `ago` before now, its
-    /// sighting ended then ([`Self::guest`]).
+    /// For tests: a known face was matched `ago` before now, its sighting
+    /// ended then ([`Self::guest`], [`Self::room_told`]).
     #[cfg(test)]
     pub(crate) fn matched_ago(&self, ago: Duration) {
-        self.named_once.store(true, Ordering::Release);
         *self.last_seen_until.lock().unwrap() = Instant::now().checked_sub(ago);
     }
 
@@ -647,9 +635,6 @@ impl FaceCache {
             })
         };
         let named = next.is_some();
-        if named {
-            self.named_once.store(true, Ordering::Release);
-        }
         // The newest fresh sighting, for why a later line is the room's.
         if let Some(face) = next.as_ref()
             && let Ok(mut seen) = self.last_seen_until.lock()

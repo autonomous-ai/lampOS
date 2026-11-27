@@ -2343,20 +2343,26 @@ Các quyết định của người phụ trách ký ức (hỏi trong phiên n�
   cho mô hình dùng chữ *guest*; điều khách nhờ giữ hết hạn sau 30 ngày, như
   các lượt trao đổi của họ. Khách vẫn nghe các ghi chú của phòng như hôm nay.
   "Quên những gì khách tôi nói" chưa được làm.
+- **27/11/2026, 21:06, quyết định của first builder trên #8903 (c7220367618),
+  phương án b:** "a line is a guest's only while an unknown face is in view
+  **alongside** a known one, so the owner is there with them. An unknown
+  face alone stays the owner's." Quyết định này thu hẹp quyết định "chỉ
+  khuôn mặt lạ" của người phụ trách ký ức; người phụ trách có thể nới rộng
+  sau.
 
-**Ai là khách.** Một câu nghe được, nhận vào là của phòng khi camera được
-phép, có ít nhất một khuôn mặt trong khung hình ở lần làm mới gần nhất, không
-có khuôn mặt quen nào được thấy trong `NO_FACE_QUIET` (120 giây), và không bị
-giữ vì khoảng trống (`FaceCache::guest`; `remember::guest::mark_line` giữ 16
-câu khách mới nhất theo mã yêu cầu). Không có ai trong khung hình, một khuôn
-mặt quen trong khung hình, hoặc một khuôn mặt quen vừa thấy trong 120 giây
-(nhận nhầm một lượt) không bao giờ là khách. Cũng không ai là khách trước khi
-mắt đã nhận ra một khuôn mặt đã đăng ký ít nhất một lần từ khi voice khởi động
-(`FaceCache::named_once`, không bao giờ đặt lại; P1 của Reviewer-lead trên
-#8903, phương án b, không thêm khoảng thời gian nào): trên đèn chưa đăng ký
-khuôn mặt nào, hoặc trước khi chủ được nhận ra lần đầu sau khi khởi động, mọi
-câu là của phòng, được giữ và không đánh dấu, như trước. Câu mà người của
-phiên (`LAMP_SESSION_PERSON`) nhận là của họ thì bị xoá dấu.
+**Ai là khách.** Một câu nghe được, nhận vào khi camera được phép, trong lúc
+bộ nhớ đệm khuôn mặt gọi tên một khuôn mặt quen vừa được nhận ra (không giữ vì
+khoảng trống, không phải tên mắt đang giữ) và lần làm mới gần nhất thấy ít
+nhất hai khuôn mặt: một khuôn mặt lạ bên cạnh một khuôn mặt quen, nên chủ đang
+ở cùng họ (`FaceCache::guest`, chỉ khung hình hiện tại, không có khoảng thời
+gian; `remember::guest::mark_line` giữ 16 câu khách mới nhất theo mã yêu cầu).
+Một khuôn mặt lạ một mình (chủ mà mắt không nhận ra: ngược sáng, nghiêng mặt,
+kể cả sau một lần nhận ra trước đó và hơn 120 giây không nhận ra), chưa đăng ký
+khuôn mặt nào, hai khuôn mặt lạ, không có ai, chủ một mình, hoặc nhận nhầm một
+lượt không bao giờ là khách: câu vẫn là của chủ, được giữ và không đánh dấu,
+như hôm nay. Chỉ câu khách được ghi là của phòng mới được đánh dấu: câu của
+chính người quen, được thấy đang nói, vẫn là của họ, và câu mà người của phiên
+(`LAMP_SESSION_PERSON`) nhận là của họ thì bị xoá dấu.
 
 **Điều được giữ.** Lời của khách vẫn được giữ trong ký ức của phòng như trước
 (lượt trao đổi 30 ngày, và điều phòng nhờ giữ), nay có đánh dấu: `append_linked`
@@ -2403,9 +2409,8 @@ không có nó. Tắt công tắc, không có gì được đánh dấu và mọ
 
 | Giới hạn | Giá trị | Ở đâu |
 |---|---|---|
-| Khuôn mặt quen thấy gần đây (2 phút của quyết định 1) | 120 giây | `memory_scope::NO_FACE_QUIET` |
-| Khuôn mặt trong khung hình để là khách | ít nhất 1 ở lần làm mới gần nhất | `FaceCache::guest` |
-| Đã nhận ra khuôn mặt đã đăng ký | một lần từ khi voice khởi động (không có khoảng thời gian) | `FaceCache::named_once` |
+| Khuôn mặt trong khung hình để là khách | ít nhất 2 ở lần làm mới gần nhất, một là khuôn mặt quen vừa nhận ra | `FaceCache::guest` |
+| Khoảng thời gian cho khách | không có: chỉ khung hình hiện tại | `FaceCache::guest` |
 | Câu khách giữ theo mã yêu cầu | 16 câu mới nhất | `remember::guest::LINES_HELD` |
 | Lượt trao đổi của khách | 30 ngày | `--keep-days 30`, `lamp-memory.service` |
 | Điều khách nhờ giữ | 30 ngày, cùng ngày với lượt trao đổi | `Days::maintain` |
