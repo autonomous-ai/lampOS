@@ -665,11 +665,9 @@ sản phẩm từ 19/11 (`lamp-voice.service`), theo quy tắc của chủ sản
 còn nợ (ROW của #7960 đạt các bước bản ghi kết nối bên cạnh). Dòng lời nhắc
 (`LAMP_SERVICE_RECORDS_REMINDERS`) cũng bật, từ #7970, dòng việc Harness
 (`LAMP_SERVICE_RECORDS_TASKS`) bật từ 20/11 theo cùng quy tắc, ROW của nó còn
-nợ trên lamp-06c1. Công cụ tìm nguồn (`LAMP_SERVICE_RECORDS_SOURCE`) vẫn tắt
-trong sản phẩm: #8017 đưa nó vào ở trạng thái tắt, theo phán quyết của builder
-đầu tiên ngày 27/11 (18:21, trên #8017) rằng một bước thử thay thế trên Mac
-không thể bật một tính năng phụ thuộc cảm biến, và nó sẽ bật trong một pull
-request bật riêng sau bước thử của chủ trên lamp-06c1. Dòng sdk
+nợ trên lamp-06c1, và công cụ tìm nguồn (`LAMP_SERVICE_RECORDS_SOURCE`) từ sau bước thử
+của chủ trên lamp-06c1 (#8017 đưa vào ở trạng thái tắt, bật sau bước thử đó theo
+phán quyết của builder đầu tiên ngày 27/11). Dòng sdk
 vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
 tắt: chưa có gì ghi vào nó, và trình cài đặt chưa tạo nhóm `lampos-linked`.
 
@@ -741,7 +739,7 @@ ghi connector, mỗi loại có giới hạn riêng:
 - **Tắt.** Không đổi gì: không có dòng liên kết, recall hỏi 5 và kể những gì
   tìm thấy như trước, danh sách của memory được gộp như trước.
 
-### Tìm nguồn: `record_source` (lát 7, `LAMP_SERVICE_RECORDS_SOURCE` của voice, tắt; bật sau bước thử của chủ)
+### Tìm nguồn: `record_source` (lát 7, `LAMP_SERVICE_RECORDS_SOURCE` của voice, bật trong sản phẩm)
 
 Khi `LAMP_SERVICE_RECORDS_SOURCE=on` cùng `LAMP_SERVICE_RECORDS=on` (chỉ
 tuyến thứ hai, `process::service_records_source_worker_environment`;
