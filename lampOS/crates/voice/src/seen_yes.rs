@@ -1131,10 +1131,29 @@ pub fn run(
     posture: bool,
     offer_on: bool,
 ) -> Value {
+    run_in(
+        &path(),
+        lamp_msgs::consent::noticing_by_default(),
+        call,
+        (request, heard, lease),
+        posture,
+        offer_on,
+    )
+}
+
+/// [`run`] with the yes's `path` and `LAMP_NOTICING_BY_DEFAULT`
+/// (`by_default`) given, and the line as `(request, heard, lease)`.
+fn run_in(
+    path: &Path,
+    by_default: bool,
+    call: &ToolCall,
+    (request, heard, lease): (u64, bool, Option<&crate::memory_scope::ScopeLease>),
+    posture: bool,
+    offer_on: bool,
+) -> Value {
     let Ok(mut offer) = OFFERED.lock() else {
         return json!({"ok": false, "note": NOT_KEPT});
     };
-    let by_default = lamp_msgs::consent::noticing_by_default();
     match call.name.as_str() {
         OFFER => offered(&mut offer, request, heard, posture),
         LOOK => {
@@ -1142,7 +1161,7 @@ pub fn run(
             drop(offer);
             if by_default {
                 return run_by_default(
-                    &path(),
+                    path,
                     LOOK,
                     owners_spoken_yes(request, heard, lease),
                     now_unix_s(),
@@ -1151,7 +1170,7 @@ pub fn run(
             }
             let owners = answered && owners_spoken_yes(request, heard, lease);
             run_at(
-                &path(),
+                path,
                 LOOK,
                 offer_on,
                 answered,
@@ -1165,19 +1184,17 @@ pub fn run(
             // Once the old nos are done (#7767), a stop with the switch
             // since turned off keeps a no as well, so the next on still
             // reads it as no (Heron's P3 on #7940).
-            let done = path()
-                .parent()
-                .is_some_and(lamp_msgs::consent::old_nos_done);
+            let done = path.parent().is_some_and(lamp_msgs::consent::old_nos_done);
             if by_default || done {
                 return run_by_default(
-                    &path(),
+                    path,
                     STOP,
                     false,
                     now_unix_s(),
                     crate::onboarding::consent_group,
                 );
             }
-            run_at(&path(), STOP, offer_on, false, false, 0, || None)
+            run_at(path, STOP, offer_on, false, false, 0, || None)
         }
     }
 }
@@ -2743,5 +2760,77 @@ mod tests {
         assert!(!path.exists());
         assert_ne!(app_rev(&folder), old, "the app's old revision is stale");
         let _ = std::fs::remove_dir_all(folder);
+    }
+
+    /// The owner's call on #7767 (c7210153642, 27 Nov 11:5x): "Just one
+    /// ask and the lamp can turn on and off, not mouth or owner check". A
+    /// heard "start looking" with no owner seen, no owner's voice and no
+    /// offer before it turns desk noticing on, with
+    /// `LAMP_NOTICING_BY_DEFAULT` on (both files, after a kept no) and off
+    /// (the opt-in path, seen activity's yes); a line nobody spoke at the
+    /// lamp (a skill's, a written turn's) is still refused, both ways, and
+    /// nothing is written.
+    #[test]
+    fn a_heard_start_with_no_owner_and_no_mouth_turns_it_on() {
+        use lamp_msgs::consent::{BY_VOICE, FACE_EXPRESSIONS, SEEN_ACTIVITY, allowed, no_bytes};
+        // Switched on, after a stop: anyone's spoken start turns both on.
+        let switched = folder("anyone-default");
+        let path = file_in(&switched);
+        let face = crate::onboarding::face_expressions_beside(&switched.join("room-sounds.json"));
+        std::fs::write(&path, no_bytes(SEEN_ACTIVITY, 5, BY_VOICE)).unwrap();
+        std::fs::write(&face, no_bytes(FACE_EXPRESSIONS, 5, BY_VOICE)).unwrap();
+        // Not spoken at the lamp: refused, nothing written.
+        let unheard = run_in(
+            &path,
+            true,
+            &call(LOOK),
+            (88_041, false, None),
+            false,
+            false,
+        );
+        assert_eq!(unheard["ok"], false, "{unheard}");
+        assert!(!allowed(&path, SEEN_ACTIVITY, true) && !allowed(&face, FACE_EXPRESSIONS, true));
+        // Heard, no lease, no owner, no mouth: on.
+        assert_eq!(
+            run_in(&path, true, &call(LOOK), (88_042, true, None), false, false),
+            json!({"ok": true, "note": LOOKING})
+        );
+        assert!(allowed(&path, SEEN_ACTIVITY, false) && allowed(&face, FACE_EXPRESSIONS, false));
+        // And a stranger's stop still keeps a no.
+        assert_eq!(
+            run_in(&path, true, &call(STOP), (88_043, true, None), false, false)["note"],
+            STOPPED
+        );
+        assert!(!allowed(&path, SEEN_ACTIVITY, true) && !allowed(&face, FACE_EXPRESSIONS, true));
+        let _ = std::fs::remove_dir_all(switched);
+        // The opt-in path, the voice's offer off or on, no offer said: on.
+        for offer_on in [false, true] {
+            let opt_in = folder(&format!("anyone-opt-in-{offer_on}"));
+            let path = file_in(&opt_in);
+            let unheard = run_in(
+                &path,
+                false,
+                &call(LOOK),
+                (88_051, false, None),
+                false,
+                offer_on,
+            );
+            assert_eq!(unheard["ok"], false, "{unheard}");
+            assert!(!path.exists());
+            assert_eq!(
+                run_in(
+                    &path,
+                    false,
+                    &call(LOOK),
+                    (88_052, true, None),
+                    false,
+                    offer_on
+                ),
+                json!({"ok": true, "note": LOOKING}),
+                "offer {offer_on}"
+            );
+            assert!(lamp_msgs::consent::read(&path, SEEN_ACTIVITY).yes);
+            let _ = std::fs::remove_dir_all(opt_in);
+        }
     }
 }
