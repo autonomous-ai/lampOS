@@ -2232,3 +2232,109 @@ fn a_speaker_gone_mid_run_is_a_gap_for_capture_until_its_clock_starts_again() {
     rig.end_with(Control::Stop);
     rig.finish();
 }
+
+impl Rig {
+    /// The speaker re-primes on its own copy of the closing authority, ends
+    /// on it, says `Stopped`, and closes its end of the reference link, all
+    /// between two of capture's ticks (#7224, 06c1 leg 2 on 26 Nov). Its
+    /// `ClockPrimed` is valid, so capture's answer to it is a real send to
+    /// the closed peer, refused by the kernel. On Linux that refused send
+    /// also drops what capture's side of the link had queued, the
+    /// `Stopped` with it.
+    fn prime_stop_and_go(&mut self) {
+        let old = self.playback_epoch;
+        let accepted_through =
+            PRIME_FRAMES as u64 + (self.references - self.epoch_base) * RENDER_SAMPLES as u64;
+        let at = monotonic_us();
+        let prime = ClockPrimed {
+            playback_epoch: old + 1,
+            privacy_generation: self.privacy,
+            accepted_zero_frames: PRIME_FRAMES,
+            accepted_at_us: at,
+            queue_observed_at_us: at,
+            queued_frames: PRIME_FRAMES,
+            discarded: Some(lamp_audio::ownership::QueuedRange {
+                epoch: old,
+                retired_through: 0,
+                accepted_through,
+            }),
+        };
+        self.speaker
+            .control
+            .send(ReferenceControl::ClockPrimed { prime })
+            .unwrap();
+        self.speaker
+            .control
+            .send(ReferenceControl::Stopped {
+                playback_epoch: old + 1,
+                observed_at_us: monotonic_us(),
+            })
+            .unwrap();
+        self.speaker_gone();
+    }
+}
+
+/// #7224's leg 2 on lamp-06c1, 26 Nov 00:40 (#7327's row): a stall, and the
+/// slide closed inside it. Capture is in the ridden gap, its microphone
+/// already shut, when the mute's denied authority reaches it: it takes it
+/// at its next controls check (`install` closes nothing, the gap's reopen
+/// is not permitted), so nothing denied is left queued. The speaker ends on
+/// its own copy, says `ClockPrimed` and `Stopped`, and goes; capture's
+/// answer to the prime is refused (`ref.c.capture: Connection refused`).
+/// That is the voice's own end as the speaker's was, a clean one, never an
+/// exit 1 that fails the voice's cleanup. The microphone stays closed.
+#[test]
+fn a_slide_closed_in_a_ridden_gap_ends_capture_cleanly_though_its_answer_to_the_speaker_is_refused()
+{
+    warm_up();
+    let signal = Signal::new(100);
+    let mut rig = Rig::start_with("scripted gap closed", 0, ReferenceRecovery::Bounded);
+    rig.tolerate_fault = true;
+    rig.stream(&signal, 30);
+    rig.settle(0);
+    // The stall: no authority for 400 ms, the speaker going on through it.
+    rig.hold_up(400);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while rig.gaps < 1 {
+        assert!(
+            Instant::now() < deadline && rig.worker_running(),
+            "no gap: starts {:?}, fault {:?} {:?}",
+            rig.epochs,
+            rig.fault,
+            rig.worker_fault
+        );
+        rig.take();
+        sleep(Duration::from_micros(500));
+    }
+    // The microphone as the gap left it: closed. From here to the end it is
+    // never opened or started again, before the denial, under it, at the
+    // refused send or at the end.
+    let (opens, starts, _, _) = rig.device.counts();
+    // The slide closed: the denied authority, and nothing after it.
+    rig.controller
+        .set_microphone_permission(now(), Permission::Denied)
+        .unwrap();
+    let snapshot = rig.controller.snapshot(now()).unwrap();
+    rig.end_with(Control::Authority { snapshot });
+    // Capture takes it at its next check, about every 10 ms, and goes on in
+    // the gap: nothing it is sent closes it.
+    let taken = Instant::now() + Duration::from_millis(60);
+    while Instant::now() < taken {
+        assert!(rig.worker_running(), "capture ended on the denial itself");
+        rig.take();
+        sleep(Duration::from_micros(500));
+    }
+    assert_eq!(rig.epochs, [1], "the microphone opened again");
+    rig.prime_stop_and_go();
+    let ended = rig.ended();
+    assert_eq!(ended, Ok(()), "fault: {:?}", rig.worker_fault);
+    assert_eq!(rig.worker_fault, None);
+    assert!(rig.stopped, "no CaptureStopped");
+    assert_eq!(rig.epochs, [1], "the microphone opened again");
+    let (opened, started, _, _) = rig.device.counts();
+    assert_eq!(
+        (opened, started),
+        (opens, starts),
+        "the microphone was opened or started after the gap"
+    );
+}
