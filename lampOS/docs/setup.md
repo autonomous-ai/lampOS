@@ -695,7 +695,7 @@ is off (`serve-behind-v1-nginx.json`).
 The whole ring is one colour. A breath goes from 35 hundredths of the colour
 to all of it and back, never dark, so it reads as on; no channel is ever over
 24, the night's light cap and under the product voice's day ring ceiling
-(`--ring-channel-ceiling 60`, #8615), so setup is no brighter than the lamp
+(`--ring-channel-ceiling 30`, #8832), so setup is no brighter than the lamp
 after it. It fades in over 1.5 s, one look
 turns into the next over 0.8 s, and the breath runs on through a change, so
 nothing jumps or blinks: a calm thing breathing, quicker while it works.
