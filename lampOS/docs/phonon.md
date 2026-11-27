@@ -78,8 +78,34 @@ comes.
 - **Not English:** with the lamp in another language, the voice journals
   that Phonon is chosen but speaks English only, and uses the lamp's one
   voice.
-- Phonon is never "near" and never at another address. The configured
-  voice's socket is not opened ahead while Phonon speaks.
+- Phonon is never "near" and never at another address. While Phonon
+  speaks, the lamp's one voice is not warmed: neither its connection as a
+  line begins (`LAMP_SECOND_SPEECH_WARM`) nor its socket as an answer
+  begins (`LAMP_SECOND_SPEECH_SOCKET`). Before, a test lamp on #8768
+  journalled "the speech connection opened ahead" at every line, a request
+  to the lamp's ElevenLabs voice that Phonon never needed.
+- **Every other line the lamp says itself** (the test lamp's row on #8768):
+  the say service's lines (`/run/lampos-say/say.sock`: a Store app's or a
+  paired computer's exact words, a notice) and the cached fixed lines
+  (`say/tts_cache.rs`: the shutdown's, the sleep line, the owner's fixed
+  lines, the offline rings' clips) are rendered by the speech cache in the
+  voice's main process, apart from the route's worker. It reads the
+  choice the same way (`LAMP_OWN_KEYS`, `own_phonon.voice`, the lamp in
+  English), so while Phonon is chosen it asks `lamp-phonon` on its socket
+  for them too; one journal line, "the speech cache keeps its lines in
+  Phonon on the lamp, voice <name>". Before, every such line was the
+  lamp's own ElevenLabs voice. Their key names the voice:
+  `phonon:<voice>` with the model `phonon-31m-en`, never the lamp's lines
+  or a person's ElevenLabs voice's. A line Phonon can't say (not serving
+  yet, stopped, a failure, no sound within the render's bound) is said in
+  the lamp's own voice, never left unsaid, and kept, if at all, under the
+  lamp's key; the next line asks Phonon again. A fixed line not kept in
+  Phonon's voice yet plays the lamp's kept one where nothing may wait
+  (the shutdown's, the sleep line), and is kept in Phonon's voice the next
+  time the say service asks for it. The lines warmed at start fall back the
+  same way, so a lamp whose `lamp-phonon` was still fetching its model
+  keeps them in the lamp's voice until then. The app's voice preview in a named voice (#7485) is
+  always the lamp's own service, never Phonon.
 
 ## Headroom and the big cores
 
@@ -186,7 +212,18 @@ it tests the voice's path as the app would use it.
   a failure being an error before any speech, a dropped speech closing the
   connection; `Voice::Phonon` speaking each sentence with the lamp's voice
   never asked, and falling back without a service; never near; the choice
-  only when switched on, chosen and English.
+  only when switched on, chosen and English; a reply's pieces from the
+  services the worker builds (`worker::services`) said by Phonon with the
+  lamp's voice neither asked nor warmed
+  (`a_reply_from_the_services_the_worker_builds_is_said_by_phonon_when_chosen`);
+  the speech cache's say lines and fixed lines said by Phonon, the lamp's
+  voice for a line it can't say, never the voice preview
+  (`say/tts_cache.rs`: `a_say_line_and_a_fixed_line_are_said_by_phonon_while_it_is_chosen`,
+  `a_line_phonon_cannot_say_is_said_in_the_lamps_own_and_phonon_is_asked_again`,
+  `the_voice_preview_is_never_phonons`,
+  `the_phonon_render_asks_lamp_phonon_in_the_chosen_voice_and_fails_without_it`,
+  and the pin
+  `the_lamps_voice_and_the_persons_elevenlabs_voice_render_as_before`).
 - `-p lamp-setup --test it keys`: offered only in English and only where
   the unit is installed (refused `not_on_this_lamp` without it, the
   ElevenLabs files untouched), chosen without a key, one own voice at a

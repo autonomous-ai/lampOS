@@ -938,13 +938,17 @@ taken only while the lamp speaks English and only where
 `keys.get` has no Phonon offer and `keys.set` is refused with code
 `not_on_this_lamp`, nothing removed. Choosing it removes a person's own
 ElevenLabs voice, and keeping an ElevenLabs voice removes it: one own voice
-at a time. Its `offers[]` entry has `"runs": "lamp"`, its `voices`, and
-`"agent": false`. Choosing or removing it restarts `lamp-phonon.service`
-before the voice, in the same quiet moment and under the same update lock
-(`keys::restart_after`, `Done::restart_phonon`): lamp-phonon starts only
-while the choice exists, so a removed choice stops it. A lamp without the
-unit says so in the journal and the voice still restarts. Never restarts
-lamp-cloud. Tested in `tests/update_lock.rs`
+at a time. While it is chosen, the answers and every other line the lamp
+says itself (the say service's lines and the cached fixed lines, rendered
+by the speech cache in the voice's main process) are said by
+`lamp-phonon`, kept under `phonon:<voice>`, and a line it can't say is
+the lamp's own voice. Its `offers[]` entry has `"runs": "lamp"`, its
+`voices`, and `"agent": false`. Choosing or removing it restarts
+`lamp-phonon.service` before the voice, in the same quiet moment and under
+the same update lock (`keys::restart_after`, `Done::restart_phonon`):
+lamp-phonon starts only while the choice exists, so a removed choice stops
+it. A lamp without the unit says so in the journal and the voice still
+restarts. Never restarts lamp-cloud. Tested in `tests/update_lock.rs`
 (`a_phonon_choice_restarts_lamp_phonon_then_the_voice_once_quiet`). The
 model, the service and the fallback are in [phonon.md](phonon.md).
 

@@ -1005,28 +1005,27 @@ impl Net {
             .is_some_and(|(_, lost)| !lost.is_lost())
     }
 
-    /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a
-    /// sentence it cannot say goes to the configured voice.
     /// Speech is Phonon's, on the lamp, in `voice` (#8754), over the lamp's
     /// one voice, which says what Phonon can't.
-    pub fn speaking_on_the_lamp(mut self, voice: lamp_msgs::phonon::Voice) -> Self {
-        self.phonon = Some(Arc::new(net::PhononTts::new(
-            lamp_msgs::phonon::SOCKET,
-            voice,
-        )));
+    /// `lamp-phonon` is asked at `socket` ([`lamp_msgs::phonon::SOCKET`] on
+    /// a lamp).
+    pub fn speaking_on_the_lamp(
+        mut self,
+        socket: &std::path::Path,
+        voice: lamp_msgs::phonon::Voice,
+    ) -> Self {
+        self.phonon = Some(Arc::new(net::PhononTts::new(socket, voice)));
         self
     }
 
     /// [`Self::speaking_on_the_lamp`] at `socket`: tests only.
     #[cfg(test)]
-    fn speaking_on_the_lamp_at(mut self, socket: &std::path::Path) -> Self {
-        self.phonon = Some(Arc::new(net::PhononTts::new(
-            socket,
-            lamp_msgs::phonon::VOICES[0],
-        )));
-        self
+    fn speaking_on_the_lamp_at(self, socket: &std::path::Path) -> Self {
+        self.speaking_on_the_lamp(socket, lamp_msgs::phonon::VOICES[0])
     }
 
+    /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a
+    /// sentence it cannot say goes to the configured voice.
     pub fn speaking_with_gemini(
         mut self,
         gemini: &GeminiCall<'_>,
@@ -1696,8 +1695,11 @@ impl Services for Net {
             self.near_chat()
                 .map_or_else(|| self.chat.clone(), |(chat, _, _)| chat)
         });
-        // The configured voice only when it is the lamp's one voice.
-        let configured = (self.warm_speech && gemini.is_none()).then(|| self.turn_tts());
+        // The configured voice only when it is the lamp's one voice, and
+        // not while Phonon speaks (#8754, the test lamp on #8768: it was
+        // opened ahead at every line, though Phonon said every piece).
+        let configured = (self.warm_speech && gemini.is_none() && self.phonon.is_none())
+            .then(|| self.turn_tts());
         let provider = self.config.tts_provider.name();
         Box::pin(async move {
             let speech = async {
@@ -2736,6 +2738,89 @@ pub(crate) mod tests {
             Ok(vec![7])
         );
         assert_eq!(lamps_asked.lock().unwrap().len(), 1);
+    }
+
+    /// The test lamp's row on #8768: with Phonon chosen ("Freya",
+    /// `LAMP_OWN_KEYS=on`) and the lamp's own ElevenLabs voice behind it,
+    /// a reply's pieces, asked of the services as the worker builds them
+    /// ([`super::super::worker::services`], with the lamp's switches to
+    /// open the voice's connection and socket ahead), are Phonon's at its
+    /// socket, and the lamp's voice is never asked: not for a piece, and
+    /// not to open its connection ahead as a line begins, which before
+    /// went to ElevenLabs at every line ("the speech connection opened
+    /// ahead in 407 ms").
+    #[tokio::test]
+    async fn a_reply_from_the_services_the_worker_builds_is_said_by_phonon_when_chosen() {
+        use std::os::unix::fs::PermissionsExt;
+        let (folder, asked) = phonon_service(vec![3, 4]).await;
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let config = config_at("phonon-route", LAMPS_KEY, &lamps_url, &lamps_url);
+        let unit = PhononFolder::new();
+        let private = |name: &str, text: &str| {
+            let path = unit.0.join(name);
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        private(lamp_msgs::phonon::CHOSEN_CREDENTIAL, "Freya\n");
+        let llm = private("llm.key", LAMPS_KEY);
+        let provider: crate::config::ProviderConfig = serde_json::from_str(&format!(
+            r#"{{"endpoint":"wss://relay.example.invalid/ws","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+            llm.display()
+        ))
+        .unwrap();
+        let route = super::super::worker::RouteFlags {
+            speech: Some(super::super::worker::SpeechRoute::ElevenLabs),
+            ..Default::default()
+        };
+        let net = super::super::worker::services_on_the_lamp(
+            config,
+            &provider,
+            route,
+            Some(unit.0.as_os_str()),
+            Arc::new(Vec::new),
+            (true, &folder.socket()),
+        )
+        .unwrap()
+        .warming_the_speech(true)
+        .speaking_on_a_socket(true);
+        net.turn_begins();
+        net.warm().await;
+        net.open_speech_ahead(8768);
+        for text in ["Here is a story.", "Once upon a time."] {
+            let turn = turn_of(8768).unwrap();
+            assert_eq!(
+                spoken(net.speak_for(text.into(), turn)).await,
+                Ok(vec![3, 4]),
+                "{text}"
+            );
+        }
+        assert_eq!(
+            spoken(net.speak("A fixed line.".into())).await,
+            Ok(vec![3, 4])
+        );
+        let asked: Vec<_> = asked
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|line| lamp_msgs::phonon::parse_request(line).unwrap())
+            .map(|(text, voice)| (text, voice.name))
+            .collect();
+        assert_eq!(
+            asked,
+            [
+                ("Here is a story.".to_owned(), "Freya"),
+                ("Once upon a time.".to_owned(), "Freya"),
+                ("A fixed line.".to_owned(), "Freya"),
+            ]
+        );
+        assert!(lamps_asked.lock().unwrap().is_empty());
     }
 
     /// #8754: Phonon is the turn's voice at its own socket, never a near

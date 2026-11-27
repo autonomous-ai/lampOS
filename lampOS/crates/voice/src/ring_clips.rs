@@ -608,7 +608,7 @@ mod tests {
             "en",
             theirs,
         )
-        .giving_way_to(lamps, Box::new(|| false));
+        .giving_way_to(lamps, Box::new(|| false), "the person's own Gemini voice");
         let voice = cache.identity().to_owned();
         let mut renderer = Renderer::new(clips.clone(), cache);
         let start = Instant::now();

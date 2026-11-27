@@ -1355,11 +1355,34 @@ pub(crate) fn text_model_said(
 /// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
 /// credentials, in `credentials` (its `CREDENTIALS_DIRECTORY`).
 pub fn services(
+    config: crate::second_config::SecondConfig,
+    provider: &crate::config::ProviderConfig,
+    route: RouteFlags,
+    credentials: Option<&std::ffi::OsStr>,
+    declare: super::net::Declare,
+) -> io::Result<Net> {
+    let own_keys =
+        std::env::var_os(crate::second_config::OWN_KEYS_ENV).is_some_and(|value| value == "on");
+    services_on_the_lamp(
+        config,
+        provider,
+        route,
+        credentials,
+        declare,
+        (own_keys, std::path::Path::new(lamp_msgs::phonon::SOCKET)),
+    )
+}
+
+/// [`services`], with `LAMP_OWN_KEYS` read as `own_keys` and Phonon
+/// (#8754), when chosen, asked at `phonon_at`: tests give a socket of
+/// their own.
+pub(crate) fn services_on_the_lamp(
     mut config: crate::second_config::SecondConfig,
     provider: &crate::config::ProviderConfig,
     route: RouteFlags,
     credentials: Option<&std::ffi::OsStr>,
     declare: super::net::Declare,
+    (own_keys, phonon_at): (bool, &std::path::Path),
 ) -> io::Result<Net> {
     use crate::second_config::{OPENROUTER_CREDENTIAL, unit_credential};
     let gemini = config.gemini.clone();
@@ -1498,11 +1521,9 @@ pub fn services(
     }
     // Phonon on the lamp (#8754): the person's choice, over the lamp's one
     // voice, which stays for what Phonon can't say.
-    let own_keys =
-        std::env::var_os(crate::second_config::OWN_KEYS_ENV).is_some_and(|value| value == "on");
     match phonon_chosen(own_keys, credentials, crate::language::at_start()) {
         PhononChoice::Chosen(voice) => {
-            net = net.speaking_on_the_lamp(voice);
+            net = net.speaking_on_the_lamp(phonon_at, voice);
             eprintln!(
                 "lamp-voice second: the voice is Phonon on the lamp, voice {}, the lamp's one voice for what it can't say (LAMP_OWN_KEYS)",
                 voice.name
