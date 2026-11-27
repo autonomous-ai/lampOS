@@ -123,6 +123,27 @@ test("the Store's refusal is said with its reason and what to do", async (t) => 
   await assert.rejects(submissions(undefined, { where: fake.where, token: 'stale' }), (e) => e.code === 'authentication_error' && /run `lamp login` again/.test(e.why));
 });
 
+// Each refusal the READMEs list, with the words they promise.
+const REFUSALS = {
+  skill_version_exists: 'raise `version` in app.json',
+  skill_name_exists: 'change `name` in app.json',
+  skill_name_reserved: "a lampOS built-in's: change `name` in app.json",
+  developer_app_only: '`lamp skill push`',
+  listing_invalid: 'the title or description is too long, or holds markup or a control character',
+  skill_media_invalid: 'icon 1024x1024, cover 1600x900',
+  developer_upload_in_progress: 'already sending an upload: wait for it, then try again',
+  developer_upload_disabled: 'uploads are off for now: try again later',
+  developer_upload_unavailable: 'upload is unavailable for now: try again later',
+};
+
+for (const [code, words] of Object.entries(REFUSALS)) {
+  test(`the Store's ${code} says what to do`, async (t) => {
+    const fake = await fakeStore(t);
+    fake.refuseWith = [code, 'raw words'];
+    await assert.rejects(submitApp(APP, { where: fake.where, token: TOKEN }), (e) => e instanceof StoreError && e.code === code && e.why.includes(words) && e.why.endsWith('(the Store: raw words)'));
+  });
+}
+
 test('with no sign-in, or a package that is plainly not an app, nothing is sent', async (t) => {
   const fake = await fakeStore(t);
   await assert.rejects(submitApp(APP, { where: fake.where }), (e) => e.code === 'authentication_error' && /run `lamp login`/.test(e.why));
