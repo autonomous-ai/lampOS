@@ -626,6 +626,7 @@ fn a_held_yes_leaves_yes_please_to_the_held_question() {
                         one_face: false,
                         near: None,
                         offered_alone: false,
+                        face_yes: false,
                     });
                 }
                 engine

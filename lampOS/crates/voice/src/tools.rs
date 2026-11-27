@@ -132,9 +132,22 @@ const MAX_ANSWER_BYTES: u64 = 8_192;
 /// Wi-Fi name instead. Nor is it run in their scope: forgetting needs the
 /// mouth seen speaking (the memory owner, 16:49 on #5385: "tạm thời chưa
 /// cho xóa nếu ko detect đc mở miệng"), so nothing is forgotten and the
-/// lamp asks them to look at it ([`ONE_FACE_JUST_KEPT`]).
-static ONE_FACE_KEPT: std::sync::Mutex<Vec<(crate::memory_scope::RequestKey, String, Instant)>> =
-    std::sync::Mutex::new(Vec::new());
+/// lamp asks them to look at it ([`ONE_FACE_JUST_KEPT`]). With
+/// `LAMP_MEMORY_REPLACES` the kept thing's id goes with it: with
+/// `LAMP_ONE_FACE_FORGETS_ON_YES`, the second route holds that bare forget
+/// as the forget of that id for their yes ([`one_face_kept_why`]). The
+/// second route's calls run in its own worker's process, on the thread that
+/// asks (`provider_worker::answered_scoped`), so the mark and its peek are
+/// the same process's.
+#[allow(clippy::type_complexity)]
+static ONE_FACE_KEPT: std::sync::Mutex<
+    Vec<(
+        crate::memory_scope::RequestKey,
+        String,
+        Instant,
+        Option<u64>,
+    )>,
+> = std::sync::Mutex::new(Vec::new());
 const ONE_FACE_KEPT_SESSIONS: usize = 4;
 
 /// What the model is told for a bare forget right after a one-face keep
@@ -161,14 +174,83 @@ fn same_session(a: &crate::memory_scope::RequestKey, b: &crate::memory_scope::Re
 }
 
 /// Marks request `key`'s keep as `person`'s by the one-face rule
-/// ([`ONE_FACE_KEPT`]), in place of its session's earlier one.
-fn one_face_kept(key: crate::memory_scope::RequestKey, person: String) {
+/// ([`ONE_FACE_KEPT`]), with the kept thing's `id` when the memory told
+/// it, in place of its session's earlier one.
+fn one_face_kept(key: crate::memory_scope::RequestKey, person: String, id: Option<u64>) {
     if let Ok(mut kept) = ONE_FACE_KEPT.lock() {
         kept.retain(|(at, ..)| !same_session(at, &key));
         if kept.len() == ONE_FACE_KEPT_SESSIONS {
             kept.remove(0);
         }
-        kept.push((key, person, Instant::now()));
+        kept.push((key, person, Instant::now(), id));
+    }
+}
+
+/// [`one_face_kept`] for a test of the second route's bare-forget hold.
+#[cfg(test)]
+pub(crate) fn one_face_kept_for_test(
+    key: crate::memory_scope::RequestKey,
+    person: String,
+    id: Option<u64>,
+) {
+    one_face_kept(key, person, id);
+}
+
+/// The kept id of the keep a bare forget in request `key` is about, on a
+/// line `person`'s by the one-face rule: the same worker and session, a
+/// request after it, the same person, within
+/// [`crate::remember::HELD_FORGET_FOR`], with its id known. Not only the
+/// request right after it (row 8654 L2, lamp-06c1: the model asked "forget
+/// that" back in words, and the bare forget it called on their yes, the
+/// keep's request + 2, was refused). The session's mark is its latest
+/// one-face keep, and a forget by what or which ends it. Peeked, never
+/// taken: the mark stays for the provider route's refusal.
+#[cfg(test)]
+pub(crate) fn one_face_just_kept_id(
+    key: crate::memory_scope::RequestKey,
+    person: &str,
+) -> Option<u64> {
+    one_face_kept_mark(key, person).map(|(_, id)| id)
+}
+
+/// [`one_face_just_kept_id`] with the request that kept it: `(request, id)`.
+#[cfg(test)]
+pub(crate) fn one_face_kept_mark(
+    key: crate::memory_scope::RequestKey,
+    person: &str,
+) -> Option<(u64, u64)> {
+    one_face_kept_why(key, person).ok()
+}
+
+/// [`one_face_kept_mark`], or why it gives nothing, in a journal's machine
+/// words (row 8654 L2: the hold refused with no line saying which check):
+/// `no_mark` (none this session), `other_person`, `not_later`, `too_old`
+/// or `no_id`.
+pub(crate) fn one_face_kept_why(
+    key: crate::memory_scope::RequestKey,
+    person: &str,
+) -> Result<(u64, u64), &'static str> {
+    let kept = ONE_FACE_KEPT.lock().map_err(|_| "no_mark")?;
+    let Some((at, whose, when, id)) = kept.iter().find(|(at, ..)| same_session(at, &key)) else {
+        return Err("no_mark");
+    };
+    if whose != person {
+        Err("other_person")
+    } else if at.request >= key.request {
+        Err("not_later")
+    } else if when.elapsed() > crate::remember::HELD_FORGET_FOR {
+        Err("too_old")
+    } else {
+        (*id).map(|id| (at.request, id)).ok_or("no_id")
+    }
+}
+
+/// Every [`ONE_FACE_KEPT`] mark let go, for a test of a keep the memory
+/// route left unmarked (row 8654 L2).
+#[cfg(test)]
+pub(crate) fn one_face_kept_clear_for_test() {
+    if let Ok(mut kept) = ONE_FACE_KEPT.lock() {
+        kept.clear();
     }
 }
 
@@ -183,7 +265,7 @@ fn one_face_just_kept(key: crate::memory_scope::RequestKey, person: &str) -> boo
     let Some(at) = kept.iter().position(|(at, ..)| same_session(at, &key)) else {
         return false;
     };
-    let (at, whose, when) = kept.remove(at);
+    let (at, whose, when, _) = kept.remove(at);
     at.request.checked_add(1) == Some(key.request)
         && whose == person
         && when.elapsed() <= crate::remember::HELD_FORGET_FOR
@@ -2457,8 +2539,13 @@ fn run_call_with_scope(
                         // Nor a correction of a kept thing (`replaces`): it
                         // retires the old fact, as a forget would (the
                         // privacy read's P2 on #5592). A plain keep runs.
+                        // But the correction their yes agreed to by their face
+                        // alone in view (`LAMP_ONE_FACE_FORGETS_ON_YES`).
                         if crate::remember::corrects(&model.name, &call.args)
                             && lease.forgets_need_mouth()
+                            && !(crate::second_provider::one_face_forgets_on_yes()
+                                && lease.held_yes_agreed(&model.name, &call.args)
+                                && !lease.sticky_held())
                         {
                             eprintln!(
                                 "lamp-voice: request {request}: a correction on a line whose keep is the one known face's is not run: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
@@ -2515,7 +2602,15 @@ fn run_call_with_scope(
                                 "lamp-voice: request {request}: a bare forget on a one-face line is not run{}: nothing saw the mouth say it (LAMP_PERSON_SCOPE_ONE_FACE)",
                                 if just { ", right after their keep" } else { "" }
                             );
-                            let note = if just {
+                            // With `LAMP_ONE_FACE_FORGETS_ON_YES` their face
+                            // alone in view is enough for a forget on their
+                            // yes, so the mouth gate's "when I can see you say
+                            // it" is no longer true there: it asks which, as
+                            // any other bare forget does (row 8654 L2).
+                            let note = if just
+                                && !(crate::second_provider::one_face_forgets_on_yes()
+                                    && lease.in_view_by_one_face())
+                            {
                                 ONE_FACE_JUST_KEPT
                             } else {
                                 ONE_FACE_BARE_FORGET
@@ -2639,7 +2734,7 @@ fn run_call_with_scope(
                                     && kept.0.get("replaced").is_none()
                                     && lease.kept_by_one_face().as_deref() == Some(person.as_str())
                                 {
-                                    one_face_kept(lease.key(), person);
+                                    one_face_kept(lease.key(), person, kept.0["id"].as_u64());
                                 }
                                 kept
                             }
@@ -7970,7 +8065,7 @@ mod tests {
                     ..Default::default()
                 };
                 if !kept {
-                    one_face_kept(key(at, 0), ann.clone());
+                    one_face_kept(key(at, 0), ann.clone(), None);
                 }
                 let mut notes = Vec::new();
                 for (offset, name, args, _, who) in steps {
@@ -8121,6 +8216,189 @@ mod tests {
     /// person agreed to runs in their scope, by that id alone. If the line
     /// is narrowed before it runs (another face or voice), nothing reaches
     /// the memory: it is kept, never forgotten in the room's scope.
+    /// #8570 S1a: a one-face keep's mark keeps the kept id the memory told
+    /// (`LAMP_MEMORY_REPLACES`), and the second route's peek at it
+    /// ([`one_face_just_kept_id`]) takes nothing: the next request, the same
+    /// session and person, finds it again, and so does the provider route's
+    /// [`one_face_just_kept`]. A later request of theirs finds it too;
+    /// another person, the keep's own request or no id finds none.
+    #[test]
+    fn one_face_kept_stores_the_kept_id_and_peeking_takes_nothing() {
+        let ann = crate::remember::person_id("Ann");
+        let key = |request: u64| crate::memory_scope::RequestKey {
+            worker: lamp_turn_owner::BootId::new([0x89; 16]).unwrap(),
+            session: 1,
+            request,
+        };
+        one_face_kept(key(8_570_100), ann.clone(), Some(5));
+        assert_eq!(one_face_just_kept_id(key(8_570_101), &ann), Some(5));
+        assert_eq!(
+            one_face_just_kept_id(key(8_570_101), &ann),
+            Some(5),
+            "peeked"
+        );
+        assert_eq!(
+            one_face_just_kept_id(key(8_570_101), &crate::remember::person_id("Bo")),
+            None
+        );
+        assert_eq!(
+            one_face_just_kept_id(key(8_570_102), &ann),
+            Some(5),
+            "a later request of the same session and person (row 8654 L2)"
+        );
+        assert_eq!(one_face_just_kept_id(key(8_570_100), &ann), None, "itself");
+        assert!(one_face_just_kept(key(8_570_101), &ann), "still marked");
+        one_face_kept(key(8_570_100), ann.clone(), None);
+        assert_eq!(one_face_just_kept_id(key(8_570_101), &ann), None, "no id");
+        let _ = one_face_just_kept(key(8_570_101), &ann);
+    }
+
+    /// #8570 S1a, with `LAMP_ONE_FACE_FORGETS_ON_YES` on: the provider
+    /// route has no hold, so a bare forget right after their one-face keep
+    /// on a `LAMP_PERSON_SCOPE_ONE_FACE_READS` line is still refused there
+    /// as before (`second_provider::ONE_FACE_FORGET`), asked of no memory;
+    /// the kept id it is about stays for the second route, which holds it
+    /// for their yes (`second_provider::hold_on_face_yes`).
+    #[test]
+    fn with_the_switch_a_bare_forget_after_their_keep_is_held_not_refused() {
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+        let ann = crate::remember::person_id("Ann");
+        let key = |request: u64| crate::memory_scope::RequestKey {
+            worker: lamp_turn_owner::BootId::new([0x8a; 16]).unwrap(),
+            session: 1,
+            request,
+        };
+        let socket = std::env::temp_dir().join(format!("s1ab-bare-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        one_face_kept(key(8_570_200), ann.clone(), Some(6));
+        assert_eq!(
+            one_face_just_kept_id(key(8_570_201), &ann),
+            Some(6),
+            "the second route's hold finds the kept id"
+        );
+        let owner = crate::memory_scope::RequestScope::new(
+            key(8_570_201),
+            crate::memory_scope::ScopeSnapshot::of("Ann"),
+        );
+        let lease = owner.lease();
+        assert!(lease.read_by_one_face());
+        let settings = Settings {
+            memory: Some(socket.clone()),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "b8570".into(),
+            name: crate::remember::FORGET.into(),
+            args: json!({}),
+        };
+        let told = answer_scoped(&settings, &call, 8_570_201, false, &lease);
+        assert_eq!(told["forgotten"], json!(false), "{told}");
+        assert_eq!(
+            told["note"],
+            json!(crate::second_provider::ONE_FACE_FORGET),
+            "{told}"
+        );
+        assert!(listener.accept().is_err(), "asked of no memory");
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #8570 S1b, with `LAMP_ONE_FACE_FORGETS_ON_YES` on: on a line theirs
+    /// by one face, a correction (`replaces`) their yes agreed to
+    /// (`ScopeLease::mark_held_yes`, the second route's held run) reaches
+    /// the memory in their scope; a plain one, or one of another id, is
+    /// refused as before and asked of no memory. The switch off: refused.
+    #[test]
+    fn an_agreed_correction_runs_in_their_scope_and_a_plain_one_is_refused() {
+        let nell = crate::remember::person_id("Nell");
+        for (at, on, marked, agreed) in [
+            (0u64, true, Some(3), true),
+            (1, true, None, false),
+            (2, true, Some(4), false),
+            (3, false, Some(3), false),
+        ] {
+            crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(on));
+            let socket =
+                std::env::temp_dir().join(format!("s1ab-fix-{at}-{}.sock", std::process::id()));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let stop = done.clone();
+            let served = std::thread::spawn(move || {
+                let mut asked = vec![];
+                while !stop.load(std::sync::atomic::Ordering::Acquire) {
+                    let Ok((mut stream, _)) = listener.accept() else {
+                        std::thread::sleep(Duration::from_millis(2));
+                        continue;
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    let mut line = String::new();
+                    if BufReader::new(stream.try_clone().unwrap())
+                        .read_line(&mut line)
+                        .is_ok()
+                    {
+                        asked.extend(serde_json::from_str::<Value>(&line).ok());
+                    }
+                    let _ = stream.write_all(b"{\"ok\":true,\"id\":9}\n");
+                }
+                asked
+            });
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x8b; 16]).unwrap(),
+                    session: 1,
+                    request: 8_570_300 + at,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Nell"),
+            );
+            let lease = owner.lease();
+            assert!(lease.read_by_one_face());
+            let args = json!({"text": "Gym is on Ninth Street.", "replaces": 3});
+            if let Some(id) = marked {
+                lease.mark_held_yes(
+                    &crate::second_provider::one_face_forget_yes_for_test(),
+                    crate::remember::REMEMBER,
+                    &json!({"text": "Gym is on Ninth Street.", "replaces": id}),
+                );
+            }
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "c8570".into(),
+                name: crate::remember::REMEMBER.into(),
+                args,
+            };
+            let told = answer_scoped(&settings, &call, 8_570_300 + at, false, &lease);
+            done.store(true, std::sync::atomic::Ordering::Release);
+            let asked = served.join().unwrap();
+            crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+            std::fs::remove_file(&socket).unwrap();
+            if agreed {
+                assert_ne!(
+                    told["note"],
+                    json!(crate::second_provider::ONE_FACE_FORGET),
+                    "{at}: runs: {told}"
+                );
+                assert!(
+                    asked.iter().any(|ask| ask["person"] == json!(nell)),
+                    "{at}: in their scope: {asked:?}"
+                );
+            } else {
+                assert_eq!(
+                    told["note"],
+                    json!(crate::second_provider::ONE_FACE_FORGET),
+                    "{at}: refused: {told}"
+                );
+                assert!(asked.is_empty(), "{at}: asked of no memory: {asked:?}");
+            }
+        }
+    }
+
     #[test]
     fn an_agreed_one_face_forget_runs_in_their_scope_or_not_at_all() {
         let nell = crate::remember::person_id("Nell");
