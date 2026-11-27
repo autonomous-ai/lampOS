@@ -1131,6 +1131,29 @@ pub const SIMPLE_CALL_ENVIRONMENT: &str = "LAMP_SIMPLE_CALL";
 pub(crate) const SIMPLE_HELD: &str =
     "not \"Hey Lamp\", and no conversation going on (LAMP_SIMPLE_CALL)";
 
+/// Why a line is held with [`SIMPLE_CALL_ENVIRONMENT`] on: nothing was said
+/// in it (a sound, a cough, room noise), and no tap.
+pub(crate) const SIMPLE_NO_WORDS: &str = "no words heard in it (LAMP_SIMPLE_CALL)";
+
+/// Whether [`SIMPLE_CALL_ENVIRONMENT`] is on in this process.
+pub fn simple_call_on() -> bool {
+    std::env::var(SIMPLE_CALL_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// A switch's value as read from the environment, or none when
+/// [`SIMPLE_CALL_ENVIRONMENT`] is on: with the one simple rule, each switch
+/// passed through here (a sensor, a rule or a note that decides or colours
+/// what a line is) is off. `SPOKEN_TO`, `SAID_TO_ME` and `NAME_SECOND_SIGN`
+/// never pass through it: the rule sets them aside in code.
+pub(crate) fn unless_simple(value: Option<String>) -> Option<String> {
+    unless_simple_with(value, simple_call_on())
+}
+
+/// [`unless_simple`] with the switch given.
+pub(crate) fn unless_simple_with(value: Option<String>, simple: bool) -> Option<String> {
+    value.filter(|_| !simple)
+}
+
 /// `on` exactly, off unless set (the product owner, 26 Nov 2026): the lamp's
 /// own news is replied to within the conversation's 20 s, as any answer is,
 /// and a line about its work opens no window of its own
