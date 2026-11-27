@@ -81,6 +81,9 @@ ConfigurationDirectory=lampOS/voice/own
 ConfigurationDirectoryMode=0700
 LoadCredential=own:/etc/lampOS/voice/own
 Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
+# LAMP_LIGHT_KEEP: #1464, #1468, an owner's light (from the voice or the app) kept across a restart in
+# /var/lib/lampOS/light/person.json (lampos.conf makes the folder); on by the first builder's ruling on #8832.
+Environment=LAMP_LIGHT_KEEP=on
 Environment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json
 # LAMP_ONBOARDING: its why and rules are its row in docs/switches.md (#2843, #3430).
 Environment=LAMP_ONBOARDING=on

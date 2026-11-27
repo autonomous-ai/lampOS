@@ -243,7 +243,7 @@ verdict is a journal line and an `AddonDecision` on `addon/decision`
 (`proposal`, `addon`, `act`, `choice` kept or dropped, `by` rule, `why`).
 The policy's own `policy/decisions` stays `lamp-policy`'s alone (the first
 builder, #2530). Not handled yet: a person's light restored from disk at
-boot (`LAMP_LIGHT_KEEP=on`, not set on the product) was not set this boot,
+boot (`LAMP_LIGHT_KEEP=on`, on in the product since #8832) was not set this boot,
 so an add-on's light can show over it for up to 30 s.
 
 ## The judge as designed
