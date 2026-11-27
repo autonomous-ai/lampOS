@@ -776,13 +776,18 @@ impl Face {
     ) -> [Rgb; PIXEL_COUNT] {
         self.drew_own = false;
         let frame = self.render_face(mood, level, now_us, ceiling);
-        // Every resting frame goes through the flash bound, and so does a
-        // turn's face the person gave a colour of their own: a colour chosen
-        // may be a saturated red, whose flashes the bound limits at any
-        // brightness, and a face that follows the voice swings with it.
-        // The lamp's own faces are not held, as they never were.
-        if mood != Mood::Resting && self.looks.of(mood).is_none() {
-            return frame;
+        // Every resting frame goes through the flash bound. A turn's face
+        // the person gave a colour of their own goes through it only while
+        // it is a saturated red, or comes out of one: the flash the bound
+        // limits at any brightness. Any other own colour moves with the
+        // voice as the lamp's own faces do, never held (the Reviewer-lead's
+        // P2 on #8870: speech swings a face ten times a second, and a held
+        // speaking face froze).
+        if mood != Mood::Resting {
+            let was_red = self.rest_shown.is_some_and(|shown| shown.red);
+            if self.looks.of(mood).is_none() || !(was_red || saturated_red(&frame, ceiling)) {
+                return frame;
+            }
         }
         self.flash_safe(frame, now_us, ceiling)
     }
@@ -3189,31 +3194,113 @@ mod tests {
         );
     }
 
-    /// A face the person coloured goes through the flash bound like the
-    /// resting light, red included, whatever it is made of; the lamp's own
-    /// faces do not, as they never did. The voice that moves it is only so
-    /// fast, so the bound shows as a count: however the voice goes, the
-    /// swings of a coloured face never pass three flashes a second, and a
-    /// saturated red face keeps the bound's own account of a red going in
-    /// and out.
+    /// The Reviewer-lead's P2 on #8870: a speaking face in the owner's own
+    /// colour moves with speech as the lamp's own one does, never held by
+    /// the flash bound, which is there for a saturated red. The voice is
+    /// speech-like: five syllables a second, each loud for 80 ms and quiet
+    /// for the rest, which moves the face as speech does, up in about 20 ms
+    /// and down over about 170 ms ([`LEVEL_RISE_US`], [`LEVEL_FALL_US`]),
+    /// between about 0.26 and the whole of its glow. A bright own colour
+    /// (white, a pale green) swings by a swing's share ten times a second
+    /// that way, past the bound's six; every frame of it is still drawn as
+    /// the face makes it, as the lamp's own face's always are.
     #[test]
-    fn a_coloured_face_goes_through_the_flash_bound_and_the_lamps_own_does_not() {
-        let mut own = Face::new();
-        let mut coloured = Face::new();
-        coloured.faces(faces_of(Some((10, [255, 0, 0]))));
-        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
-            own.render(mood, 200, 1_000_000, 120);
-            coloured.render(mood, 200, 1_000_000, 120);
+    fn an_own_colour_speaking_face_moves_with_speech_like_the_lamps_own() {
+        const FRAME_US: u64 = 10_000;
+        let voice = |at_us: u64| {
+            if (at_us / 1_000) % 200 < 80 { 255 } else { 0 }
+        };
+        for ceiling in [30, 60, 120] {
+            for tint in [[255, 255, 255], [160, 255, 160], [140, 204, 255]] {
+                let mut bounded = Face::new();
+                let mut free = Face::new();
+                for face in [&mut bounded, &mut free] {
+                    face.faces(Looks::from_faces(&LightFaces {
+                        listening: None,
+                        thinking: None,
+                        speaking: Some(FaceLook { tint, level: 10 }),
+                    }));
+                }
+                let mut drawn = Vec::new();
+                for frame in 0..400 {
+                    let at_us = 1_000_000 + frame * FRAME_US;
+                    let made = free.render_face(Mood::Speaking, voice(at_us), at_us, ceiling);
+                    let shown = bounded.render(Mood::Speaking, voice(at_us), at_us, ceiling);
+                    assert_eq!(shown, made, "{ceiling} {tint:?}: frame {frame} held");
+                    drawn.push(shown);
+                }
+                // It moves with the voice as much as the lamp's own face.
+                let mut plain = Face::new();
+                let plain: Vec<_> = (0..400)
+                    .map(|frame| {
+                        let at_us = 1_000_000 + frame * FRAME_US;
+                        plain.render(Mood::Speaking, voice(at_us), at_us, ceiling)
+                    })
+                    .collect();
+                let span = |frames: &[[Rgb; PIXEL_COUNT]]| {
+                    let shares: Vec<f32> = frames[100..]
+                        .iter()
+                        .map(|frame| brightness_share(frame, ceiling))
+                        .collect();
+                    shares.iter().copied().fold(f32::MIN, f32::max)
+                        - shares.iter().copied().fold(f32::MAX, f32::min)
+                };
+                assert!(
+                    span(&drawn) >= span(&plain) * 0.8,
+                    "{ceiling} {tint:?}: moved {} against the lamp's own {}",
+                    span(&drawn),
+                    span(&plain)
+                );
+            }
+        }
+        // And the bound's account would have held the brightest of them:
+        // a white face swings past six times a second.
+        let mut white = Face::new();
+        white.faces(faces_of(Some((10, [255, 255, 255]))));
+        let frames: Vec<_> = (0..400)
+            .map(|frame| {
+                let at_us = 1_000_000 + frame * FRAME_US;
+                white.render_face(Mood::Speaking, voice(at_us), at_us, 60)
+            })
+            .skip(100)
+            .collect();
+        assert!(
+            turns(&frames, 60) > 2 * usize::from(FLASHES_A_SECOND) * 3,
+            "{} turns in 3 s",
+            turns(&frames, 60)
+        );
+    }
+
+    /// A face the person coloured a saturated red goes through the flash
+    /// bound like the resting light, whatever it is made of; the lamp's own
+    /// faces and an own colour that is no saturated red do not, as the
+    /// lamp's own never did (the Reviewer-lead's P2 on #8870). The voice
+    /// that moves it is only so fast, so the bound shows as a count:
+    /// however the voice goes, the swings of a red face never pass three
+    /// flashes a second, and it keeps the bound's own account of a red
+    /// going in and out.
+    #[test]
+    fn a_red_face_goes_through_the_flash_bound_and_the_lamps_own_does_not() {
+        for mood in [Mood::Listening, Mood::Speaking] {
+            let mut own = Face::new();
+            let mut red = Face::new();
+            let mut sky = Face::new();
+            red.faces(faces_of(Some((10, [255, 0, 0]))));
+            sky.faces(faces_of(Some((10, [140, 204, 255]))));
+            let mut was_red = false;
+            for frame in 0..50 {
+                let at_us = 1_000_000 + frame * 20_000;
+                own.render(mood, 200, at_us, 120);
+                sky.render(mood, 200, at_us, 120);
+                was_red |= saturated_red(&red.render(mood, 200, at_us, 120), 120);
+            }
+            assert!(was_red, "{mood:?}: the red face is a saturated red");
             assert!(
                 own.rest_shown.is_none(),
                 "{mood:?}: the lamp's own face is not held"
             );
-            assert!(
-                coloured.rest_shown.is_some(),
-                "{mood:?}: a coloured face is"
-            );
-            own.rest_shown = None;
-            coloured.rest_shown = None;
+            assert!(sky.rest_shown.is_none(), "{mood:?}: nor is a sky face");
+            assert!(red.rest_shown.is_some(), "{mood:?}: a red face is");
         }
         // However the voice goes, five times a second, a coloured face
         // swings no more than the bound allows.
