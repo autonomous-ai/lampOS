@@ -75,7 +75,7 @@ policy = "nudge"
 
 [[do]]
 body = { look_at = "face" }
-say = "They have sat at the desk for about an hour. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+say = "They have sat at the desk for a while. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
 
 # With LAMP_NUDGES_PRESENT=on (#5207, off unless set), these stand in for
 # the values above, each key whole: on, after 60 minutes at the desk, as above.
@@ -116,4 +116,4 @@ unknown = "holds"
 
 [[present.do]]
 body = { look_at = "face" }
-say = "They have sat at the desk for about an hour. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+say = "They have sat at the desk for a while. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
