@@ -1091,7 +1091,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_MAKE_AGENT_FIRST` | Nothing in the product (off): a test switch that sends every voice make straight to the lamp's helper agent. |
 | `LAMP_MAKE_AGENT_ONE_PATH` | A skill the lamp can't make on the first try goes to its helper agent on OpenClaw too. |
 | `LAMP_MAKE_REACTIONS_ONLY_DEEPSEEK` | Only a quick reaction is made by the lamp's own model; any other skill becomes a task for its agent. |
-| `LAMP_INSTALL_FIRST_RUN` | When you install an app or skill from the Store, Lamp tells you it's ready (in the item's own words) right away if you're there, or after it next answers you. |
+| `LAMP_INSTALL_FIRST_RUN` | Install an app or skill and Lamp says it's ready, right away if you're near or after its next answer. |
 | `LAMP_MAKE_MAY_RUN_ON` | A skill that takes more than a minute to make keeps going, and the lamp tells you when it's ready. |
 | `LAMP_MAKE_NO_CANNOT` | A skill the lamp can't build itself goes to its agent as a task once you agree, or you hear why it can't. |
 | `LAMP_MAKE_QUEUE` | Ask for a new skill while another is being made and it waits its turn instead of being turned away. |
