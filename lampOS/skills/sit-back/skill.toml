@@ -15,9 +15,8 @@ needs = ["eyes", "body", "voice"]
 # the product's install (`install::PRODUCT_SKILLS`), on.
 kind = "core"
 version = "1.0.0"
-# Three nudges a day at most, counted from the local midnight. The word after
-# one (`sat_well`) is that nudge's, not counted (`follows`).
-most_a_day = 3
+# No daily most, no hours and no budget shared with the other nudges (the
+# owner, 27 Nov): a person may work late.
 
 # What it may read and use, and nothing more: the eyes' reading of the person
 # at the desk, the faces, the voice's state, and a turn toward the face. One
@@ -27,7 +26,8 @@ speak = true
 topics = ["room/activity", "humans/faces/tracked", "voice/state"]
 body = true
 
-# Leaned in for ten minutes: the eyes say `leaning_in` once it has held 10 s
+# Leaned in for a minute, as Posture's alarm (the owner, 27 Nov: "sit back is
+# alarm after 1m like posture"): the eyes say `leaning_in` once it has held 10 s
 # (eyes/src/activity.rs, the face 1.25 times as big as it sat). A sit-up
 # shorter than 20 s does not end it; one longer does, so a person shifting
 # about near the line is not nudged.
@@ -36,11 +36,11 @@ name = "leaned_in"
 topic = "room/activity"
 field = "state"
 equals = "leaning_in"
-for = "10m"
+for = "1m"
 gap = "20s"
 rearm = "leaves"          # once each time they lean in; again only after they sat back
-cooldown = "60m"
-wait = "10m"              # someone else in view, or a talk: once they go, while still leaned in
+cooldown = "30m"          # the owner, 27 Nov: "and have 30m cooldown"
+wait = "10m"              # a talk: once it ends, while still leaned in
 
 # Sat back a minute within a quarter of an hour of a nudge: one short warm word.
 [[trigger]]
@@ -53,20 +53,11 @@ gap = "10s"
 rearm = "leaves"
 follows = { trigger = "leaned_in", within = "15m" }
 
-[[while]]                 # twelve minutes into this sitting: the warm word is for sitting back, not for
-topic = "room/activity"   # coming back (a gap over 2 minutes is a new sitting, sitting_s from 0); the
-field = "sitting_s"       # word itself can't come sooner (2 minutes' baseline, then ten leaned in)
-above = 720
-[[while]]                 # nobody else in view: never said in front of others
-topic = "humans/faces/tracked"
-faces_at_most = 1
-for = "1m"
-
-[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+[[while]]                 # the lamp itself has not spoken for 10 s, as Posture waits (the owner, 27 Nov): not on top of its own last words
 topic = "voice/state"
 field = "state"
 not_equals = "speaking"
-for = "30s"
+for = "10s"
 
 [[while]]                 # never while they talk, or in the middle of a conversation
 topic = "voice/state"
@@ -74,30 +65,16 @@ field = "state"
 equals = "resting"
 for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
 
-[quiet]                   # never at night
-from = "22:00"
-to = "08:00"
-
-# Two words in a row nobody noticed (no turn to the lamp, no move, nothing
-# heard, within a minute): it rests until the next morning, as the other
-# wellbeing nudges do. Only the word counts; the warm word after it is not a
-# nudge (`follows`).
-[rest]
-after_ignored = 2
-
-# One nudge an hour between the wellbeing skills.
-[budget]
-group = "wellbeing"
-per_hour = 1
-
 # The wellbeing skills' one function (#1685): it stops the one that came
 # last, or with all, every one. The model is told the `about` of the first
 # wellbeing skill in folder order; this one says the same as A comfort break's
 # and A meal check's, so sitting back is named whichever of the three is on.
 # With only the product's wellbeing skills before it, theirs is told, which
 # does not name sitting back; the function still stops the last nudge.
+# Shared by its `group`, with no budget (the owner, 27 Nov).
 [stop]
 tool = "wellbeing_nudges"
+group = "wellbeing"
 kind = "sit-back"
 about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word for a short break, a mealtime question, a word to sit back, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
 # In short, with LAMP_USE_SKILL_SUMMARY on (#6218); the same in every
@@ -115,12 +92,3 @@ say = "They have been leaning in toward the desk for a while. In one short, kind
 [[do]]
 on = "sat_well"
 say = "They sat back after your word. Say a short, warm thanks or 'that's better' in two or three words. Nothing about their body or looks."
-
-# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
-# group's two an hour, never within 30 minutes of each other, which
-# Sip of water and Comfort break name too (a group keeps its quietest).
-[present.budget]
-group = "wellbeing"
-per_hour = 2
-gap = "30m"
-give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back

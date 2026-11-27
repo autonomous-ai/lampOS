@@ -11,8 +11,8 @@ needs = ["eyes", "body", "light", "voice"]
 # installable skills"); it can be turned off by voice (`wellbeing_nudges`) or in the app.
 kind = "core"
 version = "1.0.0"
-# Once an evening, counted from the local midnight.
-most_a_day = 1
+# No daily most and no budget shared with the other nudges (the owner, 27
+# Nov): its hour is its window, and once a sitting its rearm.
 
 # What it may read and use, and nothing more: the faces, the voice's state,
 # one droop and a shade of dim. It says one short line, worded by the voice (the owner, 25 Oct).
@@ -31,11 +31,11 @@ gap = "2m"                # looking away or leaning out of view does not end the
 rearm = "leaves"          # once a sitting
 wait = "10m"              # talking when the time comes: once the talk ends, within ten minutes
 
-[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+[[while]]                 # the lamp itself has not spoken for 10 s, as Posture waits (the owner, 27 Nov): not on top of its own last words
 topic = "voice/state"
 field = "state"
 not_equals = "speaking"
-for = "30s"
+for = "10s"
 
 [[while]]                 # never in the middle of a conversation
 topic = "voice/state"
@@ -59,25 +59,12 @@ unknown = "holds"
 from = "22:00"
 to = "23:00"
 
-[quiet]                   # from bedtime to the morning
-from = "23:00"
-to = "06:00"
-
-# One nudge an hour between the wellbeing skills.
-[budget]
-group = "wellbeing"
-per_hour = 1
-
-# As the other three: two nudges nobody noticed in a row, and it rests
-# until the morning. With these hours and once a day it adds nothing (the
-# morning comes before the next evening); it holds if the hours are widened.
-[rest]
-after_ignored = 2
-
-# One function for the four wellbeing skills, so a session counts it once
-# (#1685): it stops the one that came last, or with all, every one.
+# One function for the wellbeing skills, so a session counts it once
+# (#1685): it stops the one that came last, or with all, every one. Shared by
+# its `group`, with no budget (the owner, 27 Nov).
 [stop]
 tool = "wellbeing_nudges"
+group = "wellbeing"
 kind = "wind-down"
 about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. all = true for 'the nudges' with no kind named; leave both out for 'that one', the last. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
 # In short, with LAMP_USE_SKILL_SUMMARY on (#6218); the same in every
@@ -91,12 +78,3 @@ policy = "nudge"
 body = { gesture = "sleepy" }          # one slow droop
 light = { dim = 1, until = "ends" }    # a shade dimmer, given back when they leave the desk
 say = "It is late in the evening and they are still at the desk. In one short, gentle line, suggest starting to wind down for the night."
-
-# With LAMP_NUDGES_PRESENT=on (#5207, off unless set): the wellbeing
-# group's two an hour, never within 30 minutes of each other, which
-# Sip of water and Comfort break name too (a group keeps its quietest).
-[present.budget]
-group = "wellbeing"
-per_hour = 2
-gap = "30m"
-give_back_unsaid = true   # a nudge that said nothing (expired unheard) gives its place back

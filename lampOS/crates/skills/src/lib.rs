@@ -7102,9 +7102,11 @@ pub fn load_each_with(
                 continue;
             }
             let group = skill.budget.as_ref().map(|(group, _)| group.clone());
-            // Or a `[stop] group`'s (#7401), shared with the `[budget]`
-            // group of that name too (#8377, Posture's with the wellbeing
-            // nudges'); a pushed skill's never, so it shares nothing.
+            // Or a `[stop] group`'s (#7401); a pushed skill's never, so it
+            // shares nothing. A `[stop] group` of a `[budget]` group's name
+            // shares that group's function (#8377, Posture's with the
+            // wellbeing nudges'; the owner, 27 Nov: the wellbeing nudges in
+            // no budget, A meal check and Quiet focus still in theirs).
             let stop_shared = match skill.stop.as_ref().and_then(|stop| stop.group.as_ref()) {
                 Some(named) => skill.pushed_by.is_none().then(|| named.clone()),
                 None => group.clone(),

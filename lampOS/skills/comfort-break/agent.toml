@@ -13,11 +13,11 @@ task = { task = "One short, light line, the way a friend would, that it is a goo
 
 [[do]]
 body = { look_at = "face" }
-say = "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+say = "They have sat at the desk for about an hour. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
 
 [[present.do]]
 task = { task = "One short, light line, the way a friend would, that it is a good moment for a short break; name no place and no reason, and nothing about health.", run = "scripts/agent.py" }
 
 [[present.do]]
 body = { look_at = "face" }
-say = "They have sat at the desk for about an hour and a half. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."
+say = "They have sat at the desk for about an hour. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health."

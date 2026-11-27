@@ -150,7 +150,7 @@ pub const PILOTS: [Pilot; 11] = [
     Pilot {
         name: "stand-up",
         group: Group::Nudges,
-        fire: "someone has sat at the desk over an hour and a half without getting up, and the \
+        fire: "someone has sat at the desk about seventy minutes without getting up, and the \
                lamp tilts toward them",
         says: "one short, friendly line inviting them to stand up and move about for a minute; \
                never a word about posture",
@@ -163,8 +163,8 @@ pub const PILOTS: [Pilot; 11] = [
     Pilot {
         name: "rest-your-eyes",
         group: Group::Nudges,
-        fire: "someone has looked at the screen about three quarters of an hour, and the lamp \
-               tilts and softens its light",
+        fire: "someone has looked at the screen about half an hour, and the lamp tilts and \
+               softens its light",
         says: "one short, light line suggesting a rest for the eyes, perhaps looking at \
                something far away",
         tasks: &[Task {
@@ -245,8 +245,7 @@ pub const PILOTS: [Pilot; 11] = [
     Pilot {
         name: "comfort-break",
         group: Group::Nudges,
-        fire: "someone has sat at the desk a long while, an hour and a half or more, with nobody \
-               else in view",
+        fire: "someone has sat at the desk a long while, an hour or more",
         says: "one short, light line, the way a friend would, that it is a good moment for a \
                short break; name no place and no reason, and nothing about health",
         tasks: &[Task {

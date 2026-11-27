@@ -1,0 +1,112 @@
+# 09:00, five hours at the desk, never moving, never turning to it: at 30
+# minutes and each 45 after, as when noticed: two nudges nobody noticed no
+# longer rest it (the owner, 27 Nov).
+clock = "09:00"
+
+[[expect]]
+at = "30m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "30m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+[[expect]]
+at = "30m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
+
+[[expect]]
+at = "75m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "75m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+[[expect]]
+at = "75m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
+
+[[expect]]
+at = "120m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "120m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+[[expect]]
+at = "120m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
+
+[[expect]]
+at = "210m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "210m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+[[expect]]
+at = "210m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
+
+[[expect]]
+at = "255m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "255m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+[[expect]]
+at = "255m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }

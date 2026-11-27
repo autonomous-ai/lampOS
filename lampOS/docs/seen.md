@@ -666,7 +666,7 @@ break is a stand-up:
   `room/stood_up` said, the sitting is new and every timer counts from it,
   as before.
 - **What the readers see.** Stretch break (`break_s_ago` above 1799) and
-  Stand up (above 5999) hold for that long after a stand-up, not after a
+  Stand up (above 4199, the owner's 70 minutes of 27 Nov) hold for that long after a stand-up, not after a
   stretch: a stretch at the desk no longer silences them (case
   `quiet-after-a-stand-up`). The second voice's note (`doing_told.rs`) is
   never "seen stretching", since `last` is never `break`.

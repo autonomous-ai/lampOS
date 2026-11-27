@@ -1,0 +1,53 @@
+# 09:00, leaned in from 3, 80 and 150, each word left unnoticed for a minute
+# (no turn, no move, still leaned in): a word at 4, 81 and 151, and a warm
+# word at 96 and 166 after the last two: two words nobody noticed no longer
+# rest it (the owner, 27 Nov).
+clock = "09:00"
+
+[[expect]]
+at = "4m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "4m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }
+
+[[expect]]
+at = "81m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "81m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }
+
+[[expect]]
+at = "96m"
+within = "1m"
+call = "say"
+args = { note = "They sat back after your word. Say a short, warm thanks or 'that's better' in two or three words. Nothing about their body or looks." }
+
+[[expect]]
+at = "151m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "151m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }
+
+[[expect]]
+at = "166m"
+within = "1m"
+call = "say"
+args = { note = "They sat back after your word. Say a short, warm thanks or 'that's better' in two or three words. Nothing about their body or looks." }
