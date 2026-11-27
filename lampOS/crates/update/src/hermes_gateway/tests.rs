@@ -1038,19 +1038,27 @@ mod one_gateway {
         assert!(!systemd.ever_both);
     }
 
-    /// A cold OpenClaw gateway started by a look, the one run path on: its
-    /// allow-list add answers "not ready". The look runs the add once and
-    /// returns (no 40 × 3 s wait under the lock); the entry stays owed and
-    /// is tried once at each next look until taken. A switch to Hermes
-    /// meanwhile drops it and never leaves both up.
+    /// lamp-ee17, 27 Nov 22:19: each allow-list add the keeper ran into a
+    /// gateway in its startup met the gateway's state maintenance, and the
+    /// gateway exited, in lockstep until systemd's start limit. In its
+    /// startup (not listening) no add runs and the entry stays owed; past
+    /// it, one add a look, never waited for under the lock, at most
+    /// [`crate::gateway_keeper::ADD_LOOKS`] per start, then left to the
+    /// next round's one-shot. A switch to Hermes drops what is owed and
+    /// never leaves both up; the next start owes it again, and a ready
+    /// gateway takes it in one add.
     #[test]
-    fn a_cold_openclaw_gateway_never_holds_a_look() {
+    fn an_add_waits_out_the_gateways_startup_and_stops_after_three() {
         use std::cell::Cell;
         let (lamp, mut systemd) = lamp_with_both(false, false);
         let adds = Cell::new(0);
+        let listening = Cell::new(false);
         let ready = Cell::new(false);
         let mut run = |argv: &[String]| {
             let line = argv.join(" ");
+            if line.starts_with("ss ") && listening.get() {
+                return Ok(format!("LISTEN 0 511 127.0.0.1:{} 0.0.0.0:*", oc::PORT));
+            }
             if line.contains(" approvals allowlist add ") {
                 adds.set(adds.get() + 1);
                 if !ready.get() {
@@ -1061,124 +1069,62 @@ mod one_gateway {
         };
         let mut keeper = keeper(true);
         let mut lines = Vec::new();
-        for n in 1..=2 {
+        let look = |keeper: &mut Keeper,
+                    systemd: &mut Two,
+                    default: &str,
+                    run: &mut dyn FnMut(&[String]) -> Result<String, String>,
+                    lines: &mut Vec<String>| {
             let began = std::time::Instant::now();
             keeper.look(
                 lamp.root(),
-                &mut systemd,
-                said(Some("openclaw")),
-                &mut run,
+                systemd,
+                said(Some(default)),
+                run,
                 &mut |line: &str| lines.push(line.to_owned()),
             );
             assert!(began.elapsed() < std::time::Duration::from_secs(1));
-            assert_eq!(adds.get(), n, "one add per look");
-            assert!(keeper.entry_owed());
+        };
+        // The start and its startup: no add, still owed.
+        for _ in 0..4 {
+            look(&mut keeper, &mut systemd, "openclaw", &mut run, &mut lines);
         }
         assert_eq!(systemd.is(oc::UNIT), "active");
+        assert_eq!(adds.get(), 0, "an add in the startup: {lines:?}");
+        assert!(keeper.entry_owed());
+        // Past it, not ready: one add a look, three at most, then left to
+        // the one-shot.
+        listening.set(true);
+        for n in 1..=4 {
+            look(&mut keeper, &mut systemd, "openclaw", &mut run, &mut lines);
+            assert_eq!(adds.get(), n.min(3), "one add a look, three at most");
+        }
+        assert!(!keeper.entry_owed());
         assert_eq!(
             lines
                 .iter()
-                .filter(|l| l.contains("waits for OpenClaw's gateway"))
+                .filter(|l| l.contains("not taken in 3 looks"))
                 .count(),
             1,
             "{lines:?}"
         );
-        // Still cold, the default moves to Hermes: no add, one gateway.
-        keeper.look(
-            lamp.root(),
-            &mut systemd,
-            said(Some("hermes")),
-            &mut run,
-            &mut |_| {},
-        );
-        assert_eq!(adds.get(), 2);
+        // A switch to Hermes: nothing owed, one gateway.
+        look(&mut keeper, &mut systemd, "hermes", &mut run, &mut lines);
         assert!(!keeper.entry_owed());
         assert_eq!(systemd.is(oc::UNIT), "inactive");
         assert_eq!(systemd.is(UNIT), "active");
-        // Back to OpenClaw, ready at once: the add is taken in that look.
+        // Back to OpenClaw: owed at its start, taken by one add once ready.
+        listening.set(false);
         ready.set(true);
-        keeper.look(
-            lamp.root(),
-            &mut systemd,
-            said(Some("openclaw")),
-            &mut run,
-            &mut |_| {},
-        );
-        assert_eq!(adds.get(), 3);
-        assert!(!keeper.entry_owed());
-        // Owed again and ready at the next look: taken there, once.
-        ready.set(false);
-        keeper.look(
-            lamp.root(),
-            &mut systemd,
-            said(Some("hermes")),
-            &mut run,
-            &mut |_| {},
-        );
-        keeper.look(
-            lamp.root(),
-            &mut systemd,
-            said(Some("openclaw")),
-            &mut run,
-            &mut |_| {},
-        );
+        look(&mut keeper, &mut systemd, "openclaw", &mut run, &mut lines);
         assert!(keeper.entry_owed());
-        ready.set(true);
-        keeper.look(
-            lamp.root(),
-            &mut systemd,
-            said(Some("openclaw")),
-            &mut run,
-            &mut |_| {},
-        );
+        assert_eq!(adds.get(), 3);
+        listening.set(true);
+        look(&mut keeper, &mut systemd, "openclaw", &mut run, &mut lines);
+        assert_eq!(adds.get(), 4);
         assert!(!keeper.entry_owed());
-        keeper.look(
-            lamp.root(),
-            &mut systemd,
-            said(Some("openclaw")),
-            &mut run,
-            &mut |_| {},
-        );
-        assert_eq!(adds.get(), 5, "settled: nothing more run");
+        look(&mut keeper, &mut systemd, "openclaw", &mut run, &mut lines);
+        assert_eq!(adds.get(), 4, "taken: nothing more run");
         assert!(!systemd.ever_both, "{:?}", systemd.log);
-    }
-
-    /// lamp-ee17, 27 Nov (W leg): the look that started OpenClaw's cold
-    /// gateway ran the add 14 s into a 172 s start, and `runuser` said its
-    /// child was "Killed". That is no refusal: the entry stays owed and the
-    /// next look takes it, not the next round's one-shot.
-    #[test]
-    fn a_killed_add_in_a_cold_start_stays_owed() {
-        use std::cell::Cell;
-        let (lamp, mut systemd) = lamp_with_both(false, false);
-        let adds = Cell::new(0);
-        let mut run = |argv: &[String]| {
-            let line = argv.join(" ");
-            if line.contains(" approvals allowlist add ") {
-                adds.set(adds.get() + 1);
-                if adds.get() == 1 {
-                    return Err(format!("{line}: Killed"));
-                }
-            }
-            Ok(String::new())
-        };
-        let mut keeper = keeper(true);
-        let mut lines = Vec::new();
-        for _ in 0..2 {
-            keeper.look(
-                lamp.root(),
-                &mut systemd,
-                said(Some("openclaw")),
-                &mut run,
-                &mut |line: &str| lines.push(line.to_owned()),
-            );
-        }
-        assert_eq!(adds.get(), 2, "tried again at the next look: {lines:?}");
-        assert!(!keeper.entry_owed(), "taken at the second look");
-        assert!(
-            !lines.iter().any(|l| l.contains("the one-shot")),
-            "{lines:?}"
-        );
     }
 
     /// Harness's one-shot at work, OpenClaw not wanted: the keeper still
