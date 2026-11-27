@@ -1772,7 +1772,10 @@ fn the_product_mirrors_memory_into_the_tiers_as_shadow() {
         "Environment=LAMP_VOICE_ROUTE=second",
         "Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json",
     ] {
-        assert!(voice.contains(&line), "the voice's tiers night lacks {line}");
+        assert!(
+            voice.contains(&line),
+            "the voice's tiers night lacks {line}"
+        );
     }
 }
 
