@@ -1831,4 +1831,59 @@ mod tests {
         }
         let _ = std::fs::remove_dir_all(root);
     }
+
+    /// #8884: the app's About (`firmware`, and `build` beside it) names the
+    /// build the lamp runs now, said as the ping says it, not the one
+    /// lamp-cloud started with.
+    #[test]
+    fn the_apps_versions_name_the_build_the_lamp_runs_now() {
+        let (places, root) = places("versions-now");
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path()).unwrap();
+        let mut lamp = bare(places, Some(bus.clone()), "812+460a1a1aa2b3");
+        assert_eq!(lamp.versions()["firmware"], "812+460a1a1aa2b3");
+        bus.publisher_declared(
+            lamp_msgs::UpdateStatus::TOPIC,
+            &lamp_msgs::UpdateStatus::declaration(),
+            "update",
+        )
+        .unwrap()
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &json!({"running": {"sequence": 813, "commit": "9f00aa11bb22cc33dd44"}, "now": "idle", "last": null}),
+        )
+        .unwrap();
+        let versions = lamp.versions();
+        assert_eq!(versions["firmware"], "813+9f00aa11bb22", "{versions}");
+        assert_eq!(versions["build"], "813+9f00aa11bb22", "{versions}");
+        assert_eq!(versions["build"], lamp.identity().version.as_str());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #8884: a status said in another boot is never taken: the build
+    /// lamp-cloud started with is said until lamp-update says one in this
+    /// boot.
+    #[test]
+    fn a_status_from_another_boot_is_not_the_running_build() {
+        let (places, root) = places("other-boot");
+        let dir = tempfile::tempdir().unwrap();
+        let before = Bus::new(dir.path()).unwrap().boot_id(Some("boot-a"));
+        let mut says = before
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        assert!(says.stamp_monotonic_clock());
+        says.publish_json(
+            lamp_ipc::monotonic_us(),
+            &json!({"running": {"sequence": 813, "commit": "9f00aa11bb22cc33dd44"}, "now": "idle", "last": null}),
+        )
+        .unwrap();
+        let now = Bus::new(dir.path()).unwrap().boot_id(Some("boot-b"));
+        let lamp = bare(places, Some(now), "812+460a1a1aa2b3");
+        assert_eq!(lamp.identity().version, "812+460a1a1aa2b3");
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

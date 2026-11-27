@@ -674,4 +674,106 @@ mod tests {
         drop(watched);
         pinging.await.unwrap();
     }
+
+    /// #8884: a quiet lamp-update never makes the ping name an older build.
+    /// After a switch to B, lamp-update says nothing for 200 s (its status
+    /// has expired), and the pings still name B, never the build lamp-cloud
+    /// started with.
+    #[tokio::test]
+    async fn a_quiet_lamp_update_never_makes_the_ping_name_an_older_build() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let dir = tempfile::tempdir().unwrap();
+        let wall = Arc::new(AtomicU64::new(1_790_000_000_000));
+        let monotonic = Arc::new(AtomicU64::new(1_000_000_000));
+        let (w, m) = (wall.clone(), monotonic.clone());
+        let bus = lamp_bus::Bus::new(dir.path())
+            .unwrap()
+            .clocks(
+                move || w.load(Ordering::SeqCst),
+                move || m.load(Ordering::SeqCst),
+            )
+            .boot_id(Some("boot-a"));
+        let places = crate::lamp::Places {
+            actions: dir.path().join("call.sock"),
+            proc: dir.path().join("proc"),
+            sys: dir.path().join("sys"),
+            etc: dir.path().join("etc"),
+            run: dir.path().join("run"),
+        };
+        let lamp = crate::lamp::bare(places, Some(bus.clone()), "812+460a1a1aa2b3");
+        let (identity_tx, me) = watch::channel(lamp.identity());
+        let (base, requests) = backend(Vec::new()).await;
+        let (accounts, watched) = watch::channel(Some(account(&base)));
+        let pinging = tokio::spawn(async move {
+            pings(
+                accounts,
+                me,
+                "voice-key".into(),
+                Duration::from_millis(20),
+                &mut |_: &str| {},
+                &mut |_: &Account| {},
+                &mut |_: &ping::Reply| {},
+                None,
+                None,
+            )
+            .await;
+        });
+        let pinged_after = |from: usize, build: &str| {
+            let said = format!(r#""version":"{build}""#);
+            let requests = requests.clone();
+            async move {
+                while !requests.lock().unwrap()[from..]
+                    .iter()
+                    .any(|request| request.contains(&said))
+                {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+            }
+        };
+        let quiet = async {
+            let mut says = bus
+                .publisher_declared(
+                    lamp_msgs::UpdateStatus::TOPIC,
+                    &lamp_msgs::UpdateStatus::declaration(),
+                    "update",
+                )
+                .unwrap();
+            assert!(says.stamp_monotonic_clock());
+            says.publish_json(
+                monotonic.load(Ordering::SeqCst),
+                &serde_json::json!({
+                    "running": {"sequence": 813, "commit": "9f00aa11bb22cc33dd44"},
+                    "now": "idle", "last": null,
+                }),
+            )
+            .unwrap();
+            pinged_after(0, "813+9f00aa11bb22").await;
+            // 200 s with nothing from lamp-update: its word has expired.
+            wall.fetch_add(200_000, Ordering::SeqCst);
+            monotonic.fetch_add(200_000_000, Ordering::SeqCst);
+            let kept = bus.latest(lamp_msgs::UpdateStatus::TOPIC).unwrap().unwrap();
+            assert!(kept.expired, "the status is 200 s old");
+            let from = requests.lock().unwrap().len();
+            // Long enough for the identity to be looked at again and pinged.
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            pinged_after(from, "813+9f00aa11bb22").await;
+            from
+        };
+        let from = tokio::select! {
+            () = crate::lamp::look(identity_tx, lamp, Duration::from_millis(20)) => unreachable!(),
+            from = tokio::time::timeout(Duration::from_secs(5), quiet) => {
+                from.expect("no ping named the new build after the quiet")
+            }
+        };
+        let after: Vec<String> = requests.lock().unwrap()[from..].to_vec();
+        assert!(after.len() >= 2, "{}", after.len());
+        assert!(
+            after
+                .iter()
+                .all(|request| !request.contains(r#""version":"812+460a1a1aa2b3""#)),
+            "a ping named the older build after the quiet"
+        );
+        drop(watched);
+        pinging.await.unwrap();
+    }
 }
