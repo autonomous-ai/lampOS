@@ -6935,14 +6935,33 @@ after a take-over, but now for every turn:
     "spell", "define", "meaning of", "convert", "exchange rate"), unless
     the line also asks for several steps ("summarise", "compare", "list",
     "write", "draft", "plan", "outline", "research", "analyse",
-    "investigate", "gather", "report", "points", "options"). So "can you
-    look up the weather in Hanoi tomorrow morning?", "find out what time it
-    is in Tokyo right now" and "look up today's top news headline for me"
-    are the model's, while "find this week's main AI news and summarise it
-    in five points" is still forced.
+    "investigate", "gather", "points", "options"), a word not said right
+    after "I" or "we" ("I'm", "we're", "I'll", "we'll", "I'd", "we'd"), so
+    the person's own plan is no ask (Twelve's P2 on #8809). So "can you
+    look up the weather in Hanoi tomorrow morning?", "can you look up the
+    weather report for Hanoi tomorrow?", "look up the forecast for Sapa, I
+    plan to go hiking tomorrow", "find out what time it is in Tokyo right
+    now" and "look up today's top news headline for me" are the model's,
+    while "find this week's main AI news and summarise it in five points"
+    is still forced;
+  - and the line asks for nothing made up to enjoy
+    (`agent_tasks::AFTER_NEWS_CREATIVE`, Twelve's P3 on #8809, rule 8): a
+    poem, story, song, lullaby, joke, haiku, riddle, limerick or rhyme
+    ("write me a short poem about autumn", "write a story about a dragon
+    for my daughter") is the lamp's own to say, not an agent's read-back.
     "What did it say about Spain?", "read me the rest", "did you find
     anything about Spain?", "write that down", "what time is it?" and a
     thanks are the model's, as before. English words only.
+
+  Known slips, all on the safe side (Twelve's P3s on #8809): a research
+  ask that also says "the news" ("find the news about the election and
+  summarise it in five points"), "not" ("compare laptops that are not too
+  heavy under 800 dollars"), a quick-fact word with no several-steps word
+  ("research what's the best robot vacuum under 300 dollars") or a
+  creative word ("research the story of …") is not forced: the model may
+  still hand it over with the note alone. 51d9ab0f57 alone does not
+  compile (`has_tasks` comes in e319b2feab), which matters only when
+  bisecting.
 
   The model still writes the task and `who`; the read-back, the yes and
   `confirm_agent_task` follow as for any hand-over. The round after the
