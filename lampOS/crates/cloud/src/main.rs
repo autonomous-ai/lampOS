@@ -268,6 +268,9 @@ fn main() -> ExitCode {
         .clone()
         .zip(login.as_ref().map(|login| login.watch()));
     let alerts_bus = bus.clone();
+    // The heartbeat's OpenClaw, Hermes and Harness versions (#8881): only
+    // with LAMP_BEAT_ENGINES=on, read from lamp-update's kept status.
+    let beat_bus = ping::engines_on().then(|| bus.clone()).flatten();
     // The energy kept with the character words, said for the body (#6893).
     let energy_bus = bus.clone();
     let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
@@ -528,7 +531,7 @@ fn main() -> ExitCode {
             &mut keep,
             &mut heard,
             login.as_mut(),
-            None,
+            beat_bus,
         );
         let telling = async move {
             match telling {
