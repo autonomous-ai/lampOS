@@ -7207,7 +7207,7 @@ nhau một phút. Không kỹ năng đi kèm nào còn giữ một nhóm `[budge
 không nêu thời lượng, nên lần nhắc ở phút 135 và 210 không bao giờ nói
 "about an hour" (P3 của Twelve trên #8868). Nó mang `about` mà cả chín lời
 nhắc wellbeing dùng chung, từng byte, nên kỹ năng nào đứng đầu theo thứ tự
-thư mục thì mô hình vẫn được nói cùng một câu; Posture giữ `about` riêng.
+thư mục thì mô hình vẫn được nói cùng một câu, kể cả Posture (cả mười thành viên dùng chung).
 
 ## Chủ đề người ở bàn đang làm gì (#6543, chưa có bên phát)
 
