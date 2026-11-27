@@ -107,7 +107,7 @@ fn cut_here_when(on: bool, cut: bool) -> Option<&'static str> {
 
 /// The worker's flags for the switch, from the coordinator's environment.
 pub fn arguments_from_environment() -> Vec<String> {
-    arguments(std::env::var(ENVIRONMENT).ok().as_deref())
+    arguments(crate::second_provider::unless_simple(std::env::var(ENVIRONMENT).ok()).as_deref())
 }
 
 fn arguments(value: Option<&str>) -> Vec<String> {

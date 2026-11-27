@@ -1770,6 +1770,11 @@ pub(crate) const SIMPLE_CALLED: &str = "\"Hey Lamp\", or a tap, called it";
 pub(crate) const SIMPLE_GOING_ON: &str =
     "begun within 20 s of the end of the lamp's last words (LAMP_SIMPLE_CALL)";
 
+/// Why a line is let out with `LAMP_SIMPLE_CALL`: begun within 15 s of a
+/// call, before the lamp said anything back ([`CALL_CARRIES_FOR`]).
+pub(crate) const SIMPLE_AFTER_THE_CALL: &str =
+    "begun within 15 s of \"Hey Lamp\" (LAMP_SIMPLE_CALL)";
+
 /// The note for a spoken line: [`BY_NAME_NOTE`] when it called the lamp by
 /// name, else [`DECLINE_NOTE`].
 pub(crate) fn call_note(by_name: bool) -> &'static str {
@@ -5085,10 +5090,11 @@ pub fn serve(
     // "Not for me" written as words on a line let out only as the
     // conversation going on is the decline itself
     // (`LAMP_NOT_FOR_ME_WORDS=on`; lamp-4ace, r06, request 131).
-    let declines_in_words = std::env::var(crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT)
-        .ok()
-        .as_deref()
-        == Some("on");
+    let declines_in_words = !crate::second_provider::simple_call_on()
+        && std::env::var(crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on");
     if declines_in_words {
         eprintln!(
             "lamp-voice second: a reply opening with \"not for me\" to a line let out only as the conversation going on is taken as not_for_me, its first piece held until its opening is known (LAMP_NOT_FOR_ME_WORDS)"
@@ -5397,10 +5403,11 @@ pub fn serve(
     // An ask cut short by a line let out whose answer only declines is
     // answered in its place, never let go silently
     // (`LAMP_CUT_ASK_ANSWERED=on`, #5961).
-    let cut_ask_answered = std::env::var(crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT)
-        .ok()
-        .as_deref()
-        == Some("on");
+    let cut_ask_answered = !crate::second_provider::simple_call_on()
+        && std::env::var(crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT)
+            .ok()
+            .as_deref()
+            == Some("on");
     if cut_ask_answered {
         eprintln!(
             "lamp-voice second: words cut short by a line let out are answered in its place when its answer only declines (LAMP_CUT_ASK_ANSWERED)"
@@ -5545,7 +5552,8 @@ pub fn serve(
         // private room, no services), prints for the join alone.
         let on = |name: &str| std::env::var(name).is_ok_and(|value| value == "on");
         let join_by_voice = join_same_voice(
-            on(crate::second_provider::JOIN_SAME_VOICE_ENVIRONMENT),
+            on(crate::second_provider::JOIN_SAME_VOICE_ENVIRONMENT)
+                && !crate::second_provider::simple_call_on(),
             on(crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT)
                 || on(crate::second_provider::NAME_CARRIES_ENVIRONMENT),
             files.same_voice_for_services,
@@ -6274,8 +6282,9 @@ pub fn serve(
         // words when one person said both (`LAMP_JOIN_CUT_WORDS`): by the
         // prints, when the same-voice check runs for a rule above, or by
         // one face seen speaking both, the same reader as above.
-        if std::env::var(crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT)
-            .is_ok_and(|value| value == "on")
+        if !crate::second_provider::simple_call_on()
+            && std::env::var(crate::second_provider::JOIN_CUT_WORDS_ENVIRONMENT)
+                .is_ok_and(|value| value == "on")
         {
             eprintln!(
                 "lamp-voice second: a line that cuts the one before it short, that one unanswered, is asked with its words when the same voice or one face said both, or, let out, when nothing shows a second person (LAMP_JOIN_CUT_WORDS)"
@@ -6412,8 +6421,9 @@ pub fn serve(
         // the name's join, never just unknown (`LAMP_FIRST_SECONDS_QUIET`,
         // #3711). After `--addressed`'s looks are set up, so the levels'
         // thread reads the eyes beside them (the reviewer-lead's P3 on #3801).
-        if std::env::var(crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT)
-            .is_ok_and(|value| value == "on")
+        if !crate::second_provider::simple_call_on()
+            && std::env::var(crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT)
+                .is_ok_and(|value| value == "on")
         {
             eprintln!(
                 "lamp-voice second: right after a start, a line in a room not yet known is kept as said in a quiet room for a join when the ears' stream stayed near its own quiet outside the lines, no talk was left alone, no line was held and no other voice heard since (LAMP_FIRST_SECONDS_QUIET)"
@@ -10737,18 +10747,37 @@ impl Heeding {
     /// begins within [`crate::follows_on::WITHIN_US`]
     /// (20 s) of the end of the lamp's last words, measured to its start, as
     /// every answer's words move it on; held otherwise, and never answered.
+    ///
+    /// A line with no words in it (a sound, a cough, room noise) is never
+    /// answered, but for a tap; and a line begun within [`CALL_CARRIES_FOR`]
+    /// (15 s) of a call let out, before the lamp has said anything back, is
+    /// the call's ("Hey Lamp, what's the weather" … "in Hanoi").
     fn simple_verdict(
         attention: &crate::attention::Attention,
         said_until_us: Option<u64>,
+        called_at: Option<Instant>,
         began_us: u64,
+        heard: &str,
     ) -> crate::attention::Verdict {
         use crate::attention::Verdict;
-        if attention.simple_called() {
-            Verdict::Play(SIMPLE_CALLED)
-        } else if attention.judged_own() {
+        let after_the_call = called_at.is_some_and(|at| {
+            let ago_us = u64::try_from(at.elapsed().as_micros()).unwrap_or(u64::MAX);
+            let called_us = monotonic_us().saturating_sub(ago_us);
+            let carries_us = u64::try_from(CALL_CARRIES_FOR.as_micros()).unwrap_or(u64::MAX);
+            began_us.saturating_sub(called_us) <= carries_us
+        });
+        if attention.judged_own() {
             Verdict::Play("the lamp began this turn itself")
+        } else if attention.tapped() {
+            Verdict::Play(SIMPLE_CALLED)
+        } else if !heard.chars().any(char::is_alphanumeric) {
+            Verdict::Hold(crate::second_provider::SIMPLE_NO_WORDS)
+        } else if attention.simple_called() {
+            Verdict::Play(SIMPLE_CALLED)
         } else if crate::follows_on::due(true, false, said_until_us, began_us) {
             Verdict::Play(SIMPLE_GOING_ON)
+        } else if after_the_call {
+            Verdict::Play(SIMPLE_AFTER_THE_CALL)
         } else {
             Verdict::Hold(crate::second_provider::SIMPLE_HELD)
         }
@@ -12344,6 +12373,12 @@ impl Heeding {
             // `LAMP_SAME_SPEAKER_CARRIES`: a stop ends the conversation
             // carried.
             crate::second_provider::Did::Stopped => {
+                // `LAMP_SIMPLE_CALL`: a stop closes the window, and the call's
+                // carry with it; the next conversation opens with "Hey Lamp".
+                if self.simple_call {
+                    self.said_until_us = None;
+                    self.called_at = None;
+                }
                 self.carrying = false;
                 self.carry_window.clear();
                 self.held_colleagues.clear();
@@ -14202,7 +14237,9 @@ impl Heeding {
             verdict = Some(Self::simple_verdict(
                 attention,
                 self.said_until_us,
+                self.called_at,
                 seen.began_us,
+                &seen.heard,
             ));
         }
         let alone = alone && !simple;
