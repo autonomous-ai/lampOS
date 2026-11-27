@@ -90,7 +90,8 @@ pub const PARTS: &[&str] = &[
     "cloud",
 ];
 
-/// The parts the self-test names (`lamp_msgs::PartResult::part`).
+/// The parts the self-test names (`lamp_msgs::PartResult::part`). Keep earlier
+/// names too: a retained run can predate the installed self-test build.
 pub const SELFTEST_PARTS: &[&str] = &[
     "voice_mic",
     "room_mic",
@@ -108,6 +109,15 @@ pub const SELFTEST_PARTS: &[&str] = &[
     "board",
     "name",
     "body",
+    "base_yaw",
+    "shoulder",
+    "elbow",
+    "head_roll",
+    "head_pitch",
+    "head_move",
+    "storage",
+    "voice_route",
+    "touch_by_hand",
 ];
 
 /// The units a report may name: the product's `lamp-*.service` files
@@ -3381,6 +3391,218 @@ pub(crate) mod tests {
             .into_iter()
             .map(|(_, bytes)| serde_json::from_str(&bytes).unwrap())
             .collect()
+    }
+
+    // Follow the production registrations rather than repeating the cloud list.
+    // This deliberately understands only today's literal/JOINTS/PART naming
+    // forms: a new constructor or naming form needs a source/privacy review.
+    fn selftest_producer_parts() -> std::collections::BTreeSet<&'static str> {
+        fn quoted(source: &str) -> &str {
+            source
+                .trim_start()
+                .strip_prefix('"')
+                .unwrap()
+                .split_once('"')
+                .unwrap()
+                .0
+        }
+        fn declared(source: &'static str, owner: &str) -> &'static str {
+            let implementation = source
+                .split_once(&format!("impl Check for {owner}"))
+                .unwrap()
+                .1;
+            let value = implementation
+                .split_once("fn part(&self) -> &str {")
+                .unwrap()
+                .1
+                .split_once('}')
+                .unwrap()
+                .0
+                .trim();
+            if value == "PART" {
+                quoted(source.split_once("pub const PART: &str = ").unwrap().1)
+            } else {
+                quoted(value)
+            }
+        }
+
+        let listen = include_str!("../../selftest/src/listen.rs");
+        let checks = listen
+            .split_once("pub fn checks(")
+            .unwrap()
+            .1
+            .split_once("#[cfg(test)]")
+            .unwrap()
+            .0;
+        let mut parts = std::collections::BTreeSet::new();
+        for constructor in checks.split("Listen::new(").skip(1) {
+            let argument = constructor.split_once(',').unwrap().0.trim();
+            if argument == "name" {
+                assert!(checks.contains("for name in JOINTS"));
+                let joints = listen
+                    .split_once("pub const JOINTS:")
+                    .unwrap()
+                    .1
+                    .split_once('=')
+                    .unwrap()
+                    .1
+                    .split_once(';')
+                    .unwrap()
+                    .0;
+                parts.extend(joints.split('"').skip(1).step_by(2));
+            } else {
+                parts.insert(quoted(argument));
+            }
+        }
+        for constructor in checks.split("Box::new(").skip(1) {
+            let owner = constructor
+                .trim_start()
+                .split(['(', '{'])
+                .next()
+                .unwrap()
+                .trim();
+            match owner {
+                "Listen::new" => {}
+                "Sight" => {
+                    assert!(parts.insert(declared(listen, "Sight")));
+                }
+                _ => panic!("new listening check needs a report-name review: {owner}"),
+            }
+        }
+
+        let main = include_str!("../../selftest/src/main.rs")
+            .split_once("let mut checks = listen::checks(&bus);")
+            .unwrap()
+            .1
+            .split_once("let mut test = lamp_selftest::run(")
+            .unwrap()
+            .0;
+        for constructor in main.split("Box::new(").skip(1) {
+            // The factory check has an output callback, not another Check.
+            if constructor.trim_start().starts_with('|') {
+                continue;
+            }
+            let owner = constructor.split_once('{').unwrap().0.trim();
+            let source = match owner {
+                "mic::VoiceMic" => include_str!("../../selftest/src/mic.rs"),
+                "ring::Ring" => include_str!("../../selftest/src/ring.rs"),
+                "speaker::Speaker" => include_str!("../../selftest/src/speaker.rs"),
+                "head::HeadMove" => include_str!("../../selftest/src/head.rs"),
+                "kernel::Kernel" => include_str!("../../selftest/src/kernel.rs"),
+                "voice_route::VoiceRoute" => include_str!("../../selftest/src/voice_route.rs"),
+                "hand::ByHand" => include_str!("../../selftest/src/hand.rs"),
+                _ => panic!("new self-test constructor needs a report-name review: {owner}"),
+            };
+            assert!(parts.insert(declared(source, owner.split_once("::").unwrap().1)));
+        }
+        parts
+    }
+
+    /// These names were accepted before the producer census. Retained reports
+    /// from older programs still use them; do not remove them as unused aliases.
+    const LEGACY_SELFTEST_PARTS: &[&str] = &[
+        "servo_1", "servo_2", "servo_3", "servo_4", "servo_5", "button", "name", "body",
+    ];
+
+    fn all_selftest_failures() -> Seen {
+        let mut seen = planted();
+        let test = seen.selftest.as_mut().unwrap();
+        test.parts = selftest_producer_parts()
+            .into_iter()
+            .chain(LEGACY_SELFTEST_PARTS.iter().copied())
+            .map(|name| {
+                PartResult::new(name, Verdict::Fail, SECRETS[0]).with(SECRETS[1], SECRETS[2])
+            })
+            .collect();
+        test.parts.push(PartResult::new(
+            "PRIVATE_SELFTEST_PART",
+            Verdict::Fail,
+            SECRETS[3],
+        ));
+        test.parts.push(PartResult::new(
+            "PRIVATE_UNCHECKED_PART",
+            Verdict::NotChecked,
+            SECRETS[4],
+        ));
+        test.check().unwrap();
+        seen
+    }
+
+    #[test]
+    fn selftest_report_names_follow_registered_producers_and_keep_legacy_names() {
+        let expected: std::collections::BTreeSet<_> = selftest_producer_parts()
+            .into_iter()
+            .chain(LEGACY_SELFTEST_PARTS.iter().copied())
+            .collect();
+        let listed: std::collections::BTreeSet<_> = SELFTEST_PARTS.iter().copied().collect();
+        assert_eq!(SELFTEST_PARTS.len(), listed.len(), "duplicate report name");
+        assert_eq!(
+            listed, expected,
+            "review producer additions and removed legacy names"
+        );
+
+        let body = health_body(&all_selftest_failures());
+        let test = body.selftest.as_ref().unwrap();
+        assert_eq!(
+            test.failed
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>(),
+            expected
+        );
+        assert_eq!(test.failed.len(), SELFTEST_PARTS.len());
+        assert_eq!(test.other_failed, 1);
+        assert_eq!(test.not_checked, 1);
+        assert_eq!(test.verdict, Verdict::Fail);
+        assert_eq!(test.build, None);
+        let json = serde_json::to_string(&body).unwrap();
+        for secret in SECRETS
+            .into_iter()
+            .chain(["PRIVATE_SELFTEST_PART", "PRIVATE_UNCHECKED_PART"])
+        {
+            assert!(
+                !json.contains(secret),
+                "self-test projection leaked a canary"
+            );
+        }
+    }
+
+    #[test]
+    fn named_selftest_failures_still_fit_or_are_counted_at_four_kib() {
+        let places = places("selftest-parts-size");
+        yes(&places);
+        let mut reports = Reports::open(places);
+        let mut seen = all_selftest_failures();
+        let health = &mut seen.health.as_mut().unwrap().0;
+        health.items = PARTS
+            .iter()
+            .map(|name| HealthItem {
+                name: (*name).into(),
+                level: Level::Error,
+                message: SECRETS[0].into(),
+                age_ms: u64::MAX,
+            })
+            .collect();
+        let seq = reports.health(NOW, None, &seen).unwrap();
+        let sent = reports.due(&"d".repeat(ID_MOST));
+        assert_eq!(sent.len(), 1);
+        assert!(sent[0].1.len() <= MOST_BYTES);
+        let value: Value = serde_json::from_str(&sent[0].1).unwrap();
+        assert_eq!(value["schema"], SCHEMA);
+        assert_eq!(
+            value["selftest"]["failed"].as_array().unwrap().len(),
+            SELFTEST_PARTS.len()
+        );
+        assert_eq!(value["selftest"]["other_failed"], 1);
+        reports.acked(seq);
+
+        // An unbounded producer payload is never allowed to expand the wire
+        // limit, even when every repeated name is now in the fixed vocabulary.
+        seen.selftest.as_mut().unwrap().parts =
+            vec![PartResult::new("touch_by_hand", Verdict::Fail, SECRETS[0]); MOST_BYTES];
+        assert_eq!(reports.health(NOW + 1, None, &seen), None);
+        assert_eq!(reports.dropped().too_big, 1);
+        assert!(reports.due(ID).is_empty());
     }
 
     #[test]

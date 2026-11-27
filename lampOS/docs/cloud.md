@@ -2070,8 +2070,22 @@ Every report has:
 **The lists.** Parts: the product's `--expect` list
 (`deploy/product/lamp-health.service`) and those `lamp-health show` knows
 by name, plus `skills` and `cloud`. Units: the product's `lamp-*.service`
-files, held the same by a test. Self-test parts: those `lamp-selftest`
-names.
+files, held the same by a test. Self-test parts include the current check names:
+`voice_mic`, `room_mic`, `speaker`, `ring`, `camera`, `touch`, `air`, `board`,
+`base_yaw`, `shoulder`, `elbow`, `head_roll`, `head_pitch`, `head_move`,
+`storage`, `voice_route` and `touch_by_hand`. The older names `servo_1` through
+`servo_5`, `button`, `name` and `body` remain accepted for retained older runs.
+A source census follows the self-test's registered checks and their names.
+An unlisted failure still adds only to `other_failed`; reasons, readings and
+arbitrary part names are never sent.
+
+These additional fixed names change only the vocabulary of `selftest.failed`
+under the existing `lamp-report/1` shape. A failure formerly included in
+`other_failed` can now be named. Readers with closed name lists must accept
+the additions before rollout; earlier reports retain their original anonymous
+counts. The current consent gates and 4 KiB limit, including room for the
+longest device ID, still apply. Repeating a self-test summary in health reports
+does not count distinct runs or establish when its failure occurred.
 
 **Manager query bounds.** The health queries and exit-note metadata query
 accept a complete UTF-8 response through 256 KiB within two seconds. Closed
