@@ -24,6 +24,12 @@ SupplementaryGroups=lampos
 # lampos, lamp-cloud's group, so a person removed in the app goes from memory too. Asked only with lamp-cloud's
 # LAMP_FACES_PAGE=on; the same trust as the eyes' who.sock (anything running as lampos).
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
+# The tiered store beside Days (LAMP_MEMORY_TIERS, docs/memory.md "The tiered store beside Days"): `shadow` mirrors
+# each known person's exchanges and kept things into memory-tiers.d/, every forget reaching it, and every answer stays
+# Days' byte for byte. The owner's call of 27 Nov switched it on (C143, C144); a row on lamp-06c1 follows. `on` (the
+# tiers' recall beside Days', waited up to 50 ms) stays unset until that wait is measured on a lamp's eMMC. The night's
+# model call is the voice's, with the same switch in lamp-voice.service.
+Environment=LAMP_MEMORY_TIERS=shadow
 ExecStart=/opt/lampOS/memory/current/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --zone system --memory-days --bus-root /run/lampos-bus --forget-socket /run/lampos-memory/forget.sock --forget-group lampos
 Restart=on-failure
 RestartSec=2s
