@@ -540,6 +540,19 @@ pub struct StateLines {
     pub which: String,
     pub how_many: String,
     pub done: String,
+    /// The step's ask waits for the person's answer now: the walk's own
+    /// conversation (#8871, the first builder's change 3), so their plain
+    /// answer counts with no name and no face turned for as long as it
+    /// waits. False while the walk is paused, left or between asks.
+    #[serde(default)]
+    pub waits: bool,
+}
+
+/// Whether a person's line now is an answer to the walk's waiting ask
+/// (#8871): with the switch on, while [`StateLines::waits`], and not
+/// another voice than the conversation's (a room voice is no answer).
+pub(crate) fn holds_answer(other_voice: bool) -> bool {
+    !other_voice && on() && state().is_some_and(|lines| lines.waits)
 }
 
 /// The state lines for `step`, at place `at` of `of` (Wi-Fi counted as the
@@ -614,6 +627,7 @@ pub(crate) fn state_lines(
         which: own(which),
         how_many: own(how_many),
         done: own(done),
+        waits: false,
     }
 }
 
@@ -963,6 +977,30 @@ mod tests {
         assert!(!refused_again());
         assert!(refused_again());
         assert!(!refused_again());
+    }
+
+    /// The first builder's change 3: while the walk's ask waits, the
+    /// person's plain answer is taken, however late; not another voice's,
+    /// not while paused, not with the switch off.
+    #[test]
+    fn a_waiting_ask_holds_the_answer_window_open() {
+        set_on_for_test(true);
+        let waiting = StateLines {
+            waits: true,
+            ..state_lines(Step::WhoYouAre, 3, 7, None)
+        };
+        set_state(Some(waiting.clone()));
+        assert!(holds_answer(false));
+        assert!(!holds_answer(true), "a room voice is no answer");
+        set_state(Some(StateLines {
+            waits: false,
+            ..waiting.clone()
+        }));
+        assert!(!holds_answer(false), "paused or between asks");
+        set_state(Some(waiting));
+        set_on_for_test(false);
+        assert!(!holds_answer(false), "switch off");
+        set_state(None);
     }
 
     #[test]

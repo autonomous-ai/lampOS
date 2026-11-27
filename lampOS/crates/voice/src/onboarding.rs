@@ -1232,7 +1232,7 @@ pub struct Onboarding {
     /// is offered only then.
     make_on: bool,
     /// The state lines last set ([`walk_v2::set_state`]), by what they say.
-    state_key: Option<(Step, usize, usize)>,
+    state_key: Option<(Step, usize, usize, bool)>,
     /// The walk step told to the app as asked (#8871), with when in Unix
     /// ms ([`lamp_msgs::OnboardingPending::asking`]), and since when the
     /// walk's first line is held for it ([`ASKED_LEAD_US`]).
@@ -3739,7 +3739,7 @@ impl Onboarding {
         still: bool,
     ) -> Option<String> {
         if self.walk_v2 {
-            self.publish_state();
+            self.publish_state(paused);
         }
         // "Preferences"' hello: once the model has answered the quiet hours
         // (its words came), or [`HELLO_WAIT_US`] after them if it says
@@ -3794,7 +3794,13 @@ impl Onboarding {
     /// The state lines for where the walk stands now (#8871), set for the
     /// second route's worker as they change: the step led, else the next
     /// one, while the walk is under way; none once it is over.
-    fn publish_state(&mut self) {
+    fn publish_state(&mut self, paused: bool) {
+        // The ask waits for an answer: led and asked, the walk not paused.
+        let waits = !paused
+            && self
+                .led
+                .as_ref()
+                .is_some_and(|led| led.asked_us.is_some() && walk_v2::WALK.contains(&led.step));
         let step = self
             .led
             .as_ref()
@@ -3805,15 +3811,16 @@ impl Onboarding {
         let key = step.and_then(|step| {
             let offered = self.walk_steps();
             let at = offered.iter().position(|name| name == step.name())?;
-            Some((step, at + 2, offered.len() + 1))
+            Some((step, at + 2, offered.len() + 1, waits))
         });
         if key == self.state_key {
             return;
         }
         self.state_key = key;
-        walk_v2::set_state(
-            key.map(|(step, at, of)| walk_v2::state_lines(step, at, of, self.language)),
-        );
+        walk_v2::set_state(key.map(|(step, at, of, waits)| walk_v2::StateLines {
+            waits,
+            ..walk_v2::state_lines(step, at, of, self.language)
+        }));
     }
 
     fn tick_led(
@@ -15022,8 +15029,11 @@ mod tests {
                 "Five more, about three minutes. Right now, Where you sit: sit where you usually do and look at me."
             )
         );
+        // Its ask waits for the answer: the walk's own conversation.
+        assert!(walk_v2::state().is_some_and(|lines| lines.waits));
         // Nobody there: the step is dropped, and the state still says it.
         room.wait(GONE_US + S, None);
+        assert!(walk_v2::state().is_some_and(|lines| !lines.waits));
         assert_eq!(
             walk_v2::state_words("What were we doing?").as_deref(),
             Some("We're on step 2 of 6, Where you sit: sit where you usually do and look at me.")
