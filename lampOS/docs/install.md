@@ -2936,7 +2936,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `exec_allowlist` stays false, so the next round asks the one-shot
      again, which then only writes the launcher and edits the allow-list.
      The entry is re-checked every round: with the switch on, the record
-     saying it was added and the gateway active, the round itself runs
+     saying it was added and the gateway active and past its startup
+     (listening on 18789 and 150 s since its start,
+     `openclaw_install::past_startup`: an add in the startup met the
+     gateway's state maintenance and the gateway exited, lamp-ee17, 27
+     Nov; in it, the round leaves the entry to the next), the round itself runs
      the same `approvals allowlist add` (as `lampos`, through the wrapper;
      OpenClaw takes an entry already there without writing), so a factory
      reset that wipes OpenClaw's approvals gets it back on the next

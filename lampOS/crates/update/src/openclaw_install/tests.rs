@@ -1341,7 +1341,6 @@ fn only_a_round_resets_a_failed_gateway() {
             &mut systemd,
             wanted,
             false,
-            &mut Runs::new(&lamp).runner(),
             &mut |line: &str| said.push(line.to_owned()),
         );
         assert_eq!(systemd.asked, ["state", "gateway-state"]);
@@ -3092,6 +3091,10 @@ fn every_round_adds_agent_mains_entry_again_with_the_gateway_up() {
     assert!(!approvals(&off).iter().any(|line| line.contains(" add ")));
 }
 
+/// What `ss -Hltn` says of a gateway listening on [`PORT`]: past its
+/// startup ([`past_startup`]) with no start or uptime to read.
+const LISTENING: &str = "LISTEN 0 511 127.0.0.1:18789 0.0.0.0:*";
+
 /// #7135 (c0a4's reboot #3, 22:59:00): a round right after a boot found
 /// the gateway active but not ready ("Config unavailable"), read it as the
 /// entry gone, and asked the one-shot, which reinstalled OpenClaw. Not
@@ -3128,6 +3131,9 @@ fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
         // Not ready twice, then taken: one round, the entry kept.
         let mut adds = 0;
         let mut run = |argv: &[String]| -> Result<String, String> {
+            if argv[0] == "ss" {
+                return Ok(LISTENING.into());
+            }
             if argv.iter().any(|arg| arg == "add") {
                 adds += 1;
                 if adds < 3 {
@@ -3144,6 +3150,9 @@ fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
         // Never ready in the round: unknown, nothing marked or asked.
         let mut adds = 0;
         let mut run = |argv: &[String]| -> Result<String, String> {
+            if argv[0] == "ss" {
+                return Ok(LISTENING.into());
+            }
             if argv.iter().any(|arg| arg == "add") {
                 adds += 1;
                 return Err(why.clone());
@@ -3159,6 +3168,9 @@ fn a_round_reads_a_gateway_not_ready_as_unknown_never_as_the_entry_gone() {
     // Another refusal: marked and asked, not tried again.
     let mut adds = 0;
     let mut run = |argv: &[String]| -> Result<String, String> {
+        if argv[0] == "ss" {
+            return Ok(LISTENING.into());
+        }
         if argv.iter().any(|arg| arg == "add") {
             adds += 1;
             return Err("unknown agent".into());
@@ -4313,7 +4325,6 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
             &mut systemd,
             gateway,
             false,
-            &mut Runs::new(&lamp).runner(),
             &mut |line: &str| said.push(line.to_owned()),
         );
         (systemd.asked, said)
@@ -4352,7 +4363,6 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
         &mut systemd,
         Gateway::Wanted,
         false,
-        &mut Runs::new(&lamp).runner(),
         &mut quiet(),
     );
     assert_eq!(systemd.asked, ["state"]);
@@ -4370,7 +4380,6 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
         &mut systemd,
         Gateway::NotWanted,
         false,
-        &mut Runs::new(&lamp).runner(),
         &mut quiet(),
     );
     assert!(
@@ -4382,10 +4391,13 @@ fn between_rounds_the_gateway_follows_the_lamps_agent_and_is_quiet_when_settled(
 }
 
 /// Twelve's P2 on #8116: a gateway started between rounds because OpenClaw
-/// became the lamp's agent gets agent `main`'s entry added at once with the
-/// one run path on, through the running gateway; settled, nothing is run.
+/// became the lamp's agent owes agent `main`'s entry with the one run path
+/// on, but no add runs at its start (lamp-ee17, 27 Nov 22:19: one in its
+/// startup met the gateway's state maintenance and the gateway exited):
+/// nothing is run here, the keeper adds it once past it. Settled, nothing
+/// is owed.
 #[test]
-fn a_gateway_started_for_openclaw_gets_agent_mains_entry_at_once() {
+fn a_gateway_started_for_openclaw_owes_agent_mains_entry_and_adds_none_at_its_start() {
     let lamp = Lamp::new();
     lamp.harness_there();
     tasks_there(&lamp, TASKS_BYTES);
@@ -4402,50 +4414,26 @@ fn a_gateway_started_for_openclaw_gets_agent_mains_entry_at_once() {
         &mut idle,
         Gateway::NotWanted,
         true,
-        &mut Runs::new(&lamp).runner(),
         &mut quiet(),
     );
     assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err());
 
-    let runs = Runs::new(&lamp);
     let mut down = Fake {
         gateway: Some("inactive"),
         active: Some("inactive"),
         ..Fake::default()
     };
-    keep_between_rounds(
-        lamp.root(),
-        &mut down,
-        Gateway::Wanted,
-        true,
-        &mut runs.runner(),
-        &mut quiet(),
-    );
+    let owed = keep_between_rounds(lamp.root(), &mut down, Gateway::Wanted, true, &mut quiet());
     assert!(down.asked.contains(&"start-gateway"), "{:?}", down.asked);
-    assert_eq!(
-        approvals(&runs),
-        [approvals_line("add", "main", SKILL_START)]
-    );
+    assert_eq!(owed, Some(true));
 
-    let runs = Runs::new(&lamp);
     let mut up = Fake {
         gateway: Some("active"),
         active: Some("inactive"),
         ..Fake::default()
     };
-    keep_between_rounds(
-        lamp.root(),
-        &mut up,
-        Gateway::Wanted,
-        true,
-        &mut runs.runner(),
-        &mut quiet(),
-    );
-    assert_eq!(
-        approvals(&runs),
-        Vec::<String>::new(),
-        "settled: nothing run"
-    );
+    let owed = keep_between_rounds(lamp.root(), &mut up, Gateway::Wanted, true, &mut quiet());
+    assert_eq!(owed, None, "settled: nothing owed");
 }
 
 /// #7868 (the first builder, 02:02, point 3), as #7268's `write_waiting`:
