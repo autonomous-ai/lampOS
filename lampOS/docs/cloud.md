@@ -111,6 +111,14 @@ against lamp-06c1.
   (the installed build, `<sequence>+<commit>`), `id`, `mac` (the lamp's
   `lamp-XXXX` name), `time`, `wakeword_enabled` and `voice_input_mode`, and
   `timezone` and `local_ip` when known.
+  - **`version`** is the build the lamp runs now (#8874): the `running` that
+    `lamp-update` last said on `update/status` (said at each round's end and
+    again every minute), looked at with the address and zone every 15 s. So
+    after an update the next ping and reply name the new build, with no
+    restart of `lamp-cloud`. Until `lamp-update` says one, or while what it
+    said has expired or cannot be read, it is the build in `state.json` when
+    `lamp-cloud` started. Both are said the same way, the commit's first
+    twelve characters after the sequence.
   - **`generation`** is how a Lamp 2 is told from V1's: the backend keeps one
     device type, `lamp`, for both, and routes a lamp by `device`, so that
     stays `lamp`. The backend keeps the `generation` of the unasked `info` on
@@ -318,8 +326,8 @@ is the same light. Two differences from V1 the page should know:
   writer, so the unit's path and the fields can't drift from setup's. The
   voice's key stays in `/etc/lampOS/voice/credential`.
 - **The unit** (`deploy/product/lamp-cloud.service`) runs it as `lampos` and
-  hands it those two files and `lamp-update`'s `state.json` (for the build)
-  through `LoadCredential=`, so no file is widened. It starts only once all
+  hands it those two files and `lamp-update`'s `state.json` (for the build
+  until `lamp-update` says one on the bus) through `LoadCredential=`, so no file is widened. It starts only once all
   three are there and setup is done. It sets
   `LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known` (#2562): beside it, the
   eyes' `tellable`, read as guard mode's named text goes. Read only, as
@@ -3762,9 +3770,6 @@ adds the key itself (`lamp_cloud::hermes_llm`).
   where the app's `lan_ip` comes from.
 - Whether the issued port is plain MQTT (V1's `mqtt://`) or TLS, and v5 or
   3.1.1. The client is built with rustls, unused while the port is plain.
-- `version` is the build when `lamp-cloud` started: `state.json` is handed
-  in at start, so after an update it says the new build once `lamp-cloud`
-  restarts with it.
 
 ## Tests
 
@@ -3781,7 +3786,8 @@ reply channel, another lamp's, longer, shorter, another case) done and
 answered only once, from `fa_channel`; a `faces.add_photo` with the
 largest photo read and answered, not dropped with the connection; a refused login backing off and said once; a dropped
 connection made and subscribed again. A backend in the test checks the ping's
-bearer and body, a failure said once, and a rotated broker kept. Not yet run
+bearer and body, a failure said once, a rotated broker kept, and the
+next ping after `lamp-update` says a new build naming it, with no restart. Not yet run
 against the company's broker or on a lamp.
 
 The three Wi-Fi reconnect fixtures keep their setup-helper socket open

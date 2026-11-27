@@ -2,7 +2,7 @@
 //! the volume through `lamp-actions`' socket (its only writer), the
 //! microphones and health from the bus, the person's light asked of the
 //! ring on the bus as anyone asks it, the build from `lamp-update`'s
-//! state, the network and the host from `/proc` and `/sys`. Nothing here
+//! state and status, the network and the host from `/proc` and `/sys`. Nothing here
 //! needs root.
 use crate::answer::{Lamp, Mic, PREVIEW_HOLDS, Volume};
 use lamp_bus::{Bus, Publisher, Subscriber};
@@ -65,7 +65,8 @@ pub struct Real {
     pub bus: Option<Bus>,
     /// The backend's device id.
     pub device_id: String,
-    /// The installed build, as `version` says it.
+    /// The installed build when lamp-cloud started, as `version` says it;
+    /// [`Real::build_now`] says the one the lamp runs now.
     pub build: String,
     /// The Wi-Fi's name, asked of `iw` within a bound and kept a while.
     pub wifi: Wifi,
@@ -334,11 +335,30 @@ pub fn build(state: &str) -> String {
     };
     let installed = &state["installed"];
     match (installed["sequence"].as_u64(), installed["commit"].as_str()) {
-        (Some(sequence), Some(commit)) => {
-            format!("{sequence}+{}", commit.get(..12).unwrap_or(commit))
-        }
+        (Some(sequence), Some(commit)) => said(sequence, commit),
         _ => String::new(),
     }
+}
+
+/// A build as `version` says it: `<sequence>+<commit>`, the commit's first
+/// twelve.
+fn said(sequence: u64, commit: &str) -> String {
+    format!("{sequence}+{}", commit.get(..12).unwrap_or(commit))
+}
+
+/// The build `lamp-update`'s status says the lamp runs, said as [`build`]
+/// says it; none when the status has expired, cannot be read, says a phase
+/// it could not have said, or names no build.
+pub fn running_build(status: &lamp_bus::Message) -> Option<String> {
+    if status.expired {
+        return None;
+    }
+    let status = status.parse::<lamp_msgs::UpdateStatus>().ok()?;
+    if !lamp_msgs::UpdateStatus::NOW.contains(&status.now.as_str()) {
+        return None;
+    }
+    let running = status.running?;
+    (!running.commit.is_empty()).then(|| said(running.sequence, &running.commit))
 }
 
 /// Looks at `lamp` again every `every` and sends its [`Real::identity`]
@@ -485,17 +505,27 @@ fn read(path: &Path) -> String {
 }
 
 impl Real {
-    /// What every reply and the ping say of the lamp: its address and zone
-    /// as they are now.
+    /// What every reply and the ping say of the lamp: its build, address
+    /// and zone as they are now.
     pub fn identity(&self) -> crate::wire::Identity {
         crate::wire::Identity {
             device: "lamp".into(),
-            version: self.build.clone(),
+            version: self.build_now(),
             id: self.device_id.clone(),
             mac: self.hostname(),
             timezone: self.timezone(),
             local_ip: self.local_ip(),
         }
+    }
+
+    /// The build the lamp runs now (#8874): the one `lamp-update` last said
+    /// on `update/status`, so an update shows without a restart of
+    /// lamp-cloud; else, before it says one, when its word has expired or
+    /// cannot be read, the build lamp-cloud started with.
+    pub fn build_now(&self) -> String {
+        self.latest(lamp_msgs::UpdateStatus::TOPIC)
+            .and_then(|status| running_build(&status))
+            .unwrap_or_else(|| self.build.clone())
     }
 
     pub fn hostname(&self) -> String {

@@ -412,9 +412,11 @@ fn main() -> ExitCode {
         )
     });
     let (identity_tx, me) = watch::channel(lamp.identity());
+    // The bus too, so the ping names the build lamp-update says the lamp
+    // runs now, not only the one it started with (#8874).
     let looking = Real {
         places: lamp.places.clone(),
-        bus: None,
+        bus: lamp.bus.clone(),
         device_id: lamp.device_id.clone(),
         build: lamp.build.clone(),
         wifi: Wifi::default(),
