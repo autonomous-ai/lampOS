@@ -438,6 +438,31 @@ yet run on a lamp.
   configured one.
 - **Off:** the kinds are "not on this lamp", the helper refuses, and the
   voice reads neither file, so the route is as it was.
+- **Every other line the lamp says (#8762's lamp row):** the say
+  service's lines (`/run/lampos-say/say.sock`: a Store app's or a paired
+  computer's exact words, a notice) and the cached fixed lines
+  (`say/tts_cache.rs`, the shutdown's, the sleep line, the owner's fixed
+  lines, the offline rings' clips) are rendered by the speech cache, which
+  reads the person's Gemini key and name the same way (`with_own_keys`),
+  so they are said in the person's Gemini voice too, at Google's own API in
+  `gemini-3.8-flash-lite-tts`; one journal line, "the speech cache keeps
+  its lines in the person's own Gemini voice, apart from the lamp's".
+  Before, only the answers were theirs: every such line was the lamp's
+  own ElevenLabs voice, on the lamp's account. Their key names the voice
+  that rendered them: `own-gemini:<voice>@<address>`, never the lamp's
+  lines or an ElevenLabs voice's. A refusal (401, 403, or a 400 its body
+  says is the key) is a render that failed, never kept under the person's
+  key: that line and every later one is said in the lamp's own voice, kept
+  under the lamp's key, until the voice starts again; one journal line,
+  "the speech cache: Gemini refused the person's own key or voice (HTTP
+  <status>)". The cache runs in the voice's main process, apart from the
+  route's worker, so it sees its own refusals, and says no notice line:
+  that one goes with an answer only. Any other failure (a 429, a
+  5xx, no sound within the render's bound) says that line in the lamp's
+  own voice, never left unsaid, and the next line asks the person's voice
+  again. A line not kept in the person's voice yet plays the lamp's kept
+  one, as for ElevenLabs. The app's voice preview in a named voice (#7485)
+  always uses the lamp's own key, never the person's.
 
 **Tests:** `crates/setup/src/keys.rs`
 (`the_gemini_voice_check_says_one_word_in_the_voice_with_the_key_in_its_header`),
@@ -462,6 +487,12 @@ yet run on a lamp.
 `crates/voice/src/second_provider/services.rs`
 (`the_persons_gemini_voice_failing_twice_or_refused_gives_way_to_the_lamps_own`,
 `the_persons_gemini_voice_is_never_near_and_keeps_the_lamps_voice_behind_it`),
+`crates/voice/src/say/tts_cache.rs`
+(`a_say_line_and_a_fixed_line_are_said_in_the_persons_gemini_voice_while_one_is_kept`,
+`a_refused_gemini_voice_says_its_line_in_the_lamps_own_and_keeps_it_as_the_lamps`,
+`a_gemini_voice_failing_a_line_says_that_line_in_the_lamps_own_and_asks_theirs_again`,
+`the_persons_gemini_render_asks_google_with_their_key_and_voice_and_reads_a_refusal`, and the pin
+`the_lamps_voice_and_the_persons_elevenlabs_voice_render_as_before`),
 `crates/voice/src/second_provider/probe.rs`
 (`an_own_gemini_voice_key_is_never_sent_to_the_relay`) and
 `crates/voice/src/second_provider/worker.rs`

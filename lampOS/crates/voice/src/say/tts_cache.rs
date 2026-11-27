@@ -97,6 +97,9 @@ pub type Lost = Box<dyn Fn() -> bool + Send + Sync>;
 struct Lamps {
     cache: TtsCache,
     lost: Lost,
+    /// Every line the person's voice fails is said in the lamp's, not only
+    /// once it is refused ([`TtsCache::giving_way_to`], #8762).
+    each_failure: bool,
 }
 
 /// The voice part of the cache's key: `voice` as it is, or, for the
@@ -108,6 +111,14 @@ pub fn own_voice(voice: &str, own_at: Option<&str>) -> String {
         Some(at) => format!("own:{voice}@{at}"),
         None => voice.to_owned(),
     }
+}
+
+/// The voice part of the cache's key for the person's own Gemini voice
+/// (#8754, #8762): its name with the address it is asked at, so their
+/// lines are never the lamp's, an ElevenLabs voice's ([`own_voice`]) or
+/// another name's.
+pub fn own_gemini_voice(voice: &str, at: &str) -> String {
+    format!("own-gemini:{voice}@{at}")
 }
 
 pub struct TtsCache {
@@ -182,7 +193,25 @@ impl TtsCache {
     /// was refused, every line is the lamp's, kept under the lamp's key,
     /// never theirs.
     pub fn falling_back_to(mut self, lamps: TtsCache, lost: Lost) -> Self {
-        self.lamps = Some(Box::new(Lamps { cache: lamps, lost }));
+        self.lamps = Some(Box::new(Lamps {
+            cache: lamps,
+            lost,
+            each_failure: false,
+        }));
+        self
+    }
+
+    /// [`Self::falling_back_to`] for the person's own Gemini voice (#8762),
+    /// as the reply path gives way (#8754): a line theirs fails for any
+    /// reason is said in the lamp's own voice, never left unsaid, and kept,
+    /// if at all, under the lamp's key; the next line asks theirs again,
+    /// until `lost` says it was refused.
+    pub fn giving_way_to(mut self, lamps: TtsCache, lost: Lost) -> Self {
+        self.lamps = Some(Box::new(Lamps {
+            cache: lamps,
+            lost,
+            each_failure: true,
+        }));
         self
     }
 
@@ -314,17 +343,19 @@ impl TtsCache {
     }
 
     /// `say` in the voice the lamp speaks in now (#8367): the person's own
-    /// until it is refused, then the lamp's own. A line the person's voice
-    /// was refused for is said again in the lamp's, and kept, if at all,
-    /// under the lamp's key only: the person's render has no fallback of its
-    /// own, so it never hands back the lamp's voice to keep under theirs.
+    /// until it is refused, then the lamp's own; for their Gemini voice
+    /// (#8762), the lamp's for any line theirs fails too. A line the
+    /// person's voice was refused for is said again in the lamp's, and
+    /// kept, if at all, under the lamp's key only: the person's render has
+    /// no fallback of its own, so it never hands back the lamp's voice to
+    /// keep under theirs.
     fn in_voice<T>(&self, say: impl Fn(&TtsCache) -> Result<T, String>) -> Result<T, String> {
         let Some(lamps) = &self.lamps else {
             return say(self);
         };
         if !(lamps.lost)() {
             match say(self) {
-                Err(_) if (lamps.lost)() => {}
+                Err(_) if lamps.each_failure || (lamps.lost)() => {}
                 said => return said,
             }
         }
@@ -803,6 +834,45 @@ fn render_with(
     })
 }
 
+/// `text` rendered whole in the person's own Gemini voice `own` (#8762),
+/// at `base_url` in [`crate::second_config::GEMINI_SPEECH_MODEL`], within
+/// [`render_within`], on a runtime of its own; `refused` is told the
+/// status Google refused their key with (401, 403, or 400 for a 400 its
+/// body says is the key).
+fn render_gemini(
+    base_url: &str,
+    own: &crate::second_config::OwnGeminiVoice,
+    text: &str,
+    refused: &dyn Fn(u16),
+) -> Result<Vec<i16>, String> {
+    use crate::second_provider::net::{Error, GeminiTts};
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|why| why.to_string())?;
+    runtime.block_on(async {
+        let whole = async {
+            let tts = GeminiTts::persons(
+                base_url,
+                crate::second_config::GEMINI_SPEECH_MODEL,
+                own.key.expose().trim(),
+                &own.voice,
+            )?;
+            let mut speech = tts.speak(text).await.inspect_err(|why| match why {
+                Error::Status(status @ (401 | 403)) => refused(*status),
+                Error::KeyInvalid => refused(400),
+                _ => {}
+            })?;
+            let mut samples = Vec::new();
+            while let Some(packet) = speech.next().await? {
+                samples.extend_from_slice(&packet);
+            }
+            Ok::<_, Error>(samples)
+        };
+        whole_within(text, whole).await
+    })
+}
+
 /// `config` with the lamp's own speech (#8367): as the route had it before
 /// the person's own voice, when that is set; else as it is.
 fn lamps_config(config: &crate::second_config::SecondConfig) -> crate::second_config::SecondConfig {
@@ -837,13 +907,130 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
     Some(cache)
 }
 
+/// Called with the status a speech service refused the person's own key
+/// or voice with.
+pub(crate) type Refused = Box<dyn Fn(u16) + Send + Sync>;
+
+/// How [`voiced`] renders its lines: through the speech services
+/// ([`Renderers::services`]), or stand-ins in tests.
+pub(crate) struct Renderers {
+    /// The configured voice of `config` (`tts_*`): the lamp's own, or the
+    /// person's own ElevenLabs voice put in its place (#8367).
+    pub configured: Box<dyn Fn(crate::second_config::SecondConfig, Refused) -> Render>,
+    /// The person's own Gemini voice (#8754, #8762), at Google's own API
+    /// in the speech model the keys helper checked.
+    pub gemini: Box<dyn Fn(crate::second_config::OwnGeminiVoice, Refused) -> Render>,
+}
+
+impl Renderers {
+    /// The speech services themselves, each line on a runtime of its own.
+    fn services() -> Self {
+        Self {
+            configured: Box::new(|config, refused| {
+                Box::new(move |text: &str| render_with(&config, text, &*refused))
+            }),
+            gemini: Box::new(|own, refused| {
+                Box::new(move |text: &str| {
+                    render_gemini(crate::second_config::GEMINI_BASE_URL, &own, text, &*refused)
+                })
+            }),
+        }
+    }
+}
+
+/// The speech cache over `dir` in the voice `own` (the route's
+/// configuration, `with_own_keys` read) speaks in, `settled` as the
+/// environment has it: the person's own voice over the lamp's when one is
+/// kept (#8367), else the lamp's own.
+pub(crate) fn voiced(
+    own: crate::second_config::SecondConfig,
+    dir: &Path,
+    renderers: Renderers,
+    settled: &dyn Fn(TtsCache) -> TtsCache,
+) -> TtsCache {
+    use crate::second_provider::net::{default_model, voice_name};
+    let lamps = lamps_config(&own);
+    let model = lamps
+        .tts_model
+        .clone()
+        .unwrap_or_else(|| default_model(lamps.tts_provider).to_owned());
+    let language = lamps.stt_language.clone().unwrap_or_default();
+    let lamps_voice = voice_name(lamps.tts_provider, lamps.tts_voice.as_deref()).to_owned();
+    let configured = &renderers.configured;
+    let lamps_cache = |lamps: crate::second_config::SecondConfig| {
+        let render = configured(lamps, Box::new(|_| {}));
+        settled(TtsCache::new(dir, &lamps_voice, &model, &language, render))
+    };
+    // The person's own Gemini voice (#8762): every line the cache says, an
+    // exact one through the say service or a fixed one, in their voice, as
+    // the route's answers are (#8754); before, all of them were the lamp's.
+    // `with_own_keys` keeps it alone, never beside their ElevenLabs voice.
+    if let Some(gemini) = own.hosted.own_gemini_voice.clone() {
+        let voice = own_gemini_voice(&gemini.voice, crate::second_config::GEMINI_BASE_URL);
+        let lost = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let refused = Arc::clone(&lost);
+        let render = (renderers.gemini)(
+            gemini,
+            Box::new(move |status| {
+                if !refused.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                    eprintln!(
+                        "lamp-voice: the speech cache: Gemini refused the person's own key or voice (HTTP {status}); its lines are the lamp's own voice, kept as the lamp's, until the voice starts again (LAMP_OWN_KEYS)"
+                    );
+                }
+            }),
+        );
+        eprintln!(
+            "lamp-voice: the speech cache keeps its lines in the person's own Gemini voice, apart from the lamp's (LAMP_OWN_KEYS)"
+        );
+        return settled(TtsCache::new(
+            dir,
+            &voice,
+            crate::second_config::GEMINI_SPEECH_MODEL,
+            &language,
+            render,
+        ))
+        .giving_way_to(
+            lamps_cache(lamps),
+            Box::new(move || lost.load(std::sync::atomic::Ordering::Acquire)),
+        );
+    }
+    if own.hosted.lamps_voice.is_some() {
+        let mut own = own;
+        own.hosted.lamps_voice = None;
+        let voice = own_voice(
+            voice_name(own.tts_provider, own.tts_voice.as_deref()),
+            Some(&own.tts_base_url),
+        );
+        let lost = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let refused = Arc::clone(&lost);
+        let render = configured(
+            own,
+            Box::new(move |status| {
+                if !refused.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                    eprintln!(
+                        "lamp-voice: the speech cache: ElevenLabs refused the person's own key or voice (HTTP {status}); its lines are the lamp's own voice, kept as the lamp's, until the voice starts again (LAMP_OWN_KEYS)"
+                    );
+                }
+            }),
+        );
+        eprintln!(
+            "lamp-voice: the speech cache keeps its lines in the person's own voice, apart from the lamp's (LAMP_OWN_KEYS)"
+        );
+        settled(TtsCache::new(dir, &voice, &model, &language, render)).falling_back_to(
+            lamps_cache(lamps),
+            Box::new(move || lost.load(std::sync::atomic::Ordering::Acquire)),
+        )
+    } else {
+        lamps_cache(lamps)
+    }
+}
+
 /// The cache over the second route's speech service, when it is
 /// configured, as [`from_environment`] makes it but on its own and with
 /// nothing warmed: for the Schedule consumer, which renders the offline
 /// rings' clips through it (`crate::ring_clips`, #8708) and keeps no line
 /// of the speech cache.
 pub fn built_from_environment() -> Option<TtsCache> {
-    use crate::second_provider::net::{default_model, voice_name};
     let config = match crate::second_config::load_from_env().and_then(|config| {
         config
             .map(|config| config.with_environment(|name| std::env::var_os(name)))
@@ -864,11 +1051,6 @@ pub fn built_from_environment() -> Option<TtsCache> {
         std::env::var_os(crate::second_config::CREDENTIALS_ENV).as_deref(),
     );
     let lamps = lamps_config(&own);
-    let model = lamps
-        .tts_model
-        .clone()
-        .unwrap_or_else(|| default_model(lamps.tts_provider).to_owned());
-    let language = lamps.stt_language.clone().unwrap_or_default();
     let settled = |cache: TtsCache| {
         cache
             .speaking(crate::language::at_start())
@@ -895,39 +1077,7 @@ pub fn built_from_environment() -> Option<TtsCache> {
                 render_with(&config, text, &|_| {})
             }) as RenderIn
         });
-    let lamps_voice = voice_name(lamps.tts_provider, lamps.tts_voice.as_deref()).to_owned();
-    let lamps_cache = |lamps: crate::second_config::SecondConfig| {
-        let render: Render = Box::new(move |text: &str| render_with(&lamps, text, &|_| {}));
-        settled(TtsCache::new(DIR, &lamps_voice, &model, &language, render))
-    };
-    let cache = if own.hosted.lamps_voice.is_some() {
-        let mut own = own;
-        own.hosted.lamps_voice = None;
-        let voice = own_voice(
-            voice_name(own.tts_provider, own.tts_voice.as_deref()),
-            Some(&own.tts_base_url),
-        );
-        let lost = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let refused = Arc::clone(&lost);
-        let render: Render = Box::new(move |text: &str| {
-            render_with(&own, text, &|status| {
-                if !refused.swap(true, std::sync::atomic::Ordering::AcqRel) {
-                    eprintln!(
-                        "lamp-voice: the speech cache: ElevenLabs refused the person's own key or voice (HTTP {status}); its lines are the lamp's own voice, kept as the lamp's, until the voice starts again (LAMP_OWN_KEYS)"
-                    );
-                }
-            })
-        });
-        eprintln!(
-            "lamp-voice: the speech cache keeps its lines in the person's own voice, apart from the lamp's (LAMP_OWN_KEYS)"
-        );
-        settled(TtsCache::new(DIR, &voice, &model, &language, render)).falling_back_to(
-            lamps_cache(lamps),
-            Box::new(move || lost.load(std::sync::atomic::Ordering::Acquire)),
-        )
-    } else {
-        lamps_cache(lamps)
-    };
+    let cache = voiced(own, Path::new(DIR), Renderers::services(), &settled);
     let cache = match render_in {
         Some(render_in) => cache.speaking_in(render_in),
         None => cache,
@@ -1555,5 +1705,316 @@ mod tests {
         let (lamps, calls) = counted(&dir, "Rachel");
         assert_eq!(lamps.samples("Hello.").unwrap(), said);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    /// What the stand-in voices of [`stand_ins`] were asked, in order:
+    /// `lamp:<voice>`, `persons:<voice>` (the person's ElevenLabs voice) or
+    /// `gemini:<voice>` (the person's Gemini voice, #8754).
+    type Asked = Arc<std::sync::Mutex<Vec<String>>>;
+
+    /// How the person's Gemini stand-in answers.
+    #[derive(Clone, Copy)]
+    enum Google {
+        Speaks,
+        Refuses,
+        Fails,
+    }
+
+    /// The lamp's own voice says `[1; 2_400]`, the person's ElevenLabs
+    /// voice `[3; 2_400]`, their Gemini voice `[2; 2_400]`, as `google`
+    /// says; each asking is kept in the returned list.
+    fn stand_ins(google: Google) -> (Renderers, Asked) {
+        let asked: Asked = Arc::default();
+        let seen = Arc::clone(&asked);
+        let configured = Box::new(
+            move |config: crate::second_config::SecondConfig, _: Refused| -> Render {
+                let seen = Arc::clone(&seen);
+                Box::new(move |_: &str| {
+                    let voice = config.tts_voice.clone().unwrap_or_default();
+                    let persons = config.tts_base_url == ELEVENLABS;
+                    let who = if persons { "persons" } else { "lamp" };
+                    seen.lock().unwrap().push(format!("{who}:{voice}"));
+                    Ok(vec![if persons { 3 } else { 1 }; 2_400])
+                })
+            },
+        );
+        let seen = Arc::clone(&asked);
+        let gemini = Box::new(
+            move |own: crate::second_config::OwnGeminiVoice, refused: Refused| -> Render {
+                let seen = Arc::clone(&seen);
+                Box::new(move |_: &str| {
+                    seen.lock().unwrap().push(format!("gemini:{}", own.voice));
+                    match google {
+                        Google::Speaks => Ok(vec![2; 2_400]),
+                        Google::Refuses => {
+                            refused(401);
+                            Err("HTTP 401".into())
+                        }
+                        Google::Fails => Err("HTTP 503".into()),
+                    }
+                })
+            },
+        );
+        (Renderers { configured, gemini }, asked)
+    }
+
+    /// A route speaking with the lamp's own ElevenLabs voice ("Rachel")
+    /// through the relay, as `second.json` has it.
+    fn route(name: &str) -> crate::second_config::SecondConfig {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch(&format!("route-{name}"));
+        let private = |path: &Path, text: &str| {
+            fs::write(path, text).unwrap();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+        };
+        let credential = dir.join("llm.key");
+        private(&credential, "k-relay");
+        let file = dir.join("second.json");
+        private(
+            &file,
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/api/v1/ai","llm_model":"m","llm_credential_file":"{}","tts_provider":"elevenlabs","tts_voice":"Rachel","stt_language":"en"}}"#,
+                credential.display()
+            ),
+        );
+        crate::second_config::load_from_path(&file).unwrap()
+    }
+
+    /// [`route`] with the person's own Gemini voice kept ("Kore"), as
+    /// `with_own_keys` reads it (#8754).
+    fn with_gemini(name: &str) -> crate::second_config::SecondConfig {
+        let mut route = route(name);
+        route.hosted.own_gemini_voice = Some(crate::second_config::OwnGeminiVoice {
+            key: crate::second_config::Key::for_test("AIza-planted-8754"),
+            voice: "Kore".into(),
+        });
+        route
+    }
+
+    /// The lamp's own key for `text`, as its cache keys it.
+    fn lamps_key(dir: &Path, text: &str) -> String {
+        use crate::second_config::TtsProvider::ElevenLabs;
+        let voice = crate::second_provider::net::voice_name(ElevenLabs, Some("Rachel"));
+        let model = crate::second_provider::net::default_model(ElevenLabs);
+        let render: Render = Box::new(|_: &str| Ok(vec![]));
+        TtsCache::new(dir, voice, model, "en", render).key(text)
+    }
+
+    /// The test lamp's row on #8762: with the person's Gemini voice kept,
+    /// a Store app's exact line through the say service
+    /// (`ok, to the voice, by say.sock`) and the lamp's cached fixed lines
+    /// were rendered by the lamp's own ElevenLabs voice. Both are theirs,
+    /// in Gemini, the fixed line kept under a key of its own
+    /// (`own-gemini:<voice>@<address>`), never the lamp's or an ElevenLabs
+    /// voice's; the lamp's voice is never asked.
+    #[test]
+    fn a_say_line_and_a_fixed_line_are_said_in_the_persons_gemini_voice_while_one_is_kept() {
+        let dir = scratch("own_gemini_said");
+        let (renderers, asked) = stand_ins(Google::Speaks);
+        let cache = Arc::new(voiced(with_gemini("said"), &dir, renderers, &|cache| cache));
+        let exact = "ok, to the voice, by say.sock";
+        match cache.render_played(exact, None).unwrap() {
+            Played::Whole(samples) => assert_eq!(samples, vec![2; 2_400], "their Gemini voice"),
+            Played::Pieces(_) => panic!("a short line is rendered whole"),
+        }
+        assert_eq!(cache.render_once(exact).unwrap(), vec![2; 2_400]);
+        let fixed = cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap();
+        assert_eq!(fixed, vec![2; 2_400]);
+        assert_eq!(*asked.lock().unwrap(), ["gemini:Kore"; 3]);
+        assert!(
+            cache.identity().starts_with(&format!(
+                "own-gemini:Kore@{}|{}|",
+                crate::second_config::GEMINI_BASE_URL,
+                crate::second_config::GEMINI_SPEECH_MODEL
+            )),
+            "{}",
+            cache.identity()
+        );
+        assert_eq!(
+            kept_names(&dir),
+            [format!("{}.wav", cache.key(lamp_msgs::GOING_TO_SLEEP))]
+        );
+        assert_ne!(
+            cache.key(lamp_msgs::GOING_TO_SLEEP),
+            lamps_key(&dir, lamp_msgs::GOING_TO_SLEEP)
+        );
+        assert_eq!(cache.kept(lamp_msgs::GOING_TO_SLEEP), Some(fixed));
+    }
+
+    /// As the reply path does (#8754): Google refusing the person's key
+    /// says the line in the lamp's own voice, kept under the lamp's key
+    /// only, and every line after is the lamp's, theirs never asked again
+    /// in this run; the refusal is the process's one.
+    #[test]
+    fn a_refused_gemini_voice_says_its_line_in_the_lamps_own_and_keeps_it_as_the_lamps() {
+        let dir = scratch("own_gemini_refused");
+        let (renderers, asked) = stand_ins(Google::Refuses);
+        let cache = voiced(with_gemini("refused"), &dir, renderers, &|cache| cache);
+        let said = cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap();
+        assert_eq!(said, vec![1; 2_400], "the lamp's own voice");
+        assert_eq!(
+            kept_names(&dir),
+            [format!(
+                "{}.wav",
+                lamps_key(&dir, lamp_msgs::GOING_TO_SLEEP)
+            )]
+        );
+        assert_eq!(cache.render_once("Build passed.").unwrap(), vec![1; 2_400]);
+        assert_eq!(cache.kept(lamp_msgs::GOING_TO_SLEEP), Some(said));
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["gemini:Kore", "lamp:Rachel", "lamp:Rachel"]
+        );
+    }
+
+    /// A line the person's Gemini voice fails for another reason (a 429, a
+    /// 5xx, no sound in time) is said in the lamp's own voice, never left
+    /// unsaid, and kept, if a fixed line, under the lamp's key; the next
+    /// line asks theirs again.
+    #[test]
+    fn a_gemini_voice_failing_a_line_says_that_line_in_the_lamps_own_and_asks_theirs_again() {
+        let dir = scratch("own_gemini_failed");
+        let (renderers, asked) = stand_ins(Google::Fails);
+        let cache = voiced(with_gemini("failed"), &dir, renderers, &|cache| cache);
+        assert_eq!(cache.render_once("Build passed.").unwrap(), vec![1; 2_400]);
+        assert_eq!(
+            cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            vec![1; 2_400]
+        );
+        assert_eq!(
+            kept_names(&dir),
+            [format!(
+                "{}.wav",
+                lamps_key(&dir, lamp_msgs::GOING_TO_SLEEP)
+            )]
+        );
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["gemini:Kore", "lamp:Rachel", "gemini:Kore", "lamp:Rachel"]
+        );
+    }
+
+    /// Pinned: with no own voice the lamp's says every line under its key
+    /// as before; with the person's ElevenLabs voice (#8367) theirs says
+    /// it, keyed `own:<voice_id>@<address>`.
+    #[test]
+    fn the_lamps_voice_and_the_persons_elevenlabs_voice_render_as_before() {
+        let dir = scratch("own_none_or_elevenlabs");
+        let (renderers, asked) = stand_ins(Google::Speaks);
+        let lamps = voiced(route("none"), &dir, renderers, &|cache| cache);
+        assert_eq!(lamps.samples("Hello.").unwrap(), vec![1; 2_400]);
+        assert_eq!(lamps.key("Hello."), lamps_key(&dir, "Hello."));
+
+        let mut own = route("elevenlabs");
+        own.hosted.lamps_voice = Some(crate::second_config::LampsVoice {
+            base_url: std::mem::replace(&mut own.tts_base_url, ELEVENLABS.to_owned()),
+            key: std::mem::replace(
+                &mut own.tts_key,
+                crate::second_config::Key::for_test("sk-planted"),
+            ),
+            voice: own.tts_voice.replace("abc123".into()),
+        });
+        let (renderers, persons) = stand_ins(Google::Speaks);
+        let cache = voiced(own, &dir, renderers, &|cache| cache);
+        assert_eq!(cache.samples("Hello.").unwrap(), vec![3; 2_400]);
+        assert!(
+            cache
+                .identity()
+                .starts_with(&format!("own:abc123@{ELEVENLABS}|"))
+        );
+        assert_eq!(*asked.lock().unwrap(), ["lamp:Rachel"]);
+        assert_eq!(*persons.lock().unwrap(), ["persons:abc123"]);
+    }
+
+    /// A loopback stand-in for Google that answers one request with
+    /// `answer`: its address, and the request it read (head and body).
+    fn google_once(answer: Vec<u8>) -> (String, std::thread::JoinHandle<String>) {
+        use std::io::Read;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let served = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut seen = Vec::new();
+            let mut buf = [0; 4096];
+            loop {
+                let n = stream.read(&mut buf).unwrap();
+                seen.extend_from_slice(&buf[..n]);
+                let text = String::from_utf8_lossy(&seen).into_owned();
+                if let Some(head_end) = text.find("\r\n\r\n") {
+                    let length = text[..head_end]
+                        .lines()
+                        .find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse::<usize>().ok())?
+                        })
+                        .unwrap_or(0);
+                    if seen.len() >= head_end + 4 + length || n == 0 {
+                        break;
+                    }
+                } else if n == 0 {
+                    break;
+                }
+            }
+            stream.write_all(&answer).unwrap();
+            String::from_utf8_lossy(&seen).into_owned()
+        });
+        (url, served)
+    }
+
+    /// The render behind the person's Gemini lines (#8762) asks Google's
+    /// speech model with their key in its header and their voice's name,
+    /// and hands back its 24 kHz samples whole; a refusal of their key is
+    /// told with its status, so the cache gives way to the lamp's voice.
+    #[test]
+    fn the_persons_gemini_render_asks_google_with_their_key_and_voice_and_reads_a_refusal() {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        let own = crate::second_config::OwnGeminiVoice {
+            key: crate::second_config::Key::for_test("AIza-planted-8762\n"),
+            voice: "Kore".into(),
+        };
+        let pcm: Vec<u8> = [5i16, 6, 7].iter().flat_map(|s| s.to_le_bytes()).collect();
+        let event = serde_json::json!({"candidates": [{"content": {"parts": [
+            {"inlineData": {"mimeType": "audio/l16; rate=24000; channels=1",
+                "data": STANDARD.encode(pcm)}}
+        ]}}]});
+        let mut answer =
+            b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n"
+                .to_vec();
+        answer.extend_from_slice(format!("data: {event}\n\n").as_bytes());
+        let (url, served) = google_once(answer);
+        let statuses = std::sync::Mutex::new(Vec::new());
+        let said = render_gemini(&url, &own, "ok, to the voice, by say.sock", &|status| {
+            statuses.lock().unwrap().push(status)
+        })
+        .unwrap();
+        assert_eq!(said, [5, 6, 7]);
+        let asked = served.join().unwrap();
+        assert!(
+            asked.starts_with(&format!(
+                "POST /models/{}:streamGenerateContent?alt=sse ",
+                crate::second_config::GEMINI_SPEECH_MODEL
+            )),
+            "{asked}"
+        );
+        assert!(
+            asked
+                .to_ascii_lowercase()
+                .contains("x-goog-api-key: aiza-planted-8762\r\n")
+        );
+        assert!(asked.contains(r#""voiceName":"Kore""#), "{asked}");
+        assert!(asked.contains("ok, to the voice, by say.sock"));
+
+        let (url, served) = google_once(
+            b"HTTP/1.1 401 Unauthorized\r\ncontent-length: 0\r\nconnection: close\r\n\r\n".to_vec(),
+        );
+        assert!(
+            render_gemini(&url, &own, "Hello.", &|status| {
+                statuses.lock().unwrap().push(status)
+            })
+            .is_err()
+        );
+        served.join().unwrap();
+        assert_eq!(*statuses.lock().unwrap(), [401]);
     }
 }
