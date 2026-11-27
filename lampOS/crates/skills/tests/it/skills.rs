@@ -13959,6 +13959,71 @@ fn a_muted_lamps_unheard_nudge_retries_no_sooner_than_30_s() {
     }
 }
 
+/// Twelve's HOLD on #8868 (rule 8, a living thing, not a machine): a lamp
+/// muted at 30 minutes, with Rest your eyes and A sip of water due
+/// together there and Stretch break at 50. Each line is never heard and
+/// keeps its chance, with no cap on its tries (the owner: "No limit"), but
+/// two different nudges' tries are never within the owner's minute of each
+/// other, so they never fire in a burst; each still tries again, and one
+/// nudge's own tries are 30 s apart at the soonest.
+#[test]
+fn unheard_nudges_due_together_retry_a_minute_apart_and_each_retries() {
+    let skills: Vec<lamp_skills::Skill> = ["rest-your-eyes", "sip-of-water", "stretch-break"]
+        .iter()
+        .map(|name| lamp_skills::load_with(&skills_root().join(name), true).unwrap())
+        .collect();
+    let mut engine = Engine::new(skills, true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut tries: Vec<(u64, String)> = Vec::new();
+    for second in 0..=70 * 60u64 {
+        let now = second * 1_000_000;
+        let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        for run in engine.observe("humans/faces/tracked", now, faces.as_bytes(), None) {
+            if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
+                tries.push((second, run.skill.clone()));
+                // Muted: the say refused, never heard.
+                engine.unsaid(&run.skill, now);
+            }
+        }
+    }
+    // Never two different nudges' tries within a minute.
+    for (at, (second, skill)) in tries.iter().enumerate() {
+        for (other_second, other) in &tries[at + 1..] {
+            if other != skill {
+                assert!(other_second - second >= 60, "{tries:?}");
+            }
+        }
+    }
+    // One nudge's own tries: 30 s apart at the soonest.
+    for name in ["rest-your-eyes", "sip-of-water", "stretch-break"] {
+        let mine: Vec<u64> = tries
+            .iter()
+            .filter(|(_, skill)| skill == name)
+            .map(|(second, _)| *second)
+            .collect();
+        // Each tries again while they sit, unheard.
+        assert!(mine.len() >= 3, "{name}: {tries:?}");
+        for pair in mine.windows(2) {
+            assert!(pair[1] - pair[0] >= 30, "{name}: {tries:?}");
+        }
+    }
+    let first = |name: &str| tries.iter().find(|(_, skill)| skill == name).unwrap().0;
+    assert!(
+        (30 * 60..30 * 60 + 5).contains(&first("rest-your-eyes")),
+        "{tries:?}"
+    );
+    assert!(
+        (31 * 60..31 * 60 + 5).contains(&first("sip-of-water")),
+        "{tries:?}"
+    );
+}
+
 /// The Reviewer-lead's P3 on #8868: a `[stop] group` member with no `apart`
 /// of its own (Posture, once #8377 lands: no nudge) is never held a minute
 /// by another member's, nor holds one. A sip of water with its `apart`

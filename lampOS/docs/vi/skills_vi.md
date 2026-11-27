@@ -7157,8 +7157,13 @@ nhóm `[budget]` (`Stop::apart_us`, `Engine::apart_ran`): cơ hội của nó đ
 giữ và được lấy khi khoảng đó đã qua, nếu trigger vẫn còn giữ. Chỉ lần chạy
 được tính mới đặt và bị cản bởi mốc này (từ của `follows` thì không). Không
 có số đếm nào: không theo giờ, không theo ngày. Một câu không ai nghe
-(`Engine::unsaid`) xóa mốc của thành viên đó, nên nó không giữ thành viên
-khác cách một phút. Không có khóa thì là 0, như trước. Cả chín lời nhắc
+(`Engine::unsaid`) vẫn giữ mốc (HOLD của Twelve trên #8868, quy tắc 8): lần
+thử lại của nó, sau `UNHEARD_RETRY_US` (30 s), không bị chính mốc của nó
+cản, nhưng thành viên khác vẫn chờ đủ một phút, và các thành viên bị giữ
+chờ theo thứ tự ai đến trước (`Engine::apart_waits`, như `budget-first`
+của `[budget]`), nên trên đèn tắt tiếng các lời nhắc đến cùng lúc thử lại
+cách nhau một phút, lần lượt từng cái, không giới hạn số lần thử (kiểm thử
+`unheard_nudges_due_together_retry_a_minute_apart_and_each_retries`). Không có khóa thì là 0, như trước. Cả chín lời nhắc
 wellbeing (sip-of-water, comfort-break, stand-up, stretch-break,
 rest-your-eyes, sit-back, wind-down, meal-check, quiet-focus) ghi `group =
 "wellbeing"` và `apart = "1m"`: không lời nào trong vòng một phút sau câu
@@ -7198,7 +7203,11 @@ nhau một phút. Không kỹ năng đi kèm nào còn giữ một nhóm `[budge
 (60, 135, 210); rời đi rồi quay lại thì bắt đầu đếm 60 phút mới. Ca mới:
 `again-75-minutes-later-while-they-stay`,
 `present-again-75-minutes-later-while-they-stay` và
-`a-new-sitting-counts-60-minutes-afresh`.
+`a-new-sitting-counts-60-minutes-afresh`. Câu của nó nói "for a while",
+không nêu thời lượng, nên lần nhắc ở phút 135 và 210 không bao giờ nói
+"about an hour" (P3 của Twelve trên #8868). Nó mang `about` mà cả chín lời
+nhắc wellbeing dùng chung, từng byte, nên kỹ năng nào đứng đầu theo thứ tự
+thư mục thì mô hình vẫn được nói cùng một câu; Posture giữ `about` riêng.
 
 ## Chủ đề người ở bàn đang làm gì (#6543, chưa có bên phát)
 
