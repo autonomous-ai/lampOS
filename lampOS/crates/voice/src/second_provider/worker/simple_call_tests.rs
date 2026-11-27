@@ -581,3 +581,46 @@ fn simple_call_a_french_lamps_call() {
     assert!(!calls_in(French, "La lampe est cassée."));
     assert!(!calls_in(French, "Thème de la soirée ?"));
 }
+
+/// `LAMP_SIMPLE_CALL_HEARD` (in no product unit; its ROW is lamp-dbda's
+/// round 2): on lamp-dbda on 27 Nov strict words held 10 of 10 calls that
+/// speech to text wrote "Hey, Lynn.", "Hello, ma'am." or "Hey, man." while
+/// lamp-name heard 8 of 9 at 0.92 to 1.00. With the sub-switch, a greeting in
+/// the words and lamp-name's hearing of the line's own start at 0.95 or more
+/// call: "Hey, Lynn." at 0.98 calls with it and is held without it. "Hey
+/// man, what's up?" at 0.905 is held; "OK Lamp" at 1.000 and "Lamp, what time
+/// is it?" at 0.999, with no greeting, are held at any score.
+#[test]
+fn simple_call_heard_a_greeting_and_a_sure_start_hearing_call() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let call = |heard_on: bool, heard: &str, score: f32| {
+        let mut heeding = heeding(true, None);
+        if heard_on {
+            heeding.taking_simple_calls_heard();
+        }
+        let now = monotonic_us();
+        let names = vec![(now + 100_000, score)];
+        judged(
+            &mut heeding,
+            9,
+            now,
+            heard,
+            signs(None, Room::Unknown, names),
+        )
+    };
+    let held = Some(crate::second_provider::SIMPLE_HELD);
+    assert_eq!(
+        call(true, "Hey, Lynn.", 0.98),
+        None,
+        "on: a greeting, heard at 0.98"
+    );
+    assert_eq!(call(false, "Hey, Lynn.", 0.98), held, "off: strict words");
+    assert_eq!(call(true, "Hey man, what's up?", 0.905), held, "under 0.95");
+    assert_eq!(call(true, "OK Lamp", 1.0), held, "no greeting");
+    assert_eq!(
+        call(true, "Lamp, what time is it?", 0.999),
+        held,
+        "no greeting"
+    );
+}
