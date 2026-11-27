@@ -407,47 +407,125 @@ skills off.
 
 ## Publish your app
 
-**Staged:** built against the Store's developer API as Backend3 specified it on
+**Live:** the Store's developer upload has been on in production since
 20 Nov ([#7415](https://github.com/autonomous-ai/lampOS/issues/7415#issuecomment-7035102128)),
-live on production and checked there end to end on staging; this SDK has been
-run only against a fake Store so far. An app (format 2,
-[docs/apps.md](../../docs/apps.md)) goes to the Skills Store; a skill
-(format 1) goes on through the lamp (`lamp skill push`). Uploads are hidden
-until a reviewer approves them, and public only after a separate ask.
+and apps have been submitted to it with this CLI. Every SDK app goes to the
+Store this way: `lamp login`, `lamp app check`, `lamp app pack`,
+`lamp app submit`, `lamp app status`, `lamp app request-public`. An app
+(format 2, [docs/apps.md](../../docs/apps.md)) goes to the Skills Store; a
+skill (format 1) goes on through the lamp (`lamp skill push`).
+
+**Where it goes:** production, with nothing to set. The CLI signs in at
+`https://apiv2.autonomous.ai/api/v1/customers` and uploads to
+`https://campaign-api.autonomous.ai/api/v1/skills-store/developer`
+(`PRODUCTION` in `lampos/store.py`).
 
 An app's folder holds `app.json` (the manifest without `format`, `kind` and
 `files`), `src/` (its Python), `assets/` (WAV clips) and `skills/` (its
 companion skills). `name` defaults to the folder's; `skills` and `assets` to
 what is there.
 
+### The commands
+
 ```sh
-lamp app check gym-coach            # as the Store's reader checks it, less the signature
-lamp app pack gym-coach             # gym-coach-1.0.0.tar, unsigned: the Store signs it at approval
 lamp login                          # your Autonomous account: an emailed code, never a password
-lamp app submit gym-coach --icon icon.png --cover cover.png --title "Gym coach" --category health
-lamp app status                     # pending, approved or rejected, with the reviewer's note
-lamp app request-public 42          # only for an approved app; the reviewers decide
+lamp app check gym-coach            # as the Store's reader checks it, less the signature: "gym-coach: ok, an app (format 2)"
+lamp app pack gym-coach             # writes gym-coach-1.0.0.tar, unsigned: the Store signs it at approval
+lamp app submit gym-coach --icon icon.png --cover cover.png --title "Gym coach"
+lamp app status                     # each app: id, name and version, review, listing, the reviewer's note
+lamp app request-public 42          # only for an approved app: asks staff to make it public
 lamp app studio                     # the same, as a page on this computer
 ```
 
-- **Sign-in:** `lamp login` asks the email, has the account send a code, and
-  asks the code. The token is kept in `~/.config/lampos/store.json`
-  (`$LAMPOS_HOME`), 0600, one per account host, so a staging token never
-  goes to production; codes are rate-limited, so it is kept rather than asked
-  each time. `LAMP_STORE_TOKEN` (or `lamp login --token`) gives one instead.
-  `lamp logout` forgets it.
-- **Submit** runs `lamp app check` first: a package it refuses, an icon not
-  exactly 1024x1024 PNG, a cover not 1600x900, art over 2 MB, a title over
-  100 or a description over 1000 characters is refused here, before anything
-  is sent. A folder is packed for you; a `.tar` goes as it is. The same bytes
-  again answer the same app.
-- **The Store's refusals** are said with what to do: `lampos_package_invalid`
-  with the Store's own reason; `skill_name_exists` (the name is another
-  account's); `developer_app_only` (a skill); `authentication_error` and
-  `device_key_refused` (sign in again); `app_not_found`, `app_not_approved`,
-  `app_already_public`; and the day's limits per account,
-  `developer_daily_limit` (10 accepted uploads), `developer_attempt_limit`
-  (30 attempts), `developer_public_limit` (3 public asks).
+- **`lamp login`** asks your account's email, has the account email you a
+  code, and asks the code (`--email you@example.com` and `--code` skip the
+  questions). The token is kept in `~/.config/lampos/store.json` (under
+  `$LAMPOS_HOME` when it is set), a 0600 file in a 0700 folder, one entry
+  per account host, so a staging token never goes to production. Codes are
+  rate-limited, so the token is kept rather than asked each time.
+  `LAMP_STORE_TOKEN` (or `lamp login --token`) gives one instead.
+  `lamp logout` forgets it. Sign in as yourself: a lamp's key is refused.
+- **`lamp app check FOLDER|TAR`** checks a folder or a packed tar as the
+  Store's reader does, less the signature, with no network. It prints each
+  error and warning; exit 1 if any is refused.
+- **`lamp app pack FOLDER [-o TAR]`** writes the unsigned tar,
+  `NAME-VERSION.tar` by default, and prints its size and sha256.
+- **`lamp app submit FOLDER|TAR`** runs the check first, packs a folder for
+  you (a `.tar` goes as it is), and uploads it. Optional: `--icon` (PNG,
+  exactly 1024x1024, 2 MB at most), `--cover` (PNG, exactly 1600x900, 2 MB at
+  most), `--title` (plain text, up to 100 characters; the package's title
+  if left out), `--description` (plain text, up to 1000 characters; the
+  README if left out), and `--category` (optional: the Store sets the final
+  category at review, so leave it out unless the Store asks for one). A
+  package over 18 MiB, a refused check, wrong art or too long a listing is
+  refused here, before anything is sent, so it costs none of the day's
+  attempts. Sending the same bytes again answers the same app, not a
+  duplicate. Only apps are taken here.
+- **`lamp app status [ID]`** lists your apps, or one, a line each:
+  `42  gym-coach 1.0.0  pending  unlisted`, then the reviewer's note.
+- **`lamp app request-public ID`** asks for an approved app to go public.
+
+### Review, signing and going public
+
+- **The package is unsigned until approval.** `pack` and `submit` never
+  sign; a developer never signs. A reviewer approves the app and **the
+  Store signs it at approval**. Until then it is waiting for review and
+  not listed. A new icon or cover waits for review too.
+- **What `status` shows:** the review, `pending` (waiting for a reviewer),
+  `approved` or `rejected` (the reviewer's note says why: fix it and submit
+  again); the listing, `unlisted` or `public`; and `public asked` once going
+  public was asked for.
+- **Going public:** only an approved app can ask, with
+  `lamp app request-public ID`. The ask tells staff and changes nothing by
+  itself; asking again changes nothing. Staff decide, after a test on a lamp
+  and the first builder's yes. The developer can only ask.
+- **A new version:** raise `version` (`MAJOR.MINOR.PATCH`) in `app.json`
+  above the one listed, pack and submit again; it is reviewed and signed
+  like the first. A lamp installs only a newer version than it has (the
+  same one is "already installed", an older one "is older than the one
+  installed").
+- **`min_build`:** the lowest lamp build (the sequence before the `+` in
+  `lamp.build`) the app runs on; a lamp below it refuses to install the app.
+  An app that uses a newer manifest field (`help`, `npu`, `tools`) sets
+  `min_build` to a build that reads it, or older lamps refuse the manifest
+  ([docs/apps.md](../../docs/apps.md)).
+
+### The Store's refusals
+
+Each is a `StoreError` (a `LampError`), printed as `lamp: ...` with what to
+do; its `code` is the Store's `error_code`:
+
+| code | what to do |
+|---|---|
+| `authentication_error` | not signed in, or the sign-in ran out: `lamp login` again |
+| `device_key_refused` | a lamp's key was used: `lamp login` with your own Autonomous account |
+| `lampos_package_invalid` | the Store's check refused the package; its reason leads the message (`lamp app check` prints the same): fix what it names and submit again |
+| `skill_name_exists` | the name is another account's: change `name` in `app.json` |
+| `developer_app_only` | a skill (format 1): push it through the lamp (`lamp skill push`) |
+| `app_not_found` | no app of yours has that id: `lamp app status` lists yours |
+| `app_not_approved` | asked to go public before approval: wait for the review |
+| `app_already_public` | public already: nothing to do |
+| `developer_daily_limit`, `developer_attempt_limit`, `developer_public_limit` | the day's limits per account (10 accepted uploads, 30 attempts, 3 asks to go public) are used: try again tomorrow |
+| `store`, `unreachable` | the Store is busy, temporarily off or out of reach: try again later |
+| `bad_request` | refused here before sending (art, title, description, size): fix what it names |
+
+### Your first app, from pack to listed
+
+```sh
+lamp app check gym-coach            # fix every error it prints
+lamp app pack gym-coach             # gym-coach-1.0.0.tar
+lamp login                          # you@example.com, then the emailed code
+lamp app submit gym-coach-1.0.0.tar --icon icon.png --cover cover.png
+lamp app status                     # pending, unlisted: a reviewer reads it next
+# once approved (status says approved), and the Store has signed it:
+lamp app request-public 42          # staff test it on a lamp; once they say yes, status says public
+```
+
+A rejection's note says what to change: fix it, raise `version` if the
+package changes, and submit again.
+
+### Other Stores, the studio, and code
+
 - **The studio** serves one page on 127.0.0.1, under a random path: drop the
   tar and art in, fill in the listing, read the check, sign in, submit and
   follow the review. It calls the Store through `lamp`, so the token never
@@ -457,7 +535,8 @@ lamp app studio                     # the same, as a page on this computer
   Each must be `https://` (`http://` only for localhost, 127.0.0.1 or
   [::1]), or `lamp` stops with a `bad_url` error before anything is sent. A
   redirect is never followed, so the token goes nowhere else: a 3xx is a
-  `StoreError` with code `store`. Every host, path and error code is in `lampos/store.py`'s constants.
+  `StoreError` with code `store`. Every host, path and error code is in
+  `lampos/store.py`'s constants.
 
 In code: `lampos.app.check(path)`, `lampos.app.pack(folder)`, and
 `lampos.store.Store`: `send_code(email)`, `sign_in(email, code)`,
@@ -745,9 +824,9 @@ and send it again. Without `retry_ms`, it is a held part, as above.
 | `lamp logout` | forgets the sign-in kept for that Store |
 | `lamp app check FOLDER\|TAR...` | each an app's folder (with `app.json`) or a packed `.tar`, checked as the Store's reader checks it, less the signature |
 | `lamp app pack FOLDER [-o TAR]` | the Store's unsigned tar; `-o`/`--output` names it (`NAME-VERSION.tar`) |
-| `lamp app submit FOLDER\|TAR [--icon PNG] [--cover PNG] [--title T] [--description D] [--category SLUG]` | checks it, then uploads it for review, hidden until approved. `--icon`: PNG, 1024x1024; `--cover`: PNG, 1600x900; each 2 MB at most. `--title` up to 100, `--description` up to 1000 characters |
-| `lamp app status [ID]` | your apps, or one: `review_status`, the reviewer's note, visibility |
-| `lamp app request-public ID` | asks the reviewers to make an approved app public |
+| `lamp app submit FOLDER\|TAR [--icon PNG] [--cover PNG] [--title T] [--description D] [--category SLUG]` | checks it, then uploads it for review, hidden until approved. `--icon`: PNG, 1024x1024; `--cover`: PNG, 1600x900; each 2 MB at most. `--title` up to 100, `--description` up to 1000 characters; `--category` optional, the Store sets the final one at review |
+| `lamp app status [ID]` | your apps, or one: `review_status` (`pending`, `approved`, `rejected`), the reviewer's note, visibility (`unlisted`, `public`), whether going public was asked |
+| `lamp app request-public ID` | asks for an approved app to go public; staff decide |
 | `lamp app studio [--port N] [--no-open]` | the publishing page, on 127.0.0.1 only; `--port` (any free one), `--no-open` prints its address without opening a browser |
 | `lamp app push FOLDER\|TAR [LAMP_ID]` | an app of your own, its folder (packed here) or its tar, unsigned: checked as `lamp app check` does, then put on the paired lamp (`skills` grant) |
 | `lamp app list [LAMP_ID]` | this computer's own pushed apps |
