@@ -422,6 +422,9 @@ Environment=LAMP_TASKS_WHO=on
 # Work goes only to the agent named: one named who isn't set up is said so, never given to another (#1722; the
 # 27 Oct demo, where "have Hermes do it" went to Claude Code unsaid, #3504). Checked on lamp-75c9 on 22 Oct.
 Environment=LAMP_TASKS_NAMED_ONLY=on
+# LAMP_TASKS_AFTER_NEWS: new work asked right after the lamp's news is handed over in code, not left to the model (#8701).
+# Its why and rules are its row in docs/switches.md.
+Environment=LAMP_TASKS_AFTER_NEWS=on
 # LAMP_TASKS_CORRECT: its why and rules are its row in docs/switches.md (#2838, #6857).
 Environment=LAMP_TASKS_CORRECT=on
 # LAMP_TASKS_SIGN_IN: its why and rules are its row in docs/switches.md (#5198, #1676).

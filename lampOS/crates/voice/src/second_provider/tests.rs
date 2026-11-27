@@ -2007,6 +2007,118 @@ async fn a_reply_right_after_the_news_is_told_the_note_and_answered() {
     );
 }
 
+/// #8701, `LAMP_TASKS_AFTER_NEWS`: the messages this route asks round 1
+/// with, as it puts them together, are forced to `start_agent_task` for
+/// lamp-ee17's two asks of 27 Nov said right after the news, and not for
+/// the same asks on a line with no note, a follow-up about the news, or a
+/// short plain question after it.
+#[tokio::test]
+async fn new_work_right_after_the_news_is_forced_as_this_route_asks_it() {
+    let after_news = worker::after_news_asks();
+    let forced = |heard: &str, noted: bool| {
+        let heard = heard.to_owned();
+        async move {
+            let script = Arc::new(Script {
+                heard: Mutex::new([Ok(heard)].into()),
+                chats: Mutex::new(
+                    [
+                        vec![
+                            text("Claude Code says the report is done."),
+                            Ok(ChatEvent::Done),
+                        ],
+                        vec![text("Okay."), Ok(ChatEvent::Done)],
+                    ]
+                    .into(),
+                ),
+                ..Script::default()
+            });
+            let (engine, _, _) = scripted(script.clone());
+            let mut engine = engine.noting_after_news(Arc::new(move |request| {
+                (noted && request == 2).then_some(worker::AFTER_NEWS_NOTE)
+            }));
+            engine.submit(written(
+                1,
+                "(Nobody has spoken. News from work you handed over.)",
+            ));
+            assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+            engine.submit(start(2));
+            engine.submit(audio(2, 1));
+            engine.submit(end(2));
+            assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+            let asked = script.asked.lock().unwrap();
+            asked[1].clone()
+        }
+    };
+    for ask in [
+        "Hey Lamp, compare three robot vacuums under 300 dollars and tell me which to buy.",
+        "Hey Lamp, find this week's main AI news and summarise it in five points.",
+    ] {
+        let noted = forced(ask, true).await;
+        assert_eq!(
+            after_news(&noted).map(|forced| forced.name),
+            Some(crate::agent_tasks::START),
+            "{ask}: {noted:?}"
+        );
+        assert_eq!(after_news(&forced(ask, false).await), None, "{ask}");
+    }
+    for said in ["What did it say about Spain?", "What time is it?"] {
+        assert_eq!(after_news(&forced(said, true).await), None, "{said}");
+    }
+}
+
+/// #8701, the real miss on lamp-ee17 (try 3, read from its memory): right
+/// after the news, "find this week's main AI news and summarise it in five
+/// points" was answered with a spoken read-back and no call, so the person
+/// heard an offer with nothing prepared behind it. That reply names no agent
+/// or computer, so the read-back catch (`agent_tasks::speaks_a_read_back`,
+/// asked again) never fired. With `LAMP_TASKS_AFTER_NEWS` the round that
+/// reply answered is sent forced to `start_agent_task`: a service that keeps
+/// `tool_choice` cannot answer it in words alone.
+#[tokio::test]
+async fn the_spoken_offer_with_nothing_prepared_after_the_news_is_asked_forced() {
+    let ask = "Hey Lamp, find this week's main AI news and summarise it in five points.";
+    let offer = "I'll have the lamp research this week's main AI news and summarize it in five points. Shall I start it?";
+    assert!(!crate::agent_tasks::speaks_a_read_back(offer));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(ask.to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    text("Claude Code says the report is done."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text(offer), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.noting_after_news(Arc::new(|request| {
+        (request == 2).then_some(worker::AFTER_NEWS_NOTE)
+    }));
+    engine.submit(written(
+        1,
+        "(Nobody has spoken. News from work you handed over.)",
+    ));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    // The scripted service ignores `tool_choice`, so nothing is called here;
+    // the round it answered was sent forced.
+    assert!(calls.lock().unwrap().is_empty());
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 2, "{asked:?}");
+    assert_eq!(
+        worker::after_news_asks()(&asked[1]).map(|forced| forced.name),
+        Some(crate::agent_tasks::START),
+        "{:?}",
+        asked[1]
+    );
+}
+
 /// #4333 on the second route: with `LAMP_OWNER_PLACE=on` and a place kept,
 /// a line that needs a place is asked with the owner's place beside its
 /// words, and a line that doesn't is asked as before; without the switch
