@@ -3895,10 +3895,12 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
 /// and lamp-seen's minute full (`window_s` past 59, two checks) and at
 /// least 0.6 bad (`above` 0.5999, as `above` is strict: both checks). It
 /// reads no picture and no leaning in; its lines give no number and name no
-/// condition. The owner's calls of 27 Nov (#8377): a 15m cooldown, kept
-/// across the regions by its own `[budget]` gap, never the wellbeing
-/// group's hour, said with others in view and at night; still stopped as
-/// a wellbeing nudge by its own kind.
+/// condition. The owner's calls of 27 Nov (#8377): a 15m cooldown for
+/// each region alone ("neck slump and back slump is two different thing"),
+/// no `[budget]` and so never the wellbeing group's hour, said with others
+/// in view and at night; still stopped as a wellbeing nudge by its own
+/// kind, through its `[stop] group`. The faces topic only for its turn
+/// to the face (`look_at = "face"` reads it).
 #[test]
 fn posture_reads_the_posture_alone_and_names_a_region_never_a_condition() {
     let folder = skills_root().join("posture");
@@ -3974,8 +3976,8 @@ fn posture_reads_the_posture_alone_and_names_a_region_never_a_condition() {
             );
         }
     }
-    assert_eq!(skill.budget, Some(("posture".to_owned(), 4)));
-    assert_eq!(skill.budget_gap_us, 15 * 60 * 1_000_000);
+    assert_eq!(skill.budget, None, "no hour of any group");
+    assert!(toml.get("budget").is_none());
     assert_eq!(skill.stop.as_ref().unwrap().tool, "wellbeing_nudges");
     assert_eq!(
         skill.stop.as_ref().unwrap().group.as_deref(),
@@ -14453,11 +14455,11 @@ fn kinded_stops(dir: &Path) -> Vec<lamp_skills::Skill> {
 }
 
 /// #8377: a `[stop] group` named as a `[budget]` group shares that group's
-/// function from a skill in a `[budget]` group of its own (Posture's, in
-/// the wellbeing nudges' stop but not their hour): one function, its kind
-/// stops it alone, and with no kind every one of them.
+/// function from a skill in no `[budget]` (Posture's, in the wellbeing
+/// nudges' stop but not their hour): one function, a kind stops its skill
+/// alone, and `all` every one. Beside a `[budget]` it is still refused.
 #[test]
-fn a_stop_group_shares_a_budget_groups_function_from_its_own_group() {
+fn a_stop_group_shares_a_budget_groups_function_from_a_skill_in_no_budget() {
     let dir = tempfile::tempdir().unwrap();
     let trigger = "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n";
     skill_with(
@@ -14471,8 +14473,21 @@ fn a_stop_group_shares_a_budget_groups_function_from_its_own_group() {
         dir.path(),
         "pose",
         &format!(
-            "{trigger}[budget]\ngroup = \"pose\"\nper_hour = 4\ngap = \"15m\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\ngroup = \"wellbeing\"\nkind = \"pose\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            "{trigger}[stop]\ntool = \"nudges\"\nabout = \"When.\"\ngroup = \"wellbeing\"\nkind = \"pose\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
         ),
+    );
+    let apart = tempfile::tempdir().unwrap();
+    let own = skill_with(
+        apart.path(),
+        "own",
+        &format!(
+            "{trigger}[budget]\ngroup = \"own\"\nper_hour = 4\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\ngroup = \"wellbeing\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+        ),
+    );
+    let refused = load(&own).unwrap_err();
+    assert!(
+        refused.contains("[stop] group is for a skill in no [budget] group"),
+        "{refused}"
     );
     let (loaded, errors) = load_all(dir.path());
     assert!(errors.is_empty(), "{errors:?}");

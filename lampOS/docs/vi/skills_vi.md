@@ -7228,13 +7228,15 @@ không bao giờ được nói, và kỹ năng không nói gì. Giọng nói ngh
 10 s; vẫn nói khi có người khác trong khung hình và vào bất kỳ giờ nào (chủ sở
 hữu, 27/11: "what if user working late or early morning? we should tell them
 about bad posture too"); `cooldown` 15 phút ("only 15m cooldown, not 60m") và
-không có `rearm`, cùng một nhóm `[budget]` riêng, `posture` (4 lần mỗi giờ,
-`gap` 15 phút), nên vùng đổi sang vùng khác không thành lời thứ hai trong 15
-phút đó. Không bao giờ thuộc giờ của nhóm wellbeing: không chờ nó, cũng không
-dùng nó. Không có `most_a_day` và không có `[rest]` (V1 không có). Câu nói chỉ
+không có `rearm`, mỗi vùng riêng: tư thế xấu chuyển từ cổ sang lưng thì nói
+một lời mới ngay ("neck slump and back slump is two different thing"). Không
+có `[budget]`, nên không bao giờ thuộc giờ của nhóm wellbeing: không chờ nó,
+cũng không dùng nó. Không điều kiện nào đọc các khuôn mặt;
+`humans/faces/tracked` vẫn có trong chủ đề cho lần quay về khuôn mặt
+(`look_at = "face"` đọc nó). Không có `most_a_day` và không có `[rest]` (V1 không có). Câu nói chỉ
 nói "một lúc", không bao giờ một con số, và không gọi tên bệnh nào. `[stop]
 kind = "posture"`, với `[stop] group = "wellbeing"`, nên nó dùng chung
-`wellbeing_nudges` của các lời nhắc wellbeing từ nhóm riêng của nó (#8377). Các ca trong
+`wellbeing_nudges` của các lời nhắc wellbeing mà không có `[budget]` riêng (#8377). Các ca trong
 `skills/posture/tests`; kiểm thử
 `posture_reads_the_posture_alone_and_names_a_region_never_a_condition`, và
 ca `a-bad-posture-alone-is-let-be` của Ngồi thẳng lại.
@@ -7382,11 +7384,11 @@ ngay, ghi một lần vào nhật ký, và một `rise` quên các lần đọc 
 cơ hội bị nó giữ lại thì bị bỏ, không bao giờ được giữ. Hai điều lamp-skills thêm cho chúng
 (#7401): trên một trigger `rise` có `wait`, cơ hội được giữ vẫn là lần tăng
 đó cho tới khi được dùng hoặc hết `wait`, dù các giá trị sau không còn tăng
-(phép thử của trường, `above = 0`, vẫn phải đúng); và `[stop] group`, để các
-kỹ năng dưới thư mục skills ghi cùng một `group` dùng chung hàm `[stop]`,
-cùng với các kỹ năng của nhóm `[budget]` cùng tên (#8377: Tư thế, trong nhóm
-`[budget]` riêng, dùng chung hàm của các lời nhắc wellbeing), và trong kỹ năng
-không có `[budget]` thì không có giới hạn nào (kỹ năng được đẩy lên không dùng
+(phép thử của trường, `above = 0`, vẫn phải đúng); và `[stop] group`, trong
+kỹ năng không có `[budget]`, để các kỹ năng dưới thư mục skills ghi cùng một
+`group` dùng chung hàm `[stop]` mà không có giới hạn nào, cùng với các kỹ năng
+của nhóm `[budget]` cùng tên (#8377: Tư thế dùng chung hàm của các lời nhắc
+wellbeing) (không được đặt cạnh `[budget]`; kỹ năng được đẩy lên không dùng
 chung). Nhịp clip: mặc định
 một burst mỗi phút; với `LAMP_SEEN_BURST_15S=on` (tối, không unit nào đặt),
 cloud có thể đặt nhịp từ 15 s tới 60 s qua `seen_clip` trong phản hồi

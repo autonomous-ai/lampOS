@@ -33,8 +33,10 @@ kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: lamp-seen's posture reading,
-# the faces, the voice's state, and a turn toward the face. One short line,
-# worded by the voice.
+# the voice's state, and a turn toward the face. One short line, worded by
+# the voice. No condition reads the faces any more, but the turn does:
+# `look_at = "face"` reads `humans/faces/tracked`, and lamp-skills refuses
+# it without the topic.
 [permissions]
 speak = true
 topics = ["humans/posture", "humans/faces/tracked", "voice/state"]
@@ -45,8 +47,9 @@ body = true
 # 1), and `none` for a bad window with no region standing out (V1's "empty /
 # mixed" row). No `rearm`: a window still bad is told again once the
 # cooldown is past: 15 minutes (the owner, 27 Nov: "only 15m cooldown, not
-# 60m"), and the skill's own `[budget]` below keeps those 15 minutes between
-# any two of its words, whichever region.
+# 60m"), each region on its own: a slump that moves from the neck to the
+# back is told again at once (the owner, 27 Nov: "neck slump and back slump
+# is two different thing").
 [[trigger]]
 name = "neck"
 topic = "humans/posture"
@@ -108,14 +111,9 @@ field = "state"
 equals = "resting"
 for = "5s"
 
-# Its own group, never the wellbeing group's hour (the owner, 27 Nov:
-# posture is neither held back by it nor spends it): 15 minutes between any
-# two of its words, the trigger's cooldown across the regions, so a region
-# that changes is no second word at once.
-[budget]
-group = "posture"
-per_hour = 4
-gap = "15m"
+# No `[budget]`: never the wellbeing group's hour (the owner, 27 Nov:
+# posture is neither held back by it nor spends it), and no limit across
+# its regions but each trigger's cooldown.
 
 # The wellbeing skills' one function (#1685), shared by its `group` with
 # the wellbeing `[budget]` group's skills though Posture is not in their
