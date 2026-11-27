@@ -1,6 +1,8 @@
+pub mod archive;
 pub mod schema;
 pub mod score;
 pub mod voice;
+pub mod whole;
 
 use sha2::{Digest, Sha256};
 

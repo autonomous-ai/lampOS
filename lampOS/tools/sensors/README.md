@@ -9,8 +9,10 @@ Publication is draft-only under the owner's 27 November hold: **no merge or
 train**. Each sensor must show its own quality before a separate addition to
 the reviewed "Hey Lamp" plus 20-second renewing-window baseline. No sensor
 decides on that baseline. The baseline build/configuration and matching
-voice rubric still need to be pinned; the historical v1 played cases do not
-qualify the reset voice policy.
+voice kit must be frozen for the actual run; historical v1 played cases do not
+qualify the reset voice policy. The current rubric is **v2**,
+`sensor-team-2026-11-27-v2`. Use the [v2 adapter guide](adapter-v2.md) and
+[EVAL template](eval-template.md). V1 examples below are historical only.
 
 ## Build and check
 
@@ -27,7 +29,13 @@ cache before a recording session. Wrappers enter this directory; input and
 output arguments therefore use absolute paths. `run.sh validate MANIFEST`
 prints the SHA-256 of the exact manifest bytes. Each `score-*.sh` takes
 `MANIFEST RUN NEW_OUTPUT_DIRECTORY`. `compare-voice.sh` takes
-`COMPARISON NEW_OUTPUT_DIRECTORY`. Exit codes: 0 pass, 1 failed gate with a
+`COMPARISON NEW_OUTPUT_DIRECTORY` for the historical v1 rubric.
+`compare-whole.sh` takes `COMPARISON SENSOR_MANIFEST SENSOR_RUN SENSOR_REPORT NEW_OUTPUT_DIRECTORY`;
+C/D characterization uses `COMPARISON - - - NEW_OUTPUT_DIRECTORY`.
+`run.sh archive RAW_ROOT NEW_INVENTORY_DIRECTORY` retains a local SHA-256
+inventory and README; `run.sh verify-archive RAW_ROOT INVENTORY_JSON` checks
+them. The new interruption wrapper is `score-barge-in.sh`.
+Exit codes: 0 pass, 1 failed gate with a
 report, 2 invalid input/I/O. Validation alone is not a gate pass. Existing
 output directories are refused, including an input directory.
 
@@ -35,11 +43,13 @@ The `lampOS sensor scorers` PR workflow runs these same gates natively on
 Linux ARM64. It exercises this standalone workspace; the product workspace's
 existing jobs do not replace the scorer tests.
 
-## Minimal annotation example
+## Historical v1 annotation example
 
 Exact addressed, replay, voice-match and private adapter join examples are
 in [adapter-examples.md](adapter-examples.md).
 
+The deletion timestamp and old head labels here belong to the historical v1
+schema. They do not override the owner's current keep-all retention policy.
 This is invented schema data. It cannot qualify (one speaker/episode,
 not the required shared collection). Real recordings never go in this folder.
 
@@ -167,7 +177,7 @@ and are not copied into these reports. The timestamp/recipient/label contract
 above is shared by every adapter; `src/schema.rs` is the exact executable
 schema. Unknown fields are rejected, so keep private text out of that file.
 
-## Voice comparison input
+## Historical v1 voice comparison input
 
 This v1 comparator preserves the earlier #8673 case labels for historical
 comparisons and tool tests. `passed: true` means its numeric checks passed;

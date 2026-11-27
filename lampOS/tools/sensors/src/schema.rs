@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub type Result<T> = std::result::Result<T, String>;
+pub const V2_RUBRIC: &str = "sensor-team-2026-11-27-v2";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
@@ -12,6 +13,27 @@ pub enum Sensor {
     Head,
     SpeakingFace,
     VoiceMatch,
+    BargeIn,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DataOrigin {
+    RealPeople,
+    Generated,
+    Public,
+    Invented,
+}
+
+impl DataOrigin {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::RealPeople => "real_people",
+            Self::Generated => "generated",
+            Self::Public => "public",
+            Self::Invented => "invented",
+        }
+    }
 }
 
 impl Sensor {
@@ -28,7 +50,18 @@ pub struct Session {
     pub split: Split,
     pub started_unix_s: u64,
     pub consent: bool,
-    pub delete_after_unix_s: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delete_after_unix_s: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retention: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inventory_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readme_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_origin: Option<DataOrigin>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clock_verified: Option<bool>,
     pub clock_id: String,
     pub sync_error_us: u64,
     pub recording_sha256: String,
@@ -56,6 +89,12 @@ pub struct Trial {
     pub script_id: String,
     pub look_target: String,
     pub head_target: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shoulders_target: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lamp_audio_start_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub planned_lamp_audio_end_us: Option<u64>,
     pub bearing_deg: f64,
     pub distance_mm: u32,
     pub light: String,
@@ -79,12 +118,18 @@ pub struct Case {
     pub expected: String,
     pub fault: bool,
     pub opportunity_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub head_gold_adjudicated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observation_end_us: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
     pub version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rubric_id: Option<String>,
     pub collection_id: String,
     pub frozen_unix_s: u64,
     pub sessions: Vec<Session>,
@@ -117,6 +162,12 @@ pub struct Prediction {
     pub eyes_epoch: Option<String>,
     pub reason: Option<String>,
     pub natural_motion: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_lamp_audio_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed_until_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub playback_stopped: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -167,8 +218,16 @@ impl Manifest {
     }
 
     pub fn validate(&self) -> Result<()> {
-        if self.version != 1 || !token(&self.collection_id) || self.frozen_unix_s == 0 {
-            return Err("manifest needs version 1, collection ID and freeze time".into());
+        if ![1, 2].contains(&self.version)
+            || !token(&self.collection_id)
+            || self.frozen_unix_s == 0
+            || (self.version == 1 && self.rubric_id.is_some())
+            || (self.version == 2 && self.rubric_id.as_deref() != Some(V2_RUBRIC))
+        {
+            return Err(
+                "manifest needs version 1 or the explicit v2 rubric, collection ID and freeze time"
+                    .into(),
+            );
         }
         let mut sessions = BTreeSet::new();
         for s in &self.sessions {
@@ -176,7 +235,21 @@ impl Manifest {
                 || !sessions.insert(&s.id)
                 || !token(&s.clock_id)
                 || !s.consent
-                || s.delete_after_unix_s <= s.started_unix_s
+                || (self.version == 1
+                    && (s
+                        .delete_after_unix_s
+                        .is_none_or(|at| at <= s.started_unix_s)
+                        || s.retention.is_some()
+                        || s.inventory_sha256.is_some()
+                        || s.readme_sha256.is_some()
+                        || s.data_origin.is_some()
+                        || s.clock_verified.is_some()))
+                || (self.version == 2
+                    && (s.delete_after_unix_s.is_some()
+                        || s.retention.as_deref() != Some("keep_all")
+                        || !s.inventory_sha256.as_ref().is_some_and(|v| sha(v, 64))
+                        || !s.readme_sha256.as_ref().is_some_and(|v| sha(v, 64))
+                        || s.data_origin.is_none()))
                 || !sha(&s.recording_sha256, 64)
             {
                 return Err(format!(
@@ -203,7 +276,18 @@ impl Manifest {
                 || !t.bearing_deg.is_finite()
                 || !(-180.0..=180.0).contains(&t.bearing_deg)
                 || t.distance_mm == 0
-                || t.visible_faces.len() > 2
+                || (self.version == 1 && t.visible_faces.len() > 2)
+                || (self.version == 1
+                    && (t.shoulders_target.is_some()
+                        || t.lamp_audio_start_us.is_some()
+                        || t.planned_lamp_audio_end_us.is_some()))
+                || t.shoulders_target
+                    .as_deref()
+                    .is_some_and(|v| !one_of(v, &["lamp", "away", "unknown"]))
+                || t.lamp_audio_start_us
+                    .zip(t.planned_lamp_audio_end_us)
+                    .is_some_and(|(start, end)| start >= end)
+                || t.lamp_audio_start_us.is_some() != t.planned_lamp_audio_end_us.is_some()
                 || t.visible_faces
                     .iter()
                     .any(|s| !token(s) || s == "unknown" || s == "no_visible")
@@ -213,7 +297,8 @@ impl Manifest {
                     .is_some_and(|id| !t.visible_faces.contains(id))
                 || (t.subject_visible != t.subject_face_id.is_some())
                 || t.eyes_epoch.as_ref().is_some_and(|id| !token(id))
-                || !one_of(&t.source, &["person", "tv", "lamp"])
+                || !(one_of(&t.source, &["person", "tv", "lamp"])
+                    || (self.version == 2 && t.source == "noise"))
                 || !one_of(
                     &t.recipient,
                     &["lamp", "person", "phone", "none", "unknown"],
@@ -222,10 +307,10 @@ impl Manifest {
                     &t.look_target,
                     &["lamp", "screen", "phone", "other", "unknown"],
                 )
-                || !one_of(
+                || !(one_of(
                     &t.head_target,
                     &["lamp", "screen", "phone", "other", "unknown"],
-                )
+                ) || (self.version == 2 && t.head_target == "away"))
                 || !one_of(&t.light, &["daylight", "lamplight"])
                 || !one_of(&t.noise, &["quiet", "background"])
                 || !one_of(&t.condition, &["normal", "slow", "disconnected"])
@@ -280,6 +365,18 @@ impl Manifest {
             {
                 return Err(format!("decision opportunity outside capture: {}", c.id));
             }
+            if (self.version == 1
+                && (c.sensor == Sensor::BargeIn
+                    || c.head_gold_adjudicated.is_some()
+                    || c.observation_end_us.is_some()))
+                || (c.sensor != Sensor::Head && c.head_gold_adjudicated.is_some())
+                || (c.sensor != Sensor::BargeIn && c.observation_end_us.is_some())
+            {
+                return Err(format!(
+                    "v2-only field or field on another sensor: {}",
+                    c.id
+                ));
+            }
             let valid = match c.sensor {
                 Sensor::Call => one_of(&c.expected, &["call", "non_call"]),
                 Sensor::Addressed => {
@@ -293,8 +390,30 @@ impl Manifest {
                         && (c.expected != "turn" || t.call_end_us.is_some())
                 }
                 Sensor::Head => {
-                    one_of(&c.expected, &["lamp", "screen", "phone", "unknown"])
-                        && c.expected == t.head_target
+                    let truth_valid = if self.version == 1 {
+                        one_of(&c.expected, &["lamp", "screen", "phone", "unknown"])
+                            && c.expected == t.head_target
+                    } else {
+                        let head = t.head_target.as_str();
+                        let shoulders = t.shoulders_target.as_deref().unwrap_or("");
+                        let observed =
+                            one_of(head, &["lamp", "away"]) && one_of(shoulders, &["lamp", "away"]);
+                        let derived = if head == "lamp" && shoulders == "lamp" {
+                            "facing"
+                        } else {
+                            "away"
+                        };
+                        one_of(head, &["lamp", "away", "unknown"])
+                            && one_of(shoulders, &["lamp", "away", "unknown"])
+                            && if observed {
+                                c.expected == derived
+                            } else if c.head_gold_adjudicated == Some(true) {
+                                one_of(&c.expected, &["facing", "away"])
+                            } else {
+                                c.expected == "unknown" && c.fault
+                            }
+                    };
+                    truth_valid
                         && c.opportunity_us.is_some()
                         && (c.expected == "unknown"
                             || (t.subject_visible && t.eyes_epoch.is_some()))
@@ -331,6 +450,20 @@ impl Manifest {
                             || (a.id != b.id
                                 && a.started_unix_s.abs_diff(b.started_unix_s) >= 7200))
                 }
+                Sensor::BargeIn => {
+                    self.version == 2
+                        && one_of(
+                            &c.expected,
+                            &["interrupt", "backchannel", "side_talk", "noise"],
+                        )
+                        && t.overlap
+                        && t.lamp_audio_start_us.is_some_and(|at| at < t.start_us)
+                        && t.planned_lamp_audio_end_us
+                            .is_some_and(|at| at > t.start_us)
+                        && c.observation_end_us.is_some_and(|at| {
+                            at >= t.end_us && at >= t.planned_lamp_audio_end_us.unwrap_or(u64::MAX)
+                        })
+                }
             };
             if !valid || (c.sensor != Sensor::VoiceMatch && c.reference_trial_id.is_some()) {
                 return Err(format!("invalid truth, pair or window: {}", c.id));
@@ -342,7 +475,7 @@ impl Manifest {
 
 impl Run {
     pub fn validate(&self, manifest: &Manifest, hash: &str) -> Result<()> {
-        if self.version != 1
+        if self.version != manifest.version
             || self.manifest_sha256 != hash
             || !sha(&self.build_sha, 40)
             || self
@@ -361,6 +494,9 @@ impl Run {
         {
             return Err("invalid run identity, evidence, location or manifest hash".into());
         }
+        if self.version == 1 && self.sensor == Sensor::BargeIn {
+            return Err("barge_in requires the v2 rubric".into());
+        }
         let cases: BTreeMap<_, _> = manifest.cases.iter().map(|c| (&c.id, c)).collect();
         let mut ids = BTreeSet::new();
         for p in &self.predictions {
@@ -372,12 +508,24 @@ impl Run {
                 || p.clock_id != manifest.session(&t.session_id).clock_id
                 || !ids.insert(&p.case_id)
                 || !token(&p.output)
-                || (self.evidence == "replay") == p.ready_us.is_some()
+                || (self.evidence == "replay" && p.ready_us.is_some())
+                || (self.version == 1 && self.evidence != "replay" && p.ready_us.is_none())
                 || (self.evidence != "replay" && p.replay_elapsed_us.is_some())
                 || (self.evidence == "replay"
                     && (p.associated_us.is_some()
                         || p.face_in_frame_us.is_some()
-                        || p.first_admission_us.is_some()))
+                        || p.first_admission_us.is_some()
+                        || p.last_lamp_audio_us.is_some()
+                        || p.observed_until_us.is_some()
+                        || p.playback_stopped.is_some()))
+                || ((self.version == 1 || self.sensor != Sensor::BargeIn)
+                    && (p.last_lamp_audio_us.is_some()
+                        || p.observed_until_us.is_some()
+                        || p.playback_stopped.is_some()))
+                || p.last_lamp_audio_us.is_some_and(|at| {
+                    at < t.start_us || p.observed_until_us.is_some_and(|until| at > until)
+                })
+                || p.observed_until_us.is_some_and(|at| at < t.start_us)
                 || p.ready_us.is_some_and(|at| at < p.input_end_us)
                 || p.first_admission_us.is_some_and(|at| at < t.end_us)
                 || p.bearing_deg

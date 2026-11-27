@@ -1,263 +1,252 @@
 # The shared sensor measuring stick
 
-Implemented for #8850, following the team lead's 27 November approval and
-the approved plans in #8844–#8849. These are offline tools and a recording
-protocol, not permission to enable a sensor or a claim of device accuracy.
-The Reviewer owns labels/scoring and reads each sensor PR with the lead.
-The lead alone records and runs the team lamp. Every candidate ships off;
-an unqualified sensor cannot hold a line or delay admission.
+This is the offline protocol for #8850 / draft #8885. The Reviewer owns the
+measuring stick and reads each sensor PR with the team lead; the lead runs
+the lamp. The owner's 27 November evening method is: **bench each sensor
+alone, bring one passing sensor into one combined judge, bench the whole
+again, then consider the next sensor**. No merge and no train. A numerical
+pass does not remove that hold or authorize a device change.
 
-The product owner's 27 November 16:2x direction permits publishing our own
-branches, draft PRs and reviews, but **no merge and no train entry**. Show each
-sensor's own quality first. The voice baseline is being reset to **"Hey Lamp"
-plus a 20-second renewing window, with no sensor deciding**. After that base
-is reviewed and pinned by build and configuration, evaluate one sensor's
-addition at a time. Earlier stable results and source READ-OKs do not authorize
-integration or substitute for this new comparison.
+Use **version 2**, rubric `sensor-team-2026-11-27-v2`, for the morning EVAL.
+The head/shoulder quotas, two-or-more-face cells, interruption sample floors
+and whole-bench rules below are this measuring stick's explicit v2 choices
+for the assigned overnight evaluation. Earlier approved accuracy and timing
+budgets remain. V1 is preserved for reproducibility; its old head classes,
+one-face cells and #8673 labels cannot qualify the current jobs.
 
-## Recording once for all six sensors
+The simple baseline is the lead's #8892 “Hey Lamp” plus a 20-second renewing
+window, before any sensor decides. Its currently published source pin is
+`0dbbfc95bbea6ddf397308e1a8ef1933c5d19dcb`; the lead must also pin the actual
+binary, complete patch if any, configuration and rendered kit used on the
+lamp. Tonight's C (simple) and D (plain 16492) are **characterization**.
+Neither replaces a new sensor's A1/B1/B2/A2 experiment.
 
-Raw recordings stay **only on the lead's Mac**, under
-`~/lamp-research/sensor-sessions/`. Each session has explicit consent and
-a deletion time. Do not put recordings, frames, transcripts, names, or
-private paths in Git, issues or journals. Use anonymous participant IDs.
-The scoring manifest contains numeric/anonymous annotations and script IDs;
-the script text, ASR words and conversation context live in a private
-sidecar keyed by trial ID. Sensor adapters may read that sidecar locally;
-the scorer never needs or exports its text.
+## Keep every artifact, privately
 
-1. Before collection, freeze this scorer's commit/binary, the model and
-   threshold, the script, the eligibility rules and the participant split.
-   Calibration people and sessions are disjoint from evaluation. Use at
-   least six evaluation speakers; reserve additional development people
-   (at least eight people altogether for the speaking-face plan).
-2. At the first lamp session, record mic models, positions and camera axes;
-   the mic1/mic2 clap train, offset/drift/drops; camera and playback clock
-   alignment; and safe seated-face pitch at 0.6 and 1.2 m. Annotate every
-   monotonic clock/eyes epoch. No acoustic bearing is qualified before
-   Tests has shown that the capture pair supports it. A framing-only
-   replacement needs a new approved rubric, not a passing angle score.
-3. Collect the shared pool over daylight and lamplight sessions at least
-   two hours apart. The core pool is **480 distinct episodes**: C001–C240
-   calls, F001–F120 lamp-directed follow-ups, R001–R120 room/phone/near-name
-   lines. English scripts, one or two people, with intended recipient,
-   head target and look target independently varied. A person can address
-   the lamp while looking at a screen.
-4. C001–C240 fill the direction grid: six people × five bearings
-   (−60, −30, 0, +30, +60 degrees) × two distances (600/1200 mm) ×
-   quiet/background × two fresh utterances. Validate reach before freezing
-   positions. Keep unreachable cases as documented limitations, not silently
-   removed failures. Alternate repetitions across sessions and lighting.
-5. The mouth's 320 cases are a **slice of those same episodes**: eight
-   cells (one/two visible faces × both distances × both lights), 40 each:
-   24 clear visible speakers, eight off-camera speakers with silent visible
-   faces, eight ambiguous/occluded/overlap cases. Use 192 suitable call
-   episodes for clear speakers and 128 suitable F/R episodes for the other
-   two classes. Balance both speaking faces, sides and face sizes. The
-   remaining episodes still contribute to other sensors. Top up cells
-   that cannot be filled without changing the scene's truth.
-6. Head direction uses at least 80 clear episodes for each of lamp, screen
-   and phone; no-face/occlusion cases are separate. Follow-up classification
-   uses 120 addressed and 120 room lines within 20 seconds of the previous
-   lamp playback end. Keep window-edge cases separately labelled. Voice
-   match uses 120 cross-session same-person pairs and 120 other-source
-   pairs (80 other people, 40 TV), with 40 over-playback lines balanced
-   between classes. Reuse C references and F/R probes where eligible;
-   every probe has at most one pair, and neither side crosses the split.
-7. Add/top up the 80 direction negative/fault trials: own playback,
-   overlapping callers, non-directed lines, missing/stale/desynchronized
-   input, privacy and stop. Include first use, slow and disconnected
-   dependencies for every sensor. Fault rows are distinct from the primary
-   accuracy denominator and never erase a planned primary miss.
-8. Label actual performed behavior, not merely the planned script. Independently
-   check/adjudicate labels before seeing predictions. One episode can have
-   one case per sensor; adjacent frames or reused pair combinations cannot
-   increase its denominator. Non-overlapping capture intervals identify
-   distinct episodes. Record simultaneous speakers as one overlap episode.
+The owner's latest instruction supersedes the earlier deletion dates:
+**keep all data, never delete**. Raw recordings stay on the lead's Mac at
+`~/lamp-research/sensor-sessions/`. Retain every original audio/video/frame,
+journal, annotation, model input, output, failed run and earlier score.
+Each immutable session/run has a README and SHA-256 inventory. Keep consent
+for this retention locally. V2 declares `retention: "keep_all"` and rejects
+a deletion timestamp; v1's historical field is not a deletion instruction.
 
-Keep immutable manifest bytes after adjudication and before scoring. Changing
-any label, split or eligibility creates a new manifest SHA and requires
-rescoring both sides. The manifest's `frozen_unix_s` is the **protocol**
-freeze before holdout capture, not a claim that recordings already existed.
+Do not publish real people's recordings, frames, words, private paths or
+per-person/per-trial records. Public EVALs contain aggregate numbers,
+provenance hashes, limits and links. Anonymous IDs and private sidecars join
+who spoke, the intended recipient, independent head/shoulder/look labels,
+and the actual capture. The scorer needs numeric labels and IDs, not words.
 
-## Run the tools
+Run `run.sh archive RAW_ROOT NEW_INVENTORY_DIRECTORY` after sealing a session.
+It hashes every regular file, refuses symlinks and an output inside the raw
+root, and writes a private README and `inventory.json`. It does not move,
+copy, upload or delete raw files. `verify-archive RAW_ROOT INVENTORY` checks
+the README and every file, including missing/extra files. A changed archive
+requires a new inventory; retain the old one. Hashes alone do not guarantee
+future storage: the custodian keeps originals and local backups. Run outputs
+also contain README and SHA256SUMS; all outputs refuse overwrite.
 
-The standalone Rust package is `tools/sensors/`, outside the product workspace
-and dependency graph. It opens no microphone, camera, socket or network
-connection. Its wrappers build/run with Cargo's offline, locked mode.
-Prepare dependencies once with `cargo fetch --locked` on the development
-Mac if necessary; the recording session then needs no package download.
+## One shared collection
 
-From `lampOS/`:
+Freeze the scorer source/binary, model, thresholds, scripts, eligibility and
+split before holdout capture. Freeze adjudicated labels before viewing
+predictions. Development people and sessions are disjoint from holdout.
+Use at least **six real holdout speakers**, with daylight and lamplight
+sessions at least two hours apart; reserve additional development people
+(at least eight people overall for the speaking-face collection).
+
+Record mic/camera positions and axes, clock IDs/epochs, clap alignment,
+offset/drift/drops and safe seated-face pitch at 600 and 1200 mm. V2 requires
+verified source-clock alignment with at most **5 ms** error. Capture clocks
+are mapped explicitly; never subtract unrelated server/host monotonic clocks.
+The measured error is carried into mapped latency upper bounds. Host elapsed
+frame-work/replay times remain their own measurements.
+
+The core is **480 distinct episodes**: 240 calls, 120 lamp-directed followups
+and 120 room/phone/near-name lines. English scripts, one/two people, distance,
+lighting, noise and intended recipient are varied independently of gaze.
+Every sensor's cells are slices of this collection; top-ups keep the same
+collection ID and split. Do not fabricate 480 independent clips by reusing
+adjacent frames, overlapping intervals or pairing each probe repeatedly.
+
+- Direction: six people × five reachable bearings (-60/-30/0/30/60 degrees)
+  × two distances × quiet/background × two fresh utterances = 240 calls.
+  Add 80 no-turn fault cases: own playback, overlap, non-directed speech,
+  missing/stale/desynchronized input, privacy and stop. A framing-only
+  alternative for unsynchronized microphones needs a separate rubric.
+- Head and shoulders: at least 120 `facing` and 120 `away`. Label head and
+  shoulders separately as lamp/away/unknown. Both toward lamp means facing;
+  otherwise an observed away component with both labels known means away.
+  Include at least 20 head-toward/shoulders-away and 20 head-away/shoulders-
+  toward cases. Unknown components require independently adjudicated gold
+  to enter answerable accuracy; otherwise use an unknown fault diagnostic.
+  Looking at a phone/screen is no longer a separate primary head class.
+- Speaking face: **at least two visible faces** in every applicable primary
+  line, 320 answerable lines, four distance × light cells of at least 80.
+  Each cell has at least 24 clear speakers in each of the first two visible
+  positions and 16 off-camera speakers with silent visible faces. Keep at
+  least 192 clear-visible lines overall. Balance sides and face sizes;
+  report higher face counts separately. One-face lines cannot inflate this
+  job. Ambiguous/occluded cases remain declared diagnostics or fixed primary
+  failures, never newly excluded after predictions.
+- Words/recipient: 120 lamp-directed and 120 room-directed lines with matched
+  wording, 0–3 / 3–10 / 10–20 second gaps from **last actually audible lamp
+  output**. Keep outside-window/boundary examples separately labelled.
+- Caller voice: 120 same-person cross-session pairs and 120 different-source
+  pairs (80 other people, 40 TV), at least 20 over-playback probes in each
+  class. Reuse call references and eligible followup/room probes; one pair
+  per probe, no split crossing. Frames are not independent followups.
+- Interruption: at least **120 each** true interruption, backchannel, side
+  talk and noise during lamp playback. Reuse eligible episodes and top up
+  rather than pretending the original 480 covers every new cell. Record
+  planned playback end, actual last audible sample and observation horizon.
+  An unqualified caller-voice feature stays off in the standalone test.
+
+Each sensor also covers first use, slow and disconnected dependencies.
+Label performed behavior, not script intent. One episode may have one case
+per sensor. Disagreements are adjudicated before predictions. Changing labels,
+eligibility or the split creates new bytes/hashes and requires rescoring.
+`frozen_unix_s` records protocol freeze before holdout capture, not the later
+annotation time. Reviewer checks the collection matrix and blind-label history;
+the scorer cannot authenticate a consent claim or observer label by itself.
+
+## Standalone bars and exact clocks
+
+| Sensor | Primary numerical bar | Latency and physical boundary |
+|---|---|---|
+| 1 Call, #8844/#8907 | >=98% call recall and >=95% non-call rejection; >=120 each | Last required sample → usable result: local p95 <=100 ms, server <=300 ms, 500 ms expiry. Report observed wakes per labelled non-call hour. |
+| 2 Words/recipient, #8845 | >=114/120 lamp and >=114/120 room | Final ASR → usable result p95 <=50 ms, expiry 100 ms; speech-end → result separately. Input end equals final ASR. |
+| 3 Direction, #8846 | >=228/240 joint angle <=15 degrees AND correct full face within 1 s, one natural turn; >=76/80 no-turn faults | Input → result local 100/server 300 ms p95, expiry 500 ms; call end → observed full face separately. |
+| 4 Head and shoulders, #8847 | >=114/120 facing and >=114/120 away, with disagreement quotas above | Source capture → result local 100/server 300 ms p95, expiry 500 ms; opportunity → capture and opportunity → result separately. |
+| 5 Speaking face, #8848 | >=304/320 overall; >=76/80 in each applicable cell; >=95% clear-visible recall and face-pick precision | Frame capture → publication p95 <=350 ms; frame work p95 <=200 ms; cached line-close association <=5 ms; age <=500 ms. |
+| 6 Caller voice, #8849 | >=114/120 same and >=114/120 different | Clip submission → result p95 <=500 ms; no admission wait. Report readiness by line-end+100 ms separately from actual first admission. |
+| 7 Interruption, #8923 | >=114/120 in EACH of interrupt/backchannel/side talk/noise | True interrupt: acoustic onset → last audible lamp sample <=400 ms including clock error. Negatives: no stop/restart through planned playback end and declared observation horizon. Detector result retains local 100/server 300 ms p95. |
+
+Rates use every planned primary case. Missing predictions, unknown outputs,
+late/incomplete evidence and unknown primary truth are failures. Safe unknown
+fault abstention is reported separately and earns no primary accuracy credit.
+A correct label with missing physical evidence is not a qualified success.
+A natural playback completion is not an interruption stop. No wait/hold/safety
+violation is allowed. Missing timing is null; never replace it with zero.
+
+`ready_us` is the time usable evidence reached its consumer on the capture
+clock. Replay has **null readiness** and optional `replay_elapsed_us` for
+host invocation→result duration. It cannot supply fabricated live framing,
+association, admission or audible-stop timestamps. Cold initialization, ASR,
+transport and model-only timings name their actual boundaries and exclusions.
+
+Run evidence (`lamp_live` / `replay` / `synthetic`) is separate from session
+origin (`real_people` / `generated` / `public` / `invented`). Qualification
+needs the consented real-person collection, including its actual TV/noise
+exposures, not generated identities or public benchmark subjects. Generated
+and public results remain useful standalone development numbers, with limits.
+Training permission is source-specific: do not extend a sensor's evaluation-
+only permission to another dataset or undo #8907's authorized generation work.
+
+Reports retain raw classification by development/holdout, class and origin,
+physical/timely counts, confusion, missing coverage, speaker/session/condition
+slices, face-count and head/shoulder disagreement slices, p50/p95 and a
+session-cluster bootstrap interval. Raw label agreement is never a live pass.
+An interval from two sessions does not establish population accuracy.
+
+## Bench the whole, one addition at a time
+
+Use `compare-whole`, not the historical v1 `compare`. Freeze actual rendered
+assets and a new typed case-vector hash before predictions; the old 666-line
+#8673 set is not silently relabelled. Include **played and live** modes, at
+least ten fixed cases in every scenario per mode, six real live speakers and
+two sessions. The overlap scenario needs ten in each of four classes, so
+there are at least **90 cases per mode per leg**, before useful top-ups.
+
+| Scenario | Required evidence |
+|---|---|
+| Alone | Greeting/call and ordinary requests, including a fresh call outside the window; first and repeated use. |
+| Noisy room | Same tasks with declared background level/source, correct audible answers and negative exposures. |
+| Two people | Both people as caller, changed speaker, out-of-view cases and wrong-person/side-talk checks. |
+| Talking over the lamp | >=10 each real interruption, backchannel, side talk and noise; actual playback and acoustic stop evidence. |
+| Followups in 20 s | Early 0–3, middle 3–10, late 10–20, inside 19.5–20, outside 20–20.5, later outside and explicitly closed-window slices. |
+| Side talk | Room-directed lines inside and outside the window; independently verified stimulus and no reply. |
+
+Boundary labels require the entire measured clock-error interval to fit the
+band. Use points safely either side; an uncertain exact 20 s is unknown. An
+ignore case needs at least 10 s of independently observed silence after the
+line, with no actual reply onset. Continue cases need proof of uninterrupted
+playback through planned completion. Never infer “heard” from transcript
+presence or “stopped” from a cancellation flag.
+
+For a one-sensor addition, A1/A2 are the pinned accepted baseline and B1/B2
+add exactly the named, standalone-qualified sensor to **one combined judge**.
+Keep all other settings/assets fixed, and run A1,B1,B2,A2 in that recorded
+order for each mode. Pin source revision, actual binary, full uncommitted
+patch if any, config and model manifest per build; each leg has its own raw
+inventory and measured source clock. The added component's model/config
+must match the qualified standalone report. The CLI recomputes that report
+from its original manifest/run with the frozen scorer before accepting it.
+
+“Improves its target and drops nothing” means, separately for B1 vs A1 and
+B2 vs A2 in **both modes**:
+
+1. At least **one additional correct case** in the predeclared target scenario;
+   report its fraction and percentage-point gain. No rounding into a gain.
+2. **Zero previously correct cases lost**. Every scenario, speaker, session,
+   class and window slice keeps or improves accuracy on fixed denominators.
+   Missing/unknown/timing coverage cannot worsen; required evidence is complete.
+3. Answer (acoustic line end→first audible output) and stop (acoustic onset→
+   last audible output) p50 AND p95 do not increase. Compare full samples and
+   matched cases. Candidate upper clock bounds must be <= baseline lower
+   bounds; equal measurements inside uncertainty do not establish no loss.
+4. Each overlap class meets >=95%; real interruption p95 is <=400 ms with
+   error included. With only ten cases/class this requires 10/10. No safety
+   violation, changed assets/config, missing leg or unqualified prerequisite.
+
+C/D is `baseline_characterization`, always report-only (`passed:false`). Its
+native whole scores and exact latencies can be reported without claiming an
+addition gate. A partial run still reports its planned denominators and gaps.
+Do not make up a frozen kit or source-clock measurement to pass validation.
+
+After a numerical pass, the lead and Reviewer verify raw provenance, limits
+and the combined-judge behavior. Only a separately authorized integration may
+bring that single sensor over. Re-bench the whole before considering another;
+any regression keeps that addition out. Current no-merge/no-train hold remains.
+
+## Commands and morning table
+
+All wrapper paths must be absolute. The standalone Rust workspace is offline
+and outside product dependencies; it opens no camera, microphone or socket.
 
 ```sh
-tools/sensors/run.sh validate /private/path/manifest.json
-tools/sensors/score-call.sh MANIFEST RUN NEW_OUTPUT_DIRECTORY
-tools/sensors/score-addressed.sh MANIFEST RUN NEW_OUTPUT_DIRECTORY
-tools/sensors/score-direction.sh MANIFEST RUN NEW_OUTPUT_DIRECTORY
-tools/sensors/score-head.sh MANIFEST RUN NEW_OUTPUT_DIRECTORY
-tools/sensors/score-speaking-face.sh MANIFEST RUN NEW_OUTPUT_DIRECTORY
-tools/sensors/score-voice-match.sh MANIFEST RUN NEW_OUTPUT_DIRECTORY
-tools/sensors/compare-voice.sh COMPARISON NEW_OUTPUT_DIRECTORY
+tools/sensors/run.sh validate MANIFEST
+tools/sensors/score-call.sh MANIFEST RUN NEW_OUT
+tools/sensors/score-addressed.sh MANIFEST RUN NEW_OUT
+tools/sensors/score-direction.sh MANIFEST RUN NEW_OUT
+tools/sensors/score-head.sh MANIFEST RUN NEW_OUT
+tools/sensors/score-speaking-face.sh MANIFEST RUN NEW_OUT
+tools/sensors/score-voice-match.sh MANIFEST RUN NEW_OUT
+tools/sensors/score-barge-in.sh MANIFEST RUN NEW_OUT
+tools/sensors/run.sh whole-cases-hash CASES_JSON_ARRAY
+tools/sensors/compare-whole.sh COMPARISON SENSOR_MANIFEST SENSOR_RUN SENSOR_REPORT NEW_OUT
+tools/sensors/compare-whole.sh CD_COMPARISON - - - NEW_OUT
+tools/sensors/run.sh archive RAW_ROOT NEW_INVENTORY_DIRECTORY
+tools/sensors/run.sh verify-archive RAW_ROOT INVENTORY_JSON
 ```
 
-All paths after a wrapper must be absolute (the wrapper enters its own
-directory). Outputs are `report.json` and, for a sensor run, `trials.tsv`.
-An existing output directory is refused. Exit 0 means the requested gate
-passes, 1 means the report says NOT QUALIFIED/HOLD, and 2 means invalid input
-or an I/O failure. `validate` only checks the schema; it is never qualification.
-Every report pins the input hashes and the actual scorer executable hash.
+Exit 0: requested numeric gate passes; exit 1: complete report says not-qualified
+or characterization/hold; exit 2: invalid input/I/O, no valid score. Every score
+pins exact input and executable hashes. Use a frozen built executable rather
+than rebuilding mid-collection. Source pins, patch and executable hashes are
+distinct. `build_sha` is 40-hex Git; binary/full patch/model/config are 64-hex
+SHA-256. Unknown JSON fields are rejected. No private text in numeric inputs.
 
-The exact typed v1 contract is [schema.rs](../tools/sensors/src/schema.rs).
-Unknown JSON fields, duplicate IDs, reused capture intervals, mismatched
-hashes, wrong splits, missing consent and backward clocks are errors.
-Optional fields may be omitted or null; do not replace missing timing with
-zero. Strings used as IDs contain only letters/digits, `_`, `-`, `.`, `:`.
-Use the JSON examples in [the tool README](../tools/sensors/README.md).
+See [the EVAL template](../tools/sensors/eval-template.md), [v2 adapter guide](../tools/sensors/adapter-v2.md)
+and executable contracts [schema.rs](../tools/sensors/src/schema.rs),
+[score.rs](../tools/sensors/src/score.rs), [whole.rs](../tools/sensors/src/whole.rs).
+Around 06:30 on 28 November the Reviewer checks each EVAL and posts **one table
+on #8850**, refreshed before 07:00: sensor, measured number with denominator,
+bar, pass/not, data limits. Link the submitted EVAL and report hash. Missing
+EVALs say not-qualified/missing; development scores keep their split and do
+not become holdout passes. Record cutoff time and missing evidence explicitly.
 
-### Manifest and prediction boundaries
-
-- `sessions`: ID, development/holdout split, Unix start/consent deletion
-  times, capture `clock_id`, measured `sync_error_us`, recording SHA-256.
-- `trials`: ID/session/speaker/source (`person`, `tv`, `lamp`), monotonic
-  `start_us`/`end_us`, optional `call_end_us`, last lamp playback end,
-  recipient, script ID, distinct `look_target`/`head_target`, bearing,
-  distance, light/noise, temporary `visible_faces`, labelled
-  `subject_face_id`/`subject_visible`, `eyes_epoch`, overlap/first-use and
-  condition (`normal`, `slow`, `disconnected`). Track IDs are only meaningful
-  within their eyes epoch. Visible faces are listed left to right.
-- `cases`: ID, sensor (`call`, `addressed`, `direction`, `head`,
-  `speaking_face`, `voice_match`), trial ID, expected result, `fault`,
-  optional reference trial for voice pairs, and the head sensor's declared
-  `opportunity_us` inside the capture interval.
-- `run`: version 1, exact manifest SHA, sensor, 40-digit build SHA,
-  model and threshold/config SHA-256, `evidence` (`lamp_live`, `replay`, `synthetic`),
-  `location` (`local`, `server`) and predictions keyed by case ID.
-  Optional `producer_binary_sha256` and `source_patch_sha256` identify the
-  producer executable and complete uncommitted diff; a patch hash requires
-  the executable hash, and `build_sha` then names the base Git revision.
-- Every prediction includes the session's `clock_id`, `output`, source `input_end_us`, `ready_us`,
-  `added_wait_us`, `held_line`, `safety_violation`. It also carries the
-  fields its job needs: final ASR time; eyes epoch/subject/reason; cached
-  association/frame work; measured direction/full-face time/turn count;
-  wake count. `reason` is an anonymous token such as `no_face`, `occluded`,
-  `wrong_subject`, `stale`, `timeout`. A missing row remains a miss.
-
-For replay, `ready_us` must be null/absent. A separate optional
-`replay_elapsed_us` measures host processing duration; never add it to a
-recorded timestamp. Replay cannot supply live association, full-face or
-admission timestamps. Raw label agreement is reported separately from the
-ordinary timing/behaviour counts, whose missing readiness remains a miss.
-See [adapter examples](../tools/sensors/adapter-examples.md) for exact addressed,
-voice-match and private request-to-case joins. These fixtures are invented.
-
-Do not set `lamp_live` for offline replay. Reports cannot establish provenance
-from a label alone: the lead/reviewer must match hashes to the actual recording,
-model, settings and running binary. A schema-valid synthetic fixture is not a
-measurement. Helpers never change product switches or grant release approval.
-
-### Gates and timing
-
-| Sensor | Accuracy gates | Timing boundary |
-|---|---|---|
-| Call | ≥98% recall and ≥95% non-call rejection, ≥120 each | Last required input → usable result: local p95 ≤100 ms, server ≤300 ms; 500 ms expiry |
-| Addressed | ≥95% each class, ≥120 each in the 20 s window | Final ASR → result p95 ≤50 ms, expiry 100 ms; speech-end → result is reported separately |
-| Direction | ≥240 calls; ≥95% jointly ≤15° and correct full face within 1 s of call end, one natural turn; ≥80 faults with ≥95% no turn | Input → result as above, plus call-end → full face; each grid cell ≥12 calls |
-| Head | ≥95% recall separately, ≥80 each for lamp/screen/phone | Source capture → result p95 ≤100 ms local /300 ms server, expiry 500 ms; sampling and opportunity → result separately |
-| Speaking face | ≥304/320 overall; ≥38/40 in each cell; ≥95% visible-speaker recall and face-pick precision | Frame capture → publication p95 ≤350 ms, frame work ≤200 ms, cached line-close association ≤5 ms; evidence age ≤500 ms |
-| Voice match | ≥114/120 same and ≥114/120 different | Clip submission → result p95 ≤500 ms; count separately how many were ready by line end +100 ms |
-
-The mouth and voice-print boundaries reflect their specifically approved plans,
-not an exemption for blocking voice. Work during a line can finish before its
-end. `speech_end_to_result_us` is the nonnegative extra time after the end;
-it is zero for evidence already ready. A voice print arriving after admission
-can only help renewal; the scorer does not turn it into an admission vote.
-`within_admission_budget` counts readiness by line end +100 ms; it is not
-proof that the result preceded the actual admission event. Optional
-`first_admission_us` produces a separate `ready_before_first_admission`
-comparison (null when unmeasured). The runtime must still check actual
-admission/cancellation before using it.
-For addressed speech, `input_end_us` must equal `asr_final_us`.
-
-Direction's `framed_speaker_id`, `face_in_frame_us` and `natural_motion` are
-observer annotations of the correct full face and natural one-turn motion,
-not a detector's own claim. Head predictions must name the annotated subject
-and correct eyes epoch; a correct class for another face is a miss. Speaking
-face returns a temporary visible track ID, `no_visible`, or `unknown`.
-Unknown is correct only when the independently labelled expected result is
-unknown. Missing detections on visible people, late outputs and unanswered
-trials stay in their denominators. Every supplied hold/wait or safety violation
-fails qualification. Six speakers, separated sessions, the shared 480 episodes,
-and first-use/slow/disconnected coverage are also required.
-
-Reports include per-row outcomes, confusion counts, missing/late coverage,
-speaker/session/cell/condition slices, wrong-person picks, p50/p95 timing and
-a deterministic 2,000-resample session-cluster bootstrap interval (unavailable
-with fewer than two sessions). This interval does not prove population accuracy.
-Wake rate is per hour of **labelled non-call exposure**, not unobserved wall
-time; every such prediction needs an observed `wake_count`. No measurement is
-invented for missing data. Clock uncertainty, actual microphone feasibility,
-cell balance/side swaps and physical safety still need the lead's evidence read.
-
-## The before/after voice gate
-
-The reset baseline and its expected voice outcomes have not yet been frozen
-for this tool. The v1 kit below records the previously reviewed rules and
-remains useful for historical comparisons and comparator tests. Its
-`passed` result is **not a voice gate for the reset baseline**. Before any
-switch-on comparison, the lead and Reviewer must review the reset policy's
-case labels, freeze the matching kit/scorer revision and rendered assets,
-and pin the baseline build/configuration. Do not silently relabel v1 or set
-`kit_reviewed` merely because the earlier kit was reviewed.
-
-[played-kit-v1.json](../tools/sensors/played-kit-v1.json) pins #8673 at
-`f2d57a11a0754c9d2649f3c903e6679ffc241275`, after both readers examined its
-HOLD fixes. The default set is 58 groups, 421 scenes, 689 played lines,
-**666 scored A/Q/S lines**. `handover` is excluded; `october-exact` is removed;
-the 26 November call rule is the default. The frozen case manifest stores
-only anonymous scene IDs, groups and expected outcomes. The comparator refuses
-a subset, altered labels or substituted groups. Unscored setup lines still play.
-
-Before A1 the lead renders and hashes the actual voices and noise beds on
-the recording Mac. Keep macOS voice/rate versions and WAV bytes fixed across
-all legs. Use mac voices for the cue-dependent groups unless equivalently
-rendered and separately reviewed. `kit_sha256` identifies that full local
-source/assets manifest, not just a source commit. The code pin is ready;
-no rendered audio bundle is supplied here.
-
-The comparison JSON contains build SHAs, the one `changed_switch`, approved
-kit hash, `kit_reviewed`, scene-manifest hash, unchanged-settings hash, frozen
-cases and eight runs: A1/B1/B2/A2 for played, then the same four for live
-(interleaving modes is allowed, changing each mode's order is not). For the
-future reset-baseline gate, A1/A2 use the pinned "Hey Lamp" plus 20-second
-renewing window with no sensor deciding; B1/B2 add only the separately
-qualified sensor under review. Live has at least ten calls, ten follow-ups,
-ten room lines and ten stops,
-with matched participants, positions and levels.
-
-Each result line records its case ID, observed A/Q/S/missing, whether heard,
-speech end, first actual audible output, interruption onset and last actual
-output. Export these from synchronized capture/playback evidence. Do **not**
-rename a decision-to-first-write interval in a legacy TSV as acoustic latency.
-The existing `voiceset.py` card remains useful for native counts; its exclusion
-of UNHEARD Q rows cannot improve the fixed planned denominator here.
-
-Each group in B1 is compared with A1 and each in B2 with A2. Correct count
-cannot fall, unheard/missing cannot rise, and answer/stop p50/p95 cannot rise.
-There is no averaging a bad group or leg into a better total. Missing legs,
-missing lines/timing, changed assets/settings, unreviewed kits and safety
-violations HOLD. A passing report still needs both readers and lead-run
-on-body sensor evidence, and never lifts the current no-merge/no-train hold.
-Once integration is authorized, add one sensor at a time; any drop rolls it
-back.
-
-## Validation and limits
-
-The tool's Rust tests exercise all six passing synthetic fixtures and the
-failure boundaries: missing/duplicate rows, 98% call recall, split leakage,
-consent, capture reuse, cell failures, wrong subjects/epochs, ASR timing,
-late voice prints, A/B/B/A ordering, unseen lines, asset mismatch, latency
-regressions, and CLI output/exit behavior. Build/format/clippy/test commands
-are in the tool README. No actual voice, camera, motion, sampling delay,
-microphone synchronization or end-to-end device latency has been measured
-by this implementation. Those remain the lead's recording session.
+Tool fixtures are invented regression tests. They demonstrate the measuring
+code's behavior, not sensor quality, physical motion safety or lamp latency.
+Local/ARM test results, team EVAL measurements and remaining limits are reported
+separately. No device measurement is supplied by this tool implementation.

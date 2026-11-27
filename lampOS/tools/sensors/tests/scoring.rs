@@ -7,7 +7,12 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             split: Split::Holdout,
             started_unix_s: 10_000 + (i / 6) * 10_000,
             consent: true,
-            delete_after_unix_s: 100_000,
+            delete_after_unix_s: Some(100_000),
+            retention: None,
+            inventory_sha256: None,
+            readme_sha256: None,
+            data_origin: None,
+            clock_verified: None,
             clock_id: format!("clock{i}"),
             sync_error_us: 1000,
             recording_sha256: "a".repeat(64),
@@ -27,6 +32,9 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
             script_id: format!("script{i}"),
             look_target: "lamp".into(),
             head_target: "lamp".into(),
+            shoulders_target: None,
+            lamp_audio_start_us: None,
+            planned_lamp_audio_end_us: None,
             bearing_deg: 0.0,
             distance_mm: 600,
             light: "daylight".into(),
@@ -72,6 +80,8 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                     expected: if same { "same" } else { "different" }.into(),
                     fault: false,
                     opportunity_us: None,
+                    head_gold_adjudicated: None,
+                    observation_end_us: None,
                 });
             }
             trials[240].first_use = true;
@@ -147,12 +157,15 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                     expected,
                     fault,
                     opportunity_us: (sensor == Sensor::Head).then_some(t.start_us),
+                    head_gold_adjudicated: None,
+                    observation_end_us: None,
                 });
             }
         }
     }
     let manifest = Manifest {
         version: 1,
+        rubric_id: None,
         collection_id: "test-only".into(),
         frozen_unix_s: 9000,
         sessions,
@@ -192,6 +205,9 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
                 eyes_epoch: t.eyes_epoch.clone(),
                 reason: None,
                 natural_motion: Some(true),
+                last_lamp_audio_us: None,
+                observed_until_us: None,
+                playback_stopped: None,
             }
         })
         .collect();
