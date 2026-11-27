@@ -60,16 +60,21 @@ head-target accuracy remain unmeasured by this prerequisite.
 On simple-call base `0dbbfc95bbea6ddf397308e1a8ef1933c5d19dcb`, reuse the
 #8856 checked head geometry and #8865 capture/permission freshness guard.
 Extend the existing default-off observer rather than adding a camera,
-worker, inference schedule or voice consumer. The proposed schema/2 keeps
+worker, inference schedule or voice consumer. The implemented schema/2 keeps
 `legacy_yaw`, `mesh_yaw` and `mesh_yaw_pitch` predictions separate, each
 with facing, not-facing and unknown counts over the same existing looks.
-Reuse `facing::allowed_deg` and the inherited pitch bounds [-20, +25]; do
-not fit thresholds to the public development set. Legacy fields and the
-simple-call admission/window rule remain unchanged. Source integration and
-verification of this draft are pending.
+Reuse `facing::allowed_deg` and the inherited pitch bounds [-20, +25]. The
+first public development comparison kept these rules fixed and fitted no
+thresholds. Legacy fields and the simple-call admission/window rule remain
+unchanged. This draft is integrated and passes local Mac/Linux code gates;
+live capture timing, real-person evidence and joint qualification are pending.
+The later [bounded calibration comparison](head-direction-evaluation.md#one-bounded-development-calibration-round-2026-11-28)
+reduces false-facing on the public development data but misses both primary
+per-class targets. Keep its fitted bounds separate from these unchanged
+observer rules and from real-person qualification.
 
 Reuse the exact working-picture and same-frame full-crop paths through
-`mesh::crop_of`. The offline example's proposed `--crop working|full`
+`mesh::crop_of`. The offline example's optional `--crop working|full`
 suffix defaults to working and identifies the choice in metadata. The
 historical 2,790-image Pointing'04 result used the working-picture crop;
 it is not evidence that every runtime full-mouth configuration is identical.

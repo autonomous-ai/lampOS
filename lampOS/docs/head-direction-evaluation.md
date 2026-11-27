@@ -417,9 +417,10 @@ the optical-axis cone `abs(yaw) <= 60`, `-20 <= pitch <= 25`, using
 `yaw = -pan` and `pitch = -tilt` from Pointing'04. Separately compare
 legacy yaw and mesh yaw with the same inherited image-edge allowance,
 then mesh yaw plus pitch, so the geometry and rule changes remain visible.
-Do not select thresholds from these results or call the cone a labelled
-desk-interaction target. In particular, do not relabel every away head as
-screen or phone.
+This first fixed-rule comparison selected no thresholds, and its cone is
+not a labelled desk-interaction target. The separate bounded development
+calibration below preserves this comparison unchanged. In particular, an
+away head is not automatically a screen or phone label.
 
 Pointing'04 supplies no real speaking, desk-distance or shoulder-orientation
 labels for this task. All participants and both series already form
@@ -529,6 +530,98 @@ Pending and unmeasured entries are not passes. Keep raw inputs and derived
 observations with their holder; only reviewed numeric aggregate results
 belong in this document. No sensor joins the combined interaction judge
 before independent qualification.
+
+## One bounded development calibration round (2026-11-28)
+
+Following the first comparison, a separate protocol was frozen before one
+threshold search on the same retained public outputs. It contains 3,564
+variants: working/full crop, original/no edge allowance, yaw bounds from
+10 to 60 degrees in steps of 5, lower pitch bounds from -40 to 0 in steps
+of 5, and upper pitch bounds from 5 to 45 in steps of 5. Reference labels,
+geometry eligibility, size/clipping checks and unknown handling stayed fixed.
+The protocol SHA-256 is
+`2c08701642ded99ebb29f4d5a30f9e2934f38658697e6cfec2f7924b56dca05b`.
+This is a new development comparison, not a change to the three runtime
+observer rules or to their original measurements.
+
+For each of 15 folds, both series from one participant were excluded from
+parameter selection. The remaining 14 selected the rule maximizing outside
+recall, subject to inside correct × 100 >= inside opportunities × 95 and a
+frozen tie order. The primary procedure selected both crop and thresholds;
+two secondary procedures fixed the crop first. Selection used only the
+conservative single-detection view. Raw largest-face results are retained
+as descriptive evidence and did not influence selection. All participants
+had already been used for development, so this is development cross-validation,
+not an untouched holdout or head-and-shoulder qualification.
+
+| Participant-out selection procedure | Inside correct / wrong / unknown, of 810 | Inside recall | Outside correct / false-facing / unknown, of 1,980 | Outside recall |
+| --- | --- | --- | --- | --- |
+| Select crop and thresholds | 757 / 53 / 0 | 93.46% | 1,224 / 680 / 76 | 61.82% |
+| Fix working crop, select thresholds | 768 / 41 / 1 | 94.81% | 1,237 / 670 / 73 | 62.47% |
+| Fix full crop, select thresholds | 750 / 60 / 0 | 92.59% | 1,217 / 689 / 74 | 61.46% |
+
+The primary procedure misses both 95% development targets. False-facing is
+680/1,980 (34.34%); its 76 unknowns are separate failures, not false-facing
+predictions. These pooled predictions describe the selection procedure:
+each excluded participant can have a different configuration. Four distinct
+configurations were selected, all without the edge allowance, with working
+crop in eight folds and full crop in seven. Excluded-participant inside
+recall ranges from 68.52% to 100%; outside recall from 46.97% to 78.79%.
+This is not the score of one fixed, deployable configuration.
+
+Against the fixed v1 working-crop rule under the same conservative view,
+the primary procedure loses 39 formerly correct inside cases and recovers
+none; outside it loses 59 and recovers 609. Outside correct rises from
+674 to 1,224, while inside correct falls from 796 to 757. The fixed full-crop
+v1 comparator is retained separately. Better outside rejection in this
+bounded round does not satisfy the per-class targets or the joint task.
+
+The one configuration selected on all 15 participants is full crop, no
+edge allowance, yaw 60 degrees and pitch [-25,+15]. Its optimistic in-sample
+figures are 772/810 (95.31%) inside and 1,230/1,980 (62.12%) outside. The same
+participants selected those parameters; these figures cannot replace the
+cross-validated procedure figures or qualify a sensor. The runtime observer
+retains its original yaw/edge/pitch rules; no fitted threshold is enabled.
+
+The fixed diagnostics also distinguish an angular error from a constant
+bias. With full crop, inside-reference pitch has signed median +1.10 degrees
+and absolute median/p90 7.38/15.08 degrees; pitch-only outside cases have
+signed median -0.54 and absolute median/p90 23.14/40.36 degrees. Opposite
+errors can cancel in a signed median. An aggregate pitch error is not a
+measured constant offset to subtract, and these diagnostics did not trigger
+a second search. Small-face and physical-distance support remain unchanged.
+
+The single Rust f32 grid invocation evaluated 19,887,120 decisions across
+both visibility views. All 33,480 actual-source baseline comparisons match
+v1. The saved prediction matrix agrees with all 641,520 participant count
+cells. Independent verification checked all 46 reported choices against the
+frozen ranking, 22,320 selected predictions, 32 class-transition groups and
+11,340 lost/recovered rows. Five standalone Rust boundary tests, five
+synthetic retention tests and the selection checks pass. No second grid,
+new inference, label change or model training was performed.
+
+The initial invocation completed once before a source review identified
+that the reusable wrapper could overwrite a failed run. The exact executed
+wrapper and successful outputs are preserved. The reusable entry point now
+uses an exclusive attempt guard; the existing attempt lock is explicitly
+labelled post-execution. No pre-execution protection is retrospectively
+claimed, and the measurements were not repeated to test that correction.
+
+All original inputs, outputs and source evidence remain retained, alongside
+this round's protocol, helpers, matrix, counts, selected predictions and
+independent audit. The final 50-artifact manifest has SHA-256
+`78178c69a0879575b94af4d42ab6639a9ac8e19f2f414229133fa923bb916a29`;
+the numeric result JSON is
+`a2ee767b2e6df1d97a6a7e60d51f0a137716269790627367225c6a806999a91d`.
+The standalone Rust classification source is
+`76c7c8abe19bb0a759dd9b8973a70476396f2c14087164f80e419ac059723daf`
+and its executable is
+`e42785d1f8b407ddb38d0ace0fb5447d31ab8decdd220e30c7e9f9d673aaf5ee`.
+This is a local analysis executable, not a new runtime binary. This round measures no new latency: the earlier host
+file-processing timings retain their original boundaries and limitations.
+Live source-capture-to-result timing, associated shoulders, independent joint
+labels, physical desk distance and small-face coverage remain unmeasured or
+unsupported. No threshold from this round is adopted into voice admission.
 
 ## Qualification and fleet integration remain separate
 

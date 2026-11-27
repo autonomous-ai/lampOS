@@ -2694,8 +2694,11 @@ remain unsuccessful opportunities on labelled answerable episodes, never
 correctly-away results. No labelled real desk episodes, distance/speaking
 or shoulder results, live capture latency or sensor qualification are
 recorded for this extension. See the
-[dated sensor 4 plan and pending evidence](head-direction-evaluation.md#sensor-4-fixed-rule-development-comparison-2026-11-27).
-Implementation and verification of this draft are pending.
+[dated sensor 4 comparison and evidence gaps](head-direction-evaluation.md#sensor-4-fixed-rule-development-comparison-2026-11-27).
+The draft is implemented and passes the local Mac/Linux code gates. Live
+capture timing, real-person evidence and joint qualification remain pending. A
+[separate development calibration](head-direction-evaluation.md#one-bounded-development-calibration-round-2026-11-28)
+failed its per-class targets; its fitted thresholds are not runtime rules.
 
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 
