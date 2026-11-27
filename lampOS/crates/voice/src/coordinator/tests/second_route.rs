@@ -157,6 +157,10 @@ struct Script {
     hears_at_start: bool,
     /// Speech starts again (a new turn, or speaking over an answer).
     speak_again: Option<When>,
+    /// With `speak_again`, not one line but bursts of `.0` capture frames
+    /// every `.1` frames for `.2` frames: with bursts too short to be a
+    /// turn, talk that leaves no pause of a second and is no line said.
+    speak_again_bursts: Option<(u64, u64, u64)>,
     /// A murmur of two capture frames, too short to be a turn: the room is
     /// not quiet for a second after it.
     murmur: Option<When>,
@@ -312,6 +316,7 @@ impl Script {
             hears_in_pieces: false,
             hears_at_start: false,
             speak_again: None,
+            speak_again_bursts: None,
             murmur: None,
             hand_stop: None,
             push: None,
@@ -609,7 +614,13 @@ impl Peers {
                 .contains(&frame)
                 || self
                     .speech_offset
-                    .is_some_and(|offset| (offset..offset + 60).contains(&frame))
+                    .is_some_and(|offset| match self.script.speak_again_bursts {
+                        None => (offset..offset + 60).contains(&frame),
+                        Some((on, every, lasts)) => {
+                            (offset..offset + lasts).contains(&frame)
+                                && (frame - offset) % every < on
+                        }
+                    })
                 || self
                     .murmur_at
                     .is_some_and(|at| (at..at + 2).contains(&frame))
@@ -4403,7 +4414,7 @@ fn with_news_8783(key: &str, short: Option<String>, ago: Duration, script: Scrip
         second: false,
         only: true,
         written: Written::Said(12),
-        limit: Duration::from_secs(40),
+        limit: script.limit.max(Duration::from_secs(40)),
         ..script
     });
     TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
@@ -4502,6 +4513,90 @@ fn news_waits_for_a_five_second_pause_and_a_second_after_an_answer() {
         "{at} ms: {}",
         answered.summary()
     );
+}
+
+/// #8812's HOLD (the first builder's P2): the lamp's answer counts for news
+/// only right after it, within `follows_on::WITHIN_US` and until anyone's
+/// next line. Here the news (come in 30 s before, its short line kept) waits
+/// in a busy room, the person's question is answered, and the room talks on
+/// after it, with `talk`: bursts too short to be a line, leaving no pause of
+/// a second, for that many capture frames, or one line said (`None`).
+fn answer_then_talk_8812(talk: Option<u64>) -> Run {
+    let short = crate::task_news::short_note(&json!({"state": "needs-input"})).unwrap();
+    TEST_ROOM_BUSY.with(|room| room.set(true));
+    let run = with_news_8783(
+        "s1:2:4",
+        Some(short),
+        Duration::from_secs(30),
+        Script {
+            speak_again: Some(When::Settled(1)),
+            speak_again_bursts: talk.map(|lasts| (2, 80, lasts)),
+            second_unheard: &[2],
+            mute_at_frame: Some(talk.unwrap_or(0) + 3_000),
+            limit: Duration::from_secs(talk.unwrap_or(0) / 100 + 40),
+            ..Script::question(Live::Answer(12))
+        },
+    );
+    TEST_ROOM_BUSY.with(|room| room.set(false));
+    run.assert_clean();
+    run
+}
+
+/// The answer no longer counts: no short line, "By the way, ...", at the
+/// talk's first pause of a second; the news is told whole once the talk is
+/// over (`task_news::TALK_OVER_US`), as news nobody was answered over is.
+fn no_short_line_after_8812(run: &Run) {
+    assert!(
+        run.events("task_news_short").is_empty(),
+        "{}",
+        run.summary()
+    );
+    assert_eq!(
+        written_8783(run, crate::task_news::BY_THE_WAY_ASKING),
+        0,
+        "{}",
+        run.summary()
+    );
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "{}", run.summary());
+    let at = news[0]["since_turn_ms"].as_u64().unwrap();
+    assert!(
+        at >= crate::task_news::TALK_OVER_US / 1_000,
+        "{at} ms: {}",
+        run.summary()
+    );
+}
+
+/// #8812's HOLD: an answer a minute before a busy room's pause of a second
+/// lets nothing out at that pause.
+#[test]
+fn an_answer_a_minute_before_a_busy_rooms_pause_lets_nothing_out() {
+    let _one = super::pilot_faults::one_session();
+    no_short_line_after_8812(&answer_then_talk_8812(Some(6_000)));
+}
+
+/// #8812's HOLD, the other way: an answer 5 s before a busy room's pause of
+/// a second still lets its short line out there, "By the way, ...".
+#[test]
+fn an_answer_five_seconds_before_a_busy_rooms_pause_still_lets_its_short_line_out() {
+    let _one = super::pilot_faults::one_session();
+    let run = answer_then_talk_8812(Some(400));
+    assert_eq!(run.events("task_news_short").len(), 1, "{}", run.summary());
+    assert_eq!(
+        written_8783(&run, crate::task_news::BY_THE_WAY_ASKING),
+        1,
+        "{}",
+        run.summary()
+    );
+    assert_eq!(written_8783(&run, NEWS_8783), 0, "{}", run.summary());
+}
+
+/// #8812's HOLD: anyone's line after the answer ends it for news, however
+/// soon: no short line at the pause after that line.
+#[test]
+fn anyones_line_after_an_answer_ends_it_for_news() {
+    let _one = super::pilot_faults::one_session();
+    no_short_line_after_8812(&answer_then_talk_8812(None));
 }
 
 /// #8783 (c), the Reviewer-lead's P2-c: with nobody seen or heard, news
