@@ -1140,7 +1140,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_NAME_NOT_ANOTHERS` | Calling a colleague named Lance, Dan or Tam near the lamp doesn't make it answer. |
 | `LAMP_NAME_GREETED_STAND_IN` | In a noisy room, "Hey Lamp" is answered even when the lamp's speech to text hears it as "Hey, Lynn". |
 | `LAMP_NAME_HEY_ONLY` | Say "Hey Lamp" to start talking; a bare "Lamp", or the word in your talk, no longer wakes it. |
-| `LAMP_FACE_NOT_A_CALL` | Looking at the lamp no longer starts a conversation: say "Hey Lamp". Once you're talking, your follow-ups are heard whether you look at it or not. |
+| `LAMP_FACE_NOT_A_CALL` | Looking at the lamp no longer starts a conversation: say "Hey Lamp". Follow-ups still don't need it. |
 | `LAMP_ONE_REPLY_WINDOW` | After the lamp speaks on its own, you have 20 seconds to reply, as after any answer. |
 | `LAMP_SHORT_REPLIES_CARRY` | In a conversation, a reply of a word or two, like a number in a game, is answered like any other. |
 | `LAMP_MOM_NOT_THE_NAME` | A child saying "Mom, can I have a snack?" near the lamp is no longer answered as a call. |
