@@ -1,0 +1,31 @@
+# training/stop's environment (its pyproject.toml) on an Intel Mac, where its
+# uv.lock cannot be installed: torch and torchaudio 2.2.2 are the last
+# releases with macOS x86_64 wheels, and they need NumPy 1; onnxruntime
+# 1.19.2 is the last with one. SciPy 1.18 and pyarrow 26 need NumPy 2 at run
+# time (their metadata does not say so), so they are held at the last
+# releases that work with NumPy 1.26. Every other package is held to the
+# version in training/stop/uv.lock. env.sh says how intel-mac.txt is made.
+torch==2.2.2
+torchaudio==2.2.2
+numpy==1.26.4
+onnxruntime==1.19.2
+scipy==1.15.3
+pyarrow==20.0.0
+cffi==2.1.1
+filelock==4.1.1
+flatbuffers==25.12.19
+fsspec==2026.9.0
+jinja2==3.1.6
+markupsafe==3.0.4
+ml-dtypes==0.6.0
+mpmath==1.3.0
+networkx==3.7
+onnx==1.23.2
+packaging==26.3
+pathvalidate==3.3.1
+piper-tts==1.8.0
+protobuf==7.36.2
+pycparser==3.11
+soundfile==0.14.0
+sympy==1.14.0
+typing-extensions==4.16.0
