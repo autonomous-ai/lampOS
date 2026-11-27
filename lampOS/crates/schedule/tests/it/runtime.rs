@@ -1,5 +1,5 @@
 use lamp_bus::Bus;
-use lamp_msgs::{Diagnostic, Level, ScheduleDue};
+use lamp_msgs::{Diagnostic, Level, ScheduleDue, ScheduleHorizon, ScheduleHorizonUnknown};
 use lamp_schedule::{
     runtime::{Clock, Config, SystemClock, serve},
     time::ClockSample,
@@ -400,18 +400,19 @@ fn diagnostics_name_the_owner_and_do_not_include_personal_text() {
         assert!(start.elapsed() < Duration::from_secs(3));
     }
 }
-/// #1562's follow-up: while a store set aside from a newer build is still
-/// in Schedule's folder, its health warns and names it, as lamp-tasks' does
-/// (#1554); removed, the warning goes.
+/// The bounded retained-store scan is latched for the owner's lifetime, so
+/// neither diagnostic publication nor the pure deadline horizon scans files.
 #[test]
-fn a_store_set_aside_is_said_in_health_until_it_is_gone() {
-    let s = Running::new();
+fn a_store_set_aside_stays_unknown_until_a_restart_verifies_its_removal() {
+    let mut s = Running::new();
+    s.stop();
+    let kept = s.config.dir.join("schedule.sqlite3.newer-2-1791964800");
+    fs::write(&kept, b"kept").unwrap();
+    s.start();
     let bus = Bus::new(&s.config.bus_root).unwrap();
     let mut sub = bus
         .subscribe_typed(Diagnostic::TOPIC, "diag_set_aside", Diagnostic::TYPE)
         .unwrap();
-    let kept = s.config.dir.join("schedule.sqlite3.newer-2-1791964800");
-    fs::write(&kept, b"kept").unwrap();
     let said = |sub: &mut lamp_bus::Subscriber, warned: bool| {
         let start = Instant::now();
         loop {
@@ -434,9 +435,25 @@ fn a_store_set_aside_is_said_in_health_until_it_is_gone() {
         "{}",
         report.message
     );
+    let unknown = Some(ScheduleHorizon::Unknown {
+        reason: ScheduleHorizonUnknown::RetainedStore,
+    });
+    receive_due(&bus, |state| state.horizon == unknown);
     fs::remove_file(&kept).unwrap();
+    // A new committed revision gets another projection without rescanning.
+    let created = s.set(60);
+    let state = receive_due(&bus, |state| {
+        state.revision == created["revision"].as_u64().unwrap()
+    });
+    assert_eq!(state.horizon, unknown);
+    assert_eq!(said(&mut sub, true).level, Level::Warn);
+    s.stop();
+    s.start();
     let report = said(&mut sub, false);
     assert!(!report.message.contains("set aside"), "{}", report.message);
+    receive_due(&bus, |state| {
+        matches!(state.horizon, Some(ScheduleHorizon::Next { .. }))
+    });
 }
 /// The first health report that `wanted` takes, within five seconds.
 fn health_until(s: &Running, wanted: impl Fn(&Diagnostic) -> bool) -> Diagnostic {
@@ -504,6 +521,12 @@ fn a_stored_reminder_this_build_cannot_read_is_kept_and_the_part_serves() {
     let report = health_until(&s, |report| said(report, "unread").as_deref() == Some("1"));
     assert_eq!(report.level, Level::Warn);
     assert!(report.message.contains("can't read"), "{}", report.message);
+    receive_due(&Bus::new(&s.config.bus_root).unwrap(), |state| {
+        state.horizon
+            == Some(ScheduleHorizon::Unknown {
+                reason: ScheduleHorizonUnknown::Unread,
+            })
+    });
     s.stop();
     let state = stored(&s);
     assert_eq!(state["items"][0], later, "kept as it is");
@@ -530,6 +553,92 @@ fn a_newer_schedule_database_is_set_aside_and_the_part_serves() {
     let kept = said(&report, "set_aside").unwrap();
     assert!(kept.starts_with("schedule.sqlite3.newer-db2-"), "{kept}");
     assert!(s.config.dir.join(&kept).exists());
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let unknown = Some(ScheduleHorizon::Unknown {
+        reason: ScheduleHorizonUnknown::RetainedStore,
+    });
+    receive_due(&bus, |state| state.horizon == unknown);
+    s.stop();
+    s.start();
+    receive_due(&bus, |state| state.horizon == unknown);
+}
+
+#[test]
+fn a_newer_snapshot_retained_during_engine_open_never_looks_empty() {
+    let mut s = Running::new();
+    s.set(60);
+    s.stop();
+    let mut state = stored(&s);
+    state["schema"] = json!(99);
+    store(&s, &state);
+    s.start();
+    assert_eq!(s.ask(json!({"op":"status"}))["items"], 0);
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let unknown = Some(ScheduleHorizon::Unknown {
+        reason: ScheduleHorizonUnknown::RetainedStore,
+    });
+    receive_due(&bus, |state| state.horizon == unknown);
+    s.stop();
+    s.start();
+    receive_due(&bus, |state| state.horizon == unknown);
+}
+
+#[test]
+fn an_overfull_retained_scan_is_unknown_and_stays_latched_until_restart() {
+    let mut s = Running::new();
+    s.stop();
+    for index in 0..=lamp_schedule::store::RETAINED_SCAN_ENTRIES {
+        fs::write(s.config.dir.join(format!("unrelated-{index}")), b"").unwrap();
+    }
+    s.start();
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let unknown = Some(ScheduleHorizon::Unknown {
+        reason: ScheduleHorizonUnknown::Unavailable,
+    });
+    receive_due(&bus, |state| state.horizon == unknown);
+    let report = health_until(&s, |report| report.message.contains("could not establish"));
+    assert_eq!(report.level, Level::Warn);
+    for index in 0..=lamp_schedule::store::RETAINED_SCAN_ENTRIES {
+        fs::remove_file(s.config.dir.join(format!("unrelated-{index}"))).unwrap();
+    }
+    let created = s.set(60);
+    let state = receive_due(&bus, |state| {
+        state.revision == created["revision"].as_u64().unwrap()
+    });
+    assert_eq!(state.horizon, unknown);
+    s.stop();
+    s.start();
+    receive_due(&bus, |state| {
+        matches!(state.horizon, Some(ScheduleHorizon::Next { .. }))
+    });
+}
+
+#[test]
+fn an_orphan_retained_sidecar_never_allows_an_empty_runtime_horizon() {
+    let mut s = Running::new();
+    s.stop();
+    fs::write(
+        s.config.dir.join("schedule.sqlite3.newer-2-1791964800-wal"),
+        b"PRIVATE_SIDECAR",
+    )
+    .unwrap();
+    s.start();
+    assert_eq!(s.ask(json!({"op":"status"}))["items"], 0);
+    let state = receive_due(&Bus::new(&s.config.bus_root).unwrap(), |state| {
+        state.horizon
+            == Some(ScheduleHorizon::Unknown {
+                reason: ScheduleHorizonUnknown::Unavailable,
+            })
+    });
+    assert!(
+        state.ready,
+        "delivery remains available despite unknown hidden work"
+    );
+    assert!(
+        !serde_json::to_string(&state)
+            .unwrap()
+            .contains("PRIVATE_SIDECAR")
+    );
 }
 
 /// #1680: a zone this build doesn't know (`LAMP_ZONE` from a newer tzdb)

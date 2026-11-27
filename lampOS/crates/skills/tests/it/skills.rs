@@ -16630,6 +16630,7 @@ mod reminder_pending {
             ready,
             pending,
             waiting_for_clock: 0,
+            horizon: None,
             oldest: (pending > 0 && ready && enabled).then_some(ScheduleNotice {
                 id: 188,
                 delivery: 1,

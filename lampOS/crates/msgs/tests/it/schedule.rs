@@ -1,7 +1,8 @@
 use lamp_bus::Kind;
 use lamp_msgs::{
-    ClockStamp, SCHEDULE_MAX_ITEMS, SCHEDULE_MAX_UNIX_MS, ScheduleDue, ScheduleNotice,
-    declaration_of, first_topics, schedule_topics,
+    ClockStamp, SCHEDULE_MAX_ITEMS, SCHEDULE_MAX_UNIX_MS, ScheduleDue, ScheduleHorizon,
+    ScheduleHorizonClock, ScheduleHorizonUnknown, ScheduleNotice, declaration_of, first_topics,
+    schedule_topics,
 };
 use serde_json::{Value, json};
 
@@ -29,6 +30,7 @@ fn due() -> ScheduleDue {
         pending: 2,
         waiting_for_clock: 1,
         oldest: Some(notice()),
+        horizon: None,
     }
 }
 
@@ -313,6 +315,541 @@ fn missing_optional_notice_still_fails_validation_when_due_work_is_offered() {
             .check()
             .is_err()
     );
+}
+
+#[test]
+fn absent_or_null_horizon_is_unsupported_and_is_never_promoted_to_empty() {
+    let old = serde_json::to_value(due()).unwrap();
+    assert!(old.get("horizon").is_none());
+    let decoded: ScheduleDue = serde_json::from_value(old.clone()).unwrap();
+    assert_eq!(decoded.horizon, None);
+    decoded.check().unwrap();
+
+    let mut explicit_null = old.clone();
+    explicit_null["horizon"] = Value::Null;
+    let decoded: ScheduleDue = serde_json::from_value(explicit_null).unwrap();
+    assert_eq!(decoded.horizon, None);
+    assert_eq!(serde_json::to_value(decoded).unwrap(), old);
+}
+
+#[test]
+fn horizon_wire_shapes_are_fixed_and_old_readers_ignore_the_new_field() {
+    // This reader has exactly the fields supported before the extension.
+    #[derive(Debug, PartialEq, serde::Deserialize)]
+    struct OldScheduleDue {
+        stamp: ClockStamp,
+        store_id: String,
+        revision: u64,
+        enabled: bool,
+        ready: bool,
+        pending: u32,
+        waiting_for_clock: u32,
+        #[serde(default)]
+        oldest: Option<ScheduleNotice>,
+    }
+
+    for (horizon, expected) in [
+        (
+            ScheduleHorizon::Empty { sampled_boot_ms: 0 },
+            json!({"state": "empty", "sampled_boot_ms": 0}),
+        ),
+        (
+            ScheduleHorizon::Next {
+                sampled_boot_ms: 900,
+                in_ms: 15 * 60 * 1_000,
+                clock: ScheduleHorizonClock::Elapsed,
+            },
+            json!({"state": "next", "sampled_boot_ms": 900, "in_ms": 900_000,
+                "clock": {"basis": "elapsed"}}),
+        ),
+        (
+            ScheduleHorizon::Next {
+                sampled_boot_ms: 900,
+                in_ms: 900_000,
+                clock: ScheduleHorizonClock::Wall {
+                    sampled_unix_ms: 1_791_964_800_000,
+                },
+            },
+            json!({"state": "next", "sampled_boot_ms": 900, "in_ms": 900_000,
+                "clock": {"basis": "wall", "sampled_unix_ms": 1_791_964_800_000i64}}),
+        ),
+        (
+            ScheduleHorizon::Unknown {
+                reason: ScheduleHorizonUnknown::Clock,
+            },
+            json!({"state": "unknown", "reason": "clock"}),
+        ),
+        (
+            ScheduleHorizon::Unknown {
+                reason: ScheduleHorizonUnknown::Unread,
+            },
+            json!({"state": "unknown", "reason": "unread"}),
+        ),
+        (
+            ScheduleHorizon::Unknown {
+                reason: ScheduleHorizonUnknown::RetainedStore,
+            },
+            json!({"state": "unknown", "reason": "retained_store"}),
+        ),
+        (
+            ScheduleHorizon::Unknown {
+                reason: ScheduleHorizonUnknown::Unavailable,
+            },
+            json!({"state": "unknown", "reason": "unavailable"}),
+        ),
+    ] {
+        let mut value = due();
+        value.pending = 0;
+        value.waiting_for_clock = 0;
+        value.oldest = None;
+        let legacy: OldScheduleDue =
+            serde_json::from_value(serde_json::to_value(&value).unwrap()).unwrap();
+        value.horizon = Some(horizon);
+        value.check().unwrap();
+        let wire = serde_json::to_value(&value).unwrap();
+        assert_eq!(wire["horizon"], expected);
+        assert_eq!(
+            serde_json::from_value::<OldScheduleDue>(wire.clone()).unwrap(),
+            legacy
+        );
+        assert_eq!(serde_json::from_value::<ScheduleDue>(wire).unwrap(), value);
+    }
+}
+
+#[test]
+fn known_horizons_require_an_enabled_ready_owner_and_no_clock_blocked_work() {
+    for enabled in [false, true] {
+        for ready in [false, true] {
+            for waiting in [0, 1] {
+                for horizon in [
+                    ScheduleHorizon::Empty { sampled_boot_ms: 1 },
+                    ScheduleHorizon::Next {
+                        sampled_boot_ms: 1,
+                        in_ms: 0,
+                        clock: ScheduleHorizonClock::Elapsed,
+                    },
+                    ScheduleHorizon::Next {
+                        sampled_boot_ms: 1,
+                        in_ms: 0,
+                        clock: ScheduleHorizonClock::Wall { sampled_unix_ms: 0 },
+                    },
+                    ScheduleHorizon::Unknown {
+                        reason: ScheduleHorizonUnknown::Unavailable,
+                    },
+                ] {
+                    let mut value = due();
+                    value.pending = 0;
+                    value.oldest = None;
+                    value.enabled = enabled;
+                    value.ready = ready;
+                    value.waiting_for_clock = waiting;
+                    value.horizon = Some(horizon);
+                    let expected = matches!(horizon, ScheduleHorizon::Unknown { .. })
+                        || (enabled && ready && waiting == 0);
+                    assert_eq!(
+                        value.check().is_ok(),
+                        expected,
+                        "enabled={enabled}, ready={ready}, waiting={waiting}, {horizon:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn empty_and_next_horizons_cannot_hide_pending_work_or_overflow_signed_durations() {
+    for pending in [0, 1, SCHEDULE_MAX_ITEMS] {
+        let mut value = due();
+        value.pending = pending;
+        value.waiting_for_clock = 0;
+        value.oldest = (pending > 0).then(notice);
+        value.horizon = Some(ScheduleHorizon::Empty {
+            sampled_boot_ms: u64::MAX,
+        });
+        assert_eq!(value.check().is_ok(), pending == 0);
+        for in_ms in [0, 1, i64::MAX as u64, i64::MAX as u64 + 1, u64::MAX] {
+            value.horizon = Some(ScheduleHorizon::Next {
+                sampled_boot_ms: u64::MAX,
+                in_ms,
+                clock: ScheduleHorizonClock::Elapsed,
+            });
+            assert_eq!(
+                value.check().is_ok(),
+                in_ms <= i64::MAX as u64 && (pending == 0 || in_ms == 0),
+                "pending={pending}, in_ms={in_ms}"
+            );
+        }
+    }
+    // The boot sample remains a u64. Validating freshness and correspondence
+    // with the receiver's boot clock is deliberately not a structural check.
+}
+
+#[test]
+fn malformed_or_incomplete_horizons_are_refused_without_guessing_a_state() {
+    for malformed in [
+        json!({}),
+        json!("empty"),
+        json!([]),
+        json!({"state": "future"}),
+        json!({"state": null}),
+        json!({"state": "empty"}),
+        json!({"state": "next", "sampled_boot_ms": 0, "clock": {"basis": "elapsed"}}),
+        json!({"state": "next", "in_ms": 0, "clock": {"basis": "elapsed"}}),
+        json!({"state": "next", "sampled_boot_ms": 0, "in_ms": 0}),
+        json!({"state": "unknown"}),
+        json!({"state": "unknown", "reason": "person's reminder"}),
+        json!({"state": "unknown", "reason": null}),
+        json!({"state": "unknown", "reason": 1}),
+    ] {
+        let mut value = serde_json::to_value(due()).unwrap();
+        value["horizon"] = malformed;
+        assert!(serde_json::from_value::<ScheduleDue>(value).is_err());
+    }
+    for bad in [
+        json!(-1),
+        json!(0.5),
+        json!(1.0),
+        json!("0"),
+        json!(false),
+        Value::Null,
+    ] {
+        for (state, field) in [
+            ("empty", "sampled_boot_ms"),
+            ("next", "sampled_boot_ms"),
+            ("next", "in_ms"),
+        ] {
+            let mut value = serde_json::to_value(due()).unwrap();
+            value["horizon"] = json!({"state": state, "sampled_boot_ms": 0, "in_ms": 0,
+                "clock": {"basis": "elapsed"}});
+            value["horizon"][field] = bad.clone();
+            assert!(
+                serde_json::from_value::<ScheduleDue>(value).is_err(),
+                "{state}.{field}={bad}"
+            );
+        }
+    }
+    for field in ["sampled_boot_ms", "in_ms"] {
+        let horizon =
+            r#"{"state":"next","sampled_boot_ms":0,"in_ms":0,"clock":{"basis":"elapsed"}}"#
+                .replace(
+                    &format!("\"{field}\":0"),
+                    &format!("\"{field}\":18446744073709551616"),
+                );
+        assert!(serde_json::from_str::<ScheduleHorizon>(&horizon).is_err());
+    }
+}
+
+#[test]
+fn next_horizons_require_a_known_clock_basis_and_complete_wall_sample() {
+    for clock in [
+        Value::Null,
+        json!("elapsed"),
+        json!(false),
+        json!([]),
+        json!(["elapsed"]),
+        json!({}),
+        json!({"basis": null}),
+        json!({"basis": 0}),
+        json!({"basis": 1, "sampled_unix_ms": 0}),
+        json!({"basis": 2}),
+        json!({"basis": -1}),
+        json!({"basis": 0.0}),
+        json!({"basis": false}),
+        json!({"basis": {"elapsed": null}}),
+        json!({"basis": "future"}),
+        json!({"basis": "wall"}),
+        json!({"basis": "wall", "sampled_unix_ms": null}),
+    ] {
+        assert!(
+            serde_json::from_value::<ScheduleHorizonClock>(clock.clone()).is_err(),
+            "accepted malformed clock value: {clock}"
+        );
+        assert!(
+            serde_json::from_str::<ScheduleHorizonClock>(&clock.to_string()).is_err(),
+            "accepted malformed clock JSON: {clock}"
+        );
+        let mut value = serde_json::to_value(due()).unwrap();
+        value["horizon"] = json!({"state": "next", "sampled_boot_ms": 0,
+            "in_ms": 0, "clock": clock});
+        assert!(
+            serde_json::from_value::<ScheduleDue>(value).is_err(),
+            "accepted malformed clock: {clock}"
+        );
+    }
+    for bad in [
+        json!(0.5),
+        json!(1.0),
+        json!("0"),
+        json!(false),
+        json!(u64::MAX),
+        Value::Null,
+    ] {
+        let value = json!({"state": "next", "sampled_boot_ms": 0, "in_ms": 0,
+            "clock": {"basis": "wall", "sampled_unix_ms": bad}});
+        assert!(
+            serde_json::from_value::<ScheduleHorizon>(value).is_err(),
+            "accepted malformed wall sample: {bad}"
+        );
+    }
+}
+
+#[test]
+fn horizon_states_are_strings_not_numeric_variant_indexes() {
+    for (index, named) in [
+        (0, json!({"state": "empty", "sampled_boot_ms": 0})),
+        (
+            1,
+            json!({"state": "next", "sampled_boot_ms": 0, "in_ms": 0,
+                "clock": {"basis": "elapsed"}}),
+        ),
+        (2, json!({"state": "unknown", "reason": "clock"})),
+    ] {
+        assert!(
+            serde_json::from_value::<ScheduleHorizon>(named.clone()).is_ok(),
+            "invalid named control: {named}"
+        );
+        let mut numeric = named;
+        numeric["state"] = json!(index);
+        assert!(
+            serde_json::from_value::<ScheduleHorizon>(numeric.clone()).is_err(),
+            "accepted numeric state value: {numeric}"
+        );
+        assert!(
+            serde_json::from_str::<ScheduleHorizon>(&numeric.to_string()).is_err(),
+            "accepted numeric state JSON: {numeric}"
+        );
+    }
+}
+
+#[test]
+fn strict_horizon_tags_preserve_field_order_and_duplicate_rejection() {
+    let reordered = r#"{"clock":{"sampled_unix_ms":0,"future":true,"basis":"wall"},
+        "in_ms":1,"sampled_boot_ms":0,"future":{},"state":"next"}"#;
+    assert_eq!(
+        serde_json::from_str::<ScheduleHorizon>(reordered).unwrap(),
+        ScheduleHorizon::Next {
+            sampled_boot_ms: 0,
+            in_ms: 1,
+            clock: ScheduleHorizonClock::Wall { sampled_unix_ms: 0 },
+        }
+    );
+    for (case, value) in [
+        (
+            "duplicate state",
+            r#"{"state":"empty","state":"empty","sampled_boot_ms":0}"#,
+        ),
+        (
+            "duplicate clock basis",
+            r#"{"state":"next","sampled_boot_ms":0,"in_ms":1,
+                "clock":{"basis":"elapsed","basis":"elapsed"}}"#,
+        ),
+        (
+            "duplicate wall sample",
+            r#"{"state":"next","sampled_boot_ms":0,"in_ms":1,
+                "clock":{"basis":"wall","sampled_unix_ms":0,"sampled_unix_ms":1}}"#,
+        ),
+        (
+            "duplicate boot sample",
+            r#"{"state":"empty","sampled_boot_ms":0,"sampled_boot_ms":1}"#,
+        ),
+    ] {
+        assert!(
+            serde_json::from_str::<ScheduleHorizon>(value).is_err(),
+            "accepted {case}"
+        );
+    }
+}
+
+#[test]
+fn wall_horizon_samples_share_the_existing_inclusive_unix_bounds() {
+    for sampled_unix_ms in [
+        i64::MIN,
+        -1,
+        0,
+        1,
+        SCHEDULE_MAX_UNIX_MS,
+        SCHEDULE_MAX_UNIX_MS + 1,
+        i64::MAX,
+    ] {
+        let mut value = due();
+        value.pending = 0;
+        value.waiting_for_clock = 0;
+        value.oldest = None;
+        value.horizon = Some(ScheduleHorizon::Next {
+            sampled_boot_ms: 0,
+            in_ms: 900_000,
+            clock: ScheduleHorizonClock::Wall { sampled_unix_ms },
+        });
+        let expected = (0..=SCHEDULE_MAX_UNIX_MS).contains(&sampled_unix_ms);
+        // The signed wire number parses; the message's structural validation
+        // decides the calendar range rather than guessing another clock basis.
+        let decoded: ScheduleDue =
+            serde_json::from_value(serde_json::to_value(&value).unwrap()).unwrap();
+        assert_eq!(decoded.check().is_ok(), expected, "{sampled_unix_ms}");
+        assert_eq!(
+            decoded
+                .horizon
+                .unwrap()
+                .remaining_ms(0, Some(sampled_unix_ms)),
+            expected.then_some(900_000),
+            "{sampled_unix_ms}"
+        );
+    }
+}
+
+#[test]
+fn elapsed_remaining_needs_no_wall_clock_and_saturates_without_overflow() {
+    let horizon = ScheduleHorizon::Next {
+        sampled_boot_ms: 1_000,
+        in_ms: 900_000,
+        clock: ScheduleHorizonClock::Elapsed,
+    };
+    assert_eq!(horizon.remaining_ms(1_000, None), Some(900_000));
+    assert_eq!(horizon.remaining_ms(1_100, None), Some(899_900));
+    assert_eq!(horizon.remaining_ms(999, None), None);
+    assert_eq!(horizon.remaining_ms(901_000, None), Some(0));
+    assert_eq!(horizon.remaining_ms(u64::MAX, None), Some(0));
+    let maximum = ScheduleHorizon::Next {
+        sampled_boot_ms: u64::MAX,
+        in_ms: i64::MAX as u64,
+        clock: ScheduleHorizonClock::Elapsed,
+    };
+    assert_eq!(maximum.remaining_ms(u64::MAX, None), Some(i64::MAX as u64));
+}
+
+#[test]
+fn wall_remaining_handles_forward_and_backward_corrections_and_lost_trust() {
+    let horizon = ScheduleHorizon::Next {
+        sampled_boot_ms: 1_000,
+        in_ms: 900_000,
+        clock: ScheduleHorizonClock::Wall {
+            sampled_unix_ms: 1_000_000,
+        },
+    };
+    assert_eq!(horizon.remaining_ms(1_100, Some(1_000_100)), Some(899_900));
+    assert_eq!(horizon.remaining_ms(1_100, Some(1_600_000)), Some(300_000));
+    assert_eq!(horizon.remaining_ms(1_100, Some(999_000)), Some(899_900));
+    assert_eq!(horizon.remaining_ms(1_100, Some(1_900_000)), Some(0));
+    assert_eq!(
+        horizon.remaining_ms(1_100, Some(SCHEDULE_MAX_UNIX_MS)),
+        Some(0)
+    );
+    assert_eq!(horizon.remaining_ms(1_100, None), None);
+    assert_eq!(horizon.remaining_ms(999, Some(1_000_100)), None);
+    for current in [i64::MIN, -1, SCHEDULE_MAX_UNIX_MS + 1, i64::MAX] {
+        assert_eq!(horizon.remaining_ms(1_100, Some(current)), None);
+    }
+}
+
+#[test]
+fn mixed_clock_remaining_is_a_lower_bound_even_when_the_timer_was_earliest() {
+    // At the source sample, an elapsed timer is due in 900 s and a wall
+    // reminder in 1,000 s. A later wall step can make the reminder first.
+    let elapsed_deadline_ms = 900_000u64;
+    let wall_deadline_ms = 2_000_000i64;
+    let sampled_unix_ms = 1_000_000i64;
+    let horizon = ScheduleHorizon::Next {
+        sampled_boot_ms: 0,
+        in_ms: elapsed_deadline_ms,
+        clock: ScheduleHorizonClock::Wall { sampled_unix_ms },
+    };
+    for boot_age in [0, 100, 1_000, 200_000, 1_000_000] {
+        for wall_change in [-500_000, -1, 0, 1, 600_000, 1_000_000] {
+            let current_wall = sampled_unix_ms + wall_change;
+            let remaining = horizon.remaining_ms(boot_age, Some(current_wall)).unwrap();
+            let actual_timer = elapsed_deadline_ms.saturating_sub(boot_age);
+            let actual_reminder = u64::try_from((wall_deadline_ms - current_wall).max(0)).unwrap();
+            assert!(
+                remaining <= actual_timer.min(actual_reminder),
+                "boot_age={boot_age}, wall_change={wall_change}, remaining={remaining}"
+            );
+        }
+    }
+    assert_eq!(horizon.remaining_ms(1_000, Some(1_600_000)), Some(300_000));
+    assert_eq!(horizon.remaining_ms(1_000, None), None);
+}
+
+#[test]
+fn remaining_rejects_invalid_sources_and_never_turns_empty_or_unknown_into_a_duration() {
+    for clock in [
+        ScheduleHorizonClock::Elapsed,
+        ScheduleHorizonClock::Wall { sampled_unix_ms: 0 },
+    ] {
+        for in_ms in [i64::MAX as u64 + 1, u64::MAX] {
+            let horizon = ScheduleHorizon::Next {
+                sampled_boot_ms: 0,
+                in_ms,
+                clock,
+            };
+            assert_eq!(horizon.remaining_ms(0, Some(0)), None);
+        }
+    }
+    for sampled_unix_ms in [i64::MIN, -1, SCHEDULE_MAX_UNIX_MS + 1, i64::MAX] {
+        let horizon = ScheduleHorizon::Next {
+            sampled_boot_ms: 0,
+            in_ms: 1,
+            clock: ScheduleHorizonClock::Wall { sampled_unix_ms },
+        };
+        assert_eq!(horizon.remaining_ms(0, Some(0)), None);
+    }
+    let pending = ScheduleHorizon::Next {
+        sampled_boot_ms: 0,
+        in_ms: 0,
+        clock: ScheduleHorizonClock::Wall { sampled_unix_ms: 0 },
+    };
+    assert_eq!(pending.remaining_ms(0, Some(0)), Some(0));
+    assert_eq!(pending.remaining_ms(0, None), None);
+    assert_eq!(
+        ScheduleHorizon::Empty { sampled_boot_ms: 0 }.remaining_ms(0, Some(0)),
+        None
+    );
+    assert_eq!(
+        ScheduleHorizon::Unknown {
+            reason: ScheduleHorizonUnknown::Clock,
+        }
+        .remaining_ms(0, Some(0)),
+        None
+    );
+}
+
+#[test]
+fn additive_horizon_fields_are_compatible_but_cannot_be_republished_as_private_data() {
+    let mut value = due();
+    value.pending = 0;
+    value.waiting_for_clock = 0;
+    value.oldest = None;
+    for horizon in [
+        ScheduleHorizon::Empty { sampled_boot_ms: 0 },
+        ScheduleHorizon::Next {
+            sampled_boot_ms: 0,
+            in_ms: 0,
+            clock: ScheduleHorizonClock::Elapsed,
+        },
+        ScheduleHorizon::Next {
+            sampled_boot_ms: 0,
+            in_ms: 0,
+            clock: ScheduleHorizonClock::Wall { sampled_unix_ms: 0 },
+        },
+        ScheduleHorizon::Unknown {
+            reason: ScheduleHorizonUnknown::Unread,
+        },
+    ] {
+        value.horizon = Some(horizon);
+        let mut wire = serde_json::to_value(&value).unwrap();
+        wire["horizon"]["future"] = json!({"private_canary": "DO_NOT_EXPORT_REMINDER_TEXT"});
+        if let Some(clock) = wire["horizon"].get_mut("clock") {
+            clock["future"] = json!({"private_canary": "DO_NOT_EXPORT_CLOCK_CONTEXT"});
+        }
+        let decoded: ScheduleDue = serde_json::from_value(wire).unwrap();
+        decoded.check().unwrap();
+        assert_eq!(decoded, value);
+        assert!(
+            !serde_json::to_string(&decoded)
+                .unwrap()
+                .contains("DO_NOT_EXPORT")
+        );
+    }
 }
 
 #[test]

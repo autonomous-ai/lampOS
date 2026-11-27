@@ -1,6 +1,6 @@
 //! Local failure fixtures, not measurements of a stalled disk or lamp timing.
 use lamp_bus::{Bus, Subscriber};
-use lamp_msgs::{Diagnostic, Level, ScheduleDue};
+use lamp_msgs::{Diagnostic, Level, ScheduleDue, ScheduleHorizon, ScheduleHorizonClock};
 use lamp_schedule::{
     runtime::{Clock, Config, STALE_AFTER, serve},
     time::ClockSample,
@@ -407,6 +407,14 @@ fn a_blocked_owner_withdraws_due_readiness_then_recovers_the_same_delivery() {
     let before = receive_due(&mut due, Duration::from_secs(3), |state| {
         state.ready && state.pending == 1
     });
+    assert_eq!(
+        before.horizon,
+        Some(ScheduleHorizon::Next {
+            sampled_boot_ms: 2000,
+            in_ms: 0,
+            clock: ScheduleHorizonClock::Elapsed,
+        })
+    );
     let original = before.oldest.unwrap();
     let queued_request = json!({
         "op":"set",
@@ -433,6 +441,7 @@ fn a_blocked_owner_withdraws_due_readiness_then_recovers_the_same_delivery() {
     assert_eq!(stale.revision, before.revision);
     assert_eq!(stale.store_id, before.store_id);
     assert!(stale.oldest.is_none());
+    assert!(stale.horizon.is_none());
     assert!(stale.stamp.sequence > before.stamp.sequence);
     let failure = receive_diagnostic(&mut diagnostics, false);
     assert_eq!(failure.level, Level::Error);
@@ -450,6 +459,14 @@ fn a_blocked_owner_withdraws_due_readiness_then_recovers_the_same_delivery() {
         state.ready && state.stamp.sequence > stale.stamp.sequence
     });
     let resumed_elapsed = resumed_at.elapsed();
+    assert_eq!(
+        resumed.horizon,
+        Some(ScheduleHorizon::Next {
+            sampled_boot_ms: 3000,
+            in_ms: 0,
+            clock: ScheduleHorizonClock::Elapsed,
+        })
+    );
     let notice = resumed.oldest.unwrap();
     assert_eq!(resumed.pending, 1);
     assert_eq!(resumed.revision, before.revision);

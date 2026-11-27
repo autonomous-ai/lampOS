@@ -285,6 +285,7 @@ fn notice(at: u64, sequence: u64) -> ScheduleDue {
         ready: true,
         pending: 1,
         waiting_for_clock: 0,
+        horizon: None,
         oldest: Some(ScheduleNotice {
             id: 1,
             delivery: 1,

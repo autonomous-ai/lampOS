@@ -666,6 +666,28 @@ scheduled Unix time and lateness metadata. Reminder text stays off this
 topic. A disabled or unavailable Schedule reports no oldest notice, even
 when pending work remains.
 
+The optional `horizon` describes upcoming work using fixed enums, numeric
+durations and clock samples. It distinguishes an empty schedule from a next deadline and
+unknown clock, unread state, retained newer store or unavailable owner. An
+absent horizon is unknown, including messages from older builds. Existing
+notice and delivery semantics are unchanged. Known horizons require readiness
+and include the exact source boot-clock sample; consumers must age the value
+from that sample, not from the later bus publication. On Linux the source
+sample is `CLOCK_BOOTTIME`, while the bus stamp remains `CLOCK_MONOTONIC`.
+Next-horizon metadata also says whether any active deadline needs wall time;
+if so it carries the trusted source Unix sample. Its conservative ageing
+helper uses the larger wall or boot age and refuses missing wall trust.
+It accounts for the current wall delta against unchanged sampled deadlines;
+it cannot remember an intermediate correction or a durable pending transition.
+Consumers must invalidate old samples on observed corrections/source changes
+and continue checking fresh owner state. This snapshot is not a reservation.
+See [Schedule's horizon contract](schedule.md#upcoming-work-horizon).
+
+This allows background evaluation to defer near a reminder without listing
+its words. It does not reserve a quiet interval or permit speech, capture,
+light or motion. A consumer must keep rechecking current source freshness,
+publisher, readiness and deadline changes while it works.
+
 Schedule's own persistent queue survives Voice being busy or down. The bus
 does not supply that durability: an event can be lost and a latest value
 replaces its predecessor. Publishing a value, reading it, or observing a

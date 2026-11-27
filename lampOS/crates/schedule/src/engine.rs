@@ -6,7 +6,10 @@ use crate::{
     time::{self, ClockSample, Deadline, When},
 };
 use lamp_local_time::LocalTime;
-use lamp_msgs::{ClockStamp, ScheduleDue, ScheduleNotice};
+use lamp_msgs::{
+    ClockStamp, ScheduleDue, ScheduleHorizon, ScheduleHorizonClock, ScheduleHorizonUnknown,
+    ScheduleNotice,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -42,6 +45,17 @@ fn written_schema(state: &State) -> u32 {
 }
 
 pub const MAX_ITEMS: usize = 128;
+
+/// Whether the owner established that no other retained store hides reminders.
+/// The runtime samples directory names once, after both store opens; this is
+/// not a claim that another process cannot change the directory afterwards.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RetainedStoreVisibility {
+    Complete,
+    Retained,
+    Unknown,
+}
+
 pub const MAX_TEXT_BYTES: usize = 300;
 pub const LATE_AFTER_MS: u64 = 1000;
 
@@ -1229,6 +1243,92 @@ impl<P: Persistence> Engine<P> {
             pending: pending as u32,
             waiting_for_clock: waiting as u32,
             oldest,
+            horizon: None,
+        }
+    }
+
+    /// The existing due queue plus a bounded, read-only projection of the next
+    /// effective deadline. It performs no persistence, recurrence advancement,
+    /// or delivery mutation. A horizon is a sample, never a reservation: callers
+    /// must keep checking fresh owner state while doing quiet work.
+    pub fn due_with_horizon(
+        &self,
+        now: &ClockSample,
+        stamp: ClockStamp,
+        ready: bool,
+        visibility: RetainedStoreVisibility,
+    ) -> ScheduleDue {
+        let mut due = self.due(now, stamp, ready);
+        if due.ready {
+            due.horizon = Some(
+                if due.stamp.check().is_err() || due.stamp.clock_id != now.boot_id {
+                    ScheduleHorizon::Unknown {
+                        reason: ScheduleHorizonUnknown::Unavailable,
+                    }
+                } else {
+                    self.horizon(now, visibility)
+                },
+            );
+        }
+        due
+    }
+
+    fn horizon(&self, now: &ClockSample, visibility: RetainedStoreVisibility) -> ScheduleHorizon {
+        let unknown = |reason| ScheduleHorizon::Unknown { reason };
+        if now.check().is_err()
+            || now.boot_id != self.last_clock.boot_id
+            || now.boot_ms < self.last_clock.boot_ms
+            || self.state.items.len() + self.state.unread.len() > MAX_ITEMS
+        {
+            return unknown(ScheduleHorizonUnknown::Unavailable);
+        }
+        if visibility == RetainedStoreVisibility::Unknown {
+            return unknown(ScheduleHorizonUnknown::Unavailable);
+        }
+        if visibility == RetainedStoreVisibility::Retained || self.set_aside.is_some() {
+            return unknown(ScheduleHorizonUnknown::RetainedStore);
+        }
+        if !self.state.unread.is_empty() {
+            return unknown(ScheduleHorizonUnknown::Unread);
+        }
+        let mut next = None;
+        let mut clock = ScheduleHorizonClock::Elapsed;
+        for item in &self.state.items {
+            // Once durably pending, a wall-clock correction cannot retract it.
+            let in_ms = if item.pending.is_some() {
+                0
+            } else {
+                let deadline = item.effective();
+                // A wall correction can make a later calendar item earliest.
+                // Record every nonpending deadline's dependency, not only the
+                // current minimum. A snooze may use elapsed time; a timer from
+                // another boot needs wall time just like a calendar reminder.
+                if deadline
+                    .elapsed
+                    .as_ref()
+                    .is_none_or(|elapsed| elapsed.boot_id != now.boot_id)
+                {
+                    clock = ScheduleHorizonClock::Wall {
+                        sampled_unix_ms: now.unix_ms,
+                    };
+                }
+                match time::remaining_ms(deadline, now) {
+                    Ok(Some(left)) => left.max(0) as u64,
+                    Ok(None) => return unknown(ScheduleHorizonUnknown::Clock),
+                    Err(_) => return unknown(ScheduleHorizonUnknown::Unavailable),
+                }
+            };
+            next = Some(next.map_or(in_ms, |earliest: u64| earliest.min(in_ms)));
+        }
+        match next {
+            Some(in_ms) => ScheduleHorizon::Next {
+                sampled_boot_ms: now.boot_ms,
+                in_ms,
+                clock,
+            },
+            None => ScheduleHorizon::Empty {
+                sampled_boot_ms: now.boot_ms,
+            },
         }
     }
 

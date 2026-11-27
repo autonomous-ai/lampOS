@@ -1,7 +1,7 @@
 //! Bounded local transport. Disk work has one owner; socket readers and bus
 //! heartbeats remain independent of a slow client or a blocked storage commit.
 use crate::{
-    engine::{Engine, Error as EngineError},
+    engine::{Engine, Error as EngineError, RetainedStoreVisibility},
     protocol::{MAX_LINE_BYTES, MAX_REPLY_BYTES, Request, refusal},
     store::Store,
     time::ClockSample,
@@ -303,10 +303,11 @@ fn report<P: crate::engine::Persistence>(
     engine: &Engine<P>,
     sample: ClockSample,
     requests: u64,
+    visibility: RetainedStoreVisibility,
 ) -> io::Result<Report> {
     Ok(Report {
         updated: Instant::now(),
-        due: engine.due(&sample, stamp(&sample, 0)?, true),
+        due: engine.due_with_horizon(&sample, stamp(&sample, 0)?, true, visibility),
         items: engine.counts(&sample).0,
         unread: engine.unread(),
         zone_fallback: engine
@@ -320,6 +321,7 @@ fn report<P: crate::engine::Persistence>(
 fn work<C: Clock>(
     mut engine: Engine<Store>,
     clock: C,
+    visibility: RetainedStoreVisibility,
     incoming: Receiver<Work>,
     current: Arc<Mutex<Report>>,
     stop: Arc<AtomicBool>,
@@ -351,7 +353,7 @@ fn work<C: Clock>(
         }
         let now = clock.sample()?;
         engine.tick(&now).map_err(io::Error::other)?;
-        let next = report(&engine, now, requests)?;
+        let next = report(&engine, now, requests, visibility)?;
         *current
             .lock()
             .map_err(|_| io::Error::other("Schedule report lock poisoned"))? = next;
@@ -517,10 +519,20 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
     let mut engine =
         Engine::open_with_offset(store, &config.zone, config.utc_offset_minutes, &sample, &id)
             .map_err(io::Error::other)?;
+    // Either open can retain a newer store. Bound this names-only scan once,
+    // after both opens; the owner never creates another retained file later.
+    // The result, including an unreadable directory, stays latched until restart.
+    let retained = crate::store::kept_aside_bounded(&config.dir);
+    let visibility = match &retained {
+        Ok(None) => RetainedStoreVisibility::Complete,
+        Ok(Some(_)) => RetainedStoreVisibility::Retained,
+        Err(_) => RetainedStoreVisibility::Unknown,
+    };
+    let set_aside = retained.ok().flatten();
     // A reminder every so many minutes or hours, only with its own switch.
     engine.allow_every(std::env::var(EVERY_SWITCH).ok().as_deref() == Some("on"));
     engine.tick(&sample).map_err(io::Error::other)?;
-    let current = Arc::new(Mutex::new(report(&engine, sample, 0)?));
+    let current = Arc::new(Mutex::new(report(&engine, sample, 0, visibility)?));
     let (listener, _binding) = bind(&config.socket)?;
     let bus = Bus::new(&config.bus_root)?;
     let mut due =
@@ -533,7 +545,16 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
     let owner_stop = stop.clone();
     let owner = thread::Builder::new()
         .name("schedule-store".into())
-        .spawn(move || work(engine, clock, owner_rx, owner_current, owner_stop))?;
+        .spawn(move || {
+            work(
+                engine,
+                clock,
+                visibility,
+                owner_rx,
+                owner_current,
+                owner_stop,
+            )
+        })?;
     let (clients_tx, clients_rx) = mpsc::sync_channel::<(UnixStream, Instant)>(CLIENT_QUEUE);
     let clients_rx = Arc::new(Mutex::new(clients_rx));
     let rejected = Arc::new(AtomicU64::new(0));
@@ -601,16 +622,19 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
                 state.ready = ready;
                 if !ready {
                     state.oldest = None;
+                    state.horizon = None;
                 }
                 let at_us = state.stamp.at_us;
                 publish(&mut due, at_us, &state, &mut publish_errors);
-                // A folder that can't be listed says nothing rather than
-                // stopping the part.
-                let set_aside = crate::store::kept_aside(&config.dir).ok().flatten();
                 let (level, message) = if !ready {
                     (Level::Error, "Schedule storage worker is not progressing")
                 } else if publish_errors > 0 {
                     (Level::Warn, "Schedule has bus publication failures")
+                } else if visibility == RetainedStoreVisibility::Unknown {
+                    (
+                        Level::Warn,
+                        "Schedule could not establish whether another store was kept aside",
+                    )
                 } else if set_aside.is_some() {
                     (
                         Level::Warn,
