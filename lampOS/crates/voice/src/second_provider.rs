@@ -1426,8 +1426,9 @@ pub const PERSON_SCOPE_ONE_FACE_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE"
 /// ([`Engine::reading_by_one_face`]).
 pub const PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE_FACE_READS";
 
-/// With [`PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT`] and the eyes reading
-/// who speaks (`LAMP_EYES_SPEAKING`): on a line its person's by their own
+/// With [`PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT`] (the voice's own copy
+/// of the eyes' speaking, `LAMP_EYES_SPEAKING`, not needed: off in the
+/// product since #8791): on a line its person's by their own
 /// known face alone in view, the mouth not seen saying it
 /// (`ScopeLease::in_view_by_one_face`: not carried, sticky, gap-held or
 /// narrowed), a forget, a correction (`remember` with `replaces`),
@@ -1437,7 +1438,9 @@ pub const PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_ONE
 /// [`take_held_forget`]). A bare "forget that" right after their one-face
 /// keep is held as the forget of that kept id. The memory owner's ruling on
 /// #8570 (25 Nov, 14:33): mouth detection is not trustable, a confirmation
-/// tells the person what is removed, and the scope is single-user. Carried
+/// tells the person what is removed, and the scope is single-user; restated
+/// 27 Nov 14:11, "mouth moving is not used anymore and not affect forget or
+/// correction in memory", and switched on in the product. Carried
 /// and sticky lines, gap holds, a second face, another's yes, a no and a
 /// late yes are as before. `on`, and nothing else; off, as before, byte for
 /// byte.
@@ -17848,13 +17851,15 @@ fn take_held_forget(
         return Taken::Nothing;
     };
     // With `LAMP_ONE_FACE_FORGETS_ON_YES` (the memory owner's ruling on
-    // #8570): this yes line is theirs by their own face alone in view, the
-    // eyes reading who speaks and no face seen speaking it, so their yes
-    // counts with no mouth seen. A face seen speaking it is judged by sight
-    // as before; a carried, sticky, gap-held or narrowed line never is one.
+    // #8570, restated 27 Nov 14:11: the mouth is not used for a forget or a
+    // correction): this yes line is theirs by their own face alone in view
+    // and no other face seen speaking it (the scope's one-face test, from
+    // the eyes' marks), so their yes counts with no mouth seen and with or
+    // without the voice's own copy of the eyes' speaking (#8791 turned it
+    // off). A face the voice's copy saw speaking it never counts; a
+    // carried, sticky, gap-held or narrowed line never is one.
     let face_yes_line = yes_line.in_view
         && one_face_forgets_on_yes()
-        && shared.forget_sight.is_some()
         && !sight
             .as_ref()
             .is_some_and(|(seen, speakers, _)| *seen == request && !speakers.is_empty());
@@ -18101,9 +18106,13 @@ fn take_held_forget(
         Some(why)
     } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
         Some(TOO_LATE)
-    } else if held.call.name == crate::remember::REMEMBER && shared.forget_sight.is_none() {
+    } else if held.call.name == crate::remember::REMEMBER
+        && !by_face
+        && shared.forget_sight.is_none()
+    {
         // A carried line's keep is let go only on a yes their face is seen
-        // saying ([`hold_carried_keep`]).
+        // saying ([`hold_carried_keep`]); a correction held for their yes by
+        // their face alone in view needs no sight (`by_face`).
         Some("the eyes don't read who speaks")
     } else if keep_by_face || by_face {
         None
@@ -18136,6 +18145,16 @@ fn take_held_forget(
                 "lamp-voice second: request {request}: dropped a held forget ({}, held in request {}): {why}",
                 held.call.name, held.request
             );
+            // A call held for a yes by their face says so in machine words
+            // too (row 8654 L4): one still not asked when a later line takes
+            // it is one whose turn was cut and never settled.
+            if held.face_yes {
+                eprintln!(
+                    "lamp-voice second: request {request}: face-hold: dropped: {} ({}) (LAMP_ONE_FACE_FORGETS_ON_YES)",
+                    if held.asked { "on_line" } else { "unfinished" },
+                    held.call.name
+                );
+            }
             // A yes too late or not theirs is told (#7478).
             dropped_yes(held.call.name, why, asker, &held.asker)
         }
@@ -18968,7 +18987,6 @@ fn agreed_on_face_yes(
     if !one_face_forgets_on_yes()
         || !bare
         || !heard
-        || shared.forget_sight.is_none()
         || held_by_gap(scope)
         || !lease.in_view_by_one_face()
         || !crate::remember::heard::only_a_yes(said)
@@ -19024,7 +19042,8 @@ fn is_quiet_note(message: &Message) -> bool {
 /// With `LAMP_ONE_FACE_FORGETS_ON_YES` (the memory owner's ruling on
 /// #8570): on a spoken line its person's by their own known face alone in
 /// view, the mouth not seen saying it (`ScopeLease::in_view_by_one_face`),
-/// with the eyes reading who speaks, `call` is held for their one yes
+/// with or without the voice's own copy of the eyes' speaking, `call` is
+/// held for their one yes
 /// ([`HeldForget::face_yes`]), never run now and never refused: a
 /// `forget_everything` (unless `everything_refused`, these words asking
 /// for something less or not to), a `forget_my_face`, a correction (a
@@ -19069,8 +19088,6 @@ fn hold_on_face_yes(
     let bare = bare_forget(call, said);
     let why = if !heard {
         Some("not_heard")
-    } else if shared.forget_sight.is_none() {
-        Some("no_sight")
     } else if held_by_gap(scope) {
         Some("gap_held")
     } else if !lease.in_view_by_one_face() {
