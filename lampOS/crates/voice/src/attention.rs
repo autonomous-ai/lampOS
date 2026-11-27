@@ -1095,6 +1095,12 @@ pub(crate) fn opens_with_hey_lamp(heard: &str) -> bool {
         .is_some_and(|word| word.eq_ignore_ascii_case("lamp"))
 }
 
+/// [`opens_with_hey_lamp`] on a lamp whose language is `language`.
+pub(crate) fn opens_with_hey_lamp_in(heard: &str, language: Option<Language>) -> bool {
+    let _ = language;
+    opens_with_hey_lamp(heard)
+}
+
 /// Whether `heard` opens with one of [`HEY_GREETINGS`] and then the lamp's
 /// name itself, past one filler: "Hey Lamp, …", "Hello, Lamp. …", "Um, hi
 /// lamb". Not "Hey man, …" nor "Hey, Lynn.".

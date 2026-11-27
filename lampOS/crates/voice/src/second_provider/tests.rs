@@ -6353,6 +6353,83 @@ async fn with_short_replies_carry_a_short_sound_in_a_conversation_is_judged_as_a
     assert!(!super::filler_only("Two."));
 }
 
+/// #8892, Reviewer-three's P2 (`LAMP_SIMPLE_CALL`): a checked short sound
+/// with a word in it is judged by the one rule, whose window runs from the
+/// end of the lamp's last words to the line's own start, never by the
+/// thread's 45 s (`sound_carries`), counted from the first stored answer,
+/// which a long answer or a late transcript outlasts. The thread's 45 s over,
+/// "Sixty four." begun 19 s after the lamp's words is answered, however late
+/// its words come; begun 25 s after them, it is held. A number, not "Yes.",
+/// which is a short word's exception.
+#[tokio::test]
+async fn with_simple_call_a_short_reply_is_judged_by_the_simple_window_not_the_threads() {
+    let run = |after_s: u64| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new(vec![Ok("Sixty four.".to_owned())].into()),
+            chats: Mutex::new(vec![vec![text("Sixty five."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let heeding = Arc::new(Mutex::new(super::worker::Heeding::new(
+            true, false, None, None,
+        )));
+        {
+            let mut rule = heeding.lock().unwrap();
+            rule.as_the_only_voice(false, true, false);
+            rule.hearing_only_said_to_me();
+            rule.taking_simple_calls();
+        }
+        let judge = heeding.clone();
+        let mut engine = engine
+            .checking_sounds(true)
+            .answering_the_lamp(Arc::new(|_| false))
+            // The thread's 45 s, from its first stored answer, is over.
+            .carrying_short_sounds_in_conversation(Arc::new(|_| false))
+            .taking_simple_calls()
+            .heeding(Arc::new(move |request, said, heard, from, lead| {
+                judge
+                    .lock()
+                    .ok()
+                    .and_then(|mut rule| rule.heed_led(request, said, heard, from, lead))
+            }));
+        // The lamp's last words ended `after_s` before the reply's first
+        // sound, as the route and the rule both keep it.
+        let began_us = monotonic_us();
+        let until_us = began_us.saturating_sub(after_s * 1_000_000);
+        engine
+            .shared
+            .said_until_us
+            .store(until_us, Ordering::Relaxed);
+        heeding.lock().unwrap().lamp_did(Did::Said(1, until_us));
+        let request = 2;
+        engine.submit(start(request));
+        engine.submit(ProviderInput::Audio {
+            request,
+            privacy_generation: 1,
+            sequence: 1,
+            read_completed_at_us: began_us,
+            samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+        });
+        engine.submit(ProviderInput::End {
+            request,
+            privacy_generation: 1,
+            sound: true,
+            cut_in: false,
+        });
+        let labels = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        (labels, asked)
+    };
+    let (labels, asked) = run(19).await;
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(asked, 1, "19 s after the lamp's words: answered");
+    let (labels, asked) = run(25).await;
+    assert_eq!(asked, 0, "25 s after the lamp's words: held: {labels:?}");
+}
+
 /// #7834: on lamp-9adf on 19 Nov "Lamp, put it back." ended as a short
 /// sound and was held 2 times in 5, `LAMP_ENDPOINT_PAUSE_JOIN` being off
 /// there. A line begun with the lamp's name set off is never held as a

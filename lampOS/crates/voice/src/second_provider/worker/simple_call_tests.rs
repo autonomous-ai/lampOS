@@ -345,10 +345,13 @@ fn simple_call_carries_the_call_for_15_s() {
     );
 }
 
-/// The audit's #11: a turn a computer opened is no call. A line in it,
-/// with no "Hey Lamp", is held; a tap still calls.
+/// A turn a computer opened is a call, as a tap is (the Reviewer-lead's
+/// P2 1 on #8892: an explicit call the Harness team relies on,
+/// `docs/control.md`; the coordinator opens it only within 8 s of
+/// `turn.start`). A line in it with no "Hey Lamp" is answered; so is one
+/// just after a head tap.
 #[test]
-fn simple_call_a_computers_turn_is_no_call_and_a_tap_is() {
+fn simple_call_a_computers_turn_and_a_tap_are_calls() {
     let _one = crate::provider_worker::tests::one_thread();
     use crate::room_told::Room;
     let mut heeding = heeding(true, None);
@@ -362,7 +365,7 @@ fn simple_call_a_computers_turn_is_no_call_and_a_tap_is() {
             "What time is it?",
             signs(None, Room::Unknown, vec![])
         ),
-        Some(crate::second_provider::SIMPLE_HELD)
+        None
     );
     let mut heeding = self::heeding(true, None);
     let now = monotonic_us();
@@ -454,4 +457,127 @@ fn simple_call_turns_the_switches_read_through_it_off() {
         Some("on")
     );
     assert_eq!(unless_simple_with(None, false), None);
+}
+
+/// The window's edges (the Reviewer-lead's P3): a line begun 19 s after the
+/// end of the lamp's last words is answered, one begun 21 s after is held.
+#[test]
+fn simple_call_the_windows_edges_are_19_and_21_s() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let line = |ended_ago_s: u64| {
+        let mut heeding = heeding(true, Some(ended_ago_s));
+        let now = monotonic_us();
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "Sixty four.",
+            signs(None, Room::Unknown, vec![]),
+        )
+    };
+    assert_eq!(line(19), None, "19 s");
+    assert_eq!(line(21), Some(crate::second_provider::SIMPLE_HELD), "21 s");
+}
+
+/// Near-misses of "Hey Lamp" are no call (the Reviewer-lead's P3): a word
+/// before the greeting, a word between it and the name, or a longer word
+/// than the name.
+#[test]
+fn simple_call_near_misses_of_hey_lamp_are_held() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    for heard in [
+        "Okay hey Lamp, what time is it?",
+        "Hey there Lamp, what time is it?",
+        "Hey Lampshade, what time is it?",
+    ] {
+        let mut heeding = heeding(true, None);
+        let now = monotonic_us();
+        assert_eq!(
+            judged(
+                &mut heeding,
+                9,
+                now,
+                heard,
+                signs(None, Room::Unknown, vec![])
+            ),
+            Some(crate::second_provider::SIMPLE_HELD),
+            "{heard}"
+        );
+    }
+}
+
+/// A spoken "Stop." in the window is judged as a line, as any line is: let
+/// out (the Reviewer-lead's P3). A stop said over the lamp's own voice is
+/// the coordinator's spoken stop, unchanged.
+#[test]
+fn simple_call_a_spoken_stop_in_the_window_is_judged_as_a_line() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, Some(5));
+    let now = monotonic_us();
+    assert_eq!(
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "Stop.",
+            signs(None, Room::Unknown, vec![])
+        ),
+        None
+    );
+}
+
+/// A lamp in another language (the Reviewer-lead's P1 on #8892): its call
+/// is the greeting and the name as its speech to text writes them
+/// (`attention::written`), still strictly in the words. "Hey Lamp" in Latin
+/// letters calls on every lamp.
+fn calls_in(language: crate::language::Language, heard: &str) -> bool {
+    crate::attention::opens_with_hey_lamp_in(heard, Some(language))
+}
+
+#[test]
+fn simple_call_a_japanese_lamps_call() {
+    use crate::language::Language::Japanese;
+    assert!(calls_in(Japanese, "ヘイ、ランプ、今何時？"));
+    assert!(calls_in(Japanese, "ヘイランプ、今何時？"));
+    assert!(calls_in(Japanese, "Hey Lamp, what time is it?"));
+    assert!(!calls_in(Japanese, "ランプを消して"));
+    assert!(!calls_in(Japanese, "前、今何時？"));
+    assert!(!calls_in(Japanese, "ヘイ、ランプシェード"));
+}
+
+#[test]
+fn simple_call_a_chinese_lamps_call() {
+    use crate::language::Language::Chinese;
+    assert!(calls_in(Chinese, "嘿，兰普，现在几点？"));
+    assert!(calls_in(Chinese, "嘿兰普现在几点"));
+    assert!(!calls_in(Chinese, "兰普现在几点"));
+}
+
+#[test]
+fn simple_call_a_korean_lamps_call() {
+    use crate::language::Language::Korean;
+    assert!(calls_in(Korean, "헤이 램프, 지금 몇 시야?"));
+    assert!(!calls_in(Korean, "램프가 고장났어."));
+    assert!(!calls_in(Korean, "지금 몇 시야?"));
+}
+
+#[test]
+fn simple_call_a_vietnamese_lamps_call() {
+    use crate::language::Language::Vietnamese;
+    assert!(calls_in(Vietnamese, "Hây lăm, mấy giờ rồi?"));
+    assert!(calls_in(Vietnamese, "Hey Lamp, mấy giờ rồi?"));
+    assert!(!calls_in(Vietnamese, "Làm, mấy giờ rồi?"));
+    assert!(!calls_in(Vietnamese, "Này, làm."));
+}
+
+#[test]
+fn simple_call_a_french_lamps_call() {
+    use crate::language::Language::French;
+    assert!(calls_in(French, "Hey man, quelle heure est-il ?"));
+    assert!(calls_in(French, "Hey Lamp, quelle heure est-il ?"));
+    assert!(!calls_in(French, "La lampe est cassée."));
+    assert!(!calls_in(French, "Thème de la soirée ?"));
 }

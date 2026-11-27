@@ -2315,6 +2315,8 @@ struct Shared {
     /// `LAMP_SHORT_REPLIES_CARRY` (#8772): whether a conversation is going on
     /// for a checked sound ([`Engine::carrying_short_sounds_in_conversation`]).
     sound_carries: Option<Asked>,
+    /// `LAMP_SIMPLE_CALL` ([`Engine::taking_simple_calls`]).
+    simple_call: bool,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
     /// When the wait sound comes ([`CUE_AFTER`], or [`CUE_AFTER_ENVIRONMENT`]'s).
@@ -5727,6 +5729,7 @@ impl Engine {
                 words_back: None,
                 asked: None,
                 sound_carries: None,
+                simple_call: false,
                 cues: None,
                 cue_after: CUE_AFTER,
                 every_tool_cued: false,
@@ -6873,6 +6876,18 @@ impl Engine {
     pub fn carrying_short_sounds_in_conversation(mut self, going_on: Asked) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.sound_carries = Some(going_on);
+        }
+        self
+    }
+
+    /// `LAMP_SIMPLE_CALL` (the product owner, 27 Nov 2026): a checked short
+    /// sound with a word in it, not a filler, is judged by the one rule
+    /// ([`worker::Heeding::taking_simple_calls`]), whose window runs from the
+    /// end of the lamp's last words to the line's own start. Before any turn
+    /// only.
+    pub fn taking_simple_calls(mut self) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.simple_call = true;
         }
         self
     }
