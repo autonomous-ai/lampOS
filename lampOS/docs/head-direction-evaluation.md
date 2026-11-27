@@ -1,17 +1,115 @@
-# Head direction: offline comparison
+# Head direction: comparison and runtime observation
 
 For [#8847](https://github.com/autonomous-ai/lampOS/issues/8847), the
 `head_direction_compare` example compares the existing five-mark geometry
-with an isolated copy of the closed [#8782](https://github.com/autonomous-ai/lampOS/pull/8782)
-mesh geometry. It produces observations for development. It does not score
-accuracy, decide that a person faces a screen or phone, or enable a sensor.
-No product unit, bus field, voice policy or camera reader is changed.
+with the checked geometry from the closed
+[#8782](https://github.com/autonomous-ai/lampOS/pull/8782) draft. A separate,
+default-off runtime observer counts its availability using meshes the eyes
+already computed. Neither path scores accuracy, decides that a person faces
+a screen or phone, or changes a product unit, bus field or voice policy.
+The observer adds no camera reader, inference or worker thread.
+
+The pure geometry moved from `examples/head_direction/geometry.rs` to
+[`src/head_direction/geometry.rs`](../crates/eyes/src/head_direction/geometry.rs)
+without changing its math. The
+[`head_direction_compare` example](../crates/eyes/examples/head_direction_compare.rs)
+now imports that shared implementation; this does not relabel the earlier
+offline results or qualify runtime behavior.
 
 The approved goal is at least 95% recall separately for lamp, screen and
 phone head-facing targets on the Reviewer's shared, independently labelled
 set: at least 80 held-out episodes per target and six speakers. Head
 direction is distinct from eye gaze, speaker identity and intended
-recipient. This offline tool alone cannot establish any of those goals.
+recipient. Neither the offline comparison nor runtime availability counts
+establish any of those goals.
+
+## Default-off runtime observer
+
+`lamp-eyes --head-direction-observer on|off` accepts exactly `on` or `off`
+and defaults to `off`. No product unit enables it. Enabling this explicit
+observation option does not enable the mouth model, pitch/gaze, a camera
+permission, a bus publication or a policy consumer. With it off, no observer
+is constructed. With it on, the
+[`Observer`](../crates/eyes/src/head_direction/mod.rs) borrows the current
+processing look's picture, detections and existing mesh results; it does
+not infer another mesh, copy a frame for analysis, change the look cadence
+or choose a person for the voice.
+
+The observer is called around the existing capture open/read and at the
+existing look's geometry boundary in
+[`main.rs`](../crates/eyes/src/main.rs). Its
+[`freshness` guard](../crates/eyes/src/head_direction/freshness.rs) checks
+capture/source identity, permission generation, sequence, monotonic source
+time and source age again after the borrowed geometry. Capture metadata and
+tickets are local only. A close clears the observer's active receipt; a
+pending look is counted as cancelled. These sampled checks do not implement
+an atomic revoke/publish fence, cancel existing inference or authorize a
+pose export. A future raw-pose publisher and its consumers still need their
+reviewed final authority boundary.
+
+### Journal record and denominator
+
+At most once per 60 seconds, when no look is pending, the existing main loop
+may write one `lamp-eyes: head_direction_observer {JSON}` journal line. A
+delayed loop produces a longer `window_us`; this is elapsed duration, not an
+event timestamp or a fixed wall-clock minute. After a report, its counters
+reset. This is one bounded, fixed-schema record, not a per-look trace or
+durable history recorder:
+
+| Field | Meaning |
+| --- | --- |
+| `schema`, `method` | Fixed `lamp-head-direction-observer/1` and `mesh_head_3a9ae0692_checked`. |
+| `window_us`, `frames`, `looks` | Elapsed reporting duration, existing camera frames observed, and existing processing looks begun. Frames and looks are different denominators. |
+| `outcomes` | One primary outcome per completed or cancelled processing look. Availability means usable geometry passed this observer's gates, not correct direction. |
+| `frame_rejections`, `look_rejections` | Counts by the guard's fixed reason enum, at frame receipt and final look acceptance respectively. The same source failure can appear at both stages; do not add these populations together. |
+| `age_bin_exclusive_upper_us`, `working_crop_source_age_us`, `full_crop_source_age_us` | Fixed histogram edges and counts, split by existing crop and driver timestamp point. Only fresh, available geometry enters them. |
+| `saturated` | A counter reached its integer limit. Such a window is not a complete count. |
+
+The processing-look outcomes stay separate: `available`, `no_face`,
+`multiple_faces`, `filtered_face`, `detection_skipped`, `decode_failed`,
+`detector_failed`, `too_small`, `outside_frame`, `clipped_face`,
+`mesh_not_configured`, `mesh_deferred`, `mesh_unavailable`,
+`invalid_geometry`, `rejected` and `cancelled`. Multiple detections are
+ambiguous even when the existing still-face filter later removes all but
+one. Missing or deferred meshes do not fall back to five marks. A failed
+final freshness/permission check makes the look `rejected`, with its fixed
+reason, rather than accepting its geometry or no-face outcome.
+
+Guard reasons distinguish missing/changed permission, absent or mismatched
+capture/source, unknown or invalid clock/timestamp/domain/point, timestamps
+before open or in the future, regressed time/sequence, duplicate sequence,
+stale or superseded observations, invalid age configuration and exhausted
+generation. See `Reason` for the exact closed vocabulary. No driver message,
+identity, face box, image, landmarks, angle, source timestamp or per-look
+identifier is included in this JSON. The temporary angles are discarded.
+Zero looks mean no processing opportunities were observed in that window;
+they do not demonstrate successful sensing.
+
+### Source-age evidence is not latency qualification
+
+The observer reuses the camera's exclusive source-age ceiling: **less than
+250,000 microseconds** at acceptance. This is an admissibility ceiling,
+not the approved p95 **100 ms or less** source-to-usable-output budget.
+Each histogram has exclusive upper edges of 25,000, 50,000, 100,000,
+150,000, 200,000 and 250,000 microseconds. Its `start_of_exposure` and
+`end_of_frame` arrays stay separate: an end-of-frame timestamp is not an
+exposure start. Working-picture and full-frame crop arrays also stay
+separate; the observer never enables the full crop itself.
+
+Available looks older than the 100 ms budget remain in the upper bins;
+looks at or beyond the 250 ms ceiling remain as `stale` rejections, without
+a histogram entry. Unknown timestamps and other rejected outcomes also
+remain counted. A percentile computed only from accepted histogram samples
+would omit these tails and failures; it cannot establish whole-path p95,
+recall or a qualified sensor. Existing processing looks are not independent
+labelled head-turn, utterance or lamp/screen/phone opportunities.
+
+The added observer overhead target is **p95 below 1 ms**, including checks
+and geometry on the existing path. On-lamp overhead, periodic journal cost,
+voice interference, thermals and the overall source-to-usable-output budget
+have not yet been measured. No timing target is marked passed by this step.
+The fleet recorder/upload, a live per-case adapter to the reviewed scorer,
+a reviewed raw-pose export fence and sensor qualification are not implemented.
 
 ## Run without a lamp
 
@@ -168,14 +266,15 @@ reported. A missed away face counted as a correct rejection. Its reported
 91–92% is neither a result for this implementation nor a held-out three-class
 qualification score. Preserve it under that original method and denominator.
 
-Before runtime integration, the candidate needs its own default-off gate,
-capture-time provenance, bounded work and cancellation, explicit unknown
-handling and a reviewed export boundary. Existing `Faces::for_skills`
-removes only pitch and looking; adding another head field without extending
-that boundary would expose it to skills. The candidate must not overwrite
-legacy fields, turn absence into away, hold a voice line, or publish gaze
-or identity. Only aggregate outcome/timing counts and versioned coverage
-belong in the fleet evaluator.
+The runtime observer above supplies a default-off, bounded availability and
+source-age prerequisite. It does not supply labelled per-case output,
+fleet recording/upload, or the reviewed raw-pose export boundary needed by
+a future sensor. Existing `Faces::for_skills` removes only pitch and looking;
+adding another head field without extending that boundary would expose it
+to skills. The candidate must not overwrite legacy fields, turn absence
+into away, hold a voice line, or publish gaze or identity. Only reviewed
+aggregate outcome/timing counts and versioned coverage belong in the fleet
+evaluator; the local observer journal is not that integration.
 
 The team lead owns all lamp tests. Qualification needs the shared on-body
 set, then the approved stable/candidate A/B/B/A comparison with the corrected

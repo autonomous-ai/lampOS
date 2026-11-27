@@ -15,8 +15,7 @@ use std::{
     time::Instant,
 };
 
-#[path = "head_direction/geometry.rs"]
-mod geometry;
+use lamp_eyes::head_direction::geometry;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 const MAX_LIST_BYTES: usize = 1_048_576;

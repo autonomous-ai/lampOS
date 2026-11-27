@@ -1,4 +1,4 @@
-//! Offline head-pose candidate for #8847; no runtime or bus integration.
+//! Shared pure head-pose candidate for #8847; no I/O or publication.
 //!
 //! Reuses the geometry and canonical points from the closed #8782 draft,
 //! `3a9ae0692bcf1f9e38303db0c0865c84df9099e6`,
@@ -13,7 +13,7 @@
 //! Synthetic rigid-face tests establish mathematical behavior only; they do
 //! not establish the model's depth scale or accuracy on a real person.
 
-use lamp_eyes::mesh::LANDMARKS;
+use crate::mesh::LANDMARKS;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Head {
