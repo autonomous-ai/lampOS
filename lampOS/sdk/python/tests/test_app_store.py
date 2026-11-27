@@ -406,6 +406,9 @@ def test_the_studio_checks_signs_in_submits_and_lists(fake, tmp_path):
     try:
         status, page = _studio_call(studio, "")
         assert status == 200 and b"Lamp app studio" in page
+        # A listing with no visibility yet reads as the Store's word, as `lamp app status` says it.
+        assert b"x.visibility||'unlisted'" in page and b"'hidden'" not in page
+        assert stores.describe({"id": "1", "name": "a", "version": "1"}).split("\t")[3] == "unlisted"
         package = base64.b64encode(apps.pack(make_app(tmp_path)).data).decode()
         _, checked = _studio_call(studio, "api/check", {"file": package})
         assert json.loads(checked)["data"]["ok"] is True
