@@ -2854,3 +2854,48 @@ fn a_reminder_rung_not_told_never_holds_up_a_timer_due_in_the_same_outage() {
         consumer.outgoing.clear();
     }
 }
+
+/// Clips of two stores and a stray file in `dir`, as a consumer run with
+/// the switch on left them.
+fn left_clips(dir: &std::path::Path) -> crate::ring_clips::Clips {
+    fs::create_dir_all(dir).unwrap();
+    for name in [
+        format!("{STORE_ID}-4.wav"),
+        format!("{STORE_ID}-4.json"),
+        "11111111111111111111111111111111-7.wav".to_owned(),
+        "11111111111111111111111111111111-7.json".to_owned(),
+        "stray.tmp".to_owned(),
+    ] {
+        fs::write(dir.join(name), b"clip").unwrap();
+    }
+    crate::ring_clips::Clips::new(dir)
+}
+
+/// #8894: with the switch off nothing renders or sweeps the clips, so a
+/// deleted reminder's words stayed on the card. The consumer's start
+/// clears every file in the folder.
+#[test]
+fn the_clips_are_cleared_at_start_with_the_switch_off() {
+    let root = Temp::new();
+    let dir = root.0.join("ring-clips");
+    let clips = left_clips(&dir);
+    let mut off = consumer(Disk::default());
+    assert!(super::clips_at_start(&mut off, false, &clips).is_none());
+    assert!(off.upcoming.is_none());
+    let left: Vec<_> = fs::read_dir(&dir).unwrap().flatten().collect();
+    assert!(left.is_empty(), "{left:?}");
+}
+
+/// #8894: with the switch on the start leaves the clips to the walks'
+/// sweep.
+#[test]
+fn with_the_switch_on_start_up_keeps_the_clips() {
+    let root = Temp::new();
+    let dir = root.0.join("ring-clips");
+    let clips = left_clips(&dir);
+    let mut on = consumer(Disk::default());
+    let _ = super::clips_at_start(&mut on, true, &clips);
+    assert!(on.upcoming.is_some());
+    assert_eq!(fs::read_dir(&dir).unwrap().count(), 5);
+    assert_eq!(clips.kept(STORE_ID), BTreeSet::from([4]));
+}
