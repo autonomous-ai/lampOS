@@ -7913,7 +7913,9 @@ forces one), a skill it makes is made whole, with everything a run needs:
   "cũng" or after "dù": "ngày nào cũng …", "every day …", is no ask; nor
   is one a negation governs within its four words before in its own
   sentence, "don't", "do not", "never", "without", "no need", "đừng",
-  "không cần": "don't tell me how many emails, just say good morning"; nor
+  "không cần": "don't tell me how many emails, just say good morning",
+  but never one of forgetting, "don't forget", "never miss", "without
+  fail", "đừng quên", which asks all the more; nor
   "the time" or "the date" after "all", "by", "at", "on", "from",
   "since", "until", "till" or "same": "all the time"), and every fixed say
   of the timed skill has no digit and doesn't repeat that phrase. The

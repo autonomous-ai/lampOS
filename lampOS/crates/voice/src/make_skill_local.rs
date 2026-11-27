@@ -8572,6 +8572,21 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 "Mỗi sáng nói Bao Nhiêu ngày nữa hết năm",
                 "Bao Nhiêu ngày nữa hết năm",
             ),
+            // El's P2 on #8822: a negation of forgetting asks all the more.
+            (
+                "every morning don't forget tell me how many emails",
+                "how many emails",
+            ),
+            ("mỗi sáng đừng quên báo bao nhiêu email", "bao nhiêu email"),
+            (
+                "every day without fail tell me how many days are left",
+                "how many days are left",
+            ),
+            (
+                "never forget to say how many days are left",
+                "how many days are left",
+            ),
+            ("at 6 do not forget to tell me the time", "the time"),
         ] {
             assert_eq!(
                 made_skill::value_left_out(&dropped, asked).as_deref(),
