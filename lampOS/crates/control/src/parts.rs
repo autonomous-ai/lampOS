@@ -688,6 +688,8 @@ impl Lamp {
             on: true,
             colour: colour.to_owned(),
             level,
+            tint: None,
+            step: None,
         };
         let until_us = (self.clock)() + u64::from(for_ms) * 1_000;
         self.publish_ring(client, light.clone(), pattern, fade_ms, None, until_us)?;
@@ -1492,6 +1494,8 @@ fn nearest_light(pixels: &[[u8; 3]]) -> Light {
             on: false,
             colour: "warm".to_owned(),
             level: 1,
+            tint: None,
+            step: None,
         };
     }
     let lit: Vec<&[u8; 3]> = pixels
@@ -1515,6 +1519,8 @@ fn nearest_light(pixels: &[[u8; 3]]) -> Light {
         on: true,
         colour: colour.to_owned(),
         level,
+        tint: None,
+        step: None,
     }
 }
 
@@ -2155,7 +2161,9 @@ mod tests {
             Light {
                 on: true,
                 colour: "warm".into(),
-                level: 3
+                level: 3,
+                tint: None,
+                step: None,
             }
         );
         assert_eq!(
@@ -2273,7 +2281,9 @@ mod tests {
                 Light {
                     on: true,
                     colour: "warm".into(),
-                    level: 3
+                    level: 3,
+                    tint: None,
+                    step: None,
                 }
             );
             assert_eq!(

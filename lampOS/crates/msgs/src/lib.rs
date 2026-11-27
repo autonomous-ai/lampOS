@@ -1460,10 +1460,15 @@ impl Light {
         Some(rgb.map(|channel| ((u32::from(channel) * 255 + top / 2) / top) as u8))
     }
 
-    /// The named colour nearest to `rgb` in hue, and whether it is exactly
-    /// that colour (the same at 8 bits). None for black.
+    /// The named colour nearest to `rgb` in hue, and whether it is that
+    /// colour: each scaled channel within what 8 bits of `rgb` could round
+    /// by (a half step of both the channel and the brightest, scaled up, at
+    /// most 12 of 255), so a named colour sent at a low brightness is still
+    /// known as itself, and a colour that is another is not. None for black.
     pub fn nearest_name(rgb: [u8; 3]) -> Option<(&'static str, bool)> {
         let scaled = Self::scaled(rgb)?;
+        let top = f32::from(rgb.into_iter().max()?);
+        let tolerance = (255.0 / top).ceil().min(12.0);
         let mut best: Option<(&'static str, f32, [u8; 3])> = None;
         for (name, shares) in Self::TINTS.iter().chain(Self::SOFT_TINTS.iter()) {
             let named = shares.map(|share| (share * 255.0).round() as u8);
@@ -1474,7 +1479,11 @@ impl Light {
                 best = Some((name, far, named));
             }
         }
-        best.map(|(name, _, named)| (name, named == scaled))
+        best.map(|(name, _, named)| {
+            let close =
+                (0..3).all(|at| (f32::from(scaled[at]) - f32::from(named[at])).abs() <= tolerance);
+            (name, close)
+        })
     }
 
     /// The brightness as a step: its own, or the step of its level.
@@ -3834,6 +3843,12 @@ mod tests {
         // A named colour at any brightness is that name, exactly.
         assert_eq!(Light::nearest_name([255, 140, 0]), Some(("warm", true)));
         assert_eq!(Light::nearest_name([51, 28, 0]), Some(("warm", true)));
+        assert_eq!(Light::nearest_name([26, 14, 0]), Some(("warm", true)));
+        // A colour that is not one, even dim, is its own.
+        assert_eq!(
+            Light::nearest_name([8, 4, 1]).map(|(_, exact)| exact),
+            Some(false)
+        );
         assert_eq!(
             Light::nearest_name([255, 255, 255]).map(|(name, _)| name),
             Some("white")

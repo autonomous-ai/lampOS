@@ -265,7 +265,8 @@ impl Watcher {
 
 /// Two lights alike as the person sees them: off is off whatever its colour.
 fn same_light(a: &Light, b: &Light) -> bool {
-    a.on == b.on && (!a.on || (a.colour == b.colour && a.level == b.level))
+    a.on == b.on
+        && (!a.on || (a.colour == b.colour && a.tint == b.tint && a.step_now() == b.step_now()))
 }
 
 #[cfg(test)]

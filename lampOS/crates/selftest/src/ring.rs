@@ -208,6 +208,8 @@ fn ask_colours_on(bus: &Bus, deadline: Instant, clock: &mut impl Clock) -> Resul
             on: true,
             colour: colour.into(),
             level: LEVEL,
+            tint: None,
+            step: None,
         };
         // The person's request is looked for right before each colour, so
         // that no test is asked after it.
@@ -297,6 +299,8 @@ mod tests {
             on: true,
             colour: colour.into(),
             level: 2,
+            tint: None,
+            step: None,
         }
     }
 

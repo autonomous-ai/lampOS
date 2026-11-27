@@ -176,6 +176,8 @@ impl Feeling {
                         on: true,
                         colour: warmer.to_owned(),
                         level,
+                        tint: None,
+                        step: None,
                     },
                     None,
                 ));
@@ -199,6 +201,8 @@ impl Feeling {
                 on: true,
                 colour: colour.to_owned(),
                 level,
+                tint: None,
+                step: None,
             },
             pattern,
         ))
@@ -310,6 +314,8 @@ mod tests {
                             on,
                             colour: colour.to_owned(),
                             level,
+                            tint: None,
+                            step: None,
                         };
                         let theirs = lamp_skills::glow::relative(Some(&now), &call);
                         let ours = feeling.light(&json!(now));

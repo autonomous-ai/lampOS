@@ -471,11 +471,16 @@ pub fn asked(call: &Call, from: Option<&Light>) -> Option<Light> {
             on: true,
             colour: colour.clone(),
             level: level.unwrap_or_else(|| from.map_or(LEVEL_UNKNOWN, |from| from.level)),
+            tint: None,
+            step: None,
         }),
         Call::Dim { steps, .. } => from.filter(|from| from.on).map(|from| Light {
             on: true,
             colour: from.colour.clone(),
             level: from.level.saturating_sub(*steps).max(1),
+            // A dim keeps the colour the person chose, and asks in levels.
+            tint: from.tint,
+            step: None,
         }),
         Call::Out { .. } => from.filter(|from| from.on).map(|from| Light {
             on: false,
@@ -527,6 +532,8 @@ mod tests {
             on,
             colour: colour.into(),
             level,
+            tint: None,
+            step: None,
         }
     }
 
@@ -751,6 +758,8 @@ mod tests {
                 on: true,
                 colour: "warm".into(),
                 level: 3,
+                tint: None,
+                step: None,
             },
         };
         says.publish_json(1, &drawn).unwrap();
