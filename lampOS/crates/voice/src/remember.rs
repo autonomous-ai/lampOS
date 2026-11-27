@@ -67,6 +67,7 @@ pub mod on;
 #[cfg(any(test, lamp_memory_probe))]
 #[path = "memory_probe.rs"]
 pub mod probe;
+pub mod guest;
 pub mod role;
 
 /// Where the coordinator reads the memory's socket: an absolute path.

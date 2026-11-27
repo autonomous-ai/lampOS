@@ -3902,6 +3902,7 @@ mod tests {
             crate::remember::doubted::UNDOES_ENVIRONMENT,
             crate::remember::heard::NEAR_ENVIRONMENT,
             crate::remember::doubted::UNSURE_ENVIRONMENT,
+            crate::remember::guest::ENVIRONMENT,
             crate::tools::REFUSED_KEEP_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
@@ -5225,6 +5226,7 @@ mod tests {
                     || name == crate::remember::doubted::UNDOES_ENVIRONMENT
                     || name == crate::remember::heard::NEAR_ENVIRONMENT
                     || name == crate::remember::doubted::UNSURE_ENVIRONMENT
+                    || name == crate::remember::guest::ENVIRONMENT
                     || name == crate::tools::REFUSED_KEEP_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
@@ -5512,6 +5514,7 @@ mod tests {
                     "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_FORGET_ASKS=on",
                     "LAMP_MEMORY_FORGET_JUST_KEPT=on",
+                    "LAMP_MEMORY_GUEST_MARKED=on",
                     "LAMP_MEMORY_HITS_ROOM_NOT_ASKER=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_ASKED=on",
