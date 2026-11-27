@@ -2186,6 +2186,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-evals"
+version = "0.1.0"
+dependencies = [
+ "lamp-checked-replace",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "lamp-expression"
 version = "0.1.0"
 dependencies = [
