@@ -612,7 +612,10 @@ fn the_posture_brief_names_the_window_lamp_seen_says() {
     // became a minute. It names the said window's length, so a change to
     // one without the other fails here.
     let posture = pilot("posture").unwrap();
-    assert_eq!(lamp_msgs::HumanPosture::SAID_WINDOW_S, 60);
-    assert!(posture.fire.contains("the last minute"), "{}", posture.fire);
+    let words = match lamp_msgs::HumanPosture::SAID_WINDOW_S {
+        60 => "the last minute",
+        other => panic!("the said window is {other} s: word the posture brief for it"),
+    };
+    assert!(posture.fire.contains(words), "{}", posture.fire);
     assert!(!posture.fire.contains("ten minutes"), "{}", posture.fire);
 }
