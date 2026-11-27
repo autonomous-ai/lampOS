@@ -213,7 +213,7 @@ pub enum PostureRegion {
     UpperArm,
     LowerArm,
     /// Bad by the overall RULA risk (`risk_level` 2 or more) with no one
-    /// region's subscore 4 or more, or no bad sample yet: `general`, never
+    /// region high (the neck's subscore 3 or more, any other's 4 or more), or no bad sample yet: `general`, never
     /// `none`, which the owner read as nothing wrong (27 Nov, #8377).
     General,
 }

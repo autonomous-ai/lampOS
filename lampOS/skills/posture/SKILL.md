@@ -13,12 +13,14 @@ forearms). When two checks in a row, a minute's worth, both read as bad,
 the lamp turns to you and says, in one short,
 kind line, the part that was most often off and one thing to do about it:
 
-- neck: bring your head back over your shoulders;
+- neck (your head bent down a while, as at a phone or the desk): that's
+  hard on the neck, so lift what you're looking at toward eye level, or
+  lift your head;
 - back: sit back and let the chair support it;
 - shoulders: let them relax;
 - forearms: adjust the keyboard so your elbows rest comfortably;
-- no one part (`general`: bad overall, no one part standing out): stand up
-  for a short stretch.
+- no one part (`general`: bad overall, no one part standing out): sit up
+  tall with your shoulders relaxed.
 
 It is not Sit back, which is your face coming nearer the lamp as you lean
 in; this one is only the posture reading.

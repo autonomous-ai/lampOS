@@ -1,5 +1,5 @@
 # 11:00, both checks bad and region general (bad by the RULA risk alone, no region high)
-# to 10 minutes: V1's empty or mixed row, a word to stand up for a short stretch at 30 s.
+# to 10 minutes: V1's empty or mixed row, a word to sit up tall with the shoulders relaxed at 30 s (the owner, 27 Nov).
 clock = "11:00"
 
 [[expect]]
@@ -12,4 +12,4 @@ args = { look_at = "face" }
 at = "30s"
 within = "30s"
 call = "say"
-args = { note = "They have sat a while in one tense position. In one short, kind line, the way a friend would, suggest standing up for a short stretch. Say only 'a while', never a number; name no condition or illness, and never mention a camera." }
+args = { note = "Their posture has been off for a while. In one short, kind line, the way a friend would, suggest sitting up tall with the shoulders relaxed. Say only 'a while', never a number; name no condition or illness, and never mention a camera." }

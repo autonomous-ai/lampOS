@@ -7219,8 +7219,12 @@ for 10m? thay is too late"). Mỗi `region` một trigger (`neck`, `trunk`, `upp
 `general` cho một cửa sổ xấu theo mức rủi ro RULA chung mà không vùng nào nổi
 bật, hàng "empty / mixed" của V1; là `none` cho tới quyết định của chủ sở hữu
 ngày 27/11, vì đọc như không có gì sai), mỗi trigger một câu nêu một cách sửa cụ thể (bảng trong `posture.md` của
-V1: đưa đầu về trên vai, ngồi tựa ra để ghế đỡ lưng, thả lỏng vai, chỉnh bàn
-phím, đứng dậy vươn vai một chút), với các `[[while]]` `bad_share` trên
+V1, cùng quyết định của chủ sở hữu ngày 27/11 trên #8377 cho cổ và `general`:
+đầu cúi xuống như khi nhìn điện thoại thì hại cho cổ, nâng thứ đang nhìn lên
+ngang tầm mắt hoặc ngẩng đầu lên; ngồi tựa ra để ghế đỡ lưng; thả lỏng vai;
+chỉnh bàn phím; và với `general`, ngồi thẳng lưng, vai thả lỏng, một lời về
+tư thế chứ không phải vươn vai). Cổ được tính là cao từ điểm RULA 3 (cúi quá
+20°), các vùng khác từ 4 (`window::NECK_HIGH_SUBSCORE` của lamp-seen), với các `[[while]]` `bad_share` trên
 0.5999 (0.6 trở lên của V1, vì `above` là so sánh ngặt) và `window_s` trên
 59 (đủ một phút của lamp-seen); một giá trị được nói ra đã có nghĩa là có
 người đang ngồi với đủ hai mẫu (`pose::window::MIN_SAMPLES`), nên 0.6 là cả

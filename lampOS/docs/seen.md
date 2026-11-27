@@ -767,7 +767,10 @@ either's). One frame and one blink can serve both.
   answer clears it all.
 - **The window** (`pose/window.rs`), V1's rules (`pose.py` `_aggregate`):
   - a sample is bad when `risk_level` is 2 or more, or any region's
-    subscore on either side is 4 or more;
+    subscore on either side is high: 3 or more for the neck (RULA's bent
+    forward past 20°; flexion alone never reaches 4, so at V1's 4 a head
+    bent to a phone read as no one region: 06c1, 27 Nov, the owner's call
+    on #8377), 4 or more for any other;
   - the window is the newest two samples, a minute of checks 30 s apart
     (the owner's call on #8377, 27 Nov: "we should tell user when they
     slump for like 1m (two posture check right?). Which health check only
@@ -785,7 +788,7 @@ either's). One frame and one blink can serve both.
     the older sample's age and 30 s, at most 60 s, so two checks 30 s
     apart say 60, the window full;
   - a partial answer (`ergo.partial: true`: the hips hidden, the upper body
-    scored alone) is bad only when the neck subscore on either side is 4
+    scored alone) is bad only when the neck subscore on either side is 3
     or more, and its region can only be neck. The server fixes trunk and
     legs at 1 and caps `risk_level` low, and it measures the upper arm
     against a trunk made from the shoulder line, so neither `risk_level`
@@ -1140,13 +1143,14 @@ names"). On, they name it.
 | Failed | `burst failed (refused, HTTP 503); 1 of 8 frames, 7650 bytes, 80 ms in all; bursts held back 60 s` (or `no_answer`, `connect`, …) |
 | Stopped | `burst aborted (gate nobody) after 2 frames, 15300 bytes: its answers dropped` |
 | A posture frame handed to its socket | `posture sample sent: 7650 bytes` |
-| Its answer | `posture sample answered: scored, bad, high neck,trunk, risk 2, 1770 ms` (`high general` when bad by the risk alone, no `high` when good, `partial, ` before the verdict on a partial answer), or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
-| Its answer, with labels | the same with the RULA score: `posture sample answered: scored, bad, high neck, risk 3, score 5, 640 ms` |
-| `humans/posture` said | `posture said: window 60 s, 2 samples, 100% bad, region general` |
+| Its answer | `posture sample answered: scored, 640 ms`, or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
+| Its answer, with labels | `posture sample answered: scored, bad, high neck,trunk, risk 2, score 4, 1770 ms` (`high general` when bad by the risk alone, no `high` when good, `partial, ` before the verdict on a partial answer) |
+| `humans/posture` said | `posture said: window 60 s, 2 samples` |
+| `humans/posture` said, with labels | `posture said: window 60 s, 2 samples, 100% bad, region general` (`0% bad, no region` with no bad sample) |
 
-A posture line names its verdict, high regions, risk, bad share and region with
-the switch off too (the owner, 27 Nov on #8377: the 06c1 row's journal never
-said which region): flags and numbers only, nothing of the frame.
+The posture lines with labels name flags and numbers only, nothing of the
+frame; they stay behind the switch (the owner, 27 Nov on #8377: "Behind the
+debug switch").
 
 With labels, `top` is the surest label any frame's answer gave; `counted` is what the
 burst counts as drinking, eating or a break (`sitting.rs`), or `none`. The
