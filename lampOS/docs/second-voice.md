@@ -6273,6 +6273,46 @@ after a take-over, but now for every turn:
     `with_hey_only_a_call_is_hey_lamp_at_the_lines_start` (with the
     product's switches too), `with_hey_only_a_call_whose_greeting_speech_to_text_lost_is_kept`
     (lamp-74ff's switches), `with_hey_only_words_call_the_lamp_only_after_a_greeting`.
+  - **One simple rule, with `LAMP_SIMPLE_CALL=on`** (on in the product's
+    lamp-voice.service; the product owner, 27 Nov 2026: "we just start with
+    a simple 'hey lamp' + 20s renewing. then we'll slowly add one thing at a
+    time and always make sure the quality is good.", then "keep it strictly
+    'Hey Lamp'. reason: false positive. someone may say Lamp or a word
+    similar to it."). It decides alone whether a line is the lamp's, after
+    every older rule has run and with none of their verdicts kept
+    (`Heeding::simple_verdict`, in `judged_verdict`):
+    - **A call** is a line whose words, past one filler, open with "hey",
+      "hi" or "hello" and then "Lamp" written as such, in any case and with
+      any punctuation (`attention::opens_with_hey_lamp`: "Hey Lamp, …",
+      "Hey, lamp.", "Hi Lamp"; never "Hey man", "Hey Lynn", "Hey lamb" or a
+      bare "Lamp, …"), a line whose head was tapped, or a turn a computer
+      opened (`Attention::simple_called`). A line going on from a call keeps
+      its words, so "Hey Lamp." and the question said after it are one call.
+      A hearing of the name by `lamp-name` never counts, at any score.
+    - **The window**: a line begun within `follows_on::WITHIN_US` (20 s) of
+      the end of the lamp's last words, measured to the line's start
+      (`said_until_us`), is answered, whatever the camera, the room, the
+      voices or its length. Every answer's words move that end on, the lamp's
+      own news's too, so the window renews.
+    - **Anything else** is held, `not "Hey Lamp", and no conversation going
+      on (LAMP_SIMPLE_CALL)`, and never answered.
+    - **Set aside**: `said_to_me` and the turned-silent rules
+      (`silence_turned` is not read), every hold and let-out in
+      `judged_verdict` (the face as a sign, lone words, untied and others'
+      answers, the busy-room, remark and turned-away rules, the trust and
+      quiet-room voice checks), the Policy's wait, the notes that a line may
+      be people's talk, the chains that kept an answer from renewing, the made
+      skill's said-start face check (`holds_said_start`), and the model's
+      `not_for_me`: it isn't offered (`tools.decline` off), and every line is
+      told `SIMPLE_NOTE`, "this was said to you: answer it".
+    - **Unchanged**: endpointing, the echo strip, a spoken stop while the lamp
+      speaks, privacy and mute, quiet hours, the tools, memory, the body and
+      `lamp-name` itself.
+    Journal at start: `a conversation opens only with "Hey Lamp" at a line's
+    start, a tap or the lamp's own turn; …(LAMP_SIMPLE_CALL)`. A line let out
+    says `its answer is played: "Hey Lamp", or a tap, called it` or `begun
+    within 20 s of the end of the lamp's last words (LAMP_SIMPLE_CALL)`.
+    Latency: none. Tests: `second_provider/worker/simple_call_tests.rs`.
   - **One reply window, with `LAMP_ONE_REPLY_WINDOW=on`** (on in the
     product's lamp-voice.service; the product owner's ruling of 26 Nov 2026:
     "ok 20s make sense"). A reply to the lamp's own news (a turn it began

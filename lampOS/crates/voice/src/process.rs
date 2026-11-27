@@ -5655,6 +5655,7 @@ mod tests {
                     "LAMP_SESSION_PERSON=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SHORT_REPLIES_CARRY=on",
+                    "LAMP_SIMPLE_CALL=on",
                     "LAMP_SKILL_ASKED=on",
                     "LAMP_SKILL_CLAIM_CHECKED=on",
                     "LAMP_SKILL_KEYTERM=on",

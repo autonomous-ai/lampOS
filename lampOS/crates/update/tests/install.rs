@@ -2738,6 +2738,25 @@ fn the_product_leaves_task_no_yes_off() {
     }
 }
 
+/// The product owner, 27 Nov 2026: "we just start with a simple 'hey lamp'
+/// + 20s renewing. then we'll slowly add one thing at a time and always make
+/// sure the quality is good." The product runs the one rule
+/// (`LAMP_SIMPLE_CALL`): a call is "Hey Lamp" in a line's words, and a line
+/// within 20 s of the lamp's last words is answered.
+#[test]
+fn the_product_runs_the_simple_hey_lamp_rule() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    assert!(
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_SIMPLE_CALL=on")
+    );
+}
+
 /// #8839 (the lead's test on lamp-52e6 at stable 16443, 27 Nov): a line
 /// begun over the lamp's own answer is a follow-up like any line in the
 /// conversation's 20 s, with no look and no test of its words, by the
