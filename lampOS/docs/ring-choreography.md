@@ -438,7 +438,7 @@ with the rest counted into the next line:
 was lit it also says the highest channel value put on the wire, read off the
 encoded frames, with the ceiling and cap in force and the fades begun (most
 end under the resting face, with no black line):
-`lamp-voice ring: lit up to 60 in the last 10 s, ceiling 60, cap 120, 2 fades begun`. A
+`lamp-voice ring: lit up to 30 in the last 10 s, ceiling 30, cap 120, 2 fades begun`. A
 flicker or brightness report can be read from the lamp's journal with no
 camera.
 
