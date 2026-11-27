@@ -23432,3 +23432,53 @@ fn only_the_routes_own_look_is_told_the_head_did_not_move() {
     assert!(kept.contains("the keys"));
     assert!(!kept.contains(super::HEAD_STILL_NOTE));
 }
+
+/// #7814, the first builder's ruling on #8842 (c7212623876): the 2 s target
+/// is the first sound from the install's finish, so an installed item's
+/// first-run turn on an English lamp is said as written, no chat asked
+/// (lamp-9adf, 27 Nov 14:05: ~1.8 s from handing to sound), and kept as the
+/// lamp's words for the person's answer.
+#[tokio::test(start_paused = true)]
+async fn an_installed_items_first_run_line_is_said_as_written_with_no_chat() {
+    const ASKS: &str = "Gym Coach is ready. Want to set your first plan?";
+    let script = Arc::new(Script {
+        chats: Mutex::new(VecDeque::from([vec![
+            text("Something of the model's own."),
+            Ok(ChatEvent::Done),
+        ]])),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.announcing(false);
+    let mut waits = crate::install_told::Waits::default();
+    waits.came(lamp_msgs::Installed {
+        item: "app".into(),
+        name: "gym-coach".into(),
+        title: "Gym Coach".into(),
+        by: "owner".into(),
+        first_run: Some(lamp_msgs::FirstRun { say: ASKS.into() }),
+        finished_us: 1_000_000_000,
+    });
+    let told = waits
+        .next(&crate::install_told::Moment {
+            now_us: 1_000_200_000,
+            face: true,
+            free: true,
+            ..Default::default()
+        })
+        .expect("at once");
+    engine.submit(written(1, &told.note));
+    let labels = turn_within(&mut engine, Duration::from_secs(10)).await;
+    let said: Vec<_> = labels
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, [&format!("said:{ASKS}")], "{labels:?}");
+    assert!(labels.contains(&"own_words:1".to_owned()), "{labels:?}");
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert!(script.asked.lock().unwrap().is_empty(), "no chat asked");
+    assert_eq!(calls.lock().unwrap().len(), 0);
+}
