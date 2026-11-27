@@ -39,6 +39,20 @@ pub fn first() -> Light {
     }
 }
 
+/// Whether `light` is the light the lamp starts with ([`first`]), as a
+/// person sees it: on, its colour, and its step now, however that step was
+/// written. The same light sent back as the app's colour is stored at its
+/// step (`step: Some(2)`), and one the voice moved dimmer and back is too;
+/// both are still the default (the Reviewer-lead's P3 on #8870, the way
+/// addons' `same_light` compares).
+fn is_first(light: &Light) -> bool {
+    let first = first();
+    light.on == first.on
+        && light.colour == first.colour
+        && light.tint == first.tint
+        && light.step_now() == first.step_now()
+}
+
 /// A light's colour as `[r, g, b]` with the brightest channel at 255: its
 /// own, or its name's.
 fn hue(light: &Light) -> Option<[u8; 3]> {
@@ -113,7 +127,7 @@ fn named(light: &Light) -> Option<&str> {
 pub fn snapshot(shown: &Light) -> Value {
     let mode = if !shown.on {
         "off"
-    } else if *shown == first() {
+    } else if is_first(shown) {
         "default"
     } else {
         "custom"
@@ -198,7 +212,7 @@ pub fn faces_snapshot(light: &Light, faces: &LightFaces) -> Value {
             "color": hue(light).unwrap_or([255, 140, 0]),
             "level": light.step_now(),
             "on": light.on,
-            "default": *light == first(),
+            "default": is_first(light),
         }),
     );
     for name in LightFaces::NAMES {
@@ -309,6 +323,37 @@ mod tests {
             assert_eq!(back.step, Some(old.step_now()), "{level}");
             assert_eq!(back.colour, "blue");
             assert_eq!(back.tint, None);
+        }
+    }
+
+    /// The Reviewer-lead's P3 on #8870: the default is judged by the step
+    /// shown, not how it was written. The app's own default colour sent
+    /// back, stored at its step, and the voice's dimmer then brighter, are
+    /// both still `default`, in `led.resting.get` and in `led.faces.get`; a
+    /// step brighter, another colour or the light off are not.
+    #[test]
+    fn the_default_is_judged_by_the_step_shown_not_how_it_was_written() {
+        let sent_back = nearest(rgb(&first())).unwrap();
+        assert_eq!(rgb(&first()), [51, 28, 0]);
+        assert_eq!(sent_back.step, Some(2));
+        let moved_back = first().at_step(1).at_step(2);
+        for light in [first(), sent_back, moved_back] {
+            assert_eq!(snapshot(&light)["mode"], "default", "{light:?}");
+            assert_eq!(snapshot(&light)["color"], Value::Null, "{light:?}");
+            let faces = faces_snapshot(&light, &LightFaces::default());
+            assert_eq!(faces["faces"]["resting"]["default"], true, "{light:?}");
+        }
+        for light in [
+            first().at_step(3),
+            stepped("blue", 2),
+            Light {
+                on: false,
+                ..first()
+            },
+        ] {
+            assert_ne!(snapshot(&light)["mode"], "default", "{light:?}");
+            let faces = faces_snapshot(&light, &LightFaces::default());
+            assert_eq!(faces["faces"]["resting"]["default"], false, "{light:?}");
         }
     }
 
