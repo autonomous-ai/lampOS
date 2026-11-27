@@ -904,3 +904,32 @@ fn a_late_one_waits_for_a_pause_in_the_talk_and_no_longer_than_its_bound() {
     unknown.late_by_ms = None;
     assert!(unknown.late_line());
 }
+
+/// #8894: with Schedule speech off the consumer never starts, so the
+/// voice's start clears the reminders' clips; with it on, the consumer's
+/// start decides.
+#[test]
+fn the_voice_start_clears_the_clips_with_schedule_speech_off() {
+    let dir = std::env::temp_dir().join(format!("lamp-8894-clips-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let fill = || {
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["0123-4.wav", "0123-4.json", "stray.tmp"] {
+            std::fs::write(dir.join(name), b"clip").unwrap();
+        }
+    };
+    let clips = crate::ring_clips::Clips::new(&dir);
+    for on in [Some("on"), Some("skill")] {
+        fill();
+        assert_eq!(clear_clips_without_speech(on, &clips), 0, "{on:?}");
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 3, "{on:?}");
+    }
+    for off in [None, Some("off"), Some("ON")] {
+        fill();
+        assert_eq!(clear_clips_without_speech(off, &clips), 3, "{off:?}");
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "{off:?}");
+    }
+    // No folder: nothing to clear, and no error.
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(clear_clips_without_speech(None, &clips), 0);
+}

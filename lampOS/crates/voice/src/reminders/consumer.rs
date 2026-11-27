@@ -1308,6 +1308,34 @@ impl<P: Persistence> Consumer<P> {
     }
 }
 
+/// The reminders' clips at the consumer's start. With the switch and a
+/// speech service, each reminder's own clip is rendered on a thread of its
+/// own (#8708); the tick only hands it each walk's end, never waiting on
+/// it.
+fn clips_at_start<P: Persistence>(
+    consumer: &mut Consumer<P>,
+    on: bool,
+    _clips: &crate::ring_clips::Clips,
+) -> Option<std::sync::mpsc::SyncSender<crate::ring_clips::Wanted>> {
+    if !on {
+        return None;
+    }
+    let renderer = crate::ring_clips::renderer_from_environment();
+    consumer.upcoming = Some(UpcomingWalk {
+        clips: renderer.is_some(),
+        ..UpcomingWalk::default()
+    });
+    match renderer.map(crate::ring_clips::spawn).transpose() {
+        Ok(clips) => clips,
+        Err(error) => {
+            consumer
+                .journal
+                .say(format!("the offline ring clips are not rendered: {error}"));
+            None
+        }
+    }
+}
+
 pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<()> {
     client::validate_socket(socket).map_err(invalid)?;
     let mut transport = WorkerTransport::from_stdin()?;
@@ -1321,27 +1349,11 @@ pub(super) fn run(ledger_dir: &Path, socket: &Path, root: &Path) -> io::Result<(
     // One left by an earlier consumer is never this one's judgement.
     let _ = std::fs::remove_file(ledger_dir.join(super::CANNOT_RING_FILE));
     let mut consumer = Consumer::new(ledger, session);
-    // With the switch and a speech service, each reminder's own clip is
-    // rendered on a thread of its own (#8708); the tick only hands it each
-    // walk's end, never waiting on it.
-    let clips = if crate::offline_rings::on() {
-        let renderer = crate::ring_clips::renderer_from_environment();
-        consumer.upcoming = Some(UpcomingWalk {
-            clips: renderer.is_some(),
-            ..UpcomingWalk::default()
-        });
-        match renderer.map(crate::ring_clips::spawn).transpose() {
-            Ok(clips) => clips,
-            Err(error) => {
-                consumer
-                    .journal
-                    .say(format!("the offline ring clips are not rendered: {error}"));
-                None
-            }
-        }
-    } else {
-        None
-    };
+    let clips = clips_at_start(
+        &mut consumer,
+        crate::offline_rings::on(),
+        &crate::ring_clips::Clips::at_dir(),
+    );
     if refence {
         consumer.cannot_ring = Some((ledger_dir.join(super::CANNOT_RING_FILE), None));
     }
