@@ -50,6 +50,11 @@ pub struct ReachMap {
     runs: Vec<Vec<Vec<(f64, f64)>>>,
     unit: Option<String>,
     offset: Pose,
+    /// The lamp's own folded arm and head home this file was laid for (`frame.lamp`), if it says.
+    frame_lamp: Option<Pose>,
+    /// The map's own folded arm and head home (`frame.map`), and whether the file says its `offset` (a missing one reads 0).
+    frame_map: Option<Pose>,
+    offset_said: bool,
 }
 
 fn axis_of(value: &serde_json::Value, name: &str) -> Result<Vec<f64>, String> {
@@ -176,6 +181,35 @@ impl ReachMap {
             elbow: off["elbow"].as_f64().unwrap_or(0.0),
             pitch: off["pitch"].as_f64().unwrap_or(0.0),
         };
+        let lamp = &value["frame"]["lamp"];
+        let frame_lamp = match (
+            lamp["shoulder"].as_f64(),
+            lamp["elbow"].as_f64(),
+            lamp["pitch"].as_f64(),
+        ) {
+            (Some(shoulder), Some(elbow), Some(pitch)) => Some(Pose {
+                shoulder,
+                elbow,
+                pitch,
+            }),
+            _ => None,
+        };
+        let at = &value["frame"]["map"];
+        let frame_map = match (
+            at["shoulder"].as_f64(),
+            at["elbow"].as_f64(),
+            at["pitch"].as_f64(),
+        ) {
+            (Some(shoulder), Some(elbow), Some(pitch)) => Some(Pose {
+                shoulder,
+                elbow,
+                pitch,
+            }),
+            _ => None,
+        };
+        let offset_said = ["shoulder", "elbow", "pitch"]
+            .iter()
+            .all(|joint| off[*joint].as_f64().is_some());
         Ok(Self {
             shoulder,
             elbow,
@@ -183,6 +217,9 @@ impl ReachMap {
             runs,
             unit,
             offset,
+            frame_lamp,
+            frame_map,
+            offset_said,
         })
     }
 
@@ -324,6 +361,16 @@ impl ReachMap {
             .fold(f64::INFINITY, f64::min)
     }
 
+    /// How far (counts) the head may look down from the pitch of `stand` (the lamp's own counts; the standing head's home is the stand
+    /// pose's pitch, which `bounds()` adds the reach to), by this map: the map's pitch-down end at that pose, in the lamp's counts, less
+    /// `margin`. `None` when the stand pose is not a safe pose on the map, or the margin leaves nothing.
+    /// Only ever a candidate to WIDEN the standing head's down reach with (`Limits::pitch_down_at`), never to narrow it.
+    pub fn pitch_down_counts(&self, stand: Pose, margin: f64) -> Option<f32> {
+        let (_, high) = self.limits(self.to_map_counts(stand), "pitch", 0.0)?;
+        let down = high + self.offset.pitch - stand.pitch - margin;
+        (down > 0.0).then_some(down as f32)
+    }
+
     /// The page guard's `restrict`: a goal in degrees for `joint`, the others at their `goals`, the lamp now at `here` (degrees,
     /// `[shoulder, elbow, pitch]`).
     pub fn restrict(
@@ -423,6 +470,81 @@ pub fn read_trusted(path: &Path, trusted_uid: u32) -> Result<String, String> {
         .read_to_string(&mut text)
         .map_err(|error| format!("the reach map is unreadable ({error})"))?;
     Ok(text)
+}
+
+/// `LAMP_BODY_DEV_REACH=on` (a dev lamp only, never in a product unit; #7513): the standing head may look down as far as the lamp's own
+/// reach map says, less [`DEV_MARGIN`]. Off unless exactly `on`.
+pub const DEV_REACH: &str = "LAMP_BODY_DEV_REACH";
+/// Where the lamp's own map is (root-owned, read only; the body never writes it). `LAMP_BODY_DEV_REACH_MAP` names another file.
+pub const DEV_REACH_MAP: &str = "LAMP_BODY_DEV_REACH_MAP";
+pub const DEV_REACH_MAP_PATH: &str = "/var/lib/lampos-body/reach-map.json";
+/// Counts kept off the map's end (the page guard's margin; the first lamp tries). The body's own margin is 20: later, if the rows allow.
+pub const DEV_MARGIN: f64 = 48.0;
+
+/// Whether a value of [`DEV_REACH`] turns the map reach on.
+pub fn dev_reach_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The lamp the body is running on, as the map file must match it.
+pub struct DevLamp<'a> {
+    pub unit: &'a str,
+    pub folded_arm: [u16; 2],
+    /// `--home`'s pitch.
+    pub home_pitch: u16,
+    /// `--stand`'s pitch, roll, yaw, shoulder, elbow.
+    pub stand: [u16; 5],
+}
+
+/// How far (counts) the standing head may look down from home on this lamp, from the map file's text (or why it could not be read);
+/// `Err` is the ONE line the journal says, and the body then runs as it does today. The file must name this unit, say the folded arm
+/// and head home it was laid for and they must be this lamp's, and the stand must be a safe pose on it.
+pub fn dev_pitch_down(text: Result<String, String>, lamp: &DevLamp) -> Result<f32, String> {
+    let map = ReachMap::parse(&text?)?;
+    if !map.for_unit(lamp.unit) {
+        return Err(format!(
+            "the map names {}, not this lamp ({})",
+            map.unit().unwrap_or("no lamp"),
+            lamp.unit
+        ));
+    }
+    let Some(frame) = map.frame_lamp else {
+        return Err("the map does not say the folded arm and head home it was laid for".to_owned());
+    };
+    let (shoulder, elbow, pitch) = (
+        f64::from(lamp.folded_arm[0]),
+        f64::from(lamp.folded_arm[1]),
+        f64::from(lamp.home_pitch),
+    );
+    if frame.shoulder != shoulder || frame.elbow != elbow || frame.pitch != pitch {
+        return Err(format!(
+            "the map was laid for folded {}/{} and head home {}, this lamp is {shoulder}/{elbow} and {pitch}",
+            frame.shoulder, frame.elbow, frame.pitch
+        ));
+    }
+    // The offset the file says is the lamp's counts less the map's: a missing or a wrong one would lay the map on the lamp shifted.
+    let Some(from) = map.frame_map else {
+        return Err("the map does not say the lamp it was drawn for (frame.map)".to_owned());
+    };
+    let said = map.offset;
+    if !map.offset_said
+        || said.shoulder != frame.shoulder - from.shoulder
+        || said.elbow != frame.elbow - from.elbow
+        || said.pitch != frame.pitch - from.pitch
+    {
+        return Err(
+            "the map's offset is missing or is not the lamp's counts less the map's".to_owned(),
+        );
+    }
+    let stand = Pose {
+        shoulder: f64::from(lamp.stand[3]),
+        elbow: f64::from(lamp.stand[4]),
+        pitch: f64::from(lamp.stand[0]),
+    };
+    map.pitch_down_counts(stand, DEV_MARGIN).ok_or_else(|| {
+        "the stand is not a safe pose on the map, or the map leaves no reach under the margin"
+            .to_owned()
+    })
 }
 
 #[cfg(test)]
@@ -574,5 +696,105 @@ mod tests {
         assert!(read_trusted(&link, me).is_err(), "a link is not followed");
         assert!(read_trusted(&dir.join("none.json"), me).is_err());
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn the_stand_of_lamp_75c9_may_look_down_to_the_maps_end_less_the_margin() {
+        // 75c9: folded arm 2076/2045, stand 2639/2570, head home 1791 (the stand's 1794); the map's frame: lamp-4ace folded 2048/2047, head home 1772.
+        let mut v: Value = serde_json::from_str(MAP).unwrap();
+        v["unit"] = "lamp-75c9".into();
+        v["frame"] = serde_json::json!({"unit":"lamp-75c9","offset":{"shoulder":28.0,"elbow":-2.0,"pitch":19.0}});
+        let map = ReachMap::parse(&v.to_string()).unwrap();
+        let stand = Pose {
+            shoulder: 2639.0,
+            elbow: 2570.0,
+            pitch: 1794.0,
+        };
+        // The page guard's answer for that pose (map counts 2611 / 2572 / 1775): the safe pitch run is 1464..2648, which is 1483..2667 in
+        // the lamp's counts: 873 counts below the stand pose's pitch 1794 (what bounds() adds the reach to, not --home's 1791), 853 with the body's 20-count margin.
+        assert_eq!(map.pitch_down_counts(stand, 20.0), Some(853.0));
+        // A pose the map calls unsafe (the folded arm: the head rests on it) gives no reach to widen with.
+        let folded = Pose {
+            shoulder: 2076.0,
+            elbow: 2045.0,
+            pitch: 1794.0,
+        };
+        assert_eq!(map.pitch_down_counts(folded, 20.0), None);
+        // A margin larger than the reach leaves nothing.
+        assert_eq!(map.pitch_down_counts(stand, 5_000.0), None);
+    }
+
+    fn map_75c9() -> String {
+        let mut v: Value = serde_json::from_str(MAP).unwrap();
+        v["unit"] = "lamp-75c9".into();
+        v["frame"] = serde_json::json!({"unit":"lamp-75c9","map":{"shoulder":2048.0,"elbow":2047.0,"pitch":1772.0},
+            "lamp":{"shoulder":2076.0,"elbow":2045.0,"pitch":1791.0},"offset":{"shoulder":28.0,"elbow":-2.0,"pitch":19.0}});
+        v.to_string()
+    }
+    const LAMP_75C9: DevLamp = DevLamp {
+        unit: "lamp-75c9",
+        folded_arm: [2076, 2045],
+        home_pitch: 1791,
+        stand: [1794, 2059, 2012, 2639, 2570],
+    };
+
+    #[test]
+    fn the_dev_reach_is_taken_from_a_map_made_for_this_lamp_with_the_first_tries_margin() {
+        // The map's end at the stand is 873 below the stand pose's pitch; the first tries keep 48 counts off it.
+        assert_eq!(dev_pitch_down(Ok(map_75c9()), &LAMP_75C9), Ok(825.0));
+        assert!(dev_reach_from(Some("on")));
+        assert!(!dev_reach_from(Some("1")) && !dev_reach_from(Some("ON")) && !dev_reach_from(None));
+    }
+
+    #[test]
+    fn the_dev_reach_says_why_it_stays_off_in_one_line_and_never_guesses() {
+        let why =
+            |text: Result<String, String>, lamp: &DevLamp| dev_pitch_down(text, lamp).unwrap_err();
+        assert!(why(Err("no reach map x".to_owned()), &LAMP_75C9).contains("no reach map"));
+        assert!(why(Ok("{}".to_owned()), &LAMP_75C9).contains("not a reach map"));
+        // The page's own map names no lamp: it is not any lamp's.
+        assert!(why(Ok(MAP.to_owned()), &LAMP_75C9).contains("not this lamp"));
+        let other = DevLamp {
+            unit: "lamp-a63e",
+            ..LAMP_75C9
+        };
+        assert!(why(Ok(map_75c9()), &other).contains("lamp-75c9, not this lamp"));
+        // A lamp whose folded arm or head home is not the one the file was laid for.
+        let moved = DevLamp {
+            folded_arm: [2077, 2045],
+            ..LAMP_75C9
+        };
+        assert!(why(Ok(map_75c9()), &moved).contains("was laid for"));
+        // A stand that is not a safe pose on the map leaves nothing to widen with.
+        let folded_stand = DevLamp {
+            stand: [1794, 2059, 2012, 2076, 2045],
+            ..LAMP_75C9
+        };
+        assert!(why(Ok(map_75c9()), &folded_stand).contains("not a safe pose"));
+        // A file with a unit but no frame does not say what it was laid for.
+        let mut v: Value = serde_json::from_str(MAP).unwrap();
+        v["unit"] = "lamp-75c9".into();
+        assert!(why(Ok(v.to_string()), &LAMP_75C9).contains("does not say"));
+        // A frame whose offset is missing (it would read 0) or is not lamp less map: refused, not laid on shifted.
+        let mut w: Value = serde_json::from_str(&map_75c9()).unwrap();
+        w["frame"].as_object_mut().unwrap().remove("offset");
+        assert!(why(Ok(w.to_string()), &LAMP_75C9).contains("offset"));
+        let mut x: Value = serde_json::from_str(&map_75c9()).unwrap();
+        x["frame"]["offset"]["pitch"] = 22.0.into();
+        assert!(why(Ok(x.to_string()), &LAMP_75C9).contains("offset"));
+    }
+
+    #[test]
+    fn the_margin_is_taken_from_the_stand_poses_pitch_where_bounds_adds_it_not_from_homes() {
+        // Twelve's P2 on #8648: a stand pitch 28 above --home's keeps the margin from the pose the reach is added to.
+        let high_stand = DevLamp {
+            stand: [1794 + 28, 2059, 2012, 2639, 2570],
+            ..LAMP_75C9
+        };
+        assert_eq!(
+            dev_pitch_down(Ok(map_75c9()), &high_stand),
+            Ok(2648.0_f32 + 19.0 - 1822.0 - 48.0)
+        );
+        assert_eq!(dev_pitch_down(Ok(map_75c9()), &LAMP_75C9), Ok(825.0));
     }
 }
