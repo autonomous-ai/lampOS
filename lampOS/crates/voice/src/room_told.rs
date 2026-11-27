@@ -914,7 +914,9 @@ pub const MACHINE_BOOT_FILE: &str = "/proc/sys/kernel/random/boot_id";
 /// The provider worker's arguments for the switches and the room's file
 /// in the environment.
 pub fn arguments_from_environment() -> Vec<String> {
-    let mut arguments = arguments(std::env::var(ENVIRONMENT).ok().as_deref());
+    let mut arguments = arguments(
+        crate::second_provider::unless_simple(std::env::var(ENVIRONMENT).ok()).as_deref(),
+    );
     arguments.extend(cut_ins_arguments(
         std::env::var(CUT_INS_ENVIRONMENT).ok().as_deref(),
     ));

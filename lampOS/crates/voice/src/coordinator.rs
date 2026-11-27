@@ -276,8 +276,8 @@ fn own_line_keeps_from_environment() -> bool {
 pub const OWN_LINE_OVER_TALK_ENVIRONMENT: &str = "LAMP_OWN_LINE_OVER_TALK";
 
 fn own_line_over_talk_from_environment() -> bool {
-    std::env::var(OWN_LINE_OVER_TALK_ENVIRONMENT)
-        .ok()
+    // `LAMP_SIMPLE_CALL`: no busy-room rule holds a line.
+    crate::second_provider::unless_simple(std::env::var(OWN_LINE_OVER_TALK_ENVIRONMENT).ok())
         .as_deref()
         == Some("on")
 }
@@ -6932,6 +6932,11 @@ fn conversation_with_gate_inner(
     // Short utterances in a room that is not busy go to the model after all
     // (`LAMP_SHORT_SOUNDS=quiet-room`, off unless set).
     let short_sounds = crate::not_speech::short_sounds_from_environment();
+    // `LAMP_SIMPLE_CALL` (the product owner, 27 Nov 2026): one rule decides
+    // what a line is. Every short utterance goes to the worker, in any room,
+    // for it to judge (a line with no words is never answered there), and no
+    // busy room holds the floor.
+    let simple_call = crate::second_provider::simple_call_on();
     // A new sound waits while an answer is awaited unheard
     // (`LAMP_WAIT_KEEPS_ANSWER=on`, #1123), and the candidate it was last
     // recorded for, so that the record says so once. With `words`, its
@@ -10931,7 +10936,8 @@ fn conversation_with_gate_inner(
                     let busy = room.busy();
                     #[cfg(test)]
                     let busy = room.busy() || TEST_ROOM_BUSY.with(std::cell::Cell::get);
-                    let holding = busy
+                    let holding = !simple_call
+                        && busy
                         && reply.as_ref().is_some_and(|current| {
                             let turn = current.owner.turn();
                             current.local_input_ended
@@ -12016,8 +12022,8 @@ fn conversation_with_gate_inner(
                                     monotonic_us(),
                                 ),
                                 said_close(&speech_levels, &loud_blocks, &rise),
-                                short_sounds,
-                                room.busy(),
+                                short_sounds || simple_call,
+                                room.busy() && !simple_call,
                                 crate::not_speech::just_stopped(
                                     stopped_at_us,
                                     last_spoke_us,

@@ -49,7 +49,7 @@ const MOST_RECENT: usize = 8;
 
 /// Whether the environment switches it on.
 pub fn on() -> bool {
-    std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
+    crate::second_provider::unless_simple(std::env::var(ENVIRONMENT).ok()).as_deref() == Some("on")
 }
 
 /// Whether `LAMP_NAME_FACE_OR_WORDS` is on

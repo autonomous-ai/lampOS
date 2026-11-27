@@ -164,12 +164,14 @@ pub fn resume_ask(bridge: &str) -> String {
 
 /// Whether the switch is on in this process's environment: `on` only.
 pub fn on() -> bool {
-    on_for(std::env::var(ENVIRONMENT).ok().as_deref())
+    on_for(crate::second_provider::unless_simple(std::env::var(ENVIRONMENT).ok()).as_deref())
 }
 
 /// Whether the resume switch is on in this process's environment: `on` only.
 pub fn resumes() -> bool {
-    on_for(std::env::var(RESUMES_ENVIRONMENT).ok().as_deref())
+    on_for(
+        crate::second_provider::unless_simple(std::env::var(RESUMES_ENVIRONMENT).ok()).as_deref(),
+    )
 }
 
 fn on_for(value: Option<&str>) -> bool {

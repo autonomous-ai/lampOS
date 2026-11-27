@@ -773,7 +773,7 @@ pub const UNCLEAR_FLAG: &str = "--ask-unclear";
 pub fn unclear_arguments_from_environment() -> Vec<String> {
     unclear_arguments_in(
         crate::language::from_environment(),
-        std::env::var(UNCLEAR_ENVIRONMENT).ok().as_deref(),
+        crate::second_provider::unless_simple(std::env::var(UNCLEAR_ENVIRONMENT).ok()).as_deref(),
     )
 }
 

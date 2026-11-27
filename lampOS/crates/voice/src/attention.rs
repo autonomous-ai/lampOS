@@ -3079,11 +3079,11 @@ impl Attention {
     /// reason: false positive. someone may say Lamp or a word similar to
     /// it."), whether the line last judged opens a conversation: its words,
     /// a line going on from one included, open with "Hey Lamp"
-    /// ([`opens_with_hey_lamp`]), its head was tapped, or a computer opened
-    /// its turn. A hearing of the name by lamp-name never counts, at any
-    /// score; nor does a face, closeness or any other sign.
+    /// ([`opens_with_hey_lamp`]), or its head was tapped. A hearing of the
+    /// name by lamp-name never counts, at any score; nor does a face,
+    /// closeness, a computer's turn or any other sign.
     pub fn simple_called(&self) -> bool {
-        self.tapped || self.opened || opens_with_hey_lamp(&self.heard)
+        self.tapped || opens_with_hey_lamp(&self.heard)
     }
 
     /// Whether the line last judged was a turn the lamp began itself.
