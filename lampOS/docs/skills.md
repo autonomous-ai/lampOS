@@ -7898,7 +7898,7 @@ forces one), a skill it makes is made whole, with everything a run needs:
   DeepSeek's". The note is not read for whether it is about the say: a
   note about something else on such a skill costs one agent make, never a
   skill kept wrong. The same say with no note ("Time to stretch!"), or
-  asked aloud, or a `say = { note }`, is kept as before. The note quoted
+  asked aloud, or a `say = { note }` alone, is kept as before. The note quoted
   to the agent is cut at 120 characters. Limits: a `remind` step's words
   are the person's reminder (as told-only keeps them), so a reminder
   beside a `left out:` note is never held. With no note, a person's ask
@@ -7907,12 +7907,22 @@ forces one), a skill it makes is made whole, with everything a run needs:
   DeepSeek kept "There are days left in the year." for "how many days are
   left in the year" with no note): the ask names one of `VALUE_ASKS`
   ("how many", "how much", "how long", "how far", "how old", "what time",
-  "what day", "what date", "which day", "days left", "days until", and in
-  Vietnamese "bao nhiêu", "bao lâu", "mấy giờ", "mấy ngày", "còn mấy",
-  as a whole word, not followed by "cũng" or after "dù": "ngày nào cũng
-  …", "every day …", is no ask), and every fixed say of the timed skill
-  has no digit and doesn't repeat that phrase. The agent is told the
-  ask's words from that phrase to the end of its sentence as the note. A
+  "what day", "what date", "which day", "the date", "today's date", "the
+  time", "days left", "days until", and in Vietnamese "bao nhiêu", "bao
+  lâu", "mấy giờ", "mấy ngày", "còn mấy", as a whole word, not followed by
+  "cũng" or after "dù": "ngày nào cũng …", "every day …", is no ask; nor
+  is one a negation governs within its four words before in its own
+  sentence, "don't", "do not", "never", "without", "no need", "đừng",
+  "không cần": "don't tell me how many emails, just say good morning"; nor
+  "the time" or "the date" after "all", "by", "at", "on", "from",
+  "since", "until", "till" or "same": "all the time"), and every fixed say
+  of the timed skill has no digit and doesn't repeat that phrase. The
+  agent is told the ask's words from that phrase to the end of its
+  sentence as the note, in the ask's own case. A `say = { note }` beside
+  the fixed says keeps the skill, as the model may say the value then;
+  with the maker's `left out:` note it is held all the same, the note
+  being the fixed say's value dropped (El's P3s on #8732, test
+  `the_date_the_time_a_negation_and_a_note_say_beside_a_fixed_one`). A
   say with a digit is told-only's (`CHANGING_SAY_REPAIR`); one that
   repeats the ask ("Time to check how much you spent today.") is a
   reminder and kept; an ask for no value ("remind me to stretch") is kept
