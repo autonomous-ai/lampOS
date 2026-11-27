@@ -2738,6 +2738,36 @@ fn the_product_leaves_task_no_yes_off() {
     }
 }
 
+/// #8839 (the lead's test on lamp-52e6 at stable 16443, 27 Nov): a line
+/// begun over the lamp's own answer is a follow-up like any line in the
+/// conversation's 20 s, with no look and no test of its words, by the
+/// product owner's rule of 26 Nov ("Hey Lamp" opens 20 s, and no look
+/// gates it). `LAMP_FOLLOW_UPS_AFTER_THE_ANSWER` sent such a line to the
+/// no-look doors, where five of the lead's follow-ups were held and the
+/// window renewed nothing; no product unit sets it now.
+#[test]
+fn the_product_takes_a_line_over_the_answer_as_a_follow_up() {
+    let name = "LAMP_FOLLOW_UPS_AFTER_THE_ANSWER";
+    for (unit, text) in install::PRODUCT {
+        let set = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains(name))
+            .count();
+        assert_eq!(set, 0, "{unit}: {name}");
+    }
+    // Its partner stays: in the window no camera sign holds a line.
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    assert!(
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_FOLLOW_UPS=on")
+    );
+}
+
 /// The make flow's five switches (the first builder's DEFAULT-ON, 19 Nov
 /// 21:42, on #7814), each `on` once in lamp-voice, whose part reads it, and
 /// in no other unit but lamp-control for made code's (its no-yes mint and

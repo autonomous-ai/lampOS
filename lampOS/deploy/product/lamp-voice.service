@@ -399,9 +399,6 @@ Environment=LAMP_SAID_TO_ME_NAME_IN_LINE=on
 # LAMP_FOLLOW_UPS: the product owner's rules of 25 Nov 2026 (#7570): in a conversation no line is held on a camera sign alone,
 # and a busy room's conversation goes on 20 s. Its why and rules are its row in docs/switches.md. DEFAULT-ON asked of its readers.
 Environment=LAMP_FOLLOW_UPS=on
-# LAMP_FOLLOW_UPS_AFTER_THE_ANSWER: a line begun over the lamp's answer is no follow-up (it has no voice print): two people
-# talking while the lamp answers one of them are left alone (the product owner, 26 Nov 2026). Its row in docs/switches.md.
-Environment=LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on
 # LAMP_SPEAKING_READ_LOOKS: its why and rules are its row in docs/switches.md (#7442, #7419).
 Environment=LAMP_SPEAKING_READ_LOOKS=on
 # LAMP_ONE_AS_LAMP: its why and rules are its row in docs/switches.md (#4710).
