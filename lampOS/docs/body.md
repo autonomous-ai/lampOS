@@ -2632,7 +2632,7 @@ report counts. It is held to what the generator promises the clips:
   With `LAMP_BODY_REACH_MAP=shadow` (#7513; off, never in a product unit) the body reads the lamp's own reach map
   (`tools/reach`, `reach_map.rs`; `LAMP_BODY_REACH_MAP_FILE`, default `/var/lib/lampos-body/reach-map.json`, root's and read
   only) and, at full height, says once per change in its journal when the pose it is about to write is outside it, 48 counts
-  in. Nothing is held and no goal changes; the map answers per pose (the other joints at their goals).
+  in (back inside only 8 counts farther in). `shadow` holds nothing and changes no goal; `LAMP_BODY_REACH_MAP=on` also holds a goal that would put the pose outside where its joint was last written (the map answers per pose, the other joints at their goals; a lamp already outside is not trapped).
   With `LAMP_BODY_APP_REACH=on` (the person, 14:04 on 10 Nov, for the dev lamps
   75c9 and a63e until the hardware team signs the numbers) a move may instead
   take each joint 90% of its hardware range from the pose, on each side

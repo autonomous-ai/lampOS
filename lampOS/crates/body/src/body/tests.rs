@@ -23388,8 +23388,102 @@ fn the_product_unit_never_turns_the_reach_map_shadow_on() {
         .find(|line| line.starts_with("| `lamp-body` LAMP_BODY_REACH_MAP"))
         .expect("docs/switches.md lists LAMP_BODY_REACH_MAP");
     assert!(
-        row.contains("`shadow`; off."),
+        row.contains("`shadow` or `on`; off."),
         "the census says it is off: {row}"
     );
     assert!(row.contains("off in the product"));
+}
+
+/// A map of one run for every shoulder and elbow: the head's pitch may be `run` (counts), 48 in from each end under the shadow's margin.
+fn flat_map(run: (f64, f64)) -> &'static crate::reach_map::ReachMap {
+    let axis = |from: f64, step: f64, count: usize| -> Vec<f64> {
+        (0..count).map(|k| from + step * k as f64).collect()
+    };
+    let (shoulder, elbow, pitch) = (
+        axis(2_400.0, 100.0, 7),
+        axis(2_400.0, 100.0, 7),
+        axis(1_500.0, 50.0, 31),
+    );
+    let row: Vec<Vec<Vec<(f64, f64)>>> = (0..shoulder.len())
+        .map(|_| (0..elbow.len()).map(|_| vec![run]).collect())
+        .collect();
+    let text = serde_json::json!({
+        "axes": {"shoulder": shoulder, "elbow": elbow, "pitch": pitch},
+        "safe_pitch_runs": row,
+    })
+    .to_string();
+    Box::leak(Box::new(crate::reach_map::ReachMap::parse(&text).unwrap()))
+}
+
+/// #7513, `LAMP_BODY_REACH_MAP=on`: a held look down past the map's edge is held at the edge the map
+/// says, 48 counts in; the same run without the refusing mode, or with the map in shadow, goes past it.
+#[test]
+fn the_reach_map_on_holds_a_look_at_the_maps_edge_and_the_shadow_does_not() {
+    // `goals` of a standing lamp: its rest before the look (at 11 s) and the highest (most down) goal it ever writes at full height.
+    let run = |reach_map: Option<&'static crate::reach_map::ReachMap>, refuse: bool| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(25));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let time = clock.time.clone();
+        let seen_at = clock.time.clone();
+        let mut seen: Vec<(Duration, f32, u16)> = Vec::new();
+        run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                reach_map,
+                reach_refuse: refuse,
+                ..gesture_limits()
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Listening, 100)),
+            move || {
+                let looking = time.get() >= Duration::from_secs(12);
+                let steps = ((time.get().as_millis() as f32 - 12_000.0) / 200.0).floor() + 1.0;
+                Asked {
+                    held: looking,
+                    // 40 counts down from home, a held look: past the map's edge below.
+                    aim: looking.then(|| [0.0, (steps * 11.4).min(40.0)]),
+                    aim_from_home: looking,
+                    ..Asked::default()
+                }
+            },
+            |glimpse| seen.push((seen_at.get(), glimpse.stand, glimpse.goals[0])),
+        );
+        let rest = seen
+            .iter()
+            .rfind(|s| s.0 < Duration::from_secs(11) && s.1 >= 1.0)
+            .map(|s| s.2)
+            .expect("the lamp stands before the look");
+        (
+            rest,
+            seen.iter()
+                .filter(|s| s.1 >= 1.0)
+                .map(|s| s.2)
+                .max()
+                .unwrap(),
+        )
+    };
+    let (rest, without) = run(None, false);
+    // The map's run ends 68 counts below the rest, so its edge less the 48 count margin is 20 below the rest: inside at rest.
+    let high = f64::from(rest) + 68.0;
+    let map = flat_map((1_500.0, high));
+    let edge = (high - 48.0) as u16;
+    let (_, shadow) = run(Some(map), false);
+    let (_, refused) = run(Some(map), true);
+    assert!(
+        without > edge + 20,
+        "the look never went past the edge without the map: {without} against {edge}"
+    );
+    assert_eq!(shadow, without, "the shadow changed a goal");
+    assert!(
+        refused <= edge + 1,
+        "the refusing mode let the head to {refused}, the edge is {edge}"
+    );
+    assert!(
+        refused + 12 >= edge,
+        "the refusing mode held the head far inside the edge: {refused} against {edge}"
+    );
 }
