@@ -13923,6 +13923,97 @@ fn with_the_switch_an_unsaid_nudge_gives_its_cooldown_back_and_comes_again_while
     }
 }
 
+/// The Reviewer-lead's HOLD on #8868, the owner's call (27 Nov, ~17:15:
+/// "Retry no sooner than 30 s"): a lamp muted at 30 minutes refuses each
+/// say, so each line is never heard and keeps its chance, but Rest your
+/// eyes turns to them again no sooner than 30 s after each try, never at
+/// every face message.
+#[test]
+fn a_muted_lamps_unheard_nudge_retries_no_sooner_than_30_s() {
+    let skill = lamp_skills::load_with(&skills_root().join("rest-your-eyes"), true).unwrap();
+    let mut engine = Engine::new(vec![skill], true);
+    engine.clock(0, 0, 36_000_000);
+    let mut tries: Vec<u64> = Vec::new();
+    for second in 0..=35 * 60u64 {
+        let now = second * 1_000_000;
+        engine.observe("voice/state", now, br#"{"state":"resting"}"#, None);
+        for run in engine.observe(
+            "humans/faces/tracked",
+            now,
+            br#"{"faces":[{"id":"a1","xmin":0.3,"ymin":0.2,"xmax":0.6,"ymax":0.6,"confidence":0.9}]}"#,
+            None,
+        ) {
+            if run.calls.iter().any(|call| matches!(call, Call::Say(_))) {
+                tries.push(second);
+                // Muted: the say refused, never heard.
+                engine.unsaid(&run.skill, now);
+            }
+        }
+    }
+    assert_eq!(tries.first(), Some(&(30 * 60)), "{tries:?}");
+    // Five minutes muted: tried again, each 30 s at the soonest.
+    assert!(tries.len() >= 5, "{tries:?}");
+    for pair in tries.windows(2) {
+        assert!(pair[1] - pair[0] >= 30, "{tries:?}");
+        assert!(pair[1] - pair[0] <= 31, "{tries:?}");
+    }
+}
+
+/// The Reviewer-lead's P3 on #8868: a `[stop] group` member with no `apart`
+/// of its own (Posture, once #8377 lands: no nudge) is never held a minute
+/// by another member's, nor holds one. A sip of water with its `apart`
+/// taken out, due at 30 with Rest your eyes, speaks at 30 beside it.
+#[test]
+fn a_group_member_with_no_apart_of_its_own_is_never_held_a_minute() {
+    let dir = tempfile::tempdir().unwrap();
+    let sip = dir.path().join("sip-of-water");
+    copy(&skills_root().join("sip-of-water"), &sip);
+    let toml = fs::read_to_string(sip.join("skill.toml")).unwrap();
+    let line = toml
+        .lines()
+        .find(|line| line.starts_with("apart ="))
+        .unwrap()
+        .to_owned();
+    fs::write(
+        sip.join("skill.toml"),
+        toml.replace(&format!("{line}\n"), ""),
+    )
+    .unwrap();
+    let skills = vec![
+        lamp_skills::load_with(&skills_root().join("rest-your-eyes"), true).unwrap(),
+        lamp_skills::load_with(&sip, true).unwrap(),
+    ];
+    assert_eq!(skills[1].stop.as_ref().map(|stop| stop.apart_us), Some(0));
+    let mut engine = Engine::new(skills, true);
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut first: Vec<(u64, String)> = Vec::new();
+    for second in 0..=33 * 60u64 {
+        let left = if (second / 30) % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        for run in engine.observe(
+            "humans/faces/tracked",
+            second * 1_000_000,
+            faces.as_bytes(),
+            None,
+        ) {
+            if run.calls.iter().any(|call| matches!(call, Call::Say(_)))
+                && !first.iter().any(|(_, seen)| *seen == run.skill)
+            {
+                first.push((second, run.skill));
+            }
+        }
+    }
+    assert_eq!(first.len(), 2, "{first:?}");
+    // Both at 30, whichever went first: neither waits the minute.
+    for (second, _) in &first {
+        assert!((30 * 60..30 * 60 + 5).contains(second), "{first:?}");
+    }
+}
+
 /// #5207, Fourteen's and Thirteen's P2 on #5237: Sit back's warm word (a
 /// `follows` run, which spends no hour) said nothing; the leaned-in nudge
 /// before it was heard and keeps its place in the hour and its gap. Only
@@ -13973,7 +14064,8 @@ fn with_the_switch_an_unsaid_word_after_a_heard_nudge_gives_nothing_back() {
     // heard nudge is not run again.
     assert_eq!(runs.len(), 3, "{runs:?}");
     assert_eq!(runs[0], (3, "sit-back".to_owned()), "{runs:?}");
-    assert_eq!(runs[1].0, runs[2].0, "{runs:?}");
+    // Again no sooner than 30 s after the unheard try (the owner, 27 Nov).
+    assert!(runs[2].0 - runs[1].0 <= 1, "{runs:?}");
     assert_eq!(
         given_back,
         [None],

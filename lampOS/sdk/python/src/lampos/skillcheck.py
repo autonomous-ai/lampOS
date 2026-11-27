@@ -391,8 +391,27 @@ def _stop(rules: dict[str, Any], report: Report) -> None:
     stop = rules.get("stop")
     if isinstance(stop, dict) and "group" in stop and "budget" in rules:
         report.errors.append("skill.toml: [stop] group is for a skill in no [budget] group: its group shares it already")
-    if isinstance(stop, dict) and "apart" in stop and "group" not in stop:
-        report.errors.append("skill.toml: [stop] apart goes with [stop] group")
+    if isinstance(stop, dict) and "apart" in stop:
+        if "group" not in stop:
+            report.errors.append("skill.toml: [stop] apart goes with [stop] group")
+        apart = _duration_us(stop["apart"])
+        if apart is not None and not 1_000_000 <= apart <= 3_600_000_000:
+            report.errors.append("skill.toml: [stop] apart is 1s to 1h")
+
+
+_DURATION = re.compile(r"^([0-9]+)(ms|s|m|h)$")
+_PER_UNIT_US = {"ms": 1_000, "s": 1_000_000, "m": 60_000_000, "h": 3_600_000_000}
+
+
+def _duration_us(text: object) -> int | None:
+    """A duration as lamp-skills reads it (`duration_us`), in microseconds;
+    None when it is no duration (the format schema says why)."""
+    if not isinstance(text, str):
+        return None
+    found = _DURATION.match(text)
+    if not found:
+        return None
+    return int(found.group(1)) * _PER_UNIT_US[found.group(2)]
 
 
 def is_service_grant(grant: object) -> bool:
