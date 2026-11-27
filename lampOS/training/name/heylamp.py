@@ -1503,7 +1503,7 @@ def report(a) -> None:
         f"Extra slice: {len(extra_calls)} calls, {len(extra_nots)} not-calls.")
     text = "\n".join(lines)
     print(text)
-    out = set_dir(merged["set"]) / "runs" / f"report-{rule}.md"
+    out = set_dir(merged["set"]) / "runs" / (f"report-{a.tag}-{rule}.md" if a.tag else f"report-{rule}.md")
     out.write_text(text + "\n")
     print(f"\nwrote {out}")
 
