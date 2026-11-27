@@ -190,6 +190,11 @@ const LOOK_AGAIN: Duration = Duration::from_millis(250);
 /// first chat round made to call [`START`] ([`named_ask`], #1722). `on`
 /// only.
 pub const NAMED_ASK_ENVIRONMENT: &str = "LAMP_TASKS_NAMED_ASK";
+/// Where the second route reads whether the first line said after the
+/// lamp's own news (`attention::AFTER_NEWS`), when its words ask for new
+/// agent-shaped work ([`new_work_after_news`]), has its first chat round
+/// made to call [`START`] (#8701). `on` only.
+pub const AFTER_NEWS_ENVIRONMENT: &str = "LAMP_TASKS_AFTER_NEWS";
 /// Where the second route reads whether a spoken line whose own words name
 /// an agent for the work ([`named_for_work`]: "Hey Lamp, OpenClaw, look up
 /// the weather in Hanoi this weekend") is handed to that agent in code as
@@ -1440,6 +1445,130 @@ fn asks_for_work(rest: &str) -> bool {
             >= WHOLE_ASK_FEWEST
 }
 
+/// The verbs that ask for agent-shaped work in a line said right after the
+/// lamp's news ([`new_work_after_news`]): research, compare, find and
+/// summarise, plan, write. Narrower than [`WORK_VERBS`]: "make the light
+/// warmer", "check the time" or "add a reminder" are the lamp's own.
+const AFTER_NEWS_VERBS: [&str; 15] = [
+    "research",
+    "compare",
+    "find",
+    "search",
+    "summarise",
+    "summarize",
+    "plan",
+    "write",
+    "draft",
+    "gather",
+    "investigate",
+    "analyse",
+    "analyze",
+    "outline",
+    "list",
+];
+
+/// Two-word asks for the same work ([`AFTER_NEWS_VERBS`]).
+const AFTER_NEWS_PHRASES: [[&str; 2]; 3] = [["look", "up"], ["look", "into"], ["dig", "into"]];
+
+/// The fewest content words ([`ask_words`]) from the work verb on, so a
+/// short ask ("write it down", "find that part again") stays the model's.
+const AFTER_NEWS_FEWEST: usize = 5;
+
+/// What may stand right before the work verb in its sentence: the asking
+/// ("can you find …", "I want you to plan …", "please write …").
+const AFTER_NEWS_LEADS: [&[&str]; 8] = [
+    &["can", "you"],
+    &["could", "you"],
+    &["would", "you"],
+    &["will", "you"],
+    &["you", "to"],
+    &["help", "me"],
+    &["please"],
+    &["now"],
+];
+
+/// Words that may open the sentence before the work verb with no asking:
+/// a greeting, the lamp's name, a link word.
+const AFTER_NEWS_OPENERS: [&str; 14] = [
+    "hey", "hi", "hello", "lamp", "ok", "okay", "so", "and", "also", "then", "next", "alright",
+    "right", "please",
+];
+
+/// Words that tie a line back to the lamp's news, a follow-up about it
+/// ("summarise the report you just told me", "read me the rest", "what was
+/// the answer again?"), or take the work back ("don't look anything up"):
+/// never forced.
+const AFTER_NEWS_BACK: [&[&str]; 18] = [
+    &["again"],
+    &["rest"],
+    &["you", "just"],
+    &["just", "said"],
+    &["just", "told"],
+    &["you", "said"],
+    &["you", "told"],
+    &["it", "said"],
+    &["the", "report"],
+    &["that", "report"],
+    &["the", "result"],
+    &["that", "result"],
+    &["the", "answer"],
+    &["the", "news"],
+    &["don't"],
+    &["dont"],
+    &["not"],
+    &["never"],
+];
+
+/// Whether a line said right after the lamp's own news asks for new
+/// agent-shaped work, to be handed over with [`START`] (#8701,
+/// `LAMP_TASKS_AFTER_NEWS`): one of its sentences opens with a work verb
+/// ([`AFTER_NEWS_VERBS`], [`AFTER_NEWS_PHRASES`]), after only a greeting
+/// or the asking ([`AFTER_NEWS_OPENERS`], [`AFTER_NEWS_LEADS`]), with at
+/// least [`AFTER_NEWS_FEWEST`] content words from that verb on, and the
+/// line has no word that ties it back to the news or takes the work back
+/// ([`AFTER_NEWS_BACK`]). On lamp-ee17 on 27 Nov, "compare three robot
+/// vacuums under 300 dollars and tell me which to buy" and "find this
+/// week's main AI news and summarise it in five points", said after the
+/// news, were answered by the model, once with its own `web_search`. A
+/// thanks, "what time is it?", "what did it say about Spain?" or "did you
+/// find anything about Spain?" is none: the model answers it.
+pub fn new_work_after_news(said: &str) -> bool {
+    let words = plain_words(said);
+    if AFTER_NEWS_BACK
+        .iter()
+        .any(|back| words.windows(back.len()).any(|run| run == *back))
+    {
+        return false;
+    }
+    said.split(['.', '!', '?', ';', ':'])
+        .map(plain_words)
+        .any(|sentence| {
+            (0..sentence.len()).any(|at| {
+                let verb = AFTER_NEWS_VERBS.contains(&sentence[at].as_str())
+                    || AFTER_NEWS_PHRASES.iter().any(|phrase| {
+                        sentence
+                            .get(at..at + 2)
+                            .is_some_and(|run| run == &phrase[..])
+                    });
+                verb && led_in(&sentence[..at])
+                    && ask_words(&sentence[at..].join(" "), false).len() >= AFTER_NEWS_FEWEST
+            })
+        })
+}
+
+/// Whether `before`, the words of a sentence before its work verb
+/// ([`new_work_after_news`]), are only openers, or end with the asking.
+fn led_in(before: &[String]) -> bool {
+    AFTER_NEWS_LEADS.iter().any(|lead| {
+        before
+            .len()
+            .checked_sub(lead.len())
+            .is_some_and(|from| before[from..] == **lead)
+    }) || before
+        .iter()
+        .all(|word| AFTER_NEWS_OPENERS.contains(&word.as_str()))
+}
+
 /// What a turn is asked again with when the person's words name `agent`
 /// for the work ([`named_for_work`]) and the model's answer called no
 /// [`START`] (#6547 (1b)): its answer was not said.
@@ -1572,6 +1701,11 @@ fn staff_now(place: &Place) -> Vec<Member> {
 /// Whether [`NAMED_ASK_ENVIRONMENT`] is `on`.
 pub fn named_ask_on() -> bool {
     std::env::var(NAMED_ASK_ENVIRONMENT).is_ok_and(|value| value == "on")
+}
+
+/// Whether [`AFTER_NEWS_ENVIRONMENT`] is `on`.
+pub fn after_news_on() -> bool {
+    std::env::var(AFTER_NEWS_ENVIRONMENT).is_ok_and(|value| value == "on")
 }
 
 /// Whether [`NAMED_AGENT_TAKES_LINE_ENVIRONMENT`] is `on`.
@@ -7256,6 +7390,43 @@ pub(crate) mod tests {
             *here.borrow_mut() =
                 engines.map(|engines| engines.iter().map(|&engine| engine.to_owned()).collect());
         });
+    }
+
+    /// #8701: the asks lamp-ee17 answered itself right after its news on
+    /// 27 Nov, and the trip of the issue, are new agent-shaped work; a
+    /// reply, a follow-up about the news, a short or plain question, and a
+    /// work verb not in the asking's place are not.
+    #[test]
+    fn new_work_after_the_news_is_told_from_a_reply_about_it() {
+        for said in [
+            "Hey Lamp, compare three robot vacuums under 300 dollars and tell me which to buy.",
+            "compare three robot vacuums under 300 dollars and tell me which to buy",
+            "Hey Lamp, find this week's main AI news and summarise it in five points.",
+            "Hey Lamp, plan a simple three-day trip to Hoi An and write it up as a short list.",
+            "Thanks, that's great. Now research the best standing desks under 500 dollars for me.",
+            "Can you look up flights from Hanoi to Tokyo next Friday and list the cheapest three?",
+            "I want you to write a short report on solar panels for a small flat.",
+        ] {
+            assert!(super::new_work_after_news(said), "{said}");
+        }
+        for said in [
+            "Thanks, that's great.",
+            "Thank you.",
+            "What time is it?",
+            "What did it say about Spain?",
+            "Read me the rest.",
+            "What was the answer again?",
+            "Did you find anything about the Spanish part of the news?",
+            "Summarise the report you just told me in three points for my boss.",
+            "Write that down.",
+            "Find that part again.",
+            "Write me a short poem.",
+            "Don't look anything up about robot vacuums for me right now.",
+            "My colleague will compare three robot vacuums under 300 dollars tomorrow.",
+            "Make the light a little warmer, please, for my reading tonight.",
+        ] {
+            assert!(!super::new_work_after_news(said), "{said}");
+        }
     }
 
     /// A last step or an ask never brings a folder or a username to the

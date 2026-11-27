@@ -6880,14 +6880,55 @@ after a take-over, but now for every turn:
   (`Engine::noting_after_news`): a reply to the news (a thanks, a question
   about that result) is answered as before; new work (plan, research,
   write, make) is a new request, handed over with `start_agent_task` as any
-  other. The verdict is unchanged and the code reads no words: the model
-  tells the two apart. The journal says `request N: the first thing said
-  after the lamp's own news: the model is told a new request in it is
-  handed over as any other`. Tests:
+  other. The verdict is unchanged. The journal says `request N: the first
+  thing said after the lamp's own news: the model is told a new request in
+  it is handed over as any other`. Tests:
   `a_new_request_right_after_the_news_is_told_the_note_and_handed_over`,
   `a_reply_right_after_the_news_is_told_the_note_and_answered`,
-  `the_first_line_after_the_news_earns_the_after_news_note`; the model's
-  choice itself is shown only on a lamp.
+  `the_first_line_after_the_news_earns_the_after_news_note`.
+- **New work right after the news is handed over in code**
+  (`LAMP_TASKS_AFTER_NEWS=on`, #8701; on in the product's
+  `lamp-voice.service`; only where work can be handed over, `tools.tasks`;
+  passed to the second worker only). With the note alone, on lamp-ee17 on
+  27 Nov, 2 of 5 fair tries still went wrong: "compare three robot vacuums
+  under 300 dollars and tell me which to buy" was answered with no call,
+  and "find this week's main AI news and summarise it in five points" with
+  the model's own `web_search`. In another try (read from ee17's memory)
+  that ask got a spoken read-back, "I'll have the lamp research … Shall I
+  start it?", with no call and nothing prepared: it names no agent or
+  computer, so the read-back catch (`agent_tasks::speaks_a_read_back`)
+  never asked again. With the switch, round 1 of such a line is
+  sent with `tool_choice` naming `start_agent_task`
+  (`worker::after_news_asks`, the same force as `LAMP_TASKS_NAMED_ASK`'s,
+  last in the chain so a plainer force such as a timer's wins). It is
+  forced only when both hold:
+  - the line is the first after the news: `worker::AFTER_NEWS_NOTE` was
+    put among its notes by code (`Heeding::after_news_note_for`), since the
+    lamp's last answer or call. The same words on any other line are asked
+    as before;
+  - its words ask for new agent-shaped work
+    (`agent_tasks::new_work_after_news`): one sentence opens, after only a
+    greeting, the lamp's name or the asking ("can you", "I want you to",
+    "please", "now"), with a work verb (research, compare, find, search,
+    summarise, plan, write, draft, gather, investigate, analyse, outline,
+    list, "look up", "look into"), with at least 5 content words from that
+    verb on; and no word ties it back to the news or takes the work back
+    ("again", "the rest", "you just", "you said", "it said", "the report",
+    "the result", "the answer", "the news", "don't", "not", "never").
+    "What did it say about Spain?", "read me the rest", "did you find
+    anything about Spain?", "write that down", "what time is it?" and a
+    thanks are the model's, as before. English words only.
+
+  The model still writes the task and `who`; the read-back, the yes and
+  `confirm_agent_task` follow as for any hand-over. The round after the
+  call is not forced. No extra chat round: the force rides on round 1, so
+  the common path costs nothing (a forced round is one tool call, then the
+  read-back round any hand-over has). Round 1's journal line names the
+  forced function. Off, nothing is forced and only the note is told. Tests:
+  `new_work_after_the_news_is_told_from_a_reply_about_it`,
+  `new_work_said_right_after_the_news_makes_the_first_round_call_start_agent_task`,
+  `new_work_right_after_the_news_is_forced_as_this_route_asks_it`,
+  `the_spoken_offer_with_nothing_prepared_after_the_news_is_asked_forced`.
 - **Only the first line after the lamp's question skips its look**
   (`LAMP_ASKED_LOOKS=on`, #8395; inert without `LAMP_SAID_TO_ME`). On
   lamp-74ff on 23 Nov 16:09-16:21, in a meeting, lines looking away were

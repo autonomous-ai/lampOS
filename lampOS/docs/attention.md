@@ -1719,6 +1719,13 @@ work. On the second route such a line is marked
 in it is handed over as any other (`worker::AFTER_NEWS_NOTE`, #8701:
 "plan a simple three-day trip to Hoi An …", right after the news, was
 answered by the lamp itself 2 times in 5; [second-voice.md](second-voice.md)).
+The note alone still let 2 of 5 long asks be answered by the model on
+lamp-ee17 on 27 Nov, so with `LAMP_TASKS_AFTER_NEWS=on` the second route
+decides in code: such a line whose words ask for new agent-shaped work
+(`agent_tasks::new_work_after_news`: research, compare, find and
+summarise, plan, write) has its first chat round forced to call
+`start_agent_task`; a reply or a follow-up about the news is not. The
+rule's verdict is the same either way.
 Test: `the_first_line_after_the_news_is_marked_whatever_it_asks`.
 
 Without it the rule holds answers only in a busy room. In a room not known

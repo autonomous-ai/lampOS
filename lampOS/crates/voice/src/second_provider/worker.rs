@@ -3401,12 +3401,30 @@ pub fn serve(
         crate::live_fact::force_when(crate::live_fact::on()),
         task_yes,
     );
+    // The first line after the lamp's own news that asks for new
+    // agent-shaped work is handed over: its first round must call
+    // start_agent_task (#8701). Last of all: a plainer force wins.
+    let after_news = tools
+        .tasks
+        .as_ref()
+        .filter(|_| crate::agent_tasks::after_news_on())
+        .map(|_| {
+            eprintln!(
+                "lamp-voice second: the first line after the lamp's news that asks for new work (research, compare, find, plan, write) must call {} in its first round ({})",
+                crate::agent_tasks::START,
+                crate::agent_tasks::AFTER_NEWS_ENVIRONMENT
+            );
+            after_news_asks()
+        });
     let net = match first_force(
-        task_yes,
         first_force(
-            named,
-            first_force(remember, first_force(make, first_force(keep, set))),
+            task_yes,
+            first_force(
+                named,
+                first_force(remember, first_force(make, first_force(keep, set))),
+            ),
         ),
+        after_news,
     ) {
         Some(force) => net.forcing(force),
         None => net,
@@ -3978,6 +3996,8 @@ pub fn serve(
             );
             crate::services::Linked::new(folder)
         });
+    // Whether work can be handed over: the after-news note's wiring reads it (#8701).
+    let has_tasks = tools.tasks.is_some();
     let waiting_place = tools.tasks.clone();
     // The tasks part, for a heard plain no to a task read back (#6582), and
     // a heard plain yes to it (#7027).
@@ -7037,6 +7057,37 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
                 fields: None,
             }),
         }
+    })
+}
+
+/// What makes a spoken turn's first round call `start_agent_task`, with
+/// `LAMP_TASKS_AFTER_NEWS=on` (#8701): the last message is the person's,
+/// told [`AFTER_NEWS_NOTE`] since the lamp last spoke or called (code puts
+/// it there only on the first line after the lamp's own news,
+/// [`Heeding::after_news_note_for`]), and its words ask for new
+/// agent-shaped work ([`crate::agent_tasks::new_work_after_news`]). With
+/// the note alone, on lamp-ee17 on 27 Nov, such asks were answered by the
+/// model 2 times in 5, once with its own `web_search`. A reply or a
+/// follow-up about the news, a plain question and a round after a call are
+/// asked as before; the same words on any other line are not forced.
+pub(crate) fn after_news_asks() -> crate::second_provider::net::Force {
+    Arc::new(|messages: &[Message]| {
+        let (last, before) = messages.split_last()?;
+        if last.role != "user" {
+            return None;
+        }
+        let noted = before
+            .iter()
+            .rev()
+            .take_while(|message| !matches!(message.role, "assistant" | "tool"))
+            .any(|message| message.role == "system" && message.words() == Some(AFTER_NEWS_NOTE));
+        (noted && crate::agent_tasks::new_work_after_news(last.words()?)).then_some(
+            crate::second_provider::net::Forced {
+                name: crate::agent_tasks::START,
+                only: None,
+                fields: None,
+            },
+        )
     })
 }
 
@@ -37793,6 +37844,107 @@ mod memory_observer {
             assert_eq!(plain.wire(messages).2, forcing.wire(messages).2);
         }
         crate::agent_tasks::tests::forget_staff();
+    }
+
+    /// `LAMP_TASKS_AFTER_NEWS` (#8701): on lamp-ee17 on 27 Nov, with only
+    /// the note, two long asks said right after the lamp's news were
+    /// answered by the model, once with its own `web_search`. Forced, the
+    /// first round of such a line must call `start_agent_task`. The same
+    /// words with no note (any other line), a note from an earlier line, a
+    /// follow-up about the news, a plain question and a round after a call
+    /// are asked as before, with no `tool_choice`.
+    #[test]
+    fn new_work_said_right_after_the_news_makes_the_first_round_call_start_agent_task() {
+        use super::super::net::{Chat, Message};
+        let place = crate::agent_tasks::Place {
+            directory: "/run/t".into(),
+            target: crate::agent_tasks::DEFAULT_TARGET.into(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            accounts: false,
+            machine_names: false,
+            needs: None,
+            staff_note: false,
+            named_only: false,
+            correct: false,
+            questions: false,
+            now: false,
+            one_yes: false,
+            reply_named: false,
+            harness_status: false,
+            sign_in: false,
+            sign_in_app: false,
+        };
+        let tools = crate::agent_tasks::tools(&place);
+        let declare: super::super::net::Declare = Arc::new(move || tools.clone());
+        let plain = Chat::deepseek("deepseek-chat", "k", declare.clone(), false).unwrap();
+        let forcing = Chat::deepseek("deepseek-chat", "k", declare, false).unwrap();
+        forcing.forcing(super::after_news_asks());
+        let news = [
+            Message::system("You are a lamp."),
+            Message::user("(Nobody has spoken. News from work you handed over.)"),
+            Message::assistant("Claude Code says the report is done."),
+        ];
+        let after_news = |said: &str| {
+            let mut messages = news.to_vec();
+            messages.push(Message::system(super::AFTER_NEWS_NOTE));
+            messages.push(Message::system("(For you to know: the room is quiet.)"));
+            messages.push(Message::user(said));
+            messages
+        };
+        let other_line = |said: &str| {
+            let mut messages = news.to_vec();
+            messages.push(Message::user(said));
+            messages
+        };
+        let start = Some(serde_json::json!(
+            {"type": "function", "function": {"name": "start_agent_task"}}
+        ));
+        let choice =
+            |chat: &Chat, messages: &[Message]| chat.wire(messages).2.get("tool_choice").cloned();
+        // The two asks lamp-ee17 answered itself, and the issue's trip.
+        let asks = [
+            "Hey Lamp, compare three robot vacuums under 300 dollars and tell me which to buy.",
+            "Hey Lamp, find this week's main AI news and summarise it in five points.",
+            "Hey Lamp, plan a simple three-day trip to Hoi An and write it up as a short list.",
+        ];
+        for ask in asks {
+            assert_eq!(choice(&forcing, &after_news(ask)), start, "{ask}");
+            // Not after the news: unchanged, word for word.
+            assert_eq!(choice(&forcing, &other_line(ask)), None, "{ask}");
+            assert_eq!(
+                plain.wire(&other_line(ask)).2,
+                forcing.wire(&other_line(ask)).2,
+                "{ask}"
+            );
+            // A note told an earlier line: this one is not after the news.
+            let mut later = after_news("Thanks.");
+            later.push(Message::assistant("You're welcome."));
+            later.push(Message::user(ask));
+            assert_eq!(choice(&forcing, &later), None, "{ask}");
+            // The round after the call is the model's.
+            let mut called = after_news(ask);
+            called.push(Message::tool("c1", "{\"ok\": true}"));
+            assert_eq!(choice(&forcing, &called), None, "{ask}");
+            // Off: never forced.
+            assert_eq!(choice(&plain, &after_news(ask)), None, "{ask}");
+        }
+        // A follow-up about the news and a short plain question after it.
+        for said in [
+            "What did it say about Spain?",
+            "Read me the rest.",
+            "What was the answer again?",
+            "What time is it?",
+            "Thanks, that's great.",
+        ] {
+            assert_eq!(choice(&forcing, &after_news(said)), None, "{said}");
+            assert_eq!(
+                plain.wire(&after_news(said)).2,
+                forcing.wire(&after_news(said)).2,
+                "{said}"
+            );
+        }
     }
 
     /// `LAMP_SECOND_REMEMBER_ASKED`: on lamp-4ace on 23 Oct at 18:30, the
