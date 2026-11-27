@@ -69,6 +69,7 @@ fn output(path: &str, value: serde_json::Value, inputs: &[(&str, &str)]) -> Resu
                 "split",
                 "data_origin",
                 "applicable",
+                "reference_trial_id",
                 "expected",
                 "output",
                 "correct",

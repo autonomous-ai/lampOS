@@ -44,7 +44,8 @@ and `raw_classification` remain primary **holdout-only**. A missing v2 live
 Public benchmarks do not imply measured desk distance or collection-specific
 consent. For **v2 development sessions only**, with origin `public`,
 `generated` or `invented`, these unmeasured fields may honestly be null:
-session `consent` and `sync_error_us`, trial `distance_mm` and `bearing_deg`.
+session `consent`, original `started_unix_s` and `sync_error_us`, trial
+`distance_mm` and `bearing_deg`.
 Use `light:"unknown"` and `noise:"unknown"` when unlabelled. Keep
 `clock_verified:false` if no measured mapping exists. A zero distance is
 invalid; never fill unknowns with a fabricated 600 mm or consent assertion.
@@ -62,6 +63,10 @@ speaker labels still fail raw accuracy on every applicable primary line.
 Retain all known label provenance and keep replay readiness null. Earlier
 scorer binaries may reject this development-only extension; pin the updated
 source and actual executable in the EVAL rather than changing the data.
+
+For repeated voice reference/probe comparisons without observed physical
+session spacing, use the explicit [raw development pair mode](development-pairs.md).
+It reports correlated pairs and source reuse; it never qualifies a sensor.
 
 Keep original source, complete patch, binary, model and configuration privately
 available for hash verification. A patch hash does not replace the base Git

@@ -37,6 +37,10 @@ number. Native tests, Clippy and source reviews are not accuracy measurements.
 For external development data, report unknown collection consent, geometry,
 clock error, light/noise as missing metadata using the v2 adapter path; never
 invent these fields to satisfy a physical holdout cell.
+For digital caller-voice comparisons, declare `raw_development_pairs`, report
+pair counts AND unique probes/references/recording hashes, and disclose shared
+sources or augmentations. Those correlated pairs are not independent episodes
+and cannot become physical holdout coverage.
 
 For whole C/D, report the simple and plain build identities, played/live
 mode, planned counts by scenario, unknown/missing counts and exact audible

@@ -5,7 +5,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
         .map(|i| Session {
             id: format!("s{i}"),
             split: Split::Holdout,
-            started_unix_s: 10_000 + (i / 6) * 10_000,
+            started_unix_s: Some(10_000 + (i / 6) * 10_000),
             consent: Some(true),
             delete_after_unix_s: Some(100_000),
             retention: None,
@@ -166,6 +166,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
     let manifest = Manifest {
         version: 1,
         rubric_id: None,
+        evaluation_mode: None,
         collection_id: "test-only".into(),
         frozen_unix_s: 9000,
         sessions,

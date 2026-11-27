@@ -144,12 +144,19 @@ Training permission is source-specific: do not extend a sensor's evaluation-
 only permission to another dataset or undo #8907's authorized generation work.
 
 Public/generated/invented **development** inputs may leave collection consent,
-clock error, distance and bearing null, and light/noise `unknown`, when those
+original session time, clock error, distance and bearing null, and light/noise `unknown`, when those
 facts were never measured. The report counts missing metadata explicitly;
 no fabricated distance, consent or clock value is required. This path does
 not fill any real-person qualification cell. Real-person sessions, holdout
 requirements and every primary quality/timing bar remain unchanged. See the
 v2 adapter guide for the exact limited encoding.
+
+Digital voice experiments that intentionally reuse a probe across reference
+identities use [raw development pair mode](../tools/sensors/development-pairs.md).
+Its unit is an ordered pair of hashed input segments, with explicit reuse
+counts. Unknown acquisition times and non-call reference speech are allowed
+there. This replay-only mode never satisfies the physical two-hour session,
+one-probe-per-pair or holdout requirements; the ordinary gates are unchanged.
 
 Reports retain raw classification by development/holdout, class and origin,
 physical/timely counts, confusion, missing coverage, speaker/session/condition

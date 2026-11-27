@@ -10,7 +10,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
         .map(|i| Session {
             id: format!("s{i}"),
             split: Split::Holdout,
-            started_unix_s: 10_000 + (i / 6) * 10_000,
+            started_unix_s: Some(10_000 + (i / 6) * 10_000),
             consent: Some(true),
             delete_after_unix_s: None,
             retention: Some("keep_all".into()),
@@ -176,6 +176,7 @@ fn fixture(sensor: Sensor) -> (Manifest, Run) {
     let manifest = Manifest {
         version: 2,
         rubric_id: Some(V2_RUBRIC.into()),
+        evaluation_mode: None,
         collection_id: "invented-v2".into(),
         frozen_unix_s: 9000,
         sessions,
@@ -424,6 +425,9 @@ fn legacy_unknown_consent_geometry_and_clock_are_still_rejected() {
     let mut no_consent = m.clone();
     no_consent.sessions[0].consent = None;
     assert!(no_consent.validate().is_err());
+    let mut no_start = m.clone();
+    no_start.sessions[0].started_unix_s = None;
+    assert!(no_start.validate().is_err());
     let mut no_distance = m.clone();
     no_distance.trials[0].distance_mm = None;
     assert!(no_distance.validate().is_err());

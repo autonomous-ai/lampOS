@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub type Result<T> = std::result::Result<T, String>;
 pub const V2_RUBRIC: &str = "sensor-team-2026-11-27-v2";
+pub type SourceSegment = (String, u64, u64);
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
@@ -48,7 +49,7 @@ impl Sensor {
 pub struct Session {
     pub id: String,
     pub split: Split,
-    pub started_unix_s: u64,
+    pub started_unix_s: Option<u64>,
     pub consent: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delete_after_unix_s: Option<u64>,
@@ -141,6 +142,8 @@ pub struct Manifest {
     pub version: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rubric_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evaluation_mode: Option<String>,
     pub collection_id: String,
     pub frozen_unix_s: u64,
     pub sessions: Vec<Session>,
@@ -214,6 +217,20 @@ fn one_of(value: &str, allowed: &[&str]) -> bool {
 }
 
 impl Manifest {
+    pub fn raw_development_pairs(&self) -> bool {
+        self.evaluation_mode.as_deref() == Some("raw_development_pairs")
+    }
+
+    pub fn source_segment(&self, trial: &Trial) -> SourceSegment {
+        (
+            self.session(&trial.session_id)
+                .recording_sha256
+                .to_ascii_lowercase(),
+            trial.start_us,
+            trial.end_us,
+        )
+    }
+
     pub fn trial(&self, id: &str) -> &Trial {
         self.trials
             .iter()
@@ -234,11 +251,26 @@ impl Manifest {
             || self.frozen_unix_s == 0
             || (self.version == 1 && self.rubric_id.is_some())
             || (self.version == 2 && self.rubric_id.as_deref() != Some(V2_RUBRIC))
+            || (self.evaluation_mode.is_some()
+                && (self.version != 2 || !self.raw_development_pairs()))
         {
             return Err(
                 "manifest needs version 1 or the explicit v2 rubric, collection ID and freeze time"
                     .into(),
             );
+        }
+        let raw_pairs = self.raw_development_pairs();
+        if raw_pairs
+            && (self
+                .sessions
+                .iter()
+                .any(|s| !s.external_development(self.version))
+                || self
+                    .cases
+                    .iter()
+                    .any(|c| c.sensor != Sensor::VoiceMatch || c.fault))
+        {
+            return Err("raw_development_pairs requires only external development sessions and primary voice_match pairs".into());
         }
         let mut sessions = BTreeSet::new();
         for s in &self.sessions {
@@ -246,12 +278,14 @@ impl Manifest {
                 || !sessions.insert(&s.id)
                 || !token(&s.clock_id)
                 || (s.consent != Some(true) && !s.external_development(self.version))
+                || (s.started_unix_s.is_none() && !s.external_development(self.version))
                 || (s.sync_error_us.is_none()
                     && (!s.external_development(self.version) || s.clock_verified == Some(true)))
                 || (self.version == 1
                     && (s
                         .delete_after_unix_s
-                        .is_none_or(|at| at <= s.started_unix_s)
+                        .zip(s.started_unix_s)
+                        .is_none_or(|(at, start)| at <= start)
                         || s.retention.is_some()
                         || s.inventory_sha256.is_some()
                         || s.readme_sha256.is_some()
@@ -270,7 +304,9 @@ impl Manifest {
                     s.id
                 ));
             }
-            if s.split == Split::Holdout && s.started_unix_s < self.frozen_unix_s {
+            if s.split == Split::Holdout
+                && s.started_unix_s.is_none_or(|at| at < self.frozen_unix_s)
+            {
                 return Err(format!("holdout predates freeze: {}", s.id));
             }
         }
@@ -278,6 +314,7 @@ impl Manifest {
         let mut captures = BTreeSet::new();
         let mut development = BTreeSet::new();
         let mut holdout = BTreeSet::new();
+        let mut source_labels = BTreeMap::new();
         for t in &self.trials {
             let external_development = self
                 .sessions
@@ -342,6 +379,22 @@ impl Manifest {
             {
                 return Err(format!("invalid/duplicate trial or capture: {}", t.id));
             }
+            if raw_pairs {
+                let labels = (
+                    &t.speaker_id,
+                    &t.source,
+                    self.session(&t.session_id).data_origin,
+                );
+                if source_labels
+                    .insert(self.source_segment(t), labels)
+                    .is_some_and(|prior| prior != labels)
+                {
+                    return Err(
+                        "one source segment has conflicting speaker, source or origin labels"
+                            .into(),
+                    );
+                }
+            }
             if t.source == "person" {
                 match self.session(&t.session_id).split {
                     Split::Development => {
@@ -373,11 +426,12 @@ impl Manifest {
         let mut cases = BTreeSet::new();
         let mut per_sensor = BTreeSet::new();
         let mut used_pairs = BTreeSet::new();
+        let mut used_source_pairs = BTreeSet::new();
         for c in &self.cases {
             if !token(&c.id)
                 || !cases.insert(&c.id)
                 || !trials.contains(&c.trial_id)
-                || !per_sensor.insert((c.sensor, &c.trial_id))
+                || (!raw_pairs && !per_sensor.insert((c.sensor, &c.trial_id)))
             {
                 return Err(format!("invalid/duplicate case or sensor trial: {}", c.id));
             }
@@ -460,17 +514,30 @@ impl Manifest {
                     let b = self.session(&t.session_id);
                     let mut pair = [reference.id.as_str(), t.id.as_str()];
                     pair.sort_unstable();
+                    let source_pair_valid = if raw_pairs {
+                        let reference = self.source_segment(reference);
+                        let probe = self.source_segment(t);
+                        let shared_audio = reference.0 == probe.0
+                            && reference.1 < probe.2
+                            && probe.1 < reference.2;
+                        !shared_audio && used_source_pairs.insert((reference, probe))
+                    } else {
+                        used_pairs.insert(pair)
+                    };
                     one_of(&c.expected, &["same", "different"])
                         && reference.source == "person"
-                        && reference.recipient == "lamp"
-                        && reference.call_end_us.is_some()
+                        && (raw_pairs
+                            || (reference.recipient == "lamp" && reference.call_end_us.is_some()))
                         && (c.expected == "same") == same
                         && reference.id != t.id
                         && a.split == b.split
-                        && used_pairs.insert(pair)
-                        && (!same
+                        && source_pair_valid
+                        && (raw_pairs
+                            || !same
                             || (a.id != b.id
-                                && a.started_unix_s.abs_diff(b.started_unix_s) >= 7200))
+                                && a.started_unix_s
+                                    .zip(b.started_unix_s)
+                                    .is_some_and(|(a, b)| a.abs_diff(b) >= 7200)))
                 }
                 Sensor::BargeIn => {
                     self.version == 2
@@ -516,6 +583,13 @@ impl Run {
         {
             return Err("invalid run identity, evidence, location or manifest hash".into());
         }
+        if manifest.raw_development_pairs()
+            && (self.sensor != Sensor::VoiceMatch || self.evidence != "replay")
+        {
+            return Err(
+                "raw_development_pairs is voice_match replay only; readiness remains null".into(),
+            );
+        }
         if self.version == 1 && self.sensor == Sensor::BargeIn {
             return Err("barge_in requires the v2 rubric".into());
         }
@@ -527,6 +601,7 @@ impl Run {
                 .ok_or_else(|| format!("unknown prediction ID: {}", p.case_id))?;
             let t = manifest.trial(&c.trial_id);
             if c.sensor != self.sensor
+                || (manifest.raw_development_pairs() && p.input_end_us != t.end_us)
                 || p.clock_id != manifest.session(&t.session_id).clock_id
                 || !ids.insert(&p.case_id)
                 || !token(&p.output)

@@ -31,6 +31,8 @@ pub struct Counts {
 #[derive(Debug, Serialize)]
 pub struct Row {
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference_trial_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub split: Option<Split>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applicable: Option<bool>,
@@ -107,6 +109,10 @@ pub struct Report {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rubric_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub evaluation_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub development_pairs: Option<PairCoverage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub raw_by_split: Option<BTreeMap<String, RawSummary>>,
     pub sensor: Sensor,
     pub manifest_sha256: String,
@@ -130,6 +136,63 @@ pub struct Report {
     pub wrong_person_picks: usize,
     pub within_admission_budget: usize,
     pub rows: Vec<Row>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PairCoverage {
+    pub unit: String,
+    pub correlated_pairs: bool,
+    pub planned_pairs: usize,
+    pub unique_probe_segments: usize,
+    pub unique_reference_segments: usize,
+    pub unique_source_segments: usize,
+    pub unique_recordings: usize,
+    pub reused_probe_segments: usize,
+    pub additional_pairs_on_reused_probes: usize,
+    pub max_pairs_per_probe: usize,
+    pub source_session_starts_unknown: usize,
+}
+
+fn pair_coverage(manifest: &Manifest) -> PairCoverage {
+    let mut probes: BTreeMap<SourceSegment, usize> = BTreeMap::new();
+    let mut references = BTreeSet::new();
+    let mut segments = BTreeSet::new();
+    let mut recordings = BTreeSet::new();
+    let mut sessions = BTreeSet::new();
+    for case in &manifest.cases {
+        let probe = manifest.trial(&case.trial_id);
+        let reference = manifest.trial(
+            case.reference_trial_id
+                .as_deref()
+                .expect("validated voice reference"),
+        );
+        let p = manifest.source_segment(probe);
+        let r = manifest.source_segment(reference);
+        *probes.entry(p.clone()).or_default() += 1;
+        references.insert(r.clone());
+        recordings.insert(p.0.clone());
+        recordings.insert(r.0.clone());
+        segments.insert(p);
+        segments.insert(r);
+        sessions.insert(&probe.session_id);
+        sessions.insert(&reference.session_id);
+    }
+    PairCoverage {
+        unit: "ordered_reference_probe_source_segment_pairs".into(),
+        correlated_pairs: true,
+        planned_pairs: manifest.cases.len(),
+        unique_probe_segments: probes.len(),
+        unique_reference_segments: references.len(),
+        unique_source_segments: segments.len(),
+        unique_recordings: recordings.len(),
+        reused_probe_segments: probes.values().filter(|&&n| n > 1).count(),
+        additional_pairs_on_reused_probes: probes.values().map(|n| n - 1).sum(),
+        max_pairs_per_probe: probes.values().copied().max().unwrap_or(0),
+        source_session_starts_unknown: sessions
+            .iter()
+            .filter(|id| manifest.session(id).started_unix_s.is_none())
+            .count(),
+    }
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -288,7 +351,7 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             speakers.insert(&t.speaker_id);
         }
         if qualification_case {
-            session_times.insert(session.started_unix_s);
+            session_times.extend(session.started_unix_s);
         }
         if let Some(reference) = &c.reference_trial_id
             && qualification_case
@@ -297,7 +360,7 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             used_holdout_sessions.insert(reference.session_id.as_str());
             real_people &=
                 manifest.session(&reference.session_id).data_origin == Some(DataOrigin::RealPeople);
-            session_times.insert(manifest.session(&reference.session_id).started_unix_s);
+            session_times.extend(manifest.session(&reference.session_id).started_unix_s);
             if reference.source == "person" {
                 speakers.insert(&reference.speaker_id);
             }
@@ -448,11 +511,13 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
             safe &= !p.safety_violation && !p.held_line && p.added_wait_us == 0;
         }
         rows.push(Row {
+            reference_trial_id: v2.then(|| c.reference_trial_id.clone()).flatten(),
             split: v2.then_some(session.split),
             applicable: v2.then_some(applicable),
             data_origin: session.data_origin,
             metadata_unknown: v2.then(|| {
                 [
+                    ("started_unix_s", session.started_unix_s.is_none()),
                     ("collection_consent", session.consent != Some(true)),
                     ("sync_error_us", session.sync_error_us.is_none()),
                     ("bearing_deg", t.bearing_deg.is_none()),
@@ -583,6 +648,8 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
         ),
     ];
     if v2 {
+        checks.push(Check::new("qualification_evaluation_mode", !manifest.raw_development_pairs(),
+            "raw_development_pairs reports correlated replay measurements only and can never qualify".into()));
         checks.push(Check::new(
             "producing_binary_recorded",
             run.producer_binary_sha256.is_some(),
@@ -1101,6 +1168,10 @@ pub fn score(manifest: &Manifest, run: &Run, hash: &str) -> Result<Report> {
     Ok(Report {
         version: manifest.version,
         rubric_id: manifest.rubric_id.clone(),
+        evaluation_mode: manifest.evaluation_mode.clone(),
+        development_pairs: manifest
+            .raw_development_pairs()
+            .then(|| pair_coverage(manifest)),
         raw_by_split: v2.then(|| {
             [Split::Development, Split::Holdout]
                 .into_iter()
