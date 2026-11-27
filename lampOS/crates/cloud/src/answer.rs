@@ -3,7 +3,7 @@
 //! refused plainly, in V1's shape, so the app shows it.
 use crate::light;
 use crate::wire::not_here;
-use lamp_msgs::{Light, MutedBy};
+use lamp_msgs::{Light, LightFaces, MutedBy};
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -57,6 +57,16 @@ pub trait Lamp {
     /// Asks for the person's light (`light/command`), after giving back a
     /// preview still shown, and reads back what the ring shows.
     fn set_light(&mut self, light: &Light) -> Result<Light, String>;
+    /// The person's colour and brightness for the faces of listening,
+    /// thinking and speaking as the ring shows them (`light/faces/state`).
+    fn light_faces(&mut self) -> Result<LightFaces, String> {
+        Err("the lamp's faces are not running".into())
+    }
+    /// Asks for the faces (`light/faces/command`) and reads back what the
+    /// ring shows.
+    fn set_light_faces(&mut self, _faces: &LightFaces) -> Result<LightFaces, String> {
+        Err("the lamp's faces are not running".into())
+    }
     /// Shows `light` over the person's for [`PREVIEW_HOLDS`] unless asked
     /// again, without keeping it (`light/request`), until the person asks
     /// for a light at the lamp.
@@ -434,7 +444,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 92] = [
+pub const KINDS: [(&str, Switch); 94] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -445,6 +455,10 @@ pub const KINDS: [(&str, Switch); 92] = [
     ("led.resting.get", ALWAYS),
     ("led.resting.set", ALWAYS),
     ("led.resting.preview", ALWAYS),
+    // The faces of a turn beside the resting light: the person's colour
+    // and brightness for each (`crate::light::faces_snapshot`).
+    ("led.faces.get", ALWAYS),
+    ("led.faces.set", ALWAYS),
     // The privacy light's look (#8696), beside the person's own light:
     // named only with its switch, on a lamp with a slide.
     (crate::privacy_light::KINDS[0], PRIVACY_LIGHT),
@@ -751,6 +765,26 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let now = lamp.light().ok();
             let wanted = light::previewed(data, now.as_ref())?;
             lamp.preview_light(&wanted).map(|()| None)
+        }
+        // The faces of a turn, beside the resting light (which is the
+        // `resting` face): read, and set for the faces named, checked
+        // before anything is asked.
+        "led.faces.get" => {
+            let shown = lamp.light()?;
+            let faces = lamp.light_faces()?;
+            Ok(Some(light::faces_snapshot(&shown, &faces)))
+        }
+        "led.faces.set" => {
+            let faces = lamp.light_faces()?;
+            let (resting, wanted) = light::faces_chosen(data, faces)?;
+            if let Some(resting) = resting {
+                lamp.set_light(&resting)?;
+            }
+            if wanted != faces {
+                lamp.set_light_faces(&wanted)?;
+            }
+            let (shown, faces) = (lamp.light()?, lamp.light_faces()?);
+            Ok(Some(light::faces_snapshot(&shown, &faces)))
         }
         // A text from the app (#1673): acked with its run, and put on the
         // bus for the voice; the answer goes back as `chat.event`.
@@ -1186,6 +1220,9 @@ pub mod tests {
         pub shown: Option<Light>,
         pub lights: Vec<Light>,
         pub previews: Vec<Light>,
+        /// The faces the ring shows, and each asking for them.
+        pub shown_faces: LightFaces,
+        pub faces_asked: Vec<LightFaces>,
         /// Texts (#1673): taken when `texting`; those sent; and the
         /// `chat.event`s' `data` it gives once a text has been sent.
         pub texting: bool,
@@ -1318,6 +1355,14 @@ pub mod tests {
         fn preview_light(&mut self, light: &Light) -> Result<(), String> {
             self.previews.push(light.clone());
             Ok(())
+        }
+        fn light_faces(&mut self) -> Result<LightFaces, String> {
+            Ok(self.shown_faces)
+        }
+        fn set_light_faces(&mut self, faces: &LightFaces) -> Result<LightFaces, String> {
+            self.faces_asked.push(*faces);
+            self.shown_faces = *faces;
+            self.light_faces()
         }
         fn texting(&self) -> bool {
             self.texting
@@ -2099,7 +2144,14 @@ pub mod tests {
             .unwrap();
         assert_eq!(got["mode"], "default");
         assert_eq!(got["effective"]["color"], json!([51, 28, 0]));
-        // A drag: each preview is shown, none kept, and none answered.
+        // What the lamp takes: any colour, ten levels. A lamp that says
+        // neither is the one with ten tints at five levels.
+        assert_eq!(
+            (&got["colours"], &got["levels"]),
+            (&json!("any"), &json!(10))
+        );
+        // A drag: each preview is shown, none kept, and none answered. The
+        // colour is kept as the app sent it, not snapped to a named one.
         assert_eq!(
             answer(
                 &mut lamp,
@@ -2108,7 +2160,9 @@ pub mod tests {
             ),
             Ok(None)
         );
-        assert_eq!(lamp.previews, [Light::new(true, "pink", 1).unwrap()]);
+        let pink = crate::light::nearest([20, 0, 10]).unwrap();
+        assert_eq!(pink.tint, Some([255, 0, 128]));
+        assert_eq!(lamp.previews, [pink]);
         assert!(lamp.lights.is_empty());
         // Save: kept, and the light read back in V1's snapshot.
         let saved = answer(
@@ -2118,8 +2172,11 @@ pub mod tests {
         )
         .unwrap()
         .unwrap();
-        assert_eq!(lamp.lights, [Light::new(true, "warm", 1).unwrap()]);
-        assert_eq!(saved["mode"], "default");
+        let dim = crate::light::nearest([8, 4, 1]).unwrap();
+        assert_eq!(dim.tint, Some([255, 128, 32]));
+        assert_eq!(lamp.lights, [dim]);
+        assert_eq!(saved["mode"], "custom");
+        assert_eq!(saved["light"]["tint"], json!([255, 128, 32]));
         answer(
             &mut lamp,
             "led.resting.set",
@@ -2130,10 +2187,9 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(off["mode"], "off");
-        assert_eq!(
-            off["light"],
-            json!({"on": false, "colour": "blue", "level": 4})
-        );
+        assert_eq!(off["light"]["on"], false);
+        assert_eq!(off["light"]["colour"], "blue");
+        assert_eq!(off["light"]["step"], 8);
         // Bad input is refused before anything is asked; a ring that is not
         // running is said.
         let asked = lamp.lights.len();
@@ -2153,6 +2209,70 @@ pub mod tests {
             answer(&mut lamp, "led.resting.get", &Value::Null),
             Err("the ring is not running".to_owned())
         );
+    }
+
+    /// The faces row: `led.faces.get` says each face and what the lamp
+    /// takes; `led.faces.set` changes the faces named, the resting one being
+    /// the person's light, and refuses bad input before anything is asked.
+    #[test]
+    fn the_faces_row_reads_and_sets_each_face_and_says_what_the_lamp_takes() {
+        let mut lamp = lamp();
+        let got = answer(&mut lamp, "led.faces.get", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (&got["colours"], &got["levels"]),
+            (&json!("any"), &json!(10))
+        );
+        assert_eq!(got["faces"]["listening"]["default"], true);
+        assert_eq!(got["faces"]["resting"]["default"], true);
+        let set = answer(
+            &mut lamp,
+            "led.faces.set",
+            &json!({
+                "listening": {"color": [0, 100, 200], "level": 5},
+                "resting": {"color": [255, 140, 0], "level": 3},
+            }),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            set["faces"]["listening"],
+            json!({"color": [0, 128, 255], "level": 5, "default": false})
+        );
+        assert_eq!(set["faces"]["resting"]["level"], 3);
+        assert_eq!(set["faces"]["resting"]["default"], false);
+        assert_eq!(set["faces"]["speaking"]["default"], true);
+        assert_eq!(lamp.lights.len(), 1);
+        assert_eq!(lamp.faces_asked.len(), 1);
+        // The faces not named stay; `default` gives one back.
+        let back = answer(
+            &mut lamp,
+            "led.faces.set",
+            &json!({"listening": "default", "speaking": {"color": [255, 0, 0], "level": 2}}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(back["faces"]["listening"]["default"], true);
+        assert_eq!(back["faces"]["speaking"]["level"], 2);
+        assert_eq!(back["faces"]["resting"]["level"], 3);
+        // Nothing changed, nothing asked.
+        let asked = (lamp.lights.len(), lamp.faces_asked.len());
+        answer(&mut lamp, "led.faces.set", &json!({"thinking": "default"})).unwrap();
+        assert_eq!((lamp.lights.len(), lamp.faces_asked.len()), asked);
+        // Bad input is refused before anything is asked.
+        for data in [
+            json!({}),
+            json!({"offline": "default"}),
+            json!({"speaking": {"color": [1, 2, 3], "level": 11}}),
+            json!({"resting": {"color": [0, 0, 0], "level": 3}, "speaking": "default"}),
+            json!("default"),
+        ] {
+            assert!(answer(&mut lamp, "led.faces.set", &data).is_err(), "{data}");
+        }
+        assert_eq!((lamp.lights.len(), lamp.faces_asked.len()), asked);
+        lamp.shown = None;
+        assert!(answer(&mut lamp, "led.faces.get", &Value::Null).is_err());
     }
 
     /// #1683: the app reads and sets the person's choice, only with the
@@ -2773,6 +2893,8 @@ pub mod tests {
             "led.resting.get",
             "led.resting.set",
             "led.resting.preview",
+            "led.faces.get",
+            "led.faces.set",
         ];
         let said = |lamp: &mut Fake| -> Vec<String> {
             let info = answer(lamp, "system.info", &Value::Null).unwrap().unwrap();

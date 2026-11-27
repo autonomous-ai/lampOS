@@ -377,6 +377,8 @@ before synthesis; valid requests acknowledge `starting`, then `success` or
 | `led.resting.get` | Read the owner's resting light choice, device default and look in effect via HAL `GET /led/resting` (synchronous) | _(none)_ |
 | `led.resting.set` | Save the resting light (`default`, `off` or `custom` colour) via HAL `PUT /led/resting`; survives reboots (synchronous) | `mode`, `color` for `custom` |
 | `led.resting.preview` | Paint a candidate colour without saving via HAL `POST /led/resting/preview`; reverts 10 s after the last preview; acks failures only | `color` |
+| `led.faces.get` | Lamp 2 only: read the owner's colour and brightness for the resting, listening, thinking and speaking faces, and what the lamp takes (synchronous) | _(none)_ |
+| `led.faces.set` | Lamp 2 only: set or reset one or more of those faces (synchronous) | one or more of `resting`, `listening`, `thinking`, `speaking`, each `{color, level}` or `"default"` |
 | `volume.get` | Read the speaker volume as 0-100% of the allowed range (synchronous) | _(none)_ |
 | `volume.set` | Set the speaker volume, 0-100% of the allowed range, via HAL `POST /audio/volume` (synchronous) | `volume` |
 | `mic.get` | Read the mic mute state and the hardware mic switch (synchronous) | _(none)_ |
@@ -1241,6 +1243,71 @@ hundred milliseconds of lag.
 
 Devices without the `light` capability reply `failure` with
 `this device has no light`. Invalid input fails before HAL is called.
+
+**What the lamp takes (Lamp 2).** A lamp that keeps the colour it is sent, and
+has finer brightness steps, says so in the replies of `led.resting.get`,
+`led.resting.set` and `led.faces.get`/`set`:
+
+```json
+{"colours": "any", "levels": 10}
+```
+
+`"colours": "any"` means a `custom` colour is kept as sent (its hue, with its
+brightest channel scaled to 255) and not snapped to one of ten named colours;
+`"levels": N` is how many brightness steps there are. The `color` the app
+reads back is the hue at the step's share of 255, and sending it back is the
+same light. A reply with neither field is the lamp of the paragraphs above:
+ten named colours at five levels. The `light` object of a Lamp 2 snapshot
+names the light (`on`, `colour`, `level`) and, when it has them, `tint` (its
+own colour) and `step` (1 to `levels`); `name` is the colour's name when it
+is one of the lamp's named colours and `null` when it is the owner's own.
+The lamp's named colours are the ten above and seven soft ones: `candle`,
+`amber`, `peach`, `rose`, `lavender`, `mint` and `sky`.
+
+#### `led.faces.*` — The faces of a turn over MQTT (Lamp 2)
+
+Besides its resting light, a Lamp 2 lets the owner colour and soften the
+faces it shows in a turn. Only colour and brightness are the owner's: how a
+face moves is always the lamp's own, and the offline breath, the update and
+error signals and the privacy light are not settable here. A face's
+brightness is a share of the lamp's own for that face, so it can be made
+softer and never brighter, and the night cap and the three-flashes-a-second
+limit still apply on top. Listed in `system.info`'s `can` as `led.faces.get`
+and `led.faces.set`; a lamp without them is a lamp without faces to set.
+
+```json
+{"cmd": "data", "kind": "led.faces.get", "data": {}}
+{"cmd": "data", "kind": "led.faces.set", "data": {
+  "listening": {"color": [60, 120, 255], "level": 6},
+  "thinking": "default",
+  "resting": {"color": [255, 140, 0], "level": 3}
+}}
+```
+
+`set` takes an object with at least one of `resting`, `listening`,
+`thinking` and `speaking`. Each value is `"default"`, which gives that face
+back to the lamp (for `resting`, the light the lamp starts with), or
+`{"color": [r, g, b], "level": N}`: `color` channels 0-255, not black, its
+hue only (it is scaled so its brightest channel is 255), and `level` a whole
+number from 1 to `levels` (10). For a turn's face `level` 10 is the lamp's
+own brightness and each step below is softer; for `resting`, which is the
+owner's light (the same as `led.resting.set` with `custom`), `level` is the
+light's own step. Faces not named stay as they were. Anything else is refused
+before the lamp is asked: an unknown face, black, a `level` outside 1 to
+`levels`, an empty object. `set` and `get` reply `success` with:
+
+```json
+{"colours": "any", "levels": 10,
+ "faces": {
+   "resting":   {"color": [255, 140, 0],   "level": 2,  "on": true, "default": true},
+   "listening": {"color": [128, 217, 255], "level": 10, "default": true},
+   "thinking":  {"color": [255, 133, 10],  "level": 10, "default": true},
+   "speaking":  {"color": [255, 184, 77],  "level": 10, "default": true}}}
+```
+
+`default` is true while a face is the lamp's own, whose `color` and `level`
+are then what it shows. The choice is kept across a restart, and a lamp that
+kept its light before faces existed keeps it as it was.
 
 #### `volume.*` / `mic.*` — Speaker volume and mic over MQTT
 
