@@ -157,8 +157,10 @@ từ app của chủ nhân: `{"v": 1, "clients": {"c_…": {"by": "app", "paired
 <giây Unix>}}}`, tệp thường (không phải link), tối đa 64 KiB, 0600. Chỉ
 `"by": "app"` được tính, và chỉ khi `paired_at` trùng với của máy tính trong
 `clients.json`; mã `lamp-control code` của người giữ máy là `"keeper"` hoặc
-không có trong tệp. Bản dựng này chỉ đọc tệp; phía ghép đôi ghi nó. Chi tiết ở
-[control.md](../control.md), "Notes", và memory-days.md.
+không có trong tệp. Bản dựng này chỉ đọc tệp; phía ghép đôi ghi nó, và bên ghi
+chưa được làm, nên trên đèn sản phẩm chưa máy tính nào được đếm cho đến khi nó
+có. `LAMP_SERVICE_RECORDS_SDK` của voice bật trong bản sản phẩm từ 27/11. Chi
+tiết ở [control.md](../control.md), "Notes", và memory-days.md.
 
 ## Công cụ của app (`app.call`, #8406)
 

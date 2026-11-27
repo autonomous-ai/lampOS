@@ -909,7 +909,8 @@ their ROW owed on lamp-06c1. The source tool (`LAMP_SERVICE_RECORDS_SOURCE`)
 stays off in the product: #8017 lands it dark, by the first builder's ruling
 of 27 Nov (18:21, on #8017) that a Mac stand-in leg cannot switch a
 sensor-dependent feature on, and it goes on in a separate switch-on pull
-request after the owner's leg on lamp-06c1. The sdk rows stay off until their own ROWs; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
+request after the owner's leg on lamp-06c1. The sdk rows (`LAMP_SERVICE_RECORDS_SDK`) are on since the owner's call of
+27 Nov, their ROW owed on lamp-06c1. `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`)
 stays off: nothing writes to it yet, and the installer doesn't make
 `lampos-linked`.
 
@@ -1042,7 +1043,7 @@ each record's `key` while it is on.
   (`deny_unknown_fields`): the call is `timed_out`. Off (either switch),
   the tool is not offered and nobody runs it.
 
-### A paired computer's daily notes count (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, off)
+### A paired computer's daily notes count (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, on)
 
 Tracker row C157 (the memory owner's call and the first builder's yes, 17
 Nov on #6811): one linked record a day for each developer computer the
@@ -1085,6 +1086,11 @@ name or a value.
   never high).
 - **Off.** Unless `LAMP_SERVICE_RECORDS_SDK=on` beside
   `LAMP_SERVICE_RECORDS=on`, nothing is asked, kept or written.
+- **On in the product** (lamp-voice's unit, beside `LAMP_SERVICE_RECORDS=on`):
+  the owner's call of 27 Nov; a row on lamp-06c1 follows. A computer counts
+  only once the pairing side writes its `app` mark in `paired-by.json`; this
+  build only reads the file, so until a writer lands nothing is counted or
+  kept, and the voice's ask every 5 minutes gets an empty answer.
 - **Rollback.** An older lamp-control answers the op with an `error`, and
   nothing is kept. A memory migrated by a build with the four-kind `CHECK`
   (slice 1 before this change, never in the product) keeps that `CHECK`, so

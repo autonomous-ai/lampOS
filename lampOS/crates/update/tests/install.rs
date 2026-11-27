@@ -2979,6 +2979,43 @@ fn the_product_keeps_handed_tasks_only_beside_the_service_records() {
     assert_eq!(seen, 1, "lamp-voice.service is a product unit");
 }
 
+/// A paired computer's daily notes count kept as the owner's linked record
+/// (`LAMP_SERVICE_RECORDS_SDK`, C157, #7574; the owner's call of 27 Nov): on
+/// in the product only in lamp-voice, whose second route's worker is its one
+/// reader, set once and exactly `on`, beside `LAMP_SERVICE_RECORDS=on`
+/// without which it does nothing, and with the second route the voice's.
+#[test]
+fn the_product_counts_an_app_paired_computers_notes_beside_the_service_records() {
+    const CHILD: &str = "LAMP_SERVICE_RECORDS_SDK";
+    const LINE: &str = "Environment=LAMP_SERVICE_RECORDS_SDK=on";
+    const PARENT: &str = "Environment=LAMP_SERVICE_RECORDS=on";
+    let mut seen = 0;
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let child: Vec<&&str> = service.iter().filter(|line| line.contains(CHILD)).collect();
+        if *unit != "lamp-voice.service" {
+            assert!(child.is_empty(), "{unit} sets {CHILD}");
+            continue;
+        }
+        seen += 1;
+        assert_eq!(child, [&LINE], "{unit} sets {LINE} once, and only it");
+        let parents: Vec<&&str> = service
+            .iter()
+            .filter(|line| line.starts_with("Environment=LAMP_SERVICE_RECORDS="))
+            .collect();
+        assert_eq!(
+            parents,
+            [&PARENT],
+            "{unit} sets {CHILD} without {PARENT}, once"
+        );
+        assert!(
+            service.contains(&"Environment=LAMP_VOICE_ROUTE=second"),
+            "{unit} sets {CHILD} off the second route"
+        );
+    }
+    assert_eq!(seen, 1, "lamp-voice.service is a product unit");
+}
+
 /// The skills page loads skills as lamp-skills does (16 Nov, lamp build
 /// 13329: a connector skill lamp-skills ran was listed "Doesn't load:
 /// grants: \"gmail-read\" is not a grant"). `lamp-cloud` answers

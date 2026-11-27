@@ -670,7 +670,7 @@ trong sản phẩm: #8017 đưa nó vào ở trạng thái tắt, theo phán quy
 đầu tiên ngày 27/11 (18:21, trên #8017) rằng một bước thử thay thế trên Mac
 không thể bật một tính năng phụ thuộc cảm biến, và nó sẽ bật trong một pull
 request bật riêng sau bước thử của chủ trên lamp-06c1. Dòng sdk
-vẫn tắt cho tới ROW riêng; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
+(`LAMP_SERVICE_RECORDS_SDK`) bật từ quyết định của chủ sản phẩm ngày 27/11, ROW còn nợ trên lamp-06c1; `linked.sock` (`LAMP_MEMORY_LINKED_SOCKET`) vẫn
 tắt: chưa có gì ghi vào nó, và trình cài đặt chưa tạo nhóm `lampos-linked`.
 
 - **Giới hạn riêng.** Tối đa 16 thay đổi chờ, tách khỏi 32 của bản ghi
@@ -797,7 +797,7 @@ ghi ("kể thêm đi", "nó nói gì?"), nó lấy thứ bản ghi trỏ tới t
   là `timed_out`. Tắt (công tắc nào cũng vậy) thì không cấp công cụ và
   không ai chạy.
 
-### Số lần đổi ghi chú mỗi ngày của một máy tính đã ghép đôi (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, tắt)
+### Số lần đổi ghi chú mỗi ngày của một máy tính đã ghép đôi (`sdk`, `LAMP_SERVICE_RECORDS_SDK`, bật)
 
 Dòng tracker C157 (quyết định của chủ bộ nhớ và cái gật đầu của builder
 đầu tiên, 17/11 trên #6811): mỗi ngày một bản ghi liên kết cho mỗi máy tính
@@ -840,6 +840,12 @@ khóa của ghi chú, tên khóa hay giá trị.
   đếm thiếu, không bao giờ đếm thừa).
 - **Tắt.** Trừ khi `LAMP_SERVICE_RECORDS_SDK=on` cùng
   `LAMP_SERVICE_RECORDS=on`, không hỏi, không giữ và không ghi gì.
+- **Bật trong bản sản phẩm** (unit của lamp-voice, cùng
+  `LAMP_SERVICE_RECORDS=on`): quyết định của chủ sản phẩm ngày 27/11; một lượt
+  kiểm tra trên lamp-06c1 sẽ theo sau. Một máy tính chỉ được đếm khi phía ghép
+  đôi ghi dấu `app` của nó vào `paired-by.json`; bản dựng này chỉ đọc tệp đó,
+  nên cho đến khi có bên ghi, không có gì được đếm hay giữ, và lần hỏi mỗi 5
+  phút của voice nhận câu trả lời rỗng.
 - **Quay về bản cũ.** lamp-control cũ trả lời op bằng `error`, và không giữ
   gì. Bộ nhớ đã được migrate bởi bản có `CHECK` bốn loại (lát 1 trước thay
   đổi này, chưa từng có trong sản phẩm) giữ `CHECK` đó, nên từ chối dòng
