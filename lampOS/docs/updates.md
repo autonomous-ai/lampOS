@@ -1832,8 +1832,12 @@ each round reads the owner's mark, `/etc/lampOS/setup/auto-update-off`
   moment as Update now does (`update_now::GIVE_WAY_QUIET` 3 s, at most
   `GIVE_WAY_MOST` 10 s), then switches, quiet or not, and is not asked
   quiet again at the voice's own boundary. `update/status`'s `round` says
-  `asked` `auto`. By day the voice says "I'm updating now. I'll be back in a
-  minute." once even with nobody near, and the ring breathes while the
+  `asked` `auto`. With lamp-voice's `LAMP_UPDATE_AUTO_SAY=on` (off by
+  default, the product owner, 27 Nov: the team ships builds often, and a lamp
+  telling each one bothers its owner; off, nothing is said unasked, day or
+  night, and someone who speaks during the round is still told), by day the
+  voice says "I'm updating now. I'll be back in a minute." once even with
+  nobody near, and the ring breathes while the
   build comes and swells once it is kept (`LAMP_RING_UPDATE`, on with this).
   Once the round has brought its build in (`last.outcome` `switched`, or
   `self-switched` with `running` at that build; a climb, which took only the
