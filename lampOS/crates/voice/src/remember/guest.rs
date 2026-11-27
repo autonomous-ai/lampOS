@@ -3,10 +3,16 @@
 //!
 //! A *guest line* is a heard line admitted as the room's with the camera
 //! allowed, an unknown face in view at the last refresh, no known face seen
-//! within the last two minutes (`memory_scope::NO_FACE_QUIET`) and no
-//! session person ([`crate::memory_scope::FaceCache::guest`]). Nobody in
-//! view, a known face in view, or a one-turn misread (a known face seen
-//! moments before) is never one: the line stays the owner's, as today.
+//! within the last two minutes (`memory_scope::NO_FACE_QUIET`), after the
+//! eyes have matched an enrolled face once since the voice started
+//! ([`crate::memory_scope::FaceCache::guest`], the Reviewer-lead's P1 on
+//! #8903). A session person's line is never one: admission reads none, and
+//! the session's verdict clears the mark (`second_provider::session_judged`,
+//! ask 2). Nobody in view, a known face in view, a one-turn misread (a known
+//! face seen moments before), no face enrolled, or none matched yet is never
+//! one: the line stays the owner's, as today. The marks are kept by request
+//! id alone (ask 5): every admitted line sets or clears its own, so an id
+//! used again in a later session finds its own mark, never an older line's.
 //!
 //! A guest's words are kept in the room's memory, as today, and now marked
 //! as a guest's: the room's `append_linked` and `remember` carry

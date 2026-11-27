@@ -3246,7 +3246,13 @@ fn session_judged(
     for told in &judged.told {
         eprintln!("lamp-voice second: request {request}: {told}");
     }
-    judged.verdict == crate::session_person::Verdict::Theirs
+    let theirs = judged.verdict == crate::session_person::Verdict::Theirs;
+    // A session person's line is never a guest's (#8639; the Reviewer-lead's
+    // ask 2 on #8903): its mark, if admission set one, is cleared here.
+    if theirs {
+        crate::remember::guest::mark_line(request, false);
+    }
+    theirs
 }
 
 fn one_face_theirs(

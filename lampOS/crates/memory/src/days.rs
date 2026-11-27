@@ -847,13 +847,21 @@ impl Days {
         let on = on.and_then(|on| kept_day(on, at, &self.local));
         let text = self.kept_text(person, text, from)?;
         self.kept_room(person)?;
+        // A guest's correction (#8639, the Reviewer-lead's P2 on #8903)
+        // retires only a guest's fact: one the household kept stays active,
+        // and the guest's words are kept beside it as the guest's, so a
+        // guest's "actually …" never takes away the household's fact (theirs
+        // expires at 30 days; nothing would bring the household's back).
+        let replaced = (speaker != Some(lamp_msgs::known::GUEST_SPEAKER)
+            || self.guest_ids(person)?.contains(&old))
+        .then_some(old);
         self.add(
             person,
             at,
             ("", "", &text),
             from,
             &[],
-            Some(old),
+            replaced,
             on_said(on, speaker),
         )
     }

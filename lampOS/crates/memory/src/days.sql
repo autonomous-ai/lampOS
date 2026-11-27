@@ -93,10 +93,13 @@ CREATE TABLE IF NOT EXISTS follow_up_offers (
 -- #2849 (the first builder's yes, 23 Oct 09:37; the voice's
 -- LAMP_MEMORY_ROOM_SPEAKER): who said a room line, the id of the one known
 -- person whose face was seen saying it; no row when nobody was. Only for the
--- room's (`everyone`) exchanges and kept things, and read only by
--- `forget_said`, never told. Its row goes with the entry when that is
--- forgotten or expires. Older builds pass this table over; `user_version`
--- stays 1.
+-- room's (`everyone`) exchanges and kept things. A person's id is read
+-- only by `forget_said`, never told. The one other value, `guest` (#8639,
+-- the voice's LAMP_MEMORY_GUEST_MARKED), is told: `said_by` in recall,
+-- search and kept, `guest_ids` in the room's session snapshot; a guest's
+-- kept thing expires with the exchanges, and a guest's correction retires
+-- only a guest's. Its row goes with the entry when that is forgotten or
+-- expires. Older builds pass this table over; `user_version` stays 1.
 CREATE TABLE IF NOT EXISTS speakers (
     rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,
     speaker TEXT NOT NULL

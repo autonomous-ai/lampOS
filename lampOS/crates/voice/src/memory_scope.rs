@@ -421,7 +421,7 @@ impl FaceCache {
     /// face, so this also holds that one is enrolled. No lock is waited for:
     /// a busy lock reads as no guest.
     pub fn guest(&self, now: Instant) -> bool {
-        if self.snapshot(now).person().is_some() {
+        if !self.named_once.load(Ordering::Acquire) || self.snapshot(now).person().is_some() {
             return false;
         }
         // `in_view` holds the faces plus one; 0 when not known.
@@ -647,6 +647,9 @@ impl FaceCache {
             })
         };
         let named = next.is_some();
+        if named {
+            self.named_once.store(true, Ordering::Release);
+        }
         // The newest fresh sighting, for why a later line is the room's.
         if let Some(face) = next.as_ref()
             && let Ok(mut seen) = self.last_seen_until.lock()

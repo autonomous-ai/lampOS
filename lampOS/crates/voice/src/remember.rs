@@ -2791,6 +2791,10 @@ pub fn speaker_of(line: Option<&crate::speaking_faces::LineSeen>) -> Option<Stri
 struct RoomSpeaker {
     on: AtomicBool,
     refused: AtomicBool,
+    /// An older memory refused a guest's mark (#8639), counted apart from
+    /// [`Self::refused`] (the Reviewer-lead's ask 4 on #8903): a refused
+    /// mark stops only the guest's marks, never a known person's.
+    guest_refused: AtomicBool,
 }
 
 impl RoomSpeaker {
@@ -2810,10 +2814,10 @@ impl RoomSpeaker {
 
     /// Whether a guest line's write in `person`'s scope carries the guest's
     /// mark (#8639, [`guest`]): only the room's, while no older memory
-    /// refused a speaker ([`send_with_speaker`]). Whatever
+    /// refused the mark ([`send_with_speaker`]). Whatever
     /// [`ROOM_SPEAKER_ENVIRONMENT`] is: the mark is the guest switch's.
     fn guest(&self, person: Option<&str>) -> bool {
-        person.is_none() && !self.refused.load(Ordering::Acquire)
+        person.is_none() && !self.guest_refused.load(Ordering::Acquire)
     }
 }
 
@@ -2834,12 +2838,20 @@ fn send_with_speaker(
     let refused = answer.as_ref().is_some_and(|answer| {
         answer["ok"] == false && answer["error"] == "bad_request" && !source_gone(answer)
     });
-    if !refused || line.as_object_mut()?.remove("speaker").is_none() {
+    if !refused {
         return answer;
     }
+    let Some(was) = line.as_object_mut()?.remove("speaker") else {
+        return answer;
+    };
     let again = send(&line);
-    if again.as_ref().is_some_and(|again| again["ok"] == true)
-        && !speaker.refused.swap(true, Ordering::AcqRel)
+    // A guest's mark refused is counted apart: a known person's marks go on.
+    let flag = if was == lamp_msgs::known::GUEST_SPEAKER {
+        &speaker.guest_refused
+    } else {
+        &speaker.refused
+    };
+    if again.as_ref().is_some_and(|again| again["ok"] == true) && !flag.swap(true, Ordering::AcqRel)
     {
         eprintln!("lamp-voice provider: {ROOM_SPEAKER_KEPT_WITHOUT}");
     }
