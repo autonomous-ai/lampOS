@@ -31,7 +31,7 @@ fn lamp(name: &str, on: bool) -> (Real, PathBuf) {
         },
         bus: Some(Bus::new(&bus_root).unwrap()),
         device_id: "d-42".into(),
-        build: String::new(),
+        build: Default::default(),
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::on(false),

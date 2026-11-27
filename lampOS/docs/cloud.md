@@ -112,13 +112,17 @@ against lamp-06c1.
   `lamp-XXXX` name), `time`, `wakeword_enabled` and `voice_input_mode`, and
   `timezone` and `local_ip` when known.
   - **`version`** is the build the lamp runs now (#8874): the `running` that
-    `lamp-update` last said on `update/status` (said at each round's end and
-    again every minute), looked at with the address and zone every 15 s. So
-    after an update the next ping and reply name the new build, with no
-    restart of `lamp-cloud`. Until `lamp-update` says one, or while what it
-    said has expired or cannot be read, it is the build in `state.json` when
-    `lamp-cloud` started. Both are said the same way, the commit's first
-    twelve characters after the sequence.
+    `lamp-update` last said on `update/status` in this boot (said at each
+    round's end and again every minute), looked at with the address and zone
+    every 15 s. So after an update the next ping and reply name the new
+    build, with no restart of `lamp-cloud`. A status that has gone quiet
+    (older than its 180 s) still counts, so a quiet `lamp-update` never
+    makes the lamp name an older build; when what is there cannot be read,
+    the last build read this boot is kept (#8884). Only before `lamp-update`
+    has said one this boot is it the build in `state.json` when `lamp-cloud`
+    started. Both are said the same way, the commit's first twelve
+    characters after the sequence. The app's About (`firmware`, `build`)
+    and the health and crash reports say the same build.
   - **`generation`** is how a Lamp 2 is told from V1's: the backend keeps one
     device type, `lamp`, for both, and routes a lamp by `device`, so that
     stays `lamp`. The backend keeps the `generation` of the unasked `info` on
@@ -185,7 +189,7 @@ lamp says so.
 | `cmd` / `kind` | Answer |
 |---|---|
 | `info` | the identity fields above |
-| `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
+| `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the build the lamp runs now, as `version` says it; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
 | `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.seen_more` with the page and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`/`skills.visibility`, `skills.upload`, `attach` with `LAMP_ATTACHMENTS=on` (#7659), `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `led.privacy.get`/`led.privacy.set` with `LAMP_PRIVACY_LIGHT=on` and `LAMP_SETTINGS_CHANGE=on` on a lamp with a slide (#8696), `desk_noticing.get`/`desk_noticing.set` with `LAMP_SEEN_ACTIVITY=on` (#6543), `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `developer` | `{"camera": bool, "microphone": bool, "speaker": bool}` while lamp-control's admin socket is there (developer access on), else no field: whether a camera, microphone or speaker stream is usable on this lamp (wired, and for the microphone and the speaker the owner's `--microphone on` and `--speaker on`), asked of lamp-control (`{"features": true}`, "The developer door"). `true` means a stream is allowed, not that one starts now (the ears share their sound on demand). The app offers its grants screen only when the field is there and shows the `microphone` tick disabled while it is `false` (and, once it offers the `speaker` tick, that one while `speaker` is `false`); a lamp-control too old to say reads as all `false`, and one from before the speaker reads `speaker` as `false` (App Only's C, 11 Nov 2026) |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
@@ -2048,7 +2052,7 @@ Every report has:
 | `seq` | number | counts up on this lamp; starts again after a reset |
 | `sent_at` | RFC 3339 UTC, whole seconds | set once, when the report is made, and kept on every send again: the backend drops a duplicate by `(device, seq, sent_at)` |
 | `clock_synced`, `uptime_s` | bool or null, number | `board/state` (a crash and `stopped` say null and 0) |
-| `build` | `<sequence>+<commit12>` or null | `lamp-update`'s state |
+| `build` | `<sequence>+<commit12>` or null | the build the lamp runs when the report is made, as `version` says it (#8884): a crash after an update is the new build's |
 | `dropped` | `{queue_full, over_rate, too_big}` | the lamp's own counts of what it did not send |
 
 - **`health`** adds `level` (`lamp/health`; `stale` when it is past its
