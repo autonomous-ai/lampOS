@@ -116,6 +116,11 @@ thread_local! {
     /// thread, once, for a test reading what is kept by request across the
     /// crate (`remember::kept_out`).
     static REQUEST_BASE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    /// The voice's own copy of the eyes' speaking (`LAMP_EYES_SPEAKING`)
+    /// off for the next [`lines_known`] or [`held_for_face_yes`] on this
+    /// thread, once, as in the product since #8791: no
+    /// [`Engine::confirming_forgets_by_sight`], so `forget_sight` is `None`.
+    static NO_SIGHT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// One test at a time that reads a one-face keep's mark: the marks
@@ -734,7 +739,7 @@ async fn lines_known(
     if let Some((hears, another)) = past_silent {
         engine = engine.carrying_past_silent_where_heard(true, hears, another);
     }
-    if saves {
+    if saves && !NO_SIGHT.with(|off| off.replace(false)) {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
     let mut engine = engine
@@ -7392,7 +7397,12 @@ fn held_for_face_yes(
     let (engine, _, _) = scripted(Arc::new(Script::default()));
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
-    let engine = engine.confirming_forgets_by_sight(eyes, path.clone());
+    let sighted = !NO_SIGHT.with(|off| off.replace(false));
+    let engine = if sighted {
+        engine.confirming_forgets_by_sight(eyes, path.clone())
+    } else {
+        engine
+    };
     if let Ok(mut hold) = engine.shared.held_forget.lock() {
         hold.held = Some(HeldForget {
             call: call("h1", name, args),
@@ -7409,11 +7419,14 @@ fn held_for_face_yes(
             offered_alone: false,
             face_yes: true,
         });
-        hold.sight = Some((
-            2,
-            speakers.iter().map(|id| (*id).to_owned()).collect(),
-            None,
-        ));
+        // No sight is read for a line with the voice's copy off.
+        hold.sight = sighted.then(|| {
+            (
+                2,
+                speakers.iter().map(|id| (*id).to_owned()).collect(),
+                None,
+            )
+        });
     }
     (engine, path)
 }
@@ -8463,4 +8476,256 @@ async fn a_bare_forget_with_an_empty_about_is_held_as_bare() {
             "{at}: their yes runs the kept id's forget"
         );
     }
+}
+
+// The memory owner's call, 27 Nov 14:11 (restating 25 Nov 14:33): the
+// mouth is not used for a forget or a correction. Since #8791 the product's
+// voice unit sets no `LAMP_EYES_SPEAKING`, so `forget_sight` is `None`;
+// each call held for a yes by their face alone in view still runs on their
+// yes, and the scope's one-face test (`ScopeLease::in_view_by_one_face`)
+// keeps a second face out.
+
+/// [`face_yes_chats`] with the voice's copy of the eyes' speaking off.
+async fn face_yes_unsighted(
+    what: &str,
+    lines: Vec<Line>,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Outcome {
+    NO_SIGHT.with(|off| off.set(true));
+    face_yes_chats(what, lines, chats, true).await
+}
+
+/// A correction, a named forget, `forget_everything` and `forget_my_face`
+/// on their one-face line, the voice's copy off: each is held and asked
+/// once, and their "Yes." by their face alone in view runs it, in A's
+/// scope.
+#[tokio::test]
+async fn with_no_sight_each_held_call_runs_on_their_yes() {
+    let a = crate::remember::person_id("A");
+    for (case, words, args, asks) in held_cases() {
+        let got = face_yes_unsighted(
+            &format!("face-yes-unsighted-{case}"),
+            vec![
+                line(words, vec![("f1", false)], 0),
+                line("Yes.", vec![("f1", false)], 5),
+            ],
+            if case == "named" {
+                forget_umbrella_agreed()
+            } else {
+                asks_then(held_call(case), args.clone(), asks, 1)
+            },
+        )
+        .await;
+        let held = if case == "named" {
+            asked_about_umbrella(&got)
+        } else {
+            held_told(&got, "waits for their yes")
+        };
+        assert!(held, "{case}: held and asked once: {:?}", got.rounds);
+        let ran = ran_named(&got, held_call(case));
+        assert_eq!(ran.len(), 1, "{case}: runs once on the yes: {:?}", got.ran);
+        if case != "named" {
+            assert_eq!(ran[0], args, "{case}: exactly the held call");
+        }
+        assert_eq!(got.calls, [Some(a.clone())], "{case}: in A's scope only");
+    }
+}
+
+/// "Forget that." right after their one-face keep, the voice's copy off:
+/// held as the forget of the kept id, and their "Yes." runs exactly that.
+#[tokio::test]
+async fn with_no_sight_a_bare_forget_after_their_keep_runs_on_yes() {
+    let _one = KEEP_MARK_TESTS.lock().await;
+    KEEP_MARKS.with(|marks| marks.set(Some(96)));
+    let mut chats = one_call(
+        crate::remember::REMEMBER,
+        json!({"text": "Locker number is 4417."}),
+    );
+    chats.extend(asks_then(
+        crate::remember::FORGET,
+        json!({}),
+        "Shall I forget that?",
+        1,
+    ));
+    let got = face_yes_unsighted(
+        "face-yes-unsighted-bare",
+        vec![
+            line("Remember my locker number is 4417.", vec![("f1", false)], 0),
+            line("Forget that.", vec![("f1", false)], 3),
+            line("Yes.", vec![("f1", false)], 3),
+        ],
+        chats,
+    )
+    .await;
+    assert!(held_told(&got, HELD), "asked once: {:?}", got.rounds);
+    assert_eq!(
+        ran_named(&got, crate::remember::FORGET),
+        [json!({"source_id": 96})]
+    );
+}
+
+/// The voice's copy off, a second face in view at the yes, silent or seen
+/// speaking it: each held call is dropped and none runs.
+#[tokio::test]
+async fn with_no_sight_a_second_face_at_the_yes_runs_nothing() {
+    for (case, words, args, asks) in held_cases() {
+        for (at, in_view) in [
+            ("silent", vec![("f1", false), ("f2", false)]),
+            ("speaking", vec![("f1", false), ("f2", true)]),
+        ] {
+            let got = face_yes_unsighted(
+                &format!("face-yes-unsighted-two-{case}-{at}"),
+                vec![
+                    line(words, vec![("f1", false)], 0),
+                    line("Yes.", in_view, 5),
+                ],
+                if case == "named" {
+                    forget_umbrella_agreed()
+                } else {
+                    asks_then(held_call(case), args.clone(), asks, 1)
+                },
+            )
+            .await;
+            assert!(
+                ran_named(&got, held_call(case)).is_empty(),
+                "{case} {at}: nothing runs: {:?}",
+                got.ran
+            );
+        }
+    }
+}
+
+/// [`take_face_yes`] with the voice's copy off: no sight held.
+fn take_unsighted(
+    what: &str,
+    held: (&str, Value),
+    said: (&str, bool),
+    (line, yes_line): (&HeldAsker, YesLine),
+    after: Duration,
+) -> Taken {
+    NO_SIGHT.with(|off| off.set(true));
+    take_face_yes(what, held, said, (line, yes_line, &[]), after)
+}
+
+/// The voice's copy off: their plain yes on a line theirs by their face
+/// alone in view runs each held call, marked agreed; the same yes on a
+/// line not in view by one face (another face seen speaking, a second face,
+/// carried) runs nothing, and a yes past the window is too late.
+#[test]
+fn with_no_sight_their_yes_by_their_face_alone_runs_and_nothing_else_does() {
+    let a = (7, crate::remember::person_id("A"));
+    let five = Duration::from_secs(5);
+    for (name, args) in [
+        (crate::remember::FORGET_EVERYTHING, json!({})),
+        (crate::known_faces::FORGET, json!({})),
+        (
+            crate::remember::REMEMBER,
+            json!({"text": "Gym is on Ninth Street.", "replaces": 7}),
+        ),
+        (crate::remember::FORGET, json!({"source_id": 91})),
+    ] {
+        let taken = take_unsighted(
+            &format!("face-yes-unsighted-runs-{name}"),
+            (name, args.clone()),
+            ("Yes.", true),
+            (&a, IN_VIEW),
+            five,
+        );
+        assert!(
+            matches!(&taken, Taken::Runs(call, _, true) if call.name == name && call.args == args),
+            "{name}: runs, agreed"
+        );
+        let not_in_view = take_unsighted(
+            &format!("face-yes-unsighted-not-in-view-{name}"),
+            (name, args.clone()),
+            ("Yes.", true),
+            (&a, YesLine::from(true)),
+            five,
+        );
+        assert!(
+            !matches!(not_in_view, Taken::Runs(..)),
+            "{name}: not their face alone in view: nothing runs"
+        );
+        let late = take_unsighted(
+            &format!("face-yes-unsighted-late-{name}"),
+            (name, args.clone()),
+            ("Yes.", true),
+            (&a, IN_VIEW),
+            crate::remember::HELD_FORGET_FOR + Duration::from_secs(1),
+        );
+        assert!(
+            !matches!(late, Taken::Runs(..)),
+            "{name}: past the window: nothing runs"
+        );
+    }
+}
+
+/// Row 8654 L4: a held correction whose turn was cut before it asked
+/// (`asked: false`), taken by the next spoken line, is dropped, and the
+/// journal says so with a `face-hold:` line; a plain held forget (not
+/// `face_yes`) dropped the same way prints none.
+#[test]
+fn a_face_yes_hold_dropped_unasked_says_unfinished() {
+    const NAME: &str = "second_provider::tests::person_scope_seen::a_face_yes_hold_dropped_unasked_says_unfinished";
+    if let Some(said) = in_child(NAME, "LAMP_TEST_ROW_8654_L4_UNFINISHED") {
+        assert!(
+            said.contains("face-hold: dropped: unfinished (remember)"),
+            "the face-yes drop is journalled: {said}"
+        );
+        assert!(said.contains("the lamp did not ask about it"), "{said}");
+        assert_eq!(
+            said.matches("face-hold:").count(),
+            1,
+            "only the face-yes hold says it: {said}"
+        );
+        return;
+    }
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+    let a = (7, crate::remember::person_id("A"));
+    for face_yes in [true, false] {
+        let (engine, _, _) = scripted(Arc::new(Script::default()));
+        if let Ok(mut hold) = engine.shared.held_forget.lock() {
+            hold.held = Some(HeldForget {
+                call: call(
+                    "r1",
+                    crate::remember::REMEMBER,
+                    json!({"text": "Gym is on Ninth Street.", "replaces": 1}),
+                ),
+                request: 10,
+                asker: a.clone(),
+                at: Instant::now(),
+                asked: false,
+                spelling: false,
+                carried: false,
+                line: None,
+                asked_again: false,
+                one_face: false,
+                near: None,
+                offered_alone: false,
+                face_yes,
+            });
+        }
+        let taken = take_held_forget(
+            &engine.shared,
+            11,
+            true,
+            "and then I went to the shop",
+            (Some(&a), Some(&a)),
+            IN_VIEW,
+            Instant::now(),
+        );
+        assert!(
+            !matches!(taken, Taken::Runs(..) | Taken::Agrees(_)),
+            "face_yes {face_yes}: dropped"
+        );
+        assert!(
+            engine
+                .shared
+                .held_forget
+                .lock()
+                .is_ok_and(|hold| hold.held.is_none()),
+            "face_yes {face_yes}: nothing held after"
+        );
+    }
+    crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
 }
