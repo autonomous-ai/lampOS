@@ -1468,7 +1468,29 @@ const AFTER_NEWS_VERBS: [&str; 15] = [
 ];
 
 /// Two-word asks for the same work ([`AFTER_NEWS_VERBS`]).
-const AFTER_NEWS_PHRASES: [[&str; 2]; 3] = [["look", "up"], ["look", "into"], ["dig", "into"]];
+const AFTER_NEWS_PHRASES: [[&str; 2]; 5] = [
+    ["look", "up"],
+    ["look", "into"],
+    ["dig", "into"],
+    ["put", "together"],
+    ["draw", "up"],
+];
+
+/// Verbs that ask for a thing to be made ("make me a four week study plan
+/// …", "create a budget sheet …", "build me a reading list …"): work only
+/// when a thing follows ([`makes_a_thing`]), so "make the light warmer"
+/// or "make it louder" stays the lamp's own.
+const AFTER_NEWS_MAKES: [&str; 3] = ["make", "create", "build"];
+
+/// Who a made thing may be for, between the make verb and its thing
+/// ("make me a …", "build us a …").
+const AFTER_NEWS_MAKE_FOR: [&str; 2] = ["me", "us"];
+
+/// Things the lamp makes itself, never handed over though made ("make me
+/// a reminder …", "create a timer …"), and a joke the model tells.
+const AFTER_NEWS_OWN_THINGS: [&str; 7] = [
+    "reminder", "alarm", "timer", "note", "light", "scene", "joke",
+];
 
 /// The fewest content words ([`ask_words`]) from the work verb on, so a
 /// short ask ("write it down", "find that part again") stays the model's.
@@ -1522,7 +1544,8 @@ const AFTER_NEWS_BACK: [&[&str]; 18] = [
 /// Whether a line said right after the lamp's own news asks for new
 /// agent-shaped work, to be handed over with [`START`] (#8701,
 /// `LAMP_TASKS_AFTER_NEWS`): one of its sentences opens with a work verb
-/// ([`AFTER_NEWS_VERBS`], [`AFTER_NEWS_PHRASES`]), after only a greeting
+/// ([`AFTER_NEWS_VERBS`], [`AFTER_NEWS_PHRASES`], or a make verb with a
+/// thing to make, [`AFTER_NEWS_MAKES`]), after only a greeting
 /// or the asking ([`AFTER_NEWS_OPENERS`], [`AFTER_NEWS_LEADS`]), with at
 /// least [`AFTER_NEWS_FEWEST`] content words from that verb on, and the
 /// line has no word that ties it back to the news or takes the work back
@@ -1549,11 +1572,27 @@ pub fn new_work_after_news(said: &str) -> bool {
                         sentence
                             .get(at..at + 2)
                             .is_some_and(|run| run == &phrase[..])
-                    });
+                    })
+                    || (AFTER_NEWS_MAKES.contains(&sentence[at].as_str())
+                        && makes_a_thing(&sentence[at + 1..]));
                 verb && led_in(&sentence[..at])
                     && ask_words(&sentence[at..].join(" "), false).len() >= AFTER_NEWS_FEWEST
             })
         })
+}
+
+/// Whether `after`, the words after a make verb ([`AFTER_NEWS_MAKES`]),
+/// name a thing to make: "me" or "us" at most, then "a" or "an", and no
+/// thing the lamp makes itself ([`AFTER_NEWS_OWN_THINGS`]).
+fn makes_a_thing(after: &[String]) -> bool {
+    let after = match after.first() {
+        Some(word) if AFTER_NEWS_MAKE_FOR.contains(&word.as_str()) => &after[1..],
+        _ => after,
+    };
+    matches!(after.first().map(String::as_str), Some("a" | "an"))
+        && !after
+            .iter()
+            .any(|word| AFTER_NEWS_OWN_THINGS.contains(&word.trim_end_matches('s')))
 }
 
 /// Whether `before`, the words of a sentence before its work verb
@@ -7406,6 +7445,11 @@ pub(crate) mod tests {
             "Thanks, that's great. Now research the best standing desks under 500 dollars for me.",
             "Can you look up flights from Hanoi to Tokyo next Friday and list the cheapest three?",
             "I want you to write a short report on solar panels for a small flat.",
+            "Make me a four week study plan for learning basic Python.",
+            "Hey Lamp, create a weekly budget sheet for a family of four.",
+            "Build me a reading list of ten classic science fiction novels.",
+            "Put together a packing list for a week of hiking in Sapa.",
+            "Can you draw up a simple meal plan for the next five days?",
         ] {
             assert!(super::new_work_after_news(said), "{said}");
         }
@@ -7424,6 +7468,10 @@ pub(crate) mod tests {
             "Don't look anything up about robot vacuums for me right now.",
             "My colleague will compare three robot vacuums under 300 dollars tomorrow.",
             "Make the light a little warmer, please, for my reading tonight.",
+            "Make me a reminder for the dentist next Tuesday at nine.",
+            "Create a timer for twenty minutes for my tea and pasta.",
+            "Make it a little louder for the rest of the evening please.",
+            "Make me a short joke.",
         ] {
             assert!(!super::new_work_after_news(said), "{said}");
         }
