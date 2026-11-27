@@ -7798,7 +7798,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             && mood == Mood::Resting
             && leaving.is_none()
             && !asked_now.quiet
-            && asked_now.expression.is_some();
+            && asked_now.expression.is_some()
+            // A computer holding the body and asking a look is the head's: a glance gave its pitch the rest pose and
+            // the look was answered `there` unmoved (#8720, lamp-75c9, 26 Nov).
+            && !(asked_now.held && asked_now.aim.is_some());
         if glance {
             // Where it rests: a rest that has lasted, or, as a glance
             // begins, a head already still at rest that has not relaxed yet
@@ -7814,7 +7817,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             asleep = [false; 3];
         }
         glanced = glance;
-        if mood != Mood::Resting || leaving.is_some() {
+        // A held look takes the head from a glance already under way too: `glance_from` would keep the pitch's goal at
+        // the glance's and the look would be answered `there` unmoved (#8720).
+        if mood != Mood::Resting || leaving.is_some() || (asked_now.held && asked_now.aim.is_some())
+        {
             glance_from = None;
         }
         // The wire is failing: nothing new is asked until it answers again.
