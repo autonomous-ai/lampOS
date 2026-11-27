@@ -588,7 +588,12 @@ asked in its own reply, when all of these hold:
   not yet answered is no;
 - as the line begins: one face in view, the walk over and nothing of it
   led, English (as the walk's name reading), the line opening a
-  conversation (60 s of quiet before it, `learn_later::Moment::opens`), and
+  conversation (60 s of quiet before it, `learn_later::Moment::opens`;
+  any worded line from anyone starts the 60 s over, the lamp's own words
+  and a bystander's line held as not said to the lamp included, the memory
+  owner's call on #8471, 27 Nov 17:54: held bystander lines reset the gap,
+  "yes start over"; the second route gives the walk every line's words
+  before it judges them, and a sound with no words resets nothing), and
   the bounds in the walk's file (`Progress::learn_later`, kept through a
   redo of the whole walk, wiped by a reset): at most once in 24 h; an ask
   left unanswered counts, and after 3 it is never asked again; the model
