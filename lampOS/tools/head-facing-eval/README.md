@@ -4,7 +4,7 @@ This kit uses public Pointing’04 photos. It does not open a camera, access liv
 
 ## Frozen producer and inputs
 
-The already reviewed producer is `lamp-eyes` example `head_direction_compare` at #8856, commit `cee2e324742b53c2e6b9e24c41d372ce5d2c864f`. Build off the lamp with:
+The already reviewed producer is `lamp-eyes` example `head_direction_compare` at #8856, commit `cee2e324742b53c2e6b9e24c41d372ce5d2c864f`. From that revision's `lampOS/` workspace, build off the lamp with:
 
 ```sh
 cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.36 -p lamp-eyes --example head_direction_compare

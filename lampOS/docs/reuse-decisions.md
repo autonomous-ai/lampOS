@@ -1,5 +1,118 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Compare head geometry through the product pipeline (#8847, 2026-11-27)
+
+Reuse `lamp-eyes`' pinned detector, JPEG decoder, rotated mesh crop and tract
+model runner for the [offline head comparison](head-direction-evaluation.md).
+The existing five-mark geometry already ports V1
+`hal/drivers/tracking/gaze.py`; its broad facing threshold is not a measured
+lamp/screen/phone classifier. V1 also clears observations after camera
+motion and excludes missing measurements from its vote. Preserve those
+distinctions as explicit future freshness/unknown requirements rather than
+claiming parity from angle fixtures.
+
+Reuse the pure geometry from closed draft #8782, with finite and degeneracy
+checks. It now lives in
+[`crates/eyes/src/head_direction/geometry.rs`](../crates/eyes/src/head_direction/geometry.rs),
+moved from the example without changing its math; the offline example imports
+it, and the default-off runtime observer borrows an existing mesh to check
+availability. Do not reuse #8782's default-on unit change,
+fallback to marks, or replacement of existing facing/speaking inputs. The
+old MediaPipe task benchmark has a different crop, pose estimator and fitted
+scoring rule; it is a reference experiment, not evidence for this candidate.
+Keep the Reviewer's shared scorer authoritative and add no duplicate scoring
+pipeline or production image upload. On-body accuracy, freshness, privacy
+and latency remain qualification work.
+
+### Count existing runtime observations before adding a pose consumer (#8847)
+
+Reuse the existing camera `PortFrame` provenance, permission generation,
+YuNet result, still-face filter and already scheduled mouth mesh. The
+[`head_direction` observer](../crates/eyes/src/head_direction/mod.rs) adds
+`--head-direction-observer on|off`, default `off`, with no product unit
+enabling it. It adds no inference, camera read, thread, cadence change,
+legacy-field replacement, fallback to marks or policy decision. Multiple
+raw detections stay ambiguous; unknown or unavailable geometry never means
+away. The shared geometry's local angles are discarded.
+
+The eyes' direct camera reader does not run the camera's `Capture` wrapper,
+so reuse its identity, source-time and sequence semantics in the bounded
+[`freshness` guard](../crates/eyes/src/head_direction/freshness.rs), including
+permission checks around open/read and after geometry. Keep the camera's
+exclusive 250 ms ceiling as a rejection boundary, not a substitute for the
+approved p95 100 ms source-to-usable-output gate. This metadata guard cannot
+close an unsampled revocation race or authorize a raw-pose publication;
+that export fence remains separate reviewed work.
+
+Reuse the existing journal for at most one bounded numeric/fixed-enum
+`lamp-head-direction-observer/1` record per 60 seconds or longer. It has
+processing-look outcomes, separate frame/look rejection reasons and fresh
+available source-age histograms, split by crop and source timestamp point;
+it has no angles, landmarks, identity or event timestamps. Retain late and
+unknown counts rather than qualifying a truncated accepted-only latency
+population. This is not a durable fleet recorder or upload, nor a per-case
+adapter for the Reviewer's scorer. Target added overhead is p95 below 1 ms;
+the on-lamp overhead, periodic journal cost, overall 100 ms budget and
+head-target accuracy remain unmeasured by this prerequisite.
+
+### Sensor 4: compare fixed facing rules without changing admission (2026-11-27 draft)
+
+On simple-call base `0dbbfc95bbea6ddf397308e1a8ef1933c5d19dcb`, reuse the
+#8856 checked head geometry and #8865 capture/permission freshness guard.
+Extend the existing default-off observer rather than adding a camera,
+worker, inference schedule or voice consumer. The proposed schema/2 keeps
+`legacy_yaw`, `mesh_yaw` and `mesh_yaw_pitch` predictions separate, each
+with facing, not-facing and unknown counts over the same existing looks.
+Reuse `facing::allowed_deg` and the inherited pitch bounds [-20, +25]; do
+not fit thresholds to the public development set. Legacy fields and the
+simple-call admission/window rule remain unchanged. Source integration and
+verification of this draft are pending.
+
+Reuse the exact working-picture and same-frame full-crop paths through
+`mesh::crop_of`. The offline example's proposed `--crop working|full`
+suffix defaults to working and identifies the choice in metadata. The
+historical 2,790-image Pointing'04 result used the working-picture crop;
+it is not evidence that every runtime full-mouth configuration is identical.
+Keep crop cohorts and source-timestamp points separate, and preserve all
+unknowns. Neither accepted-only timing histograms nor public fixed-cone
+labels establish real desk interaction recall or capture latency.
+
+Do not reuse 2D shoulder position as a facing verdict. The existing NPU
+`Keypoint` has x/y/score only (`crates/npu/src/head.rs`), selects and tracks
+one person independently of eyes, and answers a caller JPEG without source
+capture time, sequence or an eyes-face association
+(`crates/npu/src/serve.rs`, `service.rs`). It can supply image bearing and
+projected shape, not a verified torso orientation. Its API is product-enabled
+but inference is on demand; calling it here would introduce new work and
+cold-load behavior. `humans/posture` is an ergonomic time-window summary,
+not fresh shoulder pose. The sensor 4 draft therefore records
+`facing.shoulders_unknown_no_association` and adds no NPU call or image
+export. A future
+shoulder candidate needs explicit same-frame/person association and
+independent orientation labels, preserving anatomical versus image axes.
+
+Reuse the Reviewer's published v2 contract at
+`31c290d5bb9dc845679098a837a4d0ffd5059cb4` (#8885), manifest/run version 2,
+rubric `sensor-team-2026-11-27-v2`. It replaces the historical head
+lamp/screen/phone classes with joint `facing`/`away`: independently label
+head and shoulders, both known toward lamp for facing, and a known away
+component with both labels known for away. Require >=114/120 per class
+and 20 disagreement cases in each direction. Unknown components require
+independent gold or stay fault diagnostics. This head-only proxy, with
+shoulders unknown, cannot qualify the joint job alone.
+
+Pointing'04 fixed-cone analysis remains development evidence without
+speaking, desk-distance or shoulder labels. A v2 invented replay fixture
+checks the adapter contract only; readiness stays null. Qualification still
+needs the real-person holdout, verified clocks and producing binary/source/
+model/config provenance. Keep all original and derived evidence privately;
+v2 `retention: "keep_all"` supersedes old deletion dates. The lead holds
+real captures and board runs. New host first/repeated classification cost,
+board replay, live source-to-result latency and real-person recall remain
+pending; the old geometry results remain historical. See [the frozen
+contract](head-direction-evaluation.md#frozen-v2-head-and-shoulders-contract-2026-11-27)
+and [dated evidence boundaries](head-direction-evaluation.md#sensor-4-fixed-rule-development-comparison-2026-11-27).
+
 ## Keep retirement before requested music; distinguish cues (2026-11-10)
 
 V1 `hal/drivers/voice/music_service.py` waits while TTS is speaking before
