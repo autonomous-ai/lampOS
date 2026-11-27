@@ -431,6 +431,28 @@ fn failed_not_default() -> String {
 pub const SWITCHED_LINE: &str =
     "That stopped because I switched to another agent. Please ask me again.";
 
+/// What the person hears after "stop that task" (`stop_agent_task`,
+/// [`crate::task_stop`]): one short line for each answer of the tasks
+/// part's `stop`, with no agent's name and no technical word. The tasks
+/// part confirmed the work stopped.
+pub const STOP_STOPPED_LINE: &str = "Okay, I stopped it.";
+/// The stop was asked, but the tasks part could not confirm it in time.
+pub const STOP_UNCONFIRMED_LINE: &str = "I asked it to stop, but I couldn't confirm it yet.";
+/// The work had not started yet, and now never will.
+pub const STOP_NOT_STARTED_LINE: &str = "Okay, I won't start it.";
+/// The work runs on the person's computer, which the lamp can't stop yet.
+pub const STOP_REMOTE_LINE: &str =
+    "That one is running on your computer, and I can't stop it from here yet.";
+/// The work had already ended.
+pub const STOP_NOT_RUNNING_LINE: &str = "That one had already finished.";
+/// No work handed over is going now.
+pub const STOP_NOTHING_RUNNING_LINE: &str = "Nothing is running right now.";
+/// The work is being handed over right now (`busy`): nothing stopped yet.
+pub const STOP_BUSY_LINE: &str =
+    "It's just getting started. Ask me again in a moment and I'll stop it.";
+/// The tasks part refused the stop, or doesn't know it: nothing stopped.
+pub const STOP_COULD_NOT_LINE: &str = "I couldn't stop it just now.";
+
 /// [`NewsWords::checking`]'s words, built in (#8170).
 fn checking() -> String {
     "The work the person asked you to hand over, \"{asked}\", was slow to start with {who}, and you are not sure yet whether it started: it can still begin there in the next few minutes. Tell them that honestly in one or two plain, light sentences with no technical words, such as \"I'm not sure it started yet. I'll tell you if it does.\": never that it did not start or failed, and do not offer to start it again.".into()

@@ -1852,6 +1852,11 @@ fn read_once_with(
             // Work the person said yes to that never reached its agent is
             // news too: the lamp said it was handing it over.
             if let Some(failed) = failed_hand_over(item, now) {
+                // A hand-over the person stopped (`crate::task_stop`): its
+                // stop line was said, so it is never told as one that failed.
+                if crate::task_stop::hand_over_ended_quietly(&store, item) {
+                    continue;
+                }
                 let key = format!("{store}:{id}:hand-over");
                 // The computer has no such folder, or the engine isn't
                 // signed in on it: lamp-tasks says so only with `serve
@@ -1928,6 +1933,11 @@ fn read_once_with(
                 continue;
             };
             let mut data = observation["data"].clone();
+            // Work the person stopped ends quietly: its stop line was
+            // said already (`crate::task_stop`).
+            if crate::task_stop::ended_quietly(&store, id, &data) {
+                continue;
+            }
             // The watch follows an idle answer and keeps the end the agent
             // went on to; Harness gives that answer with the earlier one at
             // its front (lamp-75c9, 2026-10-16, "…once it finishes.done"),
@@ -6227,5 +6237,51 @@ mod tests {
         // Nothing heard since the voice began is nobody, early on too.
         assert!(!someone_there(5_000_000, false, 0, None));
         assert!(someone_there(5_000_000, false, 4_000_000, None));
+    }
+
+    /// "Stop that task" (`crate::task_stop`): a task that ended
+    /// `stopped_by_person` is never told as stopped or failed, nor its
+    /// hand-over as one that failed: its stop line was said already. An
+    /// ordinary stop beside it is still told.
+    #[test]
+    fn stop_news_never_tells_a_task_the_person_stopped() {
+        let root = std::env::temp_dir().join(format!("task-news-stop-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let answer = match (asked["op"].as_str().unwrap(), asked["id"].as_u64()) {
+                    ("list", _) => json!({"ok":true,"store_id":"s-news-stop","items":[
+                        {"id":1,"observations":1},
+                        {"id":2,"observations":1},
+                        {"id":3,"observations":0,"dispatch":{"state":"not_sent",
+                            "code":crate::task_stop::STOPPED_BY_PERSON,"confirmed":{"monotonic_ms":NOW - 2_000},
+                            "finished":{"boot_id":"boot-a","monotonic_ms":NOW - 1_000}}}]}),
+                    ("get_task", Some(1)) => {
+                        task("claude", json!([seen(1, "stopped", "boot-a", NOW - 1_000)]))
+                    }
+                    ("get_task", Some(2)) => {
+                        task("codex", json!([seen(2, "stopped", "boot-a", NOW - 1_000)]))
+                    }
+                    ("get_task", Some(3)) => task("claude", json!([])),
+                    ("get_observation", Some(1)) => json!({"ok":true,"data":{"state":"stopped",
+                        "answer":"","code":crate::task_stop::STOPPED_BY_PERSON,"truncated":false}}),
+                    ("get_observation", Some(2)) => json!({"ok":true,"data":{"state":"stopped",
+                        "answer":"I could not reach the repository.","truncated":false}}),
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let news = read_once(&socket, &now(), &BTreeSet::new(), &BTreeSet::new());
+        let keys: Vec<&str> = news.iter().map(|news| news.key.as_str()).collect();
+        assert_eq!(keys, ["s-news-stop:2:2"], "{news:?}");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

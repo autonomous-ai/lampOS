@@ -4173,6 +4173,71 @@ cho mô hình thêm hàm `harness_status`. Hàm này trả lời "Harness đăng
   `harness_status_refused_says_it_lightly`,
   `harness_status_signed_out_with_the_lamps_own_target_says_computers_need_the_sign_in`.
 
+## Dừng việc đó (`stop_agent_task`, khi `LAMP_TASKS_NOW=on`)
+
+Người dùng có thể bảo đèn dừng một việc đã giao mà vẫn đang chạy ("dừng việc
+đó", "hủy cái bài thơ"). Đây là nửa của giọng nói (`voice/src/task_stop.rs`).
+Nửa của phần tasks là op `stop`. Giọng nói khai báo `stop_agent_task` bên
+cạnh `tasks_now`, vì nó tìm việc đang chạy trong cùng bản ghi đó. Không có
+công tắc thì hàm không được khai báo và không bao giờ chạy. Một tiếng "Không"
+hay "Thôi" cho việc còn chờ chữ "có" vẫn như cũ: việc đó bị bỏ, và model không
+được gọi.
+
+- **Tham số.** `which` là lời của người dùng gọi việc đó ("cái bài thơ").
+  `task` là `work_id` mà lần giao việc đã trả về. Cả hai đều không bắt buộc.
+- **Việc nào.** Khi không có `task`, giọng nói đọc `tasks_now`, rồi gọi
+  `get_task` cho từng việc đang chạy (`working`, `starting`, `installing`,
+  `needs_input` hoặc `unknown`). Bản brief tạo kỹ năng không bao giờ được
+  tính. "Cái đó", hoặc không có từ nội dung nào, nghĩa là việc duy nhất đang
+  chạy. Lời nói chọn ra việc có lời nhờ chung nhiều từ nhất với nó. Tên agent
+  không bao giờ được tính là một từ như vậy. Khi nhiều việc đang chạy mà lời
+  nói không chọn ra được một việc, model nhận `{"which":[…],"next":…}`: nó hỏi
+  người dùng muốn dừng việc nào, gọi mỗi việc bằng lời nhờ của chính nó (nhãn,
+  tối đa 60 ký tự), không bao giờ bằng tên agent. Khi không có việc nào đang
+  chạy, đèn nói "Nothing is running right now."
+- **Lệnh dừng.** Giọng nói gửi `status`, rồi
+  `{"op":"stop","guard":<như cancel>,"id":<id>}` trên một luồng riêng. Luồng
+  đó đọc câu trả lời tối đa `STOP_READ` (33 s), lâu hơn 32 s của phần tasks,
+  và chỉ hỏi lại khi kho dữ liệu chưa chắc chắn. Bản thân lần gọi chỉ chờ
+  tối đa `STOP_WAIT` (3 s), nên lượt nói không bao giờ bị giữ để chờ
+  engine. Nếu đến lúc đó chưa có câu trả lời, lệnh dừng vẫn đã được gửi, nên
+  đèn nói là chưa xác nhận được. Câu trả lời đến muộn vẫn được đọc và ghi
+  vào journal, nhưng không bao giờ được nói ra. `stop` được đọc ở cấp trên
+  cùng của câu trả lời, nếu không có thì trong `data`.
+- **Đèn nói gì** (`skill_words::STOP_*_LINE`). Model được bảo nói đúng một
+  câu, một lần, và không thêm gì:
+
+  | Câu trả lời `stop` | Câu nói |
+  |---|---|
+  | `stopped` | "Okay, I stopped it." |
+  | `unconfirmed`, hoặc không trả lời kịp | "I asked it to stop, but I couldn't confirm it yet." |
+  | `not_started` | "Okay, I won't start it." |
+  | `remote` | "That one is running on your computer, and I can't stop it from here yet." |
+  | `not_running` | "That one had already finished." |
+  | lỗi `busy` (việc đang được giao ngay lúc đó) | "It's just getting started. Ask me again in a moment and I'll stop it." |
+  | bị từ chối, hoặc phần tasks không biết op này | "I couldn't stop it just now." |
+
+  Không câu nào nêu tên agent, engine hay mã lỗi.
+- **Tin về việc giữ im lặng.** Một việc kết thúc với `stopped_by_person` (là
+  `code` hoặc `reason` của lần quan sát, hoặc lời cuối của nó, hoặc `code` của
+  dispatch) không bao giờ được kể là đã dừng hay thất bại, và không bao giờ
+  được kể lại. Điều này cũng đúng với việc mà giọng nói này đã yêu cầu dừng và
+  nhận câu trả lời `stopped`, `unconfirmed` hoặc `not_started`
+  (`task_stop::ended_quietly`, `hand_over_ended_quietly`). Nếu việc đó vẫn
+  làm xong, nó vẫn được kể là đã xong.
+- **Chưa kiểm chứng:** chưa thử dừng bằng giọng nói trên một đèn có op `stop`
+  của phần tasks. Giống `tasks_now`, bất kỳ ai hỏi cũng dừng được mọi việc
+  gần đây.
+- **Test:** `task_stop::tests::stop_one_running_task_is_that_task`,
+  `stop_several_running_asks_which_by_their_words`,
+  `stop_each_outcome_maps_to_its_one_line`, `stop_no_line_names_an_engine`,
+  `stop_against_the_tasks_part_sends_stop_for_the_one_going`,
+  `stop_news_stays_silent_on_stopped_by_person`,
+  `stop_answer_reads_the_top_level_then_data_and_busy_is_never_stopped`,
+  `stop_never_holds_the_turn_for_a_slow_engine`;
+  `task_news::tests::stop_news_never_tells_a_task_the_person_stopped`;
+  `agent_tasks::tests::stop_tool_is_declared_with_tasks_now`.
+
 ## Chính đèn, với OpenClaw (#6226)
 
 `LAMP_OPENCLAW_ON_LAMP=on`, chỉ cùng `--engines-from-machines`; tắt nếu không

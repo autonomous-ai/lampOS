@@ -265,7 +265,7 @@ pub const STATUS: &str = "harness_status";
 /// named is about the work, never asked again to hand it over (the
 /// Reviewer-lead's P1 on #6786: "Hermes, go ahead and run it" confirms).
 pub fn is_task_tool(name: &str) -> bool {
-    [START, CONFIRM, CHECK, NOW, STATUS].contains(&name)
+    [START, CONFIRM, CHECK, NOW, STATUS, crate::task_stop::STOP].contains(&name)
 }
 /// [`START`]'s parameter that names who does the work.
 pub const WHO: &str = "who";
@@ -2375,6 +2375,8 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
             parameters: None,
             silent: false,
         });
+        // "Stop that task" finds the work going in the same record.
+        tools.push(crate::task_stop::tool());
     }
     if place.harness_status {
         tools.push(Tool {
@@ -3499,6 +3501,7 @@ pub fn is_tool(name: &str) -> bool {
         || name == CHECK
         || name == NOW
         || name == STATUS
+        || name == crate::task_stop::STOP
         || crate::sign_in::is_tool(name)
 }
 
@@ -5928,6 +5931,14 @@ fn run_for_asked(
                 return (crate::tools::unavailable(), false);
             }
             tasks_now(place, left())
+        }
+        // "Stop that task": with tasks_now's switch only, whatever the
+        // model calls.
+        crate::task_stop::STOP => {
+            if !place.now {
+                return (crate::tools::unavailable(), false);
+            }
+            crate::task_stop::run(place, &call.args, request, left())
         }
         // Never without its switch, whatever the model calls (#6061 B).
         STATUS => {
@@ -12694,7 +12705,10 @@ pub(crate) mod tests {
                 .collect()
         };
         assert_eq!(names(&off), [START, CONFIRM, CHECK]);
-        assert_eq!(names(&on), [START, CONFIRM, CHECK, NOW]);
+        assert_eq!(
+            names(&on),
+            [START, CONFIRM, CHECK, NOW, crate::task_stop::STOP]
+        );
         assert!(is_tool(NOW));
         let described = |place: &Place, name: &str| {
             super::declared(place, &[])
@@ -17848,5 +17862,40 @@ pub(crate) mod tests {
         let (told, _) = run(&place, &call, 9, true, PEER_WAIT);
         assert_eq!(told["error"], NO_TAKEN_CONFIRM, "{told}");
         assert!(PENDING.lock().unwrap().is_none());
+    }
+
+    /// "Stop that task": `stop_agent_task` is declared with `tasks_now`
+    /// (it finds the work going from the same record), is one of the task
+    /// tools, and is never run without that switch.
+    #[test]
+    fn stop_tool_is_declared_with_tasks_now() {
+        let off = place(Path::new("/run/t"), false);
+        let on = Place {
+            now: true,
+            ..off.clone()
+        };
+        let names = |place: &Place| -> Vec<String> {
+            super::declared(place, &[])
+                .into_iter()
+                .map(|tool| tool.name)
+                .collect()
+        };
+        assert!(!names(&off).contains(&crate::task_stop::STOP.to_owned()));
+        assert!(names(&on).contains(&crate::task_stop::STOP.to_owned()));
+        assert!(is_tool(crate::task_stop::STOP));
+        assert!(is_task_tool(crate::task_stop::STOP));
+        let call = ToolCall {
+            id: "c".into(),
+            name: crate::task_stop::STOP.into(),
+            args: json!({}),
+        };
+        let nowhere = Place {
+            directory: "/nonexistent/lamp-tasks".into(),
+            ..off
+        };
+        assert_eq!(
+            run_for(&nowhere, &[], &call, 3, true, Duration::from_millis(50)),
+            (crate::tools::unavailable(), false)
+        );
     }
 }

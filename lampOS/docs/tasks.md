@@ -8654,6 +8654,73 @@ Tests: `agent_tasks::tests::tasks_now_is_declared_and_run_only_with_its_switch`,
 `agent_tasks::tests::tasks_now_with_no_task_or_no_record_says_so_lightly`,
 `agent_tasks::tests::every_description_fits_the_service_whatever_the_switches`.
 
+### Stop that task (`stop_agent_task`, with `LAMP_TASKS_NOW=on`)
+
+The person can ask the lamp to stop work handed over that is still going
+("stop that task", "cancel the poem one"). This is the voice's half
+(`voice/src/task_stop.rs`). The tasks part's half is its `stop` op. The
+voice declares `stop_agent_task` beside `tasks_now`, because it finds the
+work going in the same record. Without the switch it is not declared and
+never run. A "No" or "Never mind" to a task still waiting for its yes is
+unchanged: it drops that task, and the model is not called.
+
+- **Arguments.** `which` holds the person's words for the work ("the poem
+  one"). `task` holds the `work_id` its hand-over answered. Both are
+  optional.
+- **Which work.** With no `task`, the voice reads `tasks_now`, then
+  `get_task` for each piece of work going (`working`, `starting`,
+  `installing`, `needs_input` or `unknown`). A skill's make brief is never
+  counted. "That one", or no content words, means the only work going.
+  Words single out the work whose ask shares the most of them. An agent's
+  name never counts as such a word. Several pieces of work going, with no
+  words that single one out, get `{"which":[…],"next":…}`: the model asks
+  which one, naming each by its own ask (its label, at most 60
+  characters) and never by its agent. With none going, the lamp says
+  "Nothing is running right now."
+- **The stop.** The voice sends `status`, then
+  `{"op":"stop","guard":<as cancel>,"id":<id>}` on a thread of its own.
+  That thread reads the answer for up to `STOP_READ` (33 s), past the tasks
+  part's own 32 s, and asks again only while the store is not sure. The
+  call itself waits at most `STOP_WAIT` (3 s), so the turn is never held
+  for the engine. With no answer by then, the stop was still sent, so the
+  lamp says it is not yet confirmed. The late answer is still read and
+  journalled, and it is never said. `stop` is read at the top level of
+  the answer, else inside `data`.
+- **What the lamp says** (`skill_words::STOP_*_LINE`). The model is told
+  to say one line, once, and nothing else:
+
+  | `stop` answer | Line |
+  |---|---|
+  | `stopped` | "Okay, I stopped it." |
+  | `unconfirmed`, or no answer in time | "I asked it to stop, but I couldn't confirm it yet." |
+  | `not_started` | "Okay, I won't start it." |
+  | `remote` | "That one is running on your computer, and I can't stop it from here yet." |
+  | `not_running` | "That one had already finished." |
+  | error `busy` (being handed over right now) | "It's just getting started. Ask me again in a moment and I'll stop it." |
+  | a refusal, or an op this tasks part doesn't know | "I couldn't stop it just now." |
+
+  No line names an agent, an engine or a code.
+- **Task news stays quiet.** A task that ends `stopped_by_person` (as the
+  observation's `code`, `reason` or last words, or the dispatch's `code`)
+  is never told as stopped or failed, and never retold. The same holds for
+  a task this voice asked to stop and was answered `stopped`,
+  `unconfirmed` or `not_started` (`task_stop::ended_quietly`,
+  `hand_over_ended_quietly`). If such work finished anyway, it is still
+  told as done.
+- **Not yet shown:** a played stop on a lamp with the tasks part's `stop`
+  op. Like `tasks_now`, anyone who asks can stop any recent work.
+
+Tests: `task_stop::tests::stop_one_running_task_is_that_task`,
+`task_stop::tests::stop_several_running_asks_which_by_their_words`,
+`task_stop::tests::stop_each_outcome_maps_to_its_one_line`,
+`task_stop::tests::stop_no_line_names_an_engine`,
+`task_stop::tests::stop_against_the_tasks_part_sends_stop_for_the_one_going`,
+`task_stop::tests::stop_news_stays_silent_on_stopped_by_person`,
+`task_stop::tests::stop_answer_reads_the_top_level_then_data_and_busy_is_never_stopped`,
+`task_stop::tests::stop_never_holds_the_turn_for_a_slow_engine`,
+`task_news::tests::stop_news_never_tells_a_task_the_person_stopped`,
+`agent_tasks::tests::stop_tool_is_declared_with_tasks_now`.
+
 ### The voice asks about its work (#7930)
 
 The model knows which work it handed over and can ask about the right one.

@@ -266,6 +266,7 @@ pub mod stalls;
 pub mod stop_scope;
 pub mod stop_words;
 pub mod task_news;
+pub mod task_stop;
 mod termination;
 #[cfg(test)]
 mod test_words;
