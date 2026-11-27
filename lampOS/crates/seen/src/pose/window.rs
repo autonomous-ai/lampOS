@@ -6,7 +6,10 @@
 //! `POSE_*`):
 //!
 //! - a sample is **bad** when its RULA `risk_level` is 2 or more, or any
-//!   region's subscore on either side is [`HIGH_SUBSCORE`] or more;
+//!   region's subscore on either side is high: [`NECK_HIGH_SUBSCORE`] (3,
+//!   bent forward past 20°) or more for the neck, [`HIGH_SUBSCORE`] or more
+//!   for any other (the owner, 27 Nov on #8377: a head bent to a phone is
+//!   the neck's, never "no one region");
 //! - the **region** is the one most often high among the bad samples, ties
 //!   to the first of neck, trunk, upper arm, lower arm (V1's order; wrist is
 //!   left out, the server fixes it at 1);
@@ -44,8 +47,13 @@ pub const MIN_SAMPLES: usize = 2;
 /// checks (a hot board's one a minute, [`crate::heat`]), so one missed
 /// check still pairs with the one before.
 pub const KEPT_US: u64 = 120_000_000;
-/// V1's `POSE_REGION_HIGH_SUBSCORE`.
+/// V1's `POSE_REGION_HIGH_SUBSCORE`: trunk, upper arm, lower arm, wrist.
 pub const HIGH_SUBSCORE: i64 = 4;
+/// The neck's: RULA's 3, bent forward more than 20°. Neck flexion alone
+/// never reaches 4 (that takes extension or a twist), so at V1's 4 a head
+/// bent to a phone read as no one region (06c1, 27 Nov 16:24: neck 25–37°,
+/// every neck subscore 3; the owner's call on #8377).
+pub const NECK_HIGH_SUBSCORE: i64 = 3;
 /// V1's bad `risk_level` (RULA score 3 or more).
 pub const BAD_RISK_LEVEL: i64 = 2;
 
@@ -86,6 +94,15 @@ fn subscore(side: Option<&serde_json::Value>, region: &str) -> i64 {
         .unwrap_or(0)
 }
 
+/// The subscore from which `region` counts as high.
+fn high_subscore(region: &str) -> i64 {
+    if region == "neck" {
+        NECK_HIGH_SUBSCORE
+    } else {
+        HIGH_SUBSCORE
+    }
+}
+
 /// What one answer's `ergo` comes to: whether it is bad, and which regions
 /// scored high.
 pub fn judge(ergo: &Ergo) -> (bool, u8) {
@@ -93,7 +110,7 @@ pub fn judge(ergo: &Ergo) -> (bool, u8) {
     let high_on = |region: &str| {
         sides
             .iter()
-            .any(|side| subscore(*side, region) >= HIGH_SUBSCORE)
+            .any(|side| subscore(*side, region) >= high_subscore(region))
     };
     let mut high = 0u8;
     for (bit, (name, _)) in REGIONS.iter().enumerate() {
@@ -303,9 +320,14 @@ mod tests {
             )),
             (true, 0b0001)
         );
-        // Neck 3 with risk 2 is not bad: the risk level does not count.
+        // Neck 3 is bad too, on the neck (the owner, #8377); neck 2 with
+        // risk 2 is not: the risk level does not count.
         assert_eq!(
             judge(&partial(json!({"body_scores": {"neck": 3}}))),
+            (true, 0b0001)
+        );
+        assert_eq!(
+            judge(&partial(json!({"body_scores": {"neck": 2}}))),
             (false, 0)
         );
         // Trunk, the arms or wrist high never make it bad.
@@ -320,13 +342,39 @@ mod tests {
             judge(&partial(json!({"body_scores": {"neck": 5, "trunk": 4}}))),
             (true, 0b0001)
         );
-        // The same full answer is judged as before.
+        // The same full answer: the neck at 3 and the trunk at 4 both high.
         let full = ergo(
             2,
             json!({"body_scores": {"neck": 3, "trunk": 4}}),
             json!({}),
         );
-        assert_eq!(judge(&full), (true, 0b0010));
+        assert_eq!(judge(&full), (true, 0b0011));
+    }
+
+    /// 06c1, 27 Nov 16:24 (the owner's call on #8377): looking down at a
+    /// phone, the neck bent 25–37°, the back straight, every neck subscore
+    /// 3 and the RULA risk 2. The neck's, not "no one region": a neck of 3
+    /// is high; any other region still needs 4.
+    #[test]
+    fn a_head_bent_to_a_phone_is_the_necks() {
+        let phone = ergo(
+            2,
+            json!({"body_scores": {"neck": 3, "trunk": 1, "upper_arm": 3, "lower_arm": 3}}),
+            json!({"body_scores": {"neck": 3, "trunk": 1, "upper_arm": 3, "lower_arm": 3}}),
+        );
+        assert_eq!(judge(&phone), (true, 0b0001));
+        let mut window = Window::default();
+        window.add(0, &phone);
+        window.add(30 * S, &phone);
+        let said = window.summary(30 * S).unwrap();
+        assert_eq!((said.bad_share, said.region), (1.0, PostureRegion::Neck));
+        // Neck 2, risk 2: bad overall, no one region high.
+        let mild = ergo(
+            2,
+            json!({"body_scores": {"neck": 2, "trunk": 3}}),
+            json!({}),
+        );
+        assert_eq!(judge(&mild), (true, 0));
     }
 
     #[test]

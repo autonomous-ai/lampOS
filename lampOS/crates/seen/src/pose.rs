@@ -44,11 +44,11 @@
 //! - **The journal** ([`Note`], drained by `serve` with [`Pose::notes`]):
 //!   each sample sent (its bytes) and its answer (scored or no body, the
 //!   time it took), at most one each 30 s. Each answer's verdict, bad or
-//!   good, its high regions and its risk level, and the said window's bad
-//!   share and region, always (the owner, 27 Nov on #8377: the journal
-//!   must say what the lamp saw): flags and numbers, nothing of the frame.
-//!   The RULA score only with the diagnostics switch
-//!   [`crate::JOURNAL_LABELS`] `on` ([`said_line`]).
+//!   good, its high regions, risk level and RULA score, and the said
+//!   window's bad share and region, only with the diagnostics switch
+//!   [`crate::JOURNAL_LABELS`] `on` (the owner, 27 Nov on #8377: "Behind
+//!   the debug switch"): a forget or the opt-in off does not clear the
+//!   journal ([`said_line`]).
 //! - **Said** on `humans/posture` ([`HumanPosture`]) every 30 s while the
 //!   gate is open and the window holds at least [`window::MIN_SAMPLES`]
 //!   samples: from the second sample of a sitting. The gate closed, nothing
@@ -164,21 +164,35 @@ pub enum Note {
 }
 
 /// The journal's line when `humans/posture` is said, without the
-/// `lamp-seen: ` prefix: the window's length, its samples, its bad share
-/// and its region, always (the owner, 27 Nov on #8377).
-pub fn said_line(posture: &HumanPosture, samples: usize) -> String {
-    format!(
-        "posture said: window {} s, {samples} samples, {:.0}% bad, region {}",
-        posture.window_s,
-        posture.bad_share * 100.0,
-        window::region_word(posture.region)
-    )
+/// `lamp-seen: ` prefix: the window's length and its samples, and its bad
+/// share and region only with `labels` ([`crate::JOURNAL_LABELS`]).
+pub fn said_line(posture: &HumanPosture, samples: usize, labels: bool) -> String {
+    let said = format!(
+        "posture said: window {} s, {samples} samples",
+        posture.window_s
+    );
+    if labels {
+        if posture.bad_share > 0.0 {
+            format!(
+                "{said}, {:.0}% bad, region {}",
+                posture.bad_share * 100.0,
+                window::region_word(posture.region)
+            )
+        } else {
+            // No bad sample: no region, never `general` (Friday's read on
+            // #8377); the wire value is unchanged.
+            format!("{said}, 0% bad, no region")
+        }
+    } else {
+        said
+    }
 }
 
 impl Note {
-    /// The journal's line, without the `lamp-seen: ` prefix: an answer's
-    /// verdict, high regions (`general` for one bad by its risk alone) and
-    /// risk always; `labels` ([`crate::JOURNAL_LABELS`]) adds the score.
+    /// The journal's line, without the `lamp-seen: ` prefix; `labels`
+    /// ([`crate::JOURNAL_LABELS`]) names an answer's verdict, high regions
+    /// (`general` for one bad by its risk alone), risk and score, off says
+    /// only scored.
     pub fn line(&self, labels: bool) -> String {
         let held = |held_back_s: &Option<u64>| {
             held_back_s
@@ -187,6 +201,11 @@ impl Note {
         };
         match self {
             Note::Sent { bytes } => format!("posture sample sent: {bytes} bytes"),
+            Note::Answered { took, kept, .. } if !labels => format!(
+                "posture sample answered: scored, {} ms{}",
+                took.as_millis(),
+                if *kept { "" } else { "; not kept (no sitting)" }
+            ),
             Note::Answered {
                 score,
                 risk_level,
@@ -203,14 +222,9 @@ impl Note {
                     (true, false) => String::new(),
                 };
                 format!(
-                    "posture sample answered: scored, {}{}{high}, risk {risk_level}{}, {} ms{}",
+                    "posture sample answered: scored, {}{}{high}, risk {risk_level}, score {score}, {} ms{}",
                     if *partial { "partial, " } else { "" },
                     if *bad { "bad" } else { "good" },
-                    if labels {
-                        format!(", score {score}")
-                    } else {
-                        String::new()
-                    },
                     took.as_millis(),
                     if *kept { "" } else { "; not kept (no sitting)" }
                 )

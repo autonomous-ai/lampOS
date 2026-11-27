@@ -10,12 +10,12 @@ grants = []
 
 [[do]]
 on = "neck"
-task = { task = "One short, kind line, the way a friend would, suggesting they gently bring the head back over the shoulders; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
+task = { task = "One short, kind line, the way a friend would, saying a head bent down a while, as at a phone or the desk, is hard on the neck, and suggesting they lift what they're looking at toward eye level, or lift the head; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
 
 [[do]]
 on = "neck"
 body = { look_at = "face" }
-say = "They have sat a while with their head forward of their shoulders. In one short, kind line, the way a friend would, suggest gently bringing the head back over the shoulders. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+say = "Their head has been bent down for a while, as when looking down at a phone or the desk. In one short, kind line, the way a friend would, say that's hard on the neck, and suggest lifting what they're looking at up toward eye level, or lifting the head. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
 
 [[do]]
 on = "trunk"
@@ -46,9 +46,9 @@ say = "They have sat a while with their forearms at an awkward angle. In one sho
 
 [[do]]
 on = "general"
-task = { task = "One short, kind line, the way a friend would, suggesting they stand up for a short stretch; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
+task = { task = "One short, kind line, the way a friend would, suggesting they sit up tall with the shoulders relaxed; say only a while, never a number, name no condition or illness, and never mention a camera.", run = "scripts/agent.py" }
 
 [[do]]
 on = "general"
 body = { look_at = "face" }
-say = "They have sat a while in one tense position. In one short, kind line, the way a friend would, suggest standing up for a short stretch. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
+say = "Their posture has been off for a while. In one short, kind line, the way a friend would, suggest sitting up tall with the shoulders relaxed. Say only 'a while', never a number; name no condition or illness, and never mention a camera."
