@@ -366,7 +366,12 @@ switch on:
   capture takes it and goes on, and on Linux the refused send drops the
   `Stopped` queued on the link: the denial taken is what is left. A refused
   link with none of those (the speaker crashed with the slide open) still
-  ends the voice as a fault.
+  ends the voice as a fault. A speaker that crashes while the slide is
+  closed ends capture cleanly, but the coordinator still sees the speaker's
+  own exit: `running` checks each worker's process (`coordinator.rs`,
+  `Worker::check_running` in `process.rs`), and shutdown reaps the speaker
+  and takes any exit but status 0 as a failed cleanup that ends the voice
+  (`worker_exit_failed`, `Worker::exit_result`).
 
 Past that bound (a stall over about 1.44 s, whose open reading is not
 steady within 1.5 s of its start) everything ends exactly as without the
