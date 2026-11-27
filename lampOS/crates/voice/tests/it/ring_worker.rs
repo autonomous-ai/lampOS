@@ -63,9 +63,15 @@ struct SocketLink {
     channels: WorkerChannels,
     parent: Arc<Mutex<WorkerChannels>>,
     after_receive: Arc<Mutex<VecDeque<Control>>>,
+    /// The rig's hold-ups, as a loaded runner makes them (#8466).
+    holds: Arc<Mutex<Holds>>,
 }
 impl RingLink for SocketLink {
     fn receive_control(&mut self) -> io::Result<Option<Control>> {
+        let stall = self.holds.lock().unwrap().stall.take();
+        if let Some(stall) = stall {
+            thread::sleep(stall);
+        }
         self.channels.control.receive()
     }
     fn receive_frame(&mut self) -> io::Result<Option<RingFrame>> {
@@ -78,9 +84,32 @@ impl RingLink for SocketLink {
         Ok(frame)
     }
     fn publish(&mut self, event: WorkerEvent) -> io::Result<()> {
+        let blanked = matches!(
+            event,
+            WorkerEvent::Ring {
+                report: RingFeedback::Blanked { .. }
+            }
+        );
+        if blanked && self.holds.lock().unwrap().blanked_late {
+            thread::sleep(BLANKED_LATE);
+        }
         self.channels.control.send(event)
     }
 }
+
+/// The rig's own hold-ups, none unless a test sets them (#8466).
+#[derive(Default)]
+struct Holds {
+    /// The worker held up once, at its next control read.
+    stall: Option<Duration>,
+    /// Each blank said [`BLANKED_LATE`] late, as a worker a little behind
+    /// on a loaded runner says it.
+    blanked_late: bool,
+}
+
+/// How late a [`Holds::blanked_late`] blank is said: a worker 20 ms behind,
+/// well under `stalls::OVER`, as on #8466's ARM64 run.
+const BLANKED_LATE: Duration = Duration::from_millis(20);
 
 struct Rig {
     _directory: SessionDirectory,
@@ -88,6 +117,7 @@ struct Rig {
     parent: Arc<Mutex<WorkerChannels>>,
     writes: Arc<Mutex<Writes>>,
     after_receive: Arc<Mutex<VecDeque<Control>>>,
+    holds: Arc<Mutex<Holds>>,
     completion: mpsc::Receiver<io::Result<()>>,
     worker: Option<thread::JoinHandle<()>>,
 }
@@ -129,10 +159,12 @@ impl Rig {
             ..Writes::default()
         }));
         let after_receive = Arc::new(Mutex::new(VecDeque::new()));
+        let holds = Arc::new(Mutex::new(Holds::default()));
         let link = SocketLink {
             channels,
             parent: parent.clone(),
             after_receive: after_receive.clone(),
+            holds: holds.clone(),
         };
         let sink = Sink(writes.clone());
         let (tx, completion) = mpsc::channel();
@@ -148,6 +180,7 @@ impl Rig {
             parent,
             writes,
             after_receive,
+            holds,
             completion,
             worker: Some(worker),
         }
@@ -191,6 +224,10 @@ impl Rig {
             .unwrap();
         self.worker.take().unwrap().join().unwrap();
         result
+    }
+    /// The worker held up `stall` once, at its next control read.
+    fn stall_next_control(&self, stall: Duration) {
+        self.holds.lock().unwrap().stall = Some(stall);
     }
     fn colored(&self) -> usize {
         self.writes
@@ -341,13 +378,51 @@ fn output_caps_start_dark_before_any_snapshot_even_with_a_valid_turn() {
     rig.finish().unwrap();
 }
 
+/// How a [`caps_dim_latched`] run is held up.
+#[derive(Clone, Copy, Default)]
+struct DimCase {
+    /// Each blank said [`BLANKED_LATE`] late ([`Holds::blanked_late`]).
+    blanked_late: bool,
+    /// The worker held up [`STALL`] once just after the cap drops.
+    worker_stall: bool,
+}
+
+/// Longer than a turn frame's 250 ms permit.
+const STALL: Duration = Duration::from_millis(300);
+
 #[test]
 fn output_caps_clamp_turn_frames_and_tightening_dims_latched_pixels_without_a_new_frame() {
+    caps_dim_latched(DimCase::default());
+}
+
+/// #8466, the Reviewer-lead's ARM64 log: a frame's own expiry blank said a
+/// little late came after the drain, and the next frame's present read it
+/// (`Blanked { AuthorityLost(ExpiredPermit) }`).
+#[test]
+fn a_frames_expiry_blank_said_late_is_waited_for() {
+    caps_dim_latched(DimCase {
+        blanked_late: true,
+        ..DimCase::default()
+    });
+}
+
+/// #8466: "tightening did not dim the latched frame before its permit
+/// ended", the worker held up past the permit.
+#[test]
+fn a_worker_held_up_after_the_cap_drop_is_a_held_up_attempt() {
+    caps_dim_latched(DimCase {
+        worker_stall: true,
+        ..DimCase::default()
+    });
+}
+
+fn caps_dim_latched(case: DimCase) {
     let (directory, mut publisher, caps) = cap_input(30);
     let mut rig = Rig::start_with_senses(Senses {
         caps: Some(caps),
         ..Senses::default()
     });
+    rig.holds.lock().unwrap().blanked_late = case.blanked_late;
     rig.ready();
     let (mut controller, owner) = conversation(rig.boot);
     let mut bright = frame(&mut controller, owner, 250_000);
@@ -370,6 +445,9 @@ fn output_caps_clamp_turn_frames_and_tightening_dims_latched_pixels_without_a_ne
     let peak = cap_peak(&rig.writes.lock().unwrap().frames[before - 1]);
     assert!(peak > 12 && peak <= 30, "turn peak {peak}");
     publish_cap(&mut publisher, 2, 12);
+    if case.worker_stall {
+        rig.stall_next_control(STALL);
+    }
     // The latched frame is dimmed toward the cap with no new turn frame,
     // and never blanked: the cap eases (#8615).
     loop {
