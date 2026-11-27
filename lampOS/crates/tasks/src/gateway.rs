@@ -483,7 +483,12 @@ pub const ALLOWLIST_ADD: [&str; 8] = [
 const READ_WITHIN: Duration = Duration::from_secs(20);
 /// One allow-list add's bound (#7280): a just-restarted Gateway answered
 /// lamp-c0a4's approvals RPCs in up to 12 s each (16 Nov) and an add ran
-/// past 20 s, so the add has its own, longer bound.
+/// past 20 s, so the add has its own, longer bound. The add is a Node CLI
+/// start, an `exec.approvals.get`, and an `exec.approvals.set` when the
+/// entry is missing, each RPC at the CLI's default 30 s timeout; adds took
+/// 10.5 to 19.3 s on lamp-c0a4, and a look's read alone 13 to 18 s on
+/// lamp-ee17 (27 Nov). It also bounds the add when the look's own bound is
+/// nearer ([`Serving`]).
 const ADD_WITHIN: Duration = Duration::from_secs(60);
 /// What the read asks the Gateway to answer within (`{ms}`).
 const READ_RPC_MS: u64 = 10_000;
@@ -645,6 +650,12 @@ impl Probe for Serving {
                 // Each add says its outcome and how long it took, so a slow
                 // gateway's wait is in the journal (the first builder, #7307).
                 let began = Instant::now();
+                // Both tries end by the later of the look's own bound and
+                // [`ADD_WITHIN`] from here: a held launch's look
+                // ([`SERVING_LOOK_WITHIN`]) has spent most of its 25 s on
+                // the read, so its remainder alone killed every add on
+                // lamp-ee17 (27 Nov) and the start was never kept.
+                let until = until.max(began + ADD_WITHIN);
                 if add.ready_until(until, cancelled) {
                     eprintln!(
                         "tasks: the OpenClaw Gateway's allow-list add for {} succeeded in {} ms",
@@ -2658,6 +2669,55 @@ mod tests {
             lines(&dir.path().join("runs")),
             2,
             "added again, same start"
+        );
+    }
+
+    /// lamp-ee17, 27 Nov: a held launch's look spent 13 to 18 s of its
+    /// 25 s on the read, and the add was killed at the look's bound every
+    /// time ("the first: stopped, the second: past the run's bound"), so
+    /// the start was never kept. The add has its own bound: one that needs
+    /// longer than the look's remainder, but less than [`ADD_WITHIN`],
+    /// succeeds and the start is kept.
+    #[test]
+    fn an_add_after_a_slow_read_is_not_cut_short_by_the_looks_bound() {
+        struct SlowRead;
+        impl Probe for SlowRead {
+            fn ready(&mut self) -> bool {
+                thread::sleep(Duration::from_millis(1200));
+                true
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let served = Arc::new(Mutex::new(None));
+        let (mut add, list) = add_script(dir.path(), 0);
+        // Takes 1.5 s, past the look's remaining 0.3 s.
+        add.argv[1] = {
+            let script = dir.path().join("slow");
+            std::fs::write(
+                &script,
+                format!(
+                    "#!/bin/sh\nsleep 1.5\nexec /bin/sh {} \"$@\"\n",
+                    add.argv[1]
+                ),
+            )
+            .unwrap();
+            script.display().to_string()
+        };
+        let port = Fake {
+            ready_from: Some(1),
+            ..Fake::default()
+        };
+        let mut serving = Serving::new(Box::new(port), Box::new(SlowRead))
+            .with_listener(Box::new(|| Some(7)), served.clone())
+            .with_add(Box::new(add));
+        let look = Duration::from_millis(1500);
+        assert!(look < ADD_WITHIN);
+        assert!(serving.ready_until(Instant::now() + look, &|| false));
+        assert_eq!(*served.lock().unwrap(), Some(7), "the start not kept");
+        assert_eq!(lines(&dir.path().join("runs")), 1, "not added once");
+        assert_eq!(
+            std::fs::read_to_string(&list).unwrap(),
+            format!("{}\n", crate::skill_start::LAUNCHER)
         );
     }
 
