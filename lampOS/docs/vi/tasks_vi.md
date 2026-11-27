@@ -314,20 +314,33 @@ của hàm giờ nói chỉ gọi khi người dùng tự nhờ đăng nhập, g
 nối một máy tính (hoặc Harness), hoặc nói "có" với lời đề nghị đăng nhập của
 chính đèn; không bao giờ tự gọi vì một agent hay máy tính không có sẵn: hãy
 nói vậy và đề nghị. Giọng nói cũng kiểm tra trong code trước khi hỏi phần
-tasks bất cứ điều gì (`sign_in::may_start`). Một START chạy khi lời người dùng
-nghe được:
+tasks bất cứ điều gì (`sign_in::may_start`). Một START chạy khi mã của một
+lần đăng nhập còn được giữ (khi đó nó chỉ trả lại đúng mã đó, nên "say it
+again" hay "what was the number?" không cần nhắc chữ "code"), hoặc khi lời
+người dùng nghe được:
 
-- nhờ đăng nhập (`sign_in::asks_to_sign_in`): "sign … in" (trong vòng ba
-  từ), "signin", "login" hoặc "log … in/on", nói riêng ("please sign me in")
-  hoặc kèm một từ chỉ máy tính (computer, laptop, Mac, MacBook, PC, Harness,
-  hand-over, hoặc "the lamp", không phải khi gọi tên đèn); "pair",
-  "connect", "link", "set up" hoặc "hook up" kèm một từ chỉ máy tính; hoặc
-  "code" khi mã của một lần đăng nhập còn được giữ ("say the code again");
-- hoặc là một tiếng "có" đơn thuần (`agent_tasks::yes_to_a_question`, cùng
-  phép thử "có" của bước xác nhận) cho câu cuối của đèn, câu đó là câu hỏi,
-  không bị cắt, nói trước đó tối đa `CONFIRM_WITHIN` (120 s), và câu hỏi đó
-  đề nghị đăng nhập (các từ sau dấu chấm cuối: "sign … in", "signing",
-  "login", "pair", "connect").
+- nhờ đăng nhập (`sign_in::asks_to_sign_in`): một từ đăng nhập mà không nêu
+  agent nào (`agent_tasks::names_an_agent`: mọi dạng tên agent giọng nói
+  biết, hoặc "agent"), như "I want to sign in" hay "help me sign in", hoặc
+  kèm một từ chỉ máy tính (computer, laptop, Mac, MacBook, PC, Harness,
+  hand-over, hoặc "the lamp", không phải khi gọi tên đèn); một từ ghép đôi
+  chỉ khi kèm một từ chỉ máy tính;
+- hoặc đồng ý (`sign_in::yes_to_the_offer`) với câu cuối của đèn, câu đó là
+  câu hỏi, không bị cắt, nói trước đó tối đa `CONFIRM_WITHIN` (120 s), và
+  câu hỏi đó (các từ sau dấu chấm cuối) đề nghị đăng nhập, theo cùng bộ từ
+  như lời nhờ: một tiếng "có" đơn thuần (`agent_tasks::yes_to_a_question`,
+  cùng phép thử "có" của bước xác nhận), hoặc bất kỳ câu trả lời nào có một
+  từ đăng nhập hay ghép đôi ("Yeah, sign it in.", "Sure, sign it in.").
+
+Một câu có từ từ chối (`sign_in::refuses`: "no", "don't", "dont", "not",
+"never", "later", "wait", "cancel", "stop", "không", "đừng", "chưa", "để
+sau") không phải lời nhờ cũng không phải lời đồng ý: "No, don't sign it in"
+sau lời đề nghị bị từ chối.
+
+Bộ từ, dùng chung cho cả hai phía (`sign_in::sign_in_word`): từ đăng nhập là
+"sign … in/into/onto" hoặc "signed … in/into/onto" (trong vòng ba từ),
+"signing", "signin", "login", "log/logged … in/on/into/onto"; từ ghép đôi là "pair", "pairing", "connect",
+"connecting", "link", "linking", "setup", "set … up", "hook … up".
 
 Nếu không, lần gọi bị từ chối bằng một lỗi cuối, không gọi lại: "Not
 started: the person did not ask to sign in or pair a computer, nor say yes
@@ -339,10 +352,18 @@ person did not ask to sign in, nor say yes to the lamp's offer (#8700)`.
 đèn. Lời chỉ được đọc bằng tiếng Anh, như các cổng chỉ-tiếng-Anh khác: khi
 ngôn ngữ của chủ là ngôn ngữ khác (`crates/voice/src/language.rs`) thì không
 kiểm tra, và khi không biết lời của request thì cũng không từ chối (từ chối
-nhầm lời nhờ của chính người dùng tệ hơn là không kiểm tra, như #6537).
+nhầm lời nhờ của chính người dùng tệ hơn là không kiểm tra, như #6537). Vì
+vậy với chủ dùng tiếng Việt, không lần gọi nào bị từ chối: phép thử "có" của
+bước xác nhận cũng chưa có từ tiếng Việt.
 
 Test: `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
-`a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`.
+`a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`,
+`the_code_asked_again_in_any_words_starts_while_one_is_kept`,
+`a_sign_in_asked_in_plain_words_starts_unless_an_agent_is_named`,
+`a_yes_to_an_offer_in_any_sign_in_words_starts`,
+`a_sign_in_said_with_into_or_signed_starts`,
+`a_yes_with_the_offers_verb_starts_and_a_no_never`,
+`a_vietnamese_owners_ask_code_again_and_yes_are_never_refused`.
 
 ### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, `LAMP_SERVICE_RECORDS_TASKS`, bật trong sản phẩm)
 

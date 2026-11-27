@@ -3740,7 +3740,7 @@ pub(crate) fn plain_yes_with(words: &str, more_yes: &[&str], more_phrases: &[&[&
 }
 
 /// Whether the lamp's `line` ends with a question.
-fn asks(line: &str) -> bool {
+pub(crate) fn asks(line: &str) -> bool {
     line.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '"' | '”' | '\'' | '’' | ')'))
         .ends_with('?')
 }
@@ -3933,12 +3933,27 @@ const NUMBER_WORDS: [(&str, &str); 24] = [
 /// ("ugh, rough day, anyway have Claude fix the login bug"), and the
 /// refusal must never push the model to send an aside to an agent (#6537,
 /// the Reviewer-lead's privacy read).
-fn ask_words(text: &str, after_name: bool) -> Vec<(String, String)> {
+/// Whether `text` names an agent the voice knows ([`KINDS`]: its name, the
+/// forms heard and the close forms, each a whole run of words) or says
+/// "agent": work for one, never the lamp's own sign-in
+/// (`crate::sign_in::asks_to_sign_in`, #8700).
+pub(crate) fn names_an_agent(text: &str) -> bool {
     let words: Vec<String> = text
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())
         .map(str::to_lowercase)
         .collect();
+    let names = every_name_form();
+    (0..words.len()).any(|at| {
+        matches!(words[at].as_str(), "agent" | "agents")
+            || names.iter().any(|form| words[at..].starts_with(form))
+    })
+}
+
+/// Every form of an agent's name the voice knows ([`KINDS`]: its name, the
+/// forms heard and the close forms), as lower-case runs of words, the
+/// longest first, so "claude code" goes whole before "claude".
+fn every_name_form() -> Vec<Vec<String>> {
     let mut names: Vec<Vec<String>> = KINDS
         .iter()
         .flat_map(|kind| {
@@ -3954,8 +3969,17 @@ fn ask_words(text: &str, after_name: bool) -> Vec<(String, String)> {
         })
         .filter(|form| !form.is_empty())
         .collect();
-    // The longest first, so "claude code" goes whole before "claude".
     names.sort_by_key(|form| std::cmp::Reverse(form.len()));
+    names
+}
+
+fn ask_words(text: &str, after_name: bool) -> Vec<(String, String)> {
+    let words: Vec<String> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let names = every_name_form();
     let mut found: Vec<(String, String)> = Vec::new();
     let mut at = 0;
     while at < words.len() {
