@@ -361,8 +361,12 @@ switch on:
   Capture, held through the gap, may then find its next send on that link
   refused; that is a clean end, not a fault, when the speaker's own
   `Stopped` or a denied authority is queued for capture, as it is at the
-  voice's Stop (`peer_stop.rs`, #7224). A refused link with neither queued
-  (the speaker crashed) still ends the voice as a fault.
+  voice's Stop (`peer_stop.rs`, #7224), or when the last authority capture
+  took denied the microphone. In the gap the denial closes nothing, so
+  capture takes it and goes on, and on Linux the refused send drops the
+  `Stopped` queued on the link: the denial taken is what is left. A refused
+  link with none of those (the speaker crashed with the slide open) still
+  ends the voice as a fault.
 
 Past that bound (a stall over about 1.44 s, whose open reading is not
 steady within 1.5 s of its start) everything ends exactly as without the
