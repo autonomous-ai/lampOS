@@ -110,6 +110,13 @@ pub const SHORT_FITS_CHARS: usize = 80;
 pub const SHORT_DONE: &str = "Excuse me: the work you handed over is done.";
 pub const SHORT_ASKING: &str = "Excuse me: the work you handed over needs your answer.";
 pub const SHORT_STOPPED: &str = "Excuse me: the work you handed over has stopped.";
+/// A room busy with other people's talk holds news only until the talk is
+/// over: nobody heard speaking and no turn for this long (#8783). The room
+/// itself stays busy 30 s (`body_link`'s forget), past the
+/// [`HEARD_WITHIN_US`] the speakers count as there for, so news after a
+/// talk with no face in view would wait for the next voice.
+pub const TALK_OVER_US: u64 = 10_000_000;
+const _: () = assert!(TALK_OVER_US > LONG_PAUSE_US && TALK_OVER_US < HEARD_WITHIN_US);
 /// The short lines said right after the lamp answered someone while the
 /// news waited (#8783), one for each of the lines above.
 pub const BY_THE_WAY_DONE: &str = "By the way, the work you handed over is done.";
@@ -2235,7 +2242,7 @@ pub fn someone_since(
 /// news to a room still talking ([`WAITS_AT_MOST`], #8240): its fixed line
 /// for the agent's state; none when the news fits one short line already
 /// (an answer of at most [`SHORT_FITS_CHARS`], whole).
-fn short_note(data: &Value) -> Option<String> {
+pub(crate) fn short_note(data: &Value) -> Option<String> {
     let answer = data["answer"].as_str().unwrap_or_default().trim();
     let line = match data["state"].as_str()? {
         "idle"
@@ -6144,8 +6151,9 @@ mod tests {
     /// #8783 (c), the product owner's rule of 26 Nov (no sensor holds a
     /// person): a result is told only with someone there now, a face in
     /// view or speech within about 15 s (`now - HEARD_WITHIN_US`); speech
-    /// 16 s ago, or two minutes ago, is an empty desk. It is not taken: it
-    /// still waits, to be told once someone is there.
+    /// 16 s ago, or two minutes ago, is an empty desk. That it waits, untold,
+    /// and is told once someone speaks is the coordinator's
+    /// `news_held_with_nobody_there_is_told_once_someone_speaks`.
     #[test]
     fn news_is_told_only_with_someone_there_now() {
         let now: u64 = 1_000_000_000;
@@ -6164,13 +6172,6 @@ mod tests {
         assert!(
             someone_since(since, false, 0, Some(now - 10_000_000)),
             "a line 10 s ago"
-        );
-        let mut news = TaskNews::waiting_for_test(settled_news(None), Duration::from_secs(11 * 60));
-        assert_eq!(news.overdue(None), Some(Overdue::Whole));
-        assert_eq!(
-            news.waiting().map(|news| news.key.clone()),
-            Some("s1:2:4".into()),
-            "untold, it waits"
         );
     }
 

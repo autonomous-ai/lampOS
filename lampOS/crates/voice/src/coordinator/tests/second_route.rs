@@ -4297,15 +4297,16 @@ fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
 /// #8240 (the first builder's bar), #8783: a settled agent's news that has
 /// waited `task_news::WAITS_AT_MOST`, or any news once the lamp answered
 /// someone since it came in (the person's question here), is no longer
-/// held by a busy room. In a room still talking it is one short line, said
-/// at the first pause of a second after the lamp's own answer, never over
-/// it, and its whole news waits for the person to answer or ask; in a
-/// quiet room it is told whole, as before.
+/// held by a busy room. In a room still talking it is one short line, "By
+/// the way, ..." after the lamp's answer, said at the first pause of a
+/// second after it, never over it, and its whole news waits for the person
+/// to answer or ask; in a quiet room it is told whole, as before.
 #[test]
 fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one() {
     let _one = super::pilot_faults::one_session();
     const NOTE: &str = "Claude Code is waiting for the person's answer.";
-    const SHORT: &str = "(Nobody has spoken. Say only: excuse me.)";
+    let short = crate::task_news::short_note(&json!({"state": "needs-input"})).unwrap();
+    let past = crate::task_news::WAITS_AT_MOST.as_secs() + 1;
     let told = |ago: u64, busy: bool| {
         let (news, _heard) = crate::task_news::TaskNews::waiting_for_test_heard(
             crate::task_news::News {
@@ -4315,7 +4316,7 @@ fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one(
                 progress: None,
                 finished: None,
                 also: Vec::new(),
-                short: Some(SHORT.into()),
+                short: Some(short.clone()),
             },
             Duration::from_secs(ago),
         );
@@ -4339,13 +4340,13 @@ fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one(
             .second
             .iter()
             .filter(
-                |input| matches!(input, ProviderInput::Written { text: said, .. } if said == text),
+                |input| matches!(input, ProviderInput::Written { text: said, .. } if said.contains(text)),
             )
             .count()
     };
-    // Others still talking, past its wait: one short line, after the
-    // lamp's answer, and not the whole news.
-    let run = told(61, true);
+    // Others still talking, past its wait and after the lamp's answer: one
+    // short line, "By the way, ...", and not the whole news.
+    let run = told(past, true);
     run.assert_clean();
     let short = run.events("task_news_short");
     assert_eq!(short.len(), 1, "{}", run.summary());
@@ -4355,7 +4356,8 @@ fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one(
         (crate::task_news::PAUSE_US / 1_000..crate::task_news::QUIET_US / 1_000).contains(&since),
         "{since} ms"
     );
-    assert_eq!(written(&run, SHORT), 1, "{}", run.summary());
+    let by_the_way = crate::task_news::BY_THE_WAY_ASKING;
+    assert_eq!(written(&run, by_the_way), 1, "{}", run.summary());
     assert_eq!(written(&run, NOTE), 0, "{}", run.summary());
     assert!(run.events("task_news").is_empty(), "{}", run.summary());
     // Not yet past its wait, but the lamp answered the person's question
@@ -4363,10 +4365,12 @@ fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one(
     let run = told(30, true);
     run.assert_clean();
     assert_eq!(run.events("task_news_short").len(), 1, "{}", run.summary());
+    assert_eq!(written(&run, by_the_way), 1, "{}", run.summary());
     assert_eq!(written(&run, NOTE), 0, "{}", run.summary());
     assert!(run.events("task_news").is_empty(), "{}", run.summary());
-    // A quiet room past its wait: the whole news, as before.
-    let run = told(61, false);
+    // A quiet room past its wait, after the lamp's answer: the whole news,
+    // as before.
+    let run = told(past, false);
     run.assert_clean();
     assert!(
         run.events("task_news_short").is_empty(),
@@ -4375,6 +4379,212 @@ fn news_past_its_wait_is_one_short_line_to_a_busy_room_and_whole_to_a_quiet_one(
     );
     assert_eq!(run.events("task_news").len(), 1, "{}", run.summary());
     assert_eq!(written(&run, NOTE), 1, "{}", run.summary());
+}
+
+/// #8783's coordinator runs: the second route alone, `LAMP_TASK_NEWS_AT_PAUSE=on`
+/// as on the product, and `key`'s news (its short line `short`) waiting,
+/// come in `ago`.
+fn with_news_8783(key: &str, short: Option<String>, ago: Duration, script: Script) -> Run {
+    let news = crate::task_news::TaskNews::waiting_for_test(
+        crate::task_news::News {
+            key: key.into(),
+            note: NEWS_8783.into(),
+            until: None,
+            progress: None,
+            finished: None,
+            also: Vec::new(),
+            short,
+        },
+        ago,
+    );
+    TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+    TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+    let run = run(Script {
+        second: false,
+        only: true,
+        written: Written::Said(12),
+        limit: Duration::from_secs(40),
+        ..script
+    });
+    TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+    TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+    run
+}
+
+const NEWS_8783: &str = "Claude Code is waiting for the person's answer.";
+
+/// How many of the lamp's written turns on the second route hold `text`.
+fn written_8783(run: &Run, text: &str) -> usize {
+    run.seen
+        .second
+        .iter()
+        .filter(|input| matches!(input, ProviderInput::Written { text: said, .. } if said.contains(text)))
+        .count()
+}
+
+/// #8783, the Reviewer-lead's P2-b: past ten minutes, in a quiet room with
+/// someone there and no answer from the lamp (the person's line unclear,
+/// the lamp's "Sorry?" its own turn), the news is its short line only,
+/// "Excuse me: ...". The whole news waits for the lamp to answer someone
+/// after it, not for the next long pause.
+#[test]
+fn news_past_ten_minutes_with_no_answer_is_its_short_line_only_in_a_quiet_room() {
+    let _one = super::pilot_faults::one_session();
+    let short = crate::task_news::short_note(&json!({"state": "needs-input"})).unwrap();
+    let run = with_news_8783(
+        "s1:2:4",
+        Some(short),
+        crate::task_news::WAITS_AT_MOST + Duration::from_secs(1),
+        Script {
+            mute_at_frame: Some(1_800),
+            ..Script::question(Live::Unclear)
+        },
+    );
+    run.assert_clean();
+    assert_eq!(run.events("task_news_short").len(), 1, "{}", run.summary());
+    assert_eq!(
+        written_8783(&run, crate::task_news::SHORT_ASKING),
+        1,
+        "{}",
+        run.summary()
+    );
+    assert_eq!(
+        written_8783(&run, crate::task_news::BY_THE_WAY_ASKING),
+        0,
+        "{}",
+        run.summary()
+    );
+    assert!(run.events("task_news").is_empty(), "{}", run.summary());
+    assert_eq!(written_8783(&run, NEWS_8783), 0, "{}", run.summary());
+}
+
+/// #8783 (a), the Reviewer-lead's P2-c: news the lamp answered nobody over
+/// waits for a pause of `task_news::LONG_PAUSE_US` in people's talk (the
+/// person's line unclear, the lamp's "Sorry?" its own turn); after the lamp
+/// answered the person, its pause for news of a second is enough.
+#[test]
+fn news_waits_for_a_five_second_pause_and_a_second_after_an_answer() {
+    let _one = super::pilot_faults::one_session();
+    let since = |run: &Run| {
+        let news = run.events("task_news");
+        assert_eq!(news.len(), 1, "{}", run.summary());
+        news[0]["since_turn_ms"].as_u64().unwrap()
+    };
+    let unanswered = with_news_8783(
+        "s1:2:4",
+        None,
+        Duration::from_secs(30),
+        Script {
+            mute_at_frame: Some(1_200),
+            ..Script::question(Live::Unclear)
+        },
+    );
+    unanswered.assert_clean();
+    let at = since(&unanswered);
+    assert!(
+        at >= crate::task_news::LONG_PAUSE_US / 1_000,
+        "{at} ms: {}",
+        unanswered.summary()
+    );
+    let answered = with_news_8783(
+        "s1:2:4",
+        None,
+        Duration::from_secs(30),
+        Script {
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(12))
+        },
+    );
+    answered.assert_clean();
+    let at = since(&answered);
+    assert!(
+        (crate::task_news::PAUSE_US / 1_000..crate::task_news::LONG_PAUSE_US / 1_000).contains(&at),
+        "{at} ms: {}",
+        answered.summary()
+    );
+}
+
+/// #8783 (c), the Reviewer-lead's P2-c: with nobody seen or heard, news
+/// waits, untold, though the room has been quiet past its long pause; once
+/// the person speaks (here 7 s in) it is told, at the pause after the
+/// lamp's answer.
+#[test]
+fn news_held_with_nobody_there_is_told_once_someone_speaks() {
+    let _one = super::pilot_faults::one_session();
+    let run = with_news_8783(
+        "s1:2:4",
+        None,
+        Duration::from_secs(30),
+        Script {
+            speech_from: 700,
+            mute_at_frame: Some(1_500),
+            ..Script::question(Live::Answer(12))
+        },
+    );
+    run.assert_clean();
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "{}", run.summary());
+    // Told 7 s into an empty room, it would be 5 s or more since the start.
+    let at = news[0]["since_turn_ms"].as_u64().unwrap();
+    assert!(
+        (crate::task_news::PAUSE_US / 1_000..crate::task_news::LONG_PAUSE_US / 1_000).contains(&at),
+        "{at} ms: {}",
+        run.summary()
+    );
+    assert_eq!(written_8783(&run, NEWS_8783), 1, "{}", run.summary());
+}
+
+/// #8783 (the kit-8783 read of f2300c9fa5): after other people's talk, no
+/// face in view, a room still busy (as `body_link` keeps it for 30 s of
+/// quiet) no longer holds the news once the talk is over
+/// (`task_news::TALK_OVER_US`), so it is said after the talk, while the
+/// speakers still count as there (15 s), not held by the busy room until
+/// they no longer do.
+#[test]
+fn news_after_a_talk_with_no_face_is_said_once_the_talk_is_over() {
+    let _one = super::pilot_faults::one_session();
+    TEST_ROOM_BUSY.with(|room| room.set(true));
+    let run = with_news_8783(
+        "s1:2:4",
+        None,
+        Duration::from_secs(30),
+        Script {
+            mute_at_frame: Some(1_800),
+            ..Script::question(Live::Unclear)
+        },
+    );
+    TEST_ROOM_BUSY.with(|room| room.set(false));
+    run.assert_clean();
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "{}", run.summary());
+    let at = news[0]["since_turn_ms"].as_u64().unwrap();
+    assert!(
+        at >= crate::task_news::TALK_OVER_US / 1_000,
+        "{at} ms: {}",
+        run.summary()
+    );
+}
+
+/// #8783, the Reviewer-lead's P2-a: a sign-in's news, which the person just
+/// asked for, is told while they are silent (typing the code, no face in
+/// view): no one seen or heard holds it.
+#[test]
+fn a_sign_ins_news_is_told_while_the_person_is_silent() {
+    let _one = super::pilot_faults::one_session();
+    let run = with_news_8783(
+        "sign-in-1-asking",
+        None,
+        Duration::from_secs(30),
+        Script {
+            silent: true,
+            mute_at_frame: Some(600),
+            ..Script::question(Live::Answer(12))
+        },
+    );
+    run.assert_clean();
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "{}", run.summary());
+    assert_eq!(news[0]["key"], "sign-in-1-asking");
 }
 
 /// #2602, finding 4 (lamp-75c9, 21 October): a sign-in's news waited for
