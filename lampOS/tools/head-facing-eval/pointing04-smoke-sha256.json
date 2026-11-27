@@ -1,0 +1,74 @@
+[
+  {
+    "path": "Person01/person01118-30-30.jpg",
+    "sha256": "1a56eb7d07f5ac36050c993f27b17895bbe2ab2bc1127ea4fa7e78dd03a312e8"
+  },
+  {
+    "path": "Person01/person01120-30+0.jpg",
+    "sha256": "6470c7e0bed694c2cf5d318a961e77008c7940073476685fdf9f5744da6ecb7c"
+  },
+  {
+    "path": "Person01/person01122-30+30.jpg",
+    "sha256": "06bb37fd82136767a7bd2861b2cd756ce5cdb89e4f898ea4a7c729ae2d4001bb"
+  },
+  {
+    "path": "Person01/person01144+0-30.jpg",
+    "sha256": "a6c734598f9132bf6dabc7b706d749cc9ce628c8a4b83a141004ed40a3963306"
+  },
+  {
+    "path": "Person01/person01146+0+0.jpg",
+    "sha256": "d06eb6828a240f333c36d940e2db2b018a8b931c93a638795ddb63ba74ee247e"
+  },
+  {
+    "path": "Person01/person01148+0+30.jpg",
+    "sha256": "5e1186ad2f1cc93f55e9e9d6f5f25529c90d1eb266d527c5bc610f12cf375cd7"
+  },
+  {
+    "path": "Person01/person01170+30-30.jpg",
+    "sha256": "f3487597d1c47d801e5b67309faf33e752f2f1ca0524577e393878a89530de09"
+  },
+  {
+    "path": "Person01/person01172+30+0.jpg",
+    "sha256": "6b3374fe8035fad6a28d9bef326ca46ede2e749f82bf10a0a3e79194da62ef14"
+  },
+  {
+    "path": "Person01/person01174+30+30.jpg",
+    "sha256": "8e8dd65c7f29f755f0eff7ed0f9349100d29620da7fb3136214926a49884c98d"
+  },
+  {
+    "path": "Person02/person02118-30-30.jpg",
+    "sha256": "b775b250e06a8539434ec329d2be96abf8af24282c81e954639e95dfa38d073b"
+  },
+  {
+    "path": "Person02/person02120-30+0.jpg",
+    "sha256": "ef3a7b65c91cb3dd0a28dffc442e01fcf0a30404d9dd179738b03dfed917f586"
+  },
+  {
+    "path": "Person02/person02122-30+30.jpg",
+    "sha256": "c7a6dd1de8e39377bc60f3002c09f097bf55d38aee8ef98c796d210da3ade59b"
+  },
+  {
+    "path": "Person02/person02144+0-30.jpg",
+    "sha256": "6a0917d4ca60fe97c4ec03fd6ed1083ebeddafee61f2d30506e9e97704125f61"
+  },
+  {
+    "path": "Person02/person02146+0+0.jpg",
+    "sha256": "b7b0194210bdb04a158d5f4b96918ee7882b515c6fbe06ef34d6af0b7a5bfb79"
+  },
+  {
+    "path": "Person02/person02148+0+30.jpg",
+    "sha256": "ce3ca48f81514c205e75c187961326801a1da9560a16b080a30692ca4e863a25"
+  },
+  {
+    "path": "Person02/person02170+30-30.jpg",
+    "sha256": "b691edaa42b7dafca23122d9a4c978fd4bd5b1e032c7440d2e59a44d8bf5541b"
+  },
+  {
+    "path": "Person02/person02172+30+0.jpg",
+    "sha256": "782567682c74d7576eb42e24ae6e245729f7f3544eab5a55eb84b60dee032a40"
+  },
+  {
+    "path": "Person02/person02174+30+30.jpg",
+    "sha256": "a2c2b30478e65ef8cb47484be17644897aef087542421d01e2a63307a2d8aa26"
+  }
+]
