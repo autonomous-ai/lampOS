@@ -6276,38 +6276,35 @@ after a take-over, but now for every turn:
   - **One simple rule, with `LAMP_SIMPLE_CALL=on`** (on in the product's
     lamp-voice.service; the product owner, 27 Nov 2026: "we just start with
     a simple 'hey lamp' + 20s renewing. then we'll slowly add one thing at a
-    time and always make sure the quality is good.", then "keep it strictly
-    'Hey Lamp'. reason: false positive. someone may say Lamp or a word
-    similar to it."). It decides alone whether a line is the lamp's, after
-    every older rule has run and with none of their verdicts kept
-    (`Heeding::simple_verdict`, in `judged_verdict`):
-    - **A call** is a line whose words, past one filler, open with "hey",
-      "hi" or "hello" and then "Lamp" written as such, in any case and with
-      any punctuation (`attention::opens_with_hey_lamp`: "Hey Lamp, …",
-      "Hey, lamp.", "Hi Lamp"; never "Hey man", "Hey Lynn", "Hey lamb" or a
-      bare "Lamp, …"; nor "Okay hey Lamp", "Hey there Lamp" or "Hey
-      Lampshade"). On a lamp in another language (`LAMP_LANGUAGE_FILE`) its
-      call is also the greeting and the name as its speech to text writes
-      them (`attention::opens_with_hey_lamp_in`, `written`: "ヘイ、ランプ",
-      "嘿兰普", "헤이 램프", "Hây lăm", French "Hey man", Deepgram's for "Hey
-      Lamp", #8517), still with the greeting first. A head tap is a call, and
-      so is a turn a computer opened within 8 s of its `turn.start`
-      (`Attention::simple_called`, `control_turn`, `docs/control.md`). A
-      line going on from a call keeps its words, so "Hey Lamp." and the
-      question said after it are one call, and a line begun within
+    time and always make sure the quality is good."; and of a call read from
+    the transcript, "this is a really dumb solution… you just make it worse":
+    the wake word is the detector's, as in every voice assistant). It decides
+    alone whether a line is the lamp's, after every older rule has run and
+    with none of their verdicts kept (`Heeding::simple_verdict`, in
+    `judged_verdict`):
+    - **The call is the "Hey Lamp" detector alone**: lamp-name's own wake for
+      the line, its hearing of the name for the line's own sound
+      (`hearing_counts_for_line`) begun within `HEY_AT_THE_START_US` (2.5 s)
+      of its start, as `LAMP_NAME_HEY_ONLY` bounds a start hearing, at the
+      detector's own decision with no score bar of this rule's
+      (`Attention::simple_called`). The words, only for understanding the
+      request, decide nothing: "Hey, Lynn." heard at its start is a call,
+      "Hey Lamp" written with no hearing is none, and a hearing past the
+      start is none. Its known false wakes are measured on lamp-dbda (27 Nov:
+      "OK Lamp" at 1.000, "lamp" mid-sentence at 0.999) and fixed in the
+      detector, by retraining it with them as not-calls (#8844), never by a
+      rule here. A head tap is a call, and so is a turn a computer opened
+      within 8 s of its `turn.start` (`control_turn`, `docs/control.md`). A
+      line going on from a call is the call's, and so is a line begun within
       `CALL_CARRIES_FOR` (15 s) of a call (`called_at`, which an answer
-      doesn't clear) is the call's. A hearing of the name by `lamp-name`
-      never counts, at any score. **Its known costs**, the price of no false
-      wakes: a call whose "Hey" speech to text dropped ("Lamp, how far …",
-      heard at 0.99999 on lamp-74ff on 26 Nov) is held, and so is a key-word
-      wake whose transcript came back empty.
+      doesn't clear).
     - **The window**: a line begun within `follows_on::WITHIN_US` (20 s) of
       the end of the lamp's last words, measured to the line's start
       (`said_until_us`), is answered, whatever the camera, the room, the
       voices or its length. Every answer's words move that end on, the lamp's
       own news's too, so the window renews; a stop closes it. A line with no
-      words in it (a sound, a cough, room noise) is never answered, but for a
-      tap or a computer's turn: `no words heard in it (LAMP_SIMPLE_CALL)`. A
+      words in it (a sound, a cough, room noise) is never answered, but as a
+      call: `no words heard in it (LAMP_SIMPLE_CALL)`. A
       checked short sound with a word in it, not a filler, is the rule's to
       judge (`simple_judges` in the route), never the thread's 45 s
       (`sound_carries`), which a long answer or a late transcript outlasts
@@ -6336,14 +6333,6 @@ after a take-over, but now for every turn:
     - **Unchanged**: endpointing, the echo strip, a spoken stop while the lamp
       speaks, privacy and mute, quiet hours, the tools, memory, the body and
       `lamp-name` itself.
-    - **With `LAMP_SIMPLE_CALL_HEARD=on`** (off, in no product unit; its ROW
-      is lamp-dbda's round 2): a line also calls when its words open with a
-      greeting, whatever word follows ("Hey, Lynn.", "Hello, ma'am.", "Hey,
-      man."), and lamp-name's hearing of that line's own start
-      (`HEY_AT_THE_START_US`, `hearing_counts_for_line`) scored 0.95 or more
-      (`Attention::simple_calls_heard`). On lamp-dbda on 27 Nov strict words
-      held 10 of 10 such calls while lamp-name heard 8 of 9 at 0.92 to 1.00.
-      No greeting, no call, at any score; "Hey man" under 0.95 is none.
     Journal at start: `a conversation opens only with "Hey Lamp" at a line's
     start, a tap or the lamp's own turn; …(LAMP_SIMPLE_CALL)`. A line let out
     says `its answer is played: "Hey Lamp", or a tap, called it` or `begun

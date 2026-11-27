@@ -1115,26 +1115,16 @@ pub const NAME_HEY_ONLY_ENVIRONMENT: &str = "LAMP_NAME_HEY_ONLY";
 /// start with a simple 'hey lamp' + 20s renewing. then we'll slowly add one
 /// thing at a time and always make sure the quality is good."): whether a
 /// line is the lamp's is decided by one rule, and no sensor or other rule
-/// holds or lets out a line. A conversation opens only with a line whose
-/// words open with "Hey Lamp" (strictly: "keep it strictly 'Hey Lamp'.
-/// reason: false positive."; a hearing of the name alone never counts), a
-/// tap, or the lamp's own turn; a line begun within
+/// holds or lets out a line. A conversation opens only with lamp-name's own
+/// wake for a line (its "Hey Lamp" heard at the line's start; the words,
+/// only for understanding the request, decide nothing), a tap, a computer's
+/// turn, or the lamp's own turn; a line begun within
 /// [`crate::follows_on::WITHIN_US`] (20 s) of the end of the lamp's last
 /// words is the lamp's and is answered, and every answer renews it; any
 /// other line is never answered
 /// ([`worker::Heeding::taking_simple_calls`]). The model is offered no
 /// decline.
 pub const SIMPLE_CALL_ENVIRONMENT: &str = "LAMP_SIMPLE_CALL";
-
-/// `on` exactly, off unless set, inert without [`SIMPLE_CALL_ENVIRONMENT`]
-/// and in no product unit: with it, a line also calls when its words open
-/// with one of the lamp's language's greetings, past one filler, whatever
-/// word follows, and lamp-name's hearing for that line's own sound began
-/// within its start and scored [`crate::attention::NEAR_SCORE`] (0.95) or
-/// more ([`worker::Heeding::taking_simple_calls_heard`]). On lamp-dbda on 27
-/// Nov, strict words held 10 of 10 calls written "Hey, Lynn.", "Hello,
-/// ma'am." or "Hey, man." while lamp-name heard 8 of 9 at 0.92 to 1.00.
-pub const SIMPLE_CALL_HEARD_ENVIRONMENT: &str = "LAMP_SIMPLE_CALL_HEARD";
 
 /// Why a line is held with [`SIMPLE_CALL_ENVIRONMENT`] on: no call and no
 /// conversation going on.
