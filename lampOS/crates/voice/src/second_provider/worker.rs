@@ -803,6 +803,14 @@ pub fn parse_flags(dir: &Path, flags: &[String]) -> io::Result<crate::provider_w
     // tools, so none is set here that nothing would hear. One list for both
     // routes is the coordinator's, later (#7761).
     parsed.2.tools.watch = false;
+    // `LAMP_SIMPLE_CALL`: every line let out is the lamp's, so the model is
+    // offered no `not_for_me`, and no note tells it a line may be people's
+    // talk (the product owner, 27 Nov 2026).
+    if std::env::var(crate::second_provider::SIMPLE_CALL_ENVIRONMENT)
+        .is_ok_and(|value| value == "on")
+    {
+        parsed.2.tools.decline = false;
+    }
     if parsed.2.keep_link {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -12657,7 +12665,10 @@ impl Heeding {
         mut signs: Signs,
     ) -> Option<&'static str> {
         self.keep_the_name_in_its_line(request, said, &mut signs);
-        self.silence_turned(request, said, heard, &mut signs);
+        // `LAMP_SIMPLE_CALL`: no camera sign is read for the line.
+        if !self.simple_call {
+            self.silence_turned(request, said, heard, &mut signs);
+        }
         let verdict = self.judge(request, said, heard, signs.clone());
         self.held_since_start_by(verdict, heard);
         if self.said_lately.len() == SAID_KEPT {
@@ -13836,7 +13847,8 @@ impl Heeding {
         // #1522 on this route (`LAMP_GOING_ON_ASKS`): what the Policy said of
         // the line is given before it is judged, and in a busy room a line
         // going on waits for it, as on the Live route.
-        if let Some(policy) = self.policy.as_mut() {
+        // `LAMP_SIMPLE_CALL`: no line waits for the Policy.
+        if let Some(policy) = self.policy.as_mut().filter(|_| !self.simple_call) {
             policy.take();
             if let Some(says) = policy.says(request) {
                 attention.policy_said(request, Some(says));
@@ -14280,11 +14292,33 @@ impl Heeding {
                 crate::second_provider::TRUSTED_NOT_CARRIED,
             ));
         }
+        // `LAMP_SIMPLE_CALL` (the product owner, 27 Nov 2026: "a simple 'hey
+        // lamp' + 20s renewing"): one rule decides, and every hold and
+        // let-out above is set aside. What follows keeps no sign of them: no
+        // line is let out only as the conversation going on, none is someone
+        // else's or opens nothing, none waits on a face, and every answer
+        // renews the window.
+        let simple = self.simple_call;
+        if simple {
+            verdict = Some(Self::simple_verdict(
+                attention,
+                self.said_until_us,
+                seen.began_us,
+            ));
+        }
+        let alone = alone && !simple;
+        let someone_else = someone_else && !simple;
+        let opens_nothing = opens_nothing && !simple;
+        let tied = tied || simple;
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
         // `LAMP_UNTIED_GOING_ON` (#3882): let out only as the conversation
         // going on, with no tie to the lamp.
         let untied = alone && played && !tied;
-        self.going_on_unseen = unseen_line(attention, request, played, !seen.speakers.is_empty());
+        self.going_on_unseen = if simple {
+            None
+        } else {
+            unseen_line(attention, request, played, !seen.speakers.is_empty())
+        };
         self.untied_line = untied.then_some(request);
         // `LAMP_DECLINE_SILENT`: as things stand before this line is let
         // out, for its decline.
@@ -14304,11 +14338,15 @@ impl Heeding {
         // `LAMP_SAME_SPEAKER_CARRIES`: the lamp answers someone, whose
         // conversation may carry on ([`Self::carrying_the_same_speaker`]).
         // A face alone is no call with `LAMP_NAME_OR_FOLLOW_UP`.
-        let called = played
-            && !opens_nothing
-            && (attention.called_for_itself()
-                || attention.face_shows(seen.room, turned)
-                || seen.named_faced);
+        let called = if simple {
+            played && attention.simple_called()
+        } else {
+            played
+                && !opens_nothing
+                && (attention.called_for_itself()
+                    || attention.face_shows(seen.room, turned)
+                    || seen.named_faced)
+        };
         if played {
             // Admission alone does not renew the once-per-answer window.
             // A new call changes its owner; only actual words renew it.
@@ -14399,7 +14437,7 @@ impl Heeding {
         // `LAMP_NAME_SIGN_TIED` (#8092): the one answer with no look to the
         // lamp's waiting question renews nothing, and is used up until a
         // line with a look or the name is played.
-        let no_look_answer = played && self.no_look_answer == Some(request);
+        let no_look_answer = played && !simple && self.no_look_answer == Some(request);
         if played {
             self.look_free_used = no_look_answer;
         }
@@ -14524,7 +14562,11 @@ impl Heeding {
                 } else {
                     ""
                 };
-                let why = shown(why, attention.sign(turned));
+                let why = if self.simple_call {
+                    why
+                } else {
+                    shown(why, attention.sign(turned))
+                };
                 eprintln!(
                     "lamp-voice second: request {request}: its answer is played: {why}{alone}"
                 );
@@ -14629,6 +14671,9 @@ impl Heeding {
     /// The note for `request` judged: [`BY_NAME_NOTE`] if its words or the
     /// lamp's name called the lamp, else [`DECLINE_NOTE`].
     pub(crate) fn call_note_for(&self, request: u64) -> &'static str {
+        if self.simple_call {
+            return SIMPLE_NOTE;
+        }
         call_note(self.by_name == Some(request))
     }
 
