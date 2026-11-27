@@ -943,10 +943,12 @@ impl Publishing {
             let mut report = health(
                 glimpse,
                 u32::try_from(publishing.resisted.len()).unwrap_or(u32::MAX),
-                publishing.bounds.as_ref().map_or(
-                    crate::body::Standing::TEMPERATURE,
-                    |(limits, _)| limits.temperature,
-                ),
+                publishing
+                    .bounds
+                    .as_ref()
+                    .map_or(crate::body::Standing::TEMPERATURE, |(limits, _)| {
+                        limits.temperature
+                    }),
             );
             if paused {
                 said_paused(&mut report);
@@ -1556,11 +1558,19 @@ mod tests {
             "its arm sat down for a strain three times in half an hour: it rests folded and may rise again in 30 min"
         );
         resting.arm_temperatures = [WARM, 40];
-        assert!(health(&resting, 0, 69).message.starts_with("shoulder is warm"));
+        assert!(
+            health(&resting, 0, 69)
+                .message
+                .starts_with("shoulder is warm")
+        );
         // A joint the body commands, too.
         let mut head = glimpse(50);
         head.temperatures = [58, 36, 41];
-        assert!(health(&head, 0, 69).message.starts_with("head_pitch is warm"));
+        assert!(
+            health(&head, 0, 69)
+                .message
+                .starts_with("head_pitch is warm")
+        );
         // Resistance, once and more than once. Warmth is said first.
         let mut pushed = glimpse(50);
         pushed.eased = [2, 0, 1];
@@ -1576,7 +1586,11 @@ mod tests {
                 .ends_with("3 times in the last minute")
         );
         assert_eq!(report.values[5].value, "3");
-        assert!(health(&head, 3, 69).message.starts_with("head_pitch is warm"));
+        assert!(
+            health(&head, 3, 69)
+                .message
+                .starts_with("head_pitch is warm")
+        );
     }
 
     /// The strain guard's warnings (#4390, #4501): seated first, then a
