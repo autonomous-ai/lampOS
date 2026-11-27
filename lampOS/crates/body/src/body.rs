@@ -7184,6 +7184,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // it, and the move it waits for, which must still be the one playing
     // when it ends.
     let mut queued: Option<Queued> = None;
+    // The awake window from before a move was queued, and the one the queue
+    // opened: a keeper pause gives that one back, as for a gesture waiting.
+    let mut queued_window: Option<(Option<Duration>, Option<Duration>)> = None;
     let mut pending: Option<(&'static Clip, Duration)> = None;
     // Who asked for the gesture playing and the one waiting (weighed
     // against each other only under `Limits::arbitration`), each priority with the name its asker gave (the
@@ -7472,7 +7475,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         test_misses = test_misses.max(asked_now.missed_by_test);
         // A new energy level only once settled, so that a cap never drops
         // under a joint still moving: no gesture playing or waiting, the
-        // pose's filter still and the arm up or down.
+        // pose's filter still and the arm up or down. A queued move
+        // (`Asked::queue`) is not counted as waiting, but the move it waits
+        // for is `playing` until it starts, so a level never settles between.
         let level = crate::energy::taken(asked_now.energy);
         // #7749: a new level ends a shift at rest it finds playing, eased
         // to rest as a hand's yield eases a gesture (`easing_out`, over
@@ -8055,6 +8060,30 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         },
                     );
                 }
+                // A move waiting for the one playing never plays on a paused
+                // lamp (the Reviewer-lead's must-fix on #8904), and the
+                // window its queue opened is given back.
+                if let Some((clip, by, _)) = queued.take() {
+                    report.gestures_dropped += 1;
+                    gesture_fates.push_told(
+                        (clip.name, "dropped: paused"),
+                        Told {
+                            source: by.1,
+                            by: None,
+                        },
+                    );
+                    if let Some((before, opened)) = queued_window.take()
+                        && awake_until == opened
+                    {
+                        let ends =
+                            playing
+                                .filter(|(clip, _)| from_outside(clip))
+                                .map(|(clip, began)| {
+                                    began + Duration::from_micros(clip.duration_within_us(stretch))
+                                });
+                        awake_until = before.max(ends);
+                    }
+                }
                 if let Some((before, opened)) = pending_window.take()
                     && awake_until == opened
                 {
@@ -8288,11 +8317,17 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // Queued behind this asker's own move playing, with nothing
             // easing out and no pause: it waits for that one to end and is
             // not weighed against it (`Asked::queue`).
-            let queue_behind = asked_now.queue
-                && easing_out.is_none()
-                && paused.is_none()
-                && playing.is_some_and(|(old, _)| from_outside(old))
-                && playing_by == (asked_by, asked_source);
+            // Behind this asker's own move still waiting to begin (the lamp
+            // rising, or behind an ease out), or playing with nothing easing
+            // out: never dropping that one (the Reviewer-lead's must-fix on
+            // #8904). The one it waits for, with when it begins or began.
+            let own = (asked_by, asked_source);
+            let waits_for = pending
+                .filter(|(old, _)| from_outside(old) && pending_by == own)
+                .or(playing.filter(|(old, _)| {
+                    from_outside(old) && playing_by == own && easing_out.is_none()
+                }));
+            let queue_behind = asked_now.queue && paused.is_none() && waits_for.is_some();
             // Why it is dropped, if it is, and who holds the body then: a
             // skill or the conversation that named itself, or nobody.
             let dropped = if asked_now.paused {
@@ -8403,7 +8438,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     } else {
                         clip
                     };
-                    if let Some((first, since)) = playing {
+                    if let Some((first, since)) = waits_for {
                         if let Some((before, by, _)) =
                             queued.replace((clip, (asked_by, asked_source), first))
                         {
@@ -8421,7 +8456,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             + Duration::from_micros(first.duration_within_us(stretch))
                             + GESTURE_WAIT
                             + Duration::from_micros(clip.duration_within_us(stretch));
+                        let before = match queued_window {
+                            Some((b, opened)) if opened == awake_until => b,
+                            _ => awake_until,
+                        };
                         awake_until = awake_until.max(Some(needed));
+                        queued_window = Some((before, awake_until));
                     }
                 }
                 None => {
@@ -8516,9 +8556,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         if let (Some((first, since)), Some((next, by, behind))) = (playing, queued)
             && std::ptr::eq(first, behind)
             && paused.is_none()
+            && !asked_now.paused
             && now.saturating_sub(since) >= Duration::from_micros(first.duration_within_us(stretch))
         {
             queued = None;
+            queued_window = None;
             if upright && !yielding {
                 playing = Some((next, now));
                 playing_by = by;
@@ -8733,8 +8775,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // plays, and is said dropped.
         if let Some((next, by, behind)) = queued
             && !playing.is_some_and(|(clip, _)| std::ptr::eq(clip, behind))
+            && !pending.is_some_and(|(clip, _)| std::ptr::eq(clip, behind))
         {
             queued = None;
+            queued_window = None;
             report.gestures_dropped += 1;
             gesture_fates.push_told(
                 (next.name, crate::moves::QUEUED_FIRST_ENDED),

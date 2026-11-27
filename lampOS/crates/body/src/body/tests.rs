@@ -22957,6 +22957,17 @@ fn queue_run(
     asks: Vec<QueueAsk>,
     seconds: u64,
 ) -> (BodyReport, Fated, Vec<QueueStep>) {
+    queue_run_in(move_queue, |_| Mood::Reading, None, asks, seconds)
+}
+
+/// As [`queue_run`], the lamp's mood at each moment, and the keeper's pause (`Asked::paused`) from `paused_from` on.
+fn queue_run_in(
+    move_queue: bool,
+    mood_at: fn(Duration) -> Mood,
+    paused_from: Option<Duration>,
+    asks: Vec<QueueAsk>,
+    seconds: u64,
+) -> (BodyReport, Fated, Vec<QueueStep>) {
     let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
     lamp.arm_moves = true;
     lamp.overload_clears = 1;
@@ -22965,6 +22976,7 @@ fn queue_run(
         ..gesture_limits()
     };
     let time = clock.time.clone();
+    let mood_time = clock.time.clone();
     let seen_at = clock.time.clone();
     let mut asks = VecDeque::from(asks);
     let (mut fates, mut seen) = (Vec::new(), Vec::new());
@@ -22975,20 +22987,31 @@ fn queue_run(
         Some(HOME),
         Some(standing(100, 60)),
         None,
-        || Some((Mood::Reading, 60)),
-        move || match asks.front() {
-            Some((at, clip, source, queue)) if time.get() >= *at => {
-                let asked = Asked {
-                    gesture: Some(*clip),
-                    replace: true,
-                    queue: *queue,
-                    ..Asked::default()
-                };
-                let told = (asked, Priority::Skill, Source::new(source));
-                asks.pop_front();
-                told
+        move || Some((mood_at(mood_time.get()), 60)),
+        move || {
+            let paused = paused_from.is_some_and(|from| time.get() >= from);
+            match asks.front() {
+                Some((at, clip, source, queue)) if time.get() >= *at => {
+                    let asked = Asked {
+                        gesture: Some(*clip),
+                        replace: true,
+                        queue: *queue,
+                        paused,
+                        ..Asked::default()
+                    };
+                    let told = (asked, Priority::Skill, Source::new(source));
+                    asks.pop_front();
+                    told
+                }
+                _ => (
+                    Asked {
+                        paused,
+                        ..Asked::default()
+                    },
+                    Priority::Conversation,
+                    None,
+                ),
             }
-            _ => (Asked::default(), Priority::Conversation, None),
         },
         |glimpse| {
             fates.extend(glimpse.gesture_fates);
@@ -23140,4 +23163,65 @@ fn a_second_queued_move_takes_the_place_of_the_first() {
         began.len() == 2 && began[1] - began[0] <= ms(1_000) + TICK,
         "{began:?}"
     );
+}
+
+/// The owner pauses the lamp as the first move plays (the Reviewer-lead's must-fix on #8904): the move waiting for it is
+/// dropped, said "dropped: paused", and never plays on the paused lamp; only the first was played.
+#[test]
+fn a_keeper_pause_drops_a_queued_move() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run_in(true, |_| Mood::Reading, Some(ms(8_600)), asks, 14);
+    assert!(fates.contains(&("control", "dropped: paused")), "{fates:?}");
+    assert_eq!(report.gestures, 1, "{fates:?}");
+    assert_eq!(began_at(&seen).len(), 1);
+}
+
+/// A queue ask made while the first move still waits to begin (the lamp folded, rising for it) stands behind it and never
+/// drops it (the Reviewer-lead's must-fix on #8904): both play, the second on the step the first ends.
+#[test]
+fn a_move_queued_behind_its_askers_move_still_waiting_plays_after_it() {
+    let ms = Duration::from_millis;
+    // Asked at once on the folded lamp: the first waits for it to stand, the second is queued behind that wait.
+    let asks = vec![
+        (ms(500), &QUEUE_FIRST, "control:c_1", false),
+        (ms(700), &QUEUE_SECOND, "control:c_1", true),
+    ];
+    let (report, fates, seen) = queue_run(true, asks, 16);
+    assert!(
+        !fates.iter().any(|(_, why)| why.starts_with("dropped")),
+        "{fates:?}"
+    );
+    assert_eq!(report.gestures, 2, "{fates:?}");
+    let began = began_at(&seen);
+    assert!(
+        began.len() == 2 && began[1] - began[0] <= ms(1_000) + TICK,
+        "{began:?}"
+    );
+}
+
+/// A conversation that begins as the first move plays ends it, and the move waiting for it is dropped, said why.
+#[test]
+fn a_conversation_beginning_drops_a_queued_move() {
+    let ms = Duration::from_millis;
+    let asks = vec![
+        (ms(8_000), &QUEUE_FIRST, "control:c_1", false),
+        (ms(8_300), &QUEUE_SECOND, "control:c_1", true),
+    ];
+    let listening = |at: Duration| {
+        if at >= Duration::from_millis(8_500) {
+            Mood::Listening
+        } else {
+            Mood::Reading
+        }
+    };
+    let (report, fates, _) = queue_run_in(true, listening, None, asks, 14);
+    assert!(
+        fates.contains(&("control", crate::moves::QUEUED_FIRST_ENDED)),
+        "{fates:?}"
+    );
+    assert_eq!(report.gestures, 1, "{fates:?}");
 }

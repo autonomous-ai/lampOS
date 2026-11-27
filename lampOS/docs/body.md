@@ -2702,18 +2702,22 @@ a sent move may say `"queue": true`:
 `{"move":{...},"source":"control:c_1","replace":true,"queue":true}`.
 
 - **Honoured only behind the same asker's move:** from lamp-control (`control:<client>`, as `replace`), while that
-  client's own move plays at the same priority, nothing eases out and no gesture is paused. Then the move playing is
-  not ended: the new one waits and starts on the step it ends (`Asked::queue`), so the two meet at the stand with
-  nothing between. A dance that crosses the stand with speed there (every joint at 0 at the same instant) passes
+  client's own move plays at the same priority with nothing easing out, or still waits to begin (the lamp rising for
+  it, or behind an ease out), and no gesture is paused. Then that move is not ended or dropped: the new one waits and
+  starts on the step it ends (`Asked::queue`), so the two meet at the stand with
+  nothing between. Asked once the first has ended (easing out, or nothing playing), it is a move as before, with the gap. A dance that crosses the stand with speed there (every joint at 0 at the same instant) passes
   through it without a stop; one that lands still lands still, with no stall after it.
 - **Otherwise it is asked as unqueued**, exactly as today: behind another asker's motion, with nothing playing, or with
   the switch off (`queue` is not read), a replace ends what plays and eases it back, and the person still wins.
 - **One waits at a time:** a newer queued move takes its place, and the one waiting is dropped, "dropped: another was
   asked after it".
-- **Anything that ends the first drops it:** a hand, a stop, a higher ask, a replace, the lease lost, a sit-down: the
-  waiting move never plays, said "dropped: the move it waited for did not play out" (`moves::QUEUED_FIRST_ENDED`). A
-  pause (#2602) holds both, and it starts when the first plays out after it; a lamp not standing when its turn comes
-  drops it, "dropped: it did not stand when its turn came".
+- **Anything the body ends the first for drops it:** a hand, a higher ask, a replace, a conversation beginning, a
+  sit-down, a stop of the body: the waiting move never plays, said "dropped: the move it waited for did not play out"
+  (`moves::QUEUED_FIRST_ENDED`). The owner's pause (the keeper's) drops it at once, "dropped: paused", and gives back
+  the window its queue opened, so the lamp folds after the first. A gesture paused for a turn (#2602) holds both, and
+  it starts when the first plays out after it; a lamp not standing when its turn comes drops it, "dropped: it did not
+  stand when its turn came". The body ties no move to lamp-control's lease: a computer's `stop`, revoke or leaving
+  does not end a move it sent, so its queued move still plays, as the first does (up to 10 s each).
 - **The same checks as any gesture:** it begins where a gesture waiting begins, so the app's reach and V1's anti-tip
   rule judge it from the pose it begins in, and `LAMP_BODY_ENERGY` plays it livelier as any sent move. The moves
   check is unchanged: it still begins and ends at nothing.
