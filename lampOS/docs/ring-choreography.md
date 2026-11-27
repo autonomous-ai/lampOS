@@ -1099,13 +1099,23 @@ takes the light (`ring_light::RingLight::faces`, `ring_face::Looks`).
   ring's ceiling, so the night's cap and the ceiling the lamp runs under
   stay over it.
 - A face with a look goes through the three-flashes-a-second bound
-  (`FLASHES_A_SECOND`, `Face::flash_safe`) as the resting light does, a
-  saturated red included; the lamp's own faces are not held, as they never
-  were.
+  (`FLASHES_A_SECOND`, `Face::flash_safe`) as the resting light does only
+  while its frame is a saturated red (`saturated_red`), or is coming out of
+  one: the flash the bound limits at any brightness. Any other colour of the
+  owner's moves with the voice as the lamp's own faces do, and neither is
+  ever held: speech swings a bright face by a tenth of the ceiling about ten
+  times a second, past the bound's six, and a held speaking face would stop
+  for the rest of each second (`ring_face`'s
+  `an_own_colour_speaking_face_moves_with_speech_like_the_lamps_own`).
 - Not settable: the offline breath, the update and error signals, the
   hand's warm glow, the reset's red, the privacy light and the camera mark.
   The Speaking face's colour is also what a skill's light held over it
   (`LAMP_SKILL_LIGHT_SPEAKING`) mixes into.
+- Rolling back to a build before #8870: the older build knows only the ten
+  named colours, so a kept light in a soft colour (mint, say) is refused
+  and the lamp starts warm at level 1, as on a first start, until the
+  person sets it again. It has no faces of a turn, so its faces are its
+  own.
 
 ### A computer's mark: seeing or hearing through the lamp
 
