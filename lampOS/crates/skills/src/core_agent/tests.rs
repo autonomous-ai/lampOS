@@ -605,3 +605,14 @@ fn the_first_fire_asks_nothing() {
     assert!(!pre_approved(&renamed));
     task::set_on_here(None);
 }
+
+#[test]
+fn the_posture_brief_names_the_window_lamp_seen_says() {
+    // Fourth's audit on #8377: the brief said ten minutes after the window
+    // became a minute. It names the said window's length, so a change to
+    // one without the other fails here.
+    let posture = pilot("posture").unwrap();
+    assert_eq!(lamp_msgs::HumanPosture::SAID_WINDOW_S, 60);
+    assert!(posture.fire.contains("the last minute"), "{}", posture.fire);
+    assert!(!posture.fire.contains("ten minutes"), "{}", posture.fire);
+}
