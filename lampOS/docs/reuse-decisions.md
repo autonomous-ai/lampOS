@@ -2448,3 +2448,34 @@ calibration. Host synthetic tests establish accounting and storage boundaries
 only; no physical latency, power-loss, acoustic or all-feature acceptance is claimed. See
 [evals.md](evals.md) for the precise state bounds, durability limits, privacy
 contract and remaining integration gates.
+
+### Isolating checkpoint writes (2026-11-27)
+
+The next recorder primitive keeps the existing `Store` format, private lifetime
+lock, bounded recovery and checked replacement. It adds a caller-neutral
+single-write worker; it does not create another storage engine or a daemon.
+
+The source pattern is `crates/voice/src/onboarding/storage.rs`: checked revision
+tags and matching completions (115–201), one-slot job/result channels (362–410),
+and requested shutdown kept separate from observed completion (437–459).
+The evaluation version is smaller: one owned immutable `Recorder`, no deferred
+job, profile/mailbox fields, take-back retry or mutable shared client. A busy
+or closed offer returns the caller's snapshot. Thread ownership remains
+explicit, and no stalled writer is replaced by another.
+
+`crates/settings/src/runtime.rs`'s indeterminate-write treatment informs the
+error boundary. `checked-replace` renames before its directory fsync; an error
+there cannot establish rollback. Every failed evaluation save therefore stays
+durability-unknown and stops further submissions until confirmed shutdown and
+validated recovery. `crates/controls/src/strip_worker.rs` also distinguishes a
+requested stop from observed worker exit. The bus logger's detached-thread
+pattern and cloud transport's broker acknowledgement are not substitutes for
+this local writer's lifecycle or durability acknowledgement.
+
+Snapshot capture remains explicit caller work, while serialization, validation
+and filesystem operations run in the worker. Offer/poll's proposed p99 budget
+is 100 microseconds with a prepared snapshot; capture and complete-save costs
+must be measured separately. Rust thread teardown and kernel filesystem stalls
+have no hard deadline here. The separate supervised recorder process and its
+quiet scheduling, producer adapter, recovery, consent and deletion policies
+remain necessary integration work.

@@ -12,6 +12,7 @@
 
 pub mod core;
 pub mod model;
+pub mod persistence;
 pub mod store;
 
 pub use core::{Error, Ingest, Recorder};

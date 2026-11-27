@@ -1,8 +1,8 @@
 # Local evaluation evidence (`lamp-evals`)
 
-`lamp-evals` is a Rust library for bounded aggregation and durable local
-checkpoints. It is the first persistence primitive for a fleet evaluation
-system; it is not the full evaluator. No process, bus adapter, producer switch,
+`lamp-evals` is a Rust library for bounded aggregation, durable local
+checkpoints and an explicit background checkpoint writer. It is a foundation
+for a fleet evaluation system; it is not the full evaluator. No process, bus adapter, producer switch,
 systemd unit, sender, backend endpoint or nightly check is installed by this
 crate. The local dashboard prototype is a separate review tool.
 
@@ -15,7 +15,8 @@ audible sound, accurate perception or a correctly performed emotion.
 
 Implementation: [model](../crates/evals/src/model.rs),
 [recorder](../crates/evals/src/core.rs),
-[store](../crates/evals/src/store.rs). The
+[store](../crates/evals/src/store.rs),
+[persistence worker](../crates/evals/src/persistence.rs). The
 [reuse decision](reuse-decisions.md#bounded-local-evaluation-evidence-2026-11-27)
 records the V1 baseline and existing Rust alternatives inspected.
 
@@ -256,6 +257,67 @@ exactly-once network guarantee, backup slot, automatic corrupt-state reset or
 write schedule in this library. Physical power-loss and storage-stall behavior
 remain unverified on a lamp.
 
+## Background checkpoint persistence
+
+`persistence::Persistence` moves the existing `Store` into one worker thread.
+The caller opens the private store and loads/validates its checkpoint during
+startup, before admitting recorder input. This primitive adds no file format,
+daemon, product unit, bus reader, network sender or automatic write schedule.
+
+| Operation | Meaning |
+|---|---|
+| `Persistence::start(Store)` | Starts one writer with exclusive ownership of the already-open store. Thread creation is startup work, outside the observation callback. |
+| `try_checkpoint(Recorder)` | Offers one owned, immutable snapshot without waiting for disk. Acceptance returns a local `Ticket`, not a durability acknowledgement. A refusal returns the original snapshot with a fixed reason. |
+| `poll()` | Collects a matching completion and reports current status. Until its completion is collected, an outstanding ticket remains busy. |
+| `status()` | Observes the controller state; an outstanding write and the last confirmed save remain separate. |
+| `request_stop()` | Refuses new work and lets the single accepted snapshot drain. A stop request does not assert that the worker has exited. |
+
+There is one outstanding snapshot, one job-channel slot and one completion
+slot. There is no second pending snapshot, coalescing, automatic retry or
+replacement worker. The caller keeps observing into its live recorder and
+retains its dirty-state/revision policy separately. Capturing or cloning the
+snapshot is explicit caller work; neither offer nor poll clones or serializes
+the history. Queue pressure must defer persistence, not discard incoming
+observations or claim the live recorder has been saved.
+
+Tickets increase without wrapping within one worker. Exhaustion refuses
+further submissions rather than reusing a completion identity. Tickets are
+local control metadata, distinct from producer turn identities, and do not
+belong in aggregate uploads. The caller must not confuse an older saved
+snapshot with newer in-memory observations, or compare ticket numbers across
+different worker instances.
+
+A matching successful completion is returned only after `Store::save` returns
+success, including candidate validation and directory sync. Any save error is
+reported as **durability unknown**, with a fixed failure category: atomic
+replacement may already have happened before the error. The failure latches;
+the writer does not continue with another snapshot or retry silently. Confirm
+shutdown, then reopen and validate the committed store before deciding how to
+recover. Neither an error nor an absent acknowledgement means the old file is
+necessarily still current. Worker loss/panic and mismatched completion cannot
+become successful saves. No raw I/O error text or checkpoint content is part
+of the status contract.
+
+An outstanding save may remain blocked in the kernel. A caller's elapsed-time
+limit does not cancel it and must not start a second writer. Polling checks
+the retained thread handle before joining; it does not wait for an unfinished
+save. Rust's [thread completion contract](https://doc.rust-lang.org/std/thread/struct.JoinHandle.html#method.is_finished)
+still permits final thread teardown after the main function returns, so this
+is not a hard real-time shutdown guarantee. A saved completion and confirmed
+thread exit are separate facts. Dropping the controller requests stop but
+detaches an unfinished thread; it may still finish the accepted write. Use
+confirmed shutdown before erasure, replacement, or claiming that no future
+write can occur. The store's lifetime lock remains with the worker until it
+exits. This primitive does not implement consent withdrawal or deletion.
+
+The proposed offer/poll target is **p99 below 100 microseconds** on the lamp,
+with an already-captured snapshot, for first and repeated calls and blocked
+storage. It is a soft target, not a hardware result. Measure snapshot capture,
+worker serialization/validation and the complete save separately; excluding
+them from offer timing does not make their CPU, memory or I/O cost disappear.
+The future process must schedule those costs, expose stale/failed persistence,
+and verify its effect on real interaction latency before activation.
+
 ## Runtime and fleet integration still required
 
 `observe` performs bounded in-memory work, including a segment search and
@@ -265,8 +327,9 @@ target lamp, first and repeated calls, including near-capacity state. This is
 a target, not a measured hardware result. Measure the entry-to-return boundary
 and tail latency, resource use and effect on live voice before enabling a
 producer. `checkpoint`, `snapshot` and blocking `Store::save` belong outside
-the voice path. Filesystem syscalls have no deadline here; a supervised bounded
-persistence worker and its failure/queue policy remain to be implemented.
+the voice path. Filesystem syscalls have no deadline here. The background writer
+isolates the save operation, but a supervised process, snapshot scheduling,
+dirty-state accounting and recovery policy remain to be integrated and tested.
 
 The full feature system needs an explicit chain for each item: an eligible
 attempt or opportunity, expected behavior, observed evidence, terminal result,
@@ -286,8 +349,9 @@ Remaining integration gates are:
    Maintain the source-backed inventory when features, controls or expression
    clips change. Controlled evaluations need their own evidence and results;
    passive receipt counts cannot stand in for them.
-3. Build the supervised recorder, scheduling, persistence worker and diagnostics
-   with explicit limits and failure behavior. An optional nightly passive
+3. Build the supervised recorder and connect snapshot scheduling, the persistence
+   worker, recovery and diagnostics with explicit limits and failure behavior.
+   An optional nightly passive
    evaluation must respect privacy, presence, conversation and update guards;
    no active sound, light or movement is authorized by this library.
 4. Specify an aggregate upload contract, consent/retention/deletion behavior,
@@ -318,6 +382,10 @@ and the person getting the result they intended.
 
 The [host verification record](verification/fleet-evals-20261127/README.md)
 records the commands, counts and limits for this first library piece.
+
+The [checkpoint-worker verification](verification/eval-persistence-20261127/README.md)
+records its separate Mac/Linux gates, controlled stalled-write cases and host
+measurements. It does not qualify a running recorder or target-lamp latency.
 
 The [core tests](../crates/evals/tests/core.rs) cover replay after restore,
 out-of-order ranges, new epochs, clock and UTC-day boundaries, clipped retention,
