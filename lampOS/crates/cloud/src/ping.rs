@@ -582,6 +582,63 @@ mod tests {
         );
     }
 
+    /// #8881: each engine is dropped on its own. Hermes with a version
+    /// lamp-update could not have said, or missing, leaves OpenClaw and
+    /// Harness in the body.
+    #[test]
+    fn one_engine_dropped_leaves_the_other_and_harness() {
+        use lamp_msgs::UpdateStatus;
+        let identity = beat_identity();
+        let (_root, bus, kept) = said_status(true);
+        let mut says = bus
+            .publisher_declared(UpdateStatus::TOPIC, &UpdateStatus::declaration(), "update")
+            .unwrap();
+        let said: UpdateStatus = kept.parse().unwrap();
+        let strange = {
+            let mut status = said.clone();
+            let engines = status.engines.as_mut().unwrap();
+            engines.get_mut("hermes").unwrap().version = Some("0.9/x".into());
+            status
+        };
+        let missing = {
+            let mut status = said;
+            status.engines.as_mut().unwrap().remove("hermes");
+            status
+        };
+        for status in [strange, missing] {
+            says.publish_json(0, &status).unwrap();
+            let kept = bus.latest(UpdateStatus::TOPIC).unwrap().unwrap();
+            let body = Payload::of(&identity).with_engines(true, Some(kept));
+            let value = serde_json::to_value(&body).unwrap();
+            assert_eq!(
+                value["engines"],
+                json!({"openclaw": {"version": "2026.11.2", "installed": true}}),
+                "{value}"
+            );
+            assert_eq!(
+                value["harness"],
+                json!({"version": "1.4.0", "installed": true}),
+                "{value}"
+            );
+        }
+    }
+
+    /// #8881: the body with the switch off, or on with no status, pinned as
+    /// the bytes the wire carried before the switch, so any field added to
+    /// it fails here and not only against the new code's own `Payload::of`.
+    #[test]
+    fn the_off_body_is_the_wire_s_bytes_from_before() {
+        const BEFORE: &str = r#"{"status":"working","setup_completed":true,"mac":"lamp-7f72","version":"0.1.0+abc","local_ip":"192.168.1.42","device":"lamp","device_id":"d-42","wakeword_enabled":false,"voice_input_mode":"automatic"}"#;
+        let identity = beat_identity();
+        let (_root, _bus, kept) = said_status(true);
+        let off = Payload::of(&identity).with_engines(engines_from(None), Some(kept));
+        assert_eq!(serde_json::to_string(&off).unwrap(), BEFORE);
+        let none = Payload::of(&identity).with_engines(engines_from(Some("on")), None);
+        assert_eq!(serde_json::to_string(&none).unwrap(), BEFORE);
+        let plain = Payload::of(&identity).with_tls(false);
+        assert_eq!(serde_json::to_string(&plain).unwrap(), BEFORE);
+    }
+
     /// #8881 (c): a stale status, or one that says no engines and no
     /// Harness, sends no engine or harness field rather than an old one.
     #[test]
