@@ -4,6 +4,7 @@ require "fileutils"
 require "minitest/autorun"
 require "tmpdir"
 require_relative "reviewer_replay"
+require_relative "reviewer_raw_pairs"
 
 class CallerFrameScoreTest < Minitest::Test
   def setup
@@ -194,5 +195,94 @@ class CallerFrameScoreTest < Minitest::Test
     end
     assert_raises(ArgumentError) { verify.call(s.merge("delete_after_unix_s" => 123), "/usr/bin/true") }
     assert_raises(ArgumentError) { verify.call(s, "/usr/bin/false") }
+  end
+end
+
+class CallerRawPairContractTest < Minitest::Test
+  def setup
+    @root = File.realpath(Dir.mktmpdir("caller-digital-contract-"))
+    Dir.mkdir(File.join(@root, "quiet"))
+    @sums = {}
+    @meta = "id\tvoice_id\nref-a\ta\nref-b\tb\nprobe\ta\n"
+    File.write(File.join(@root, "clips.tsv"), @meta)
+    @sums["clips.tsv"] = CallerFrameBench.sha(File.join(@root, "clips.tsv"))
+    %w[ref-a ref-b probe].each_with_index do |name, i|
+      rel = "quiet/#{name}.wav"
+      CallerHeldout.wav(File.join(@root, rel), Array.new(17 + i, 100 + i))
+      @sums[rel] = CallerFrameBench.sha(File.join(@root, rel))
+    end
+    @pairs = {"sa" => CallerFrameBench::Pair.new("sa", "quiet/ref-a.wav", "quiet/probe.wav", "same", 2, "quiet"),
+              "di" => CallerFrameBench::Pair.new("di", "quiet/ref-b.wav", "quiet/probe.wav", "different", 2, "quiet")}
+  end
+
+  def teardown
+    FileUtils.remove_entry(@root)
+  end
+
+  def manifest
+    CallerRawPairs.manifest("synthetic", @root, @pairs, @sums,
+                            {"created_unix_s" => 1234, "readme_sha256" => "1" * 64}, "2" * 64)
+  end
+
+  def test_correlated_pairs_use_real_file_offsets_and_preserve_abstentions
+    doc, ends = manifest
+    assert_equal "raw_development_pairs", doc[:evaluation_mode]
+    assert_equal 3, doc[:trials].size
+    assert_equal 1, doc[:cases].map { |c| c[:trial_id] }.uniq.size
+    assert_equal 2, doc[:cases].map { |c| c[:reference_trial_id] }.uniq.size
+    assert_equal @sums.values_at("quiet/ref-a.wav", "quiet/ref-b.wav", "quiet/probe.wav").sort, doc[:sessions].map { |s| s[:recording_sha256] }.sort
+    assert doc[:sessions].all? { |s| s[:started_unix_s].nil? && s[:consent].nil? && s[:sync_error_us].nil? && s[:clock_verified] == false && s[:split] == "development" }
+    assert doc[:trials].all? { |t| t[:recipient] == "unknown" && t[:call_end_us].nil? && t[:start_us] == 0 }
+    rows = CallerRawPairs.predictions(@pairs, ends, {"sa" => CallerFrameBench::Prediction.new("unknown", nil, 27, "first")})
+    assert_equal 1, rows.size
+    row = rows.first
+    assert_equal ["sa", "unknown", 1187, 27, nil], row.values_at(:case_id, :output, :input_end_us, :replay_elapsed_us, :ready_us)
+    assert_equal ends.fetch("quiet/probe.wav")[:session_id], row[:clock_id]
+  end
+
+  def test_aliases_self_comparisons_and_conflicting_speaker_labels
+    ref = "quiet/ref-a.wav"
+    alias_name = "quiet/alias.wav"
+    FileUtils.cp(File.join(@root, ref), File.join(@root, alias_name))
+    @sums[alias_name] = @sums.fetch(ref)
+    File.write(File.join(@root, "clips.tsv"), @meta + "alias\ta\n")
+    @pairs["alias"] = @pairs.fetch("sa").dup
+    @pairs["alias"].id = "alias"
+    @pairs["alias"].reference = alias_name
+    assert_match(/duplicated/, assert_raises(ArgumentError) { manifest }.message)
+    File.write(File.join(@root, "clips.tsv"), @meta + "alias\tc\n")
+    assert_match(/identical WAV/, assert_raises(ArgumentError) { manifest }.message)
+    @pairs.delete("alias")
+    @pairs.fetch("sa").reference = @pairs.fetch("sa").followup
+    assert_match(/overlapping/, assert_raises(ArgumentError) { manifest }.message)
+    @pairs.fetch("sa").reference = ref
+    @pairs.fetch("sa").label = "different"
+    assert_match(/mislabelled/, assert_raises(ArgumentError) { manifest }.message)
+  end
+
+  def test_provider_and_public_speaker_identities_are_namespaced
+    id = {"provider" => "Gemini Live", "voice" => "shared"}
+    assert_equal %w[gemini shared], CallerRawPairs.identity("synthetic-heldout", id)
+    refute_equal CallerRawPairs.identity("synthetic-heldout", id), CallerRawPairs.identity("synthetic-heldout", id.merge("provider" => "ElevenLabs"))
+    assert_equal ["reader"], CallerRawPairs.identity("public-speech", {"speaker_id" => "reader"})
+    assert_raises(ArgumentError) { CallerRawPairs.identity("public-speech", {"speaker_id" => ""}) }
+  end
+
+  def test_original_run_seal_rejects_score_or_revision_substitution
+    run = File.join(@root, "run")
+    Dir.mkdir(run)
+    revision = "a" * 40
+    fixed = {"source-revision.txt" => revision + "\n", "source.patch" => "", "run/provenance.tsv" => "receipt",
+             "run/whole.tsv" => "whole", "run/frame.tsv" => "frame"}
+    fixed.each { |f, bytes| File.write(File.join(@root, f), bytes) }
+    seal = File.join(@root, "SHA256SUMS")
+    File.write(seal, fixed.keys.map { |f| "#{CallerFrameBench.sha(File.join(@root, f))}  #{f}\n" }.join)
+    bindings = {"build_sha" => revision, "exact_commit" => true}
+    checksum, outputs = CallerRawPairs.verify_run(run, bindings)
+    assert_equal CallerFrameBench.sha(seal), checksum
+    assert_equal CallerFrameBench.sha(File.join(run, "frame.tsv")), outputs["frame"]
+    assert_match(/source revision/, assert_raises(ArgumentError) { CallerRawPairs.verify_run(run, bindings.merge("build_sha" => "b" * 40)) }.message)
+    File.write(File.join(run, "whole.tsv"), "substitute")
+    assert_match(/run seal/, assert_raises(ArgumentError) { CallerRawPairs.verify_run(run, bindings) }.message)
   end
 end
