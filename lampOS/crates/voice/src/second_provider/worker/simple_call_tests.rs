@@ -80,6 +80,16 @@ fn signs(turned: Option<bool>, room: crate::room_told::Room, names: Vec<(u64, f3
     }
 }
 
+/// The signs of a line lamp-name heard the name at, 100 ms into it: its
+/// call, whatever its words.
+fn call_at(began_us: u64) -> Signs {
+    signs(
+        None,
+        crate::room_told::Room::Unknown,
+        vec![(began_us + 100_000, 0.99)],
+    )
+}
+
 /// The verdict on `heard`, said from `began_us` for 2.2 s (`None`: let out).
 fn judged(
     heeding: &mut Heeding,
@@ -115,19 +125,23 @@ fn simple_call_holds_a_facing_question_out_of_the_window() {
     );
 }
 
-/// Strictly "Hey Lamp" in the words: a call with no face and no hearing,
-/// in any case and with any punctuation. A hearing of the name alone, at any
-/// score, is none: "Hey man", "Hey Lynn" and a bare "Lamp, …" heard at
-/// 0.999 at the line's start are held.
+/// The call is lamp-name's own wake for the line (the product owner, 27
+/// Nov 2026, rejecting a call read from the transcript): a hearing of the
+/// name for the line's own sound, begun within its start
+/// (`HEY_AT_THE_START_US`), whatever the words, at the detector's own
+/// decision with no score bar of the rule's. "Hey, Lynn." heard at its start
+/// calls, at 0.98 and at 0.7; "Hey Lamp, what time is it?" with no hearing is
+/// held; a hearing 3 s into the line, past the start, is held; a line with
+/// neither a hearing nor a window is held.
 #[test]
-fn simple_call_is_strictly_hey_lamp_in_the_words() {
+fn simple_call_the_detectors_start_hearing_is_the_call() {
     let _one = crate::provider_worker::tests::one_thread();
     use crate::room_told::Room;
-    let call = |simple: bool, heard: &str, score: Option<f32>| {
-        let mut heeding = heeding(simple, None);
+    let call = |heard: &str, hearing: Option<(u64, f32)>| {
+        let mut heeding = heeding(true, None);
         let now = monotonic_us();
-        let names = score
-            .map(|score| vec![(now + 100_000, score)])
+        let names = hearing
+            .map(|(into_us, score)| vec![(now + into_us, score)])
             .unwrap_or_default();
         judged(
             &mut heeding,
@@ -137,29 +151,32 @@ fn simple_call_is_strictly_hey_lamp_in_the_words() {
             signs(None, Room::Unknown, names),
         )
     };
-    for heard in [
-        "Hey Lamp, what time is it?",
-        "Hey, lamp. What time is it?",
-        "Hi Lamp, set a timer for five minutes.",
-        "Um, hello Lamp, are you there?",
-    ] {
-        assert_eq!(call(true, heard, None), None, "{heard}");
-    }
-    for heard in [
-        "Hey man, what time is it?",
-        "Hey Lynn, are you there?",
-        "Lamp, what time is it?",
-        "Hey lamb, what time is it?",
-        "What time is it?",
-    ] {
-        assert_eq!(
-            call(true, heard, Some(0.999)),
-            Some(crate::second_provider::SIMPLE_HELD),
-            "{heard}"
-        );
-    }
-    // Off, the same bare "Lamp, …" heard at 0.999 at its start is a call.
-    assert_eq!(call(false, "Lamp, what time is it?", Some(0.999)), None);
+    let held = Some(crate::second_provider::SIMPLE_HELD);
+    assert_eq!(
+        call("Hey, Lynn.", Some((100_000, 0.98))),
+        None,
+        "a start hearing"
+    );
+    assert_eq!(
+        call("Hey, Lynn.", Some((100_000, 0.7))),
+        None,
+        "no bar of the rule's"
+    );
+    assert_eq!(
+        call("Hey Lamp, what time is it?", None),
+        held,
+        "words, no hearing"
+    );
+    assert_eq!(
+        call("Hey, Lynn.", Some((3_000_000, 0.98))),
+        held,
+        "a late hearing"
+    );
+    assert_eq!(
+        call("What time is it?", None),
+        held,
+        "no hearing, no window"
+    );
 }
 
 /// In the window, 5 s after the lamp's words: every line is answered, with
@@ -274,7 +291,10 @@ fn simple_call_answers_the_line_after_a_bare_hey_lamp() {
     // After the lamp's "Yes?".
     let mut heeding = heeding(true, None);
     let now = monotonic_us();
-    assert_eq!(judged(&mut heeding, 9, now, "Hey Lamp.", none()), None);
+    assert_eq!(
+        judged(&mut heeding, 9, now, "Hey Lamp.", call_at(now)),
+        None
+    );
     heeding.lamp_did(crate::second_provider::Did::Said(9, now + 3 * S));
     assert_eq!(
         judged(&mut heeding, 10, now + 5 * S, "What time is it?", none()),
@@ -283,7 +303,10 @@ fn simple_call_answers_the_line_after_a_bare_hey_lamp() {
     // Going on from the call, the lamp still waiting for it.
     let mut heeding = self::heeding(true, None);
     let now = monotonic_us();
-    assert_eq!(judged(&mut heeding, 9, now, "Hey Lamp.", none()), None);
+    assert_eq!(
+        judged(&mut heeding, 9, now, "Hey Lamp.", call_at(now)),
+        None
+    );
     let goes_on = Signs {
         continues_from: Some(9),
         ..none()
@@ -326,7 +349,13 @@ fn simple_call_carries_the_call_for_15_s() {
     let mut heeding = heeding(true, None);
     let now = monotonic_us();
     assert_eq!(
-        judged(&mut heeding, 9, now, "Hey Lamp, what's the weather", none()),
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "Hey Lamp, what's the weather",
+            call_at(now)
+        ),
         None
     );
     assert_eq!(
@@ -336,7 +365,13 @@ fn simple_call_carries_the_call_for_15_s() {
     let mut heeding = self::heeding(true, None);
     let now = monotonic_us();
     assert_eq!(
-        judged(&mut heeding, 9, now, "Hey Lamp, what's the weather", none()),
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "Hey Lamp, what's the weather",
+            call_at(now)
+        ),
         None
     );
     assert_eq!(
@@ -419,29 +454,34 @@ fn simple_call_a_stop_closes_the_window() {
         Some(crate::second_provider::SIMPLE_HELD)
     );
     assert_eq!(
-        judged(&mut heeding, 10, now + S, "Hey Lamp, and tomorrow?", none()),
+        judged(
+            &mut heeding,
+            10,
+            now + S,
+            "Hey Lamp, and tomorrow?",
+            call_at(now + S)
+        ),
         None
     );
 }
 
-/// A line with no words in it is never answered, in the window or out,
-/// but for a tap: room noise opens nothing (#8875).
+/// A line with no words and no call is never answered, in the window or
+/// out (#8875's room noise); a line lamp-name heard the name at the start of
+/// is a call whatever came back as its words, none included: "Hey Lamp."
+/// that speech to text lost (lamp-74ff, 27 Nov, request 143, heard at 1.000).
 #[test]
-fn simple_call_a_line_with_no_words_is_never_answered() {
+fn simple_call_a_line_with_no_words_is_answered_only_as_a_call() {
     let _one = crate::provider_worker::tests::one_thread();
     use crate::room_told::Room;
     let mut heeding = heeding(true, Some(5));
     let now = monotonic_us();
     assert_eq!(
-        judged(
-            &mut heeding,
-            9,
-            now,
-            "",
-            signs(None, Room::Unknown, vec![(now + 100_000, 0.999)])
-        ),
+        judged(&mut heeding, 9, now, "", signs(None, Room::Unknown, vec![])),
         Some(crate::second_provider::SIMPLE_NO_WORDS)
     );
+    let mut heeding = self::heeding(true, None);
+    let now = monotonic_us();
+    assert_eq!(judged(&mut heeding, 10, now, "", call_at(now)), None);
 }
 
 /// The audit's #10 and the switches read through
@@ -480,34 +520,6 @@ fn simple_call_the_windows_edges_are_19_and_21_s() {
     assert_eq!(line(21), Some(crate::second_provider::SIMPLE_HELD), "21 s");
 }
 
-/// Near-misses of "Hey Lamp" are no call (the Reviewer-lead's P3): a word
-/// before the greeting, a word between it and the name, or a longer word
-/// than the name.
-#[test]
-fn simple_call_near_misses_of_hey_lamp_are_held() {
-    let _one = crate::provider_worker::tests::one_thread();
-    use crate::room_told::Room;
-    for heard in [
-        "Okay hey Lamp, what time is it?",
-        "Hey there Lamp, what time is it?",
-        "Hey Lampshade, what time is it?",
-    ] {
-        let mut heeding = heeding(true, None);
-        let now = monotonic_us();
-        assert_eq!(
-            judged(
-                &mut heeding,
-                9,
-                now,
-                heard,
-                signs(None, Room::Unknown, vec![])
-            ),
-            Some(crate::second_provider::SIMPLE_HELD),
-            "{heard}"
-        );
-    }
-}
-
 /// A spoken "Stop." in the window is judged as a line, as any line is: let
 /// out (the Reviewer-lead's P3). A stop said over the lamp's own voice is
 /// the coordinator's spoken stop, unchanged.
@@ -526,101 +538,5 @@ fn simple_call_a_spoken_stop_in_the_window_is_judged_as_a_line() {
             signs(None, Room::Unknown, vec![])
         ),
         None
-    );
-}
-
-/// A lamp in another language (the Reviewer-lead's P1 on #8892): its call
-/// is the greeting and the name as its speech to text writes them
-/// (`attention::written`), still strictly in the words. "Hey Lamp" in Latin
-/// letters calls on every lamp.
-fn calls_in(language: crate::language::Language, heard: &str) -> bool {
-    crate::attention::opens_with_hey_lamp_in(heard, Some(language))
-}
-
-#[test]
-fn simple_call_a_japanese_lamps_call() {
-    use crate::language::Language::Japanese;
-    assert!(calls_in(Japanese, "ヘイ、ランプ、今何時？"));
-    assert!(calls_in(Japanese, "ヘイランプ、今何時？"));
-    assert!(calls_in(Japanese, "Hey Lamp, what time is it?"));
-    assert!(!calls_in(Japanese, "ランプを消して"));
-    assert!(!calls_in(Japanese, "前、今何時？"));
-    assert!(!calls_in(Japanese, "ヘイ、ランプシェード"));
-}
-
-#[test]
-fn simple_call_a_chinese_lamps_call() {
-    use crate::language::Language::Chinese;
-    assert!(calls_in(Chinese, "嘿，兰普，现在几点？"));
-    assert!(calls_in(Chinese, "嘿兰普现在几点"));
-    assert!(!calls_in(Chinese, "兰普现在几点"));
-}
-
-#[test]
-fn simple_call_a_korean_lamps_call() {
-    use crate::language::Language::Korean;
-    assert!(calls_in(Korean, "헤이 램프, 지금 몇 시야?"));
-    assert!(!calls_in(Korean, "램프가 고장났어."));
-    assert!(!calls_in(Korean, "지금 몇 시야?"));
-}
-
-#[test]
-fn simple_call_a_vietnamese_lamps_call() {
-    use crate::language::Language::Vietnamese;
-    assert!(calls_in(Vietnamese, "Hây lăm, mấy giờ rồi?"));
-    assert!(calls_in(Vietnamese, "Hey Lamp, mấy giờ rồi?"));
-    assert!(!calls_in(Vietnamese, "Làm, mấy giờ rồi?"));
-    assert!(!calls_in(Vietnamese, "Này, làm."));
-}
-
-#[test]
-fn simple_call_a_french_lamps_call() {
-    use crate::language::Language::French;
-    assert!(calls_in(French, "Hey man, quelle heure est-il ?"));
-    assert!(calls_in(French, "Hey Lamp, quelle heure est-il ?"));
-    assert!(!calls_in(French, "La lampe est cassée."));
-    assert!(!calls_in(French, "Thème de la soirée ?"));
-}
-
-/// `LAMP_SIMPLE_CALL_HEARD` (in no product unit; its ROW is lamp-dbda's
-/// round 2): on lamp-dbda on 27 Nov strict words held 10 of 10 calls that
-/// speech to text wrote "Hey, Lynn.", "Hello, ma'am." or "Hey, man." while
-/// lamp-name heard 8 of 9 at 0.92 to 1.00. With the sub-switch, a greeting in
-/// the words and lamp-name's hearing of the line's own start at 0.95 or more
-/// call: "Hey, Lynn." at 0.98 calls with it and is held without it. "Hey
-/// man, what's up?" at 0.905 is held; "OK Lamp" at 1.000 and "Lamp, what time
-/// is it?" at 0.999, with no greeting, are held at any score.
-#[test]
-fn simple_call_heard_a_greeting_and_a_sure_start_hearing_call() {
-    let _one = crate::provider_worker::tests::one_thread();
-    use crate::room_told::Room;
-    let call = |heard_on: bool, heard: &str, score: f32| {
-        let mut heeding = heeding(true, None);
-        if heard_on {
-            heeding.taking_simple_calls_heard();
-        }
-        let now = monotonic_us();
-        let names = vec![(now + 100_000, score)];
-        judged(
-            &mut heeding,
-            9,
-            now,
-            heard,
-            signs(None, Room::Unknown, names),
-        )
-    };
-    let held = Some(crate::second_provider::SIMPLE_HELD);
-    assert_eq!(
-        call(true, "Hey, Lynn.", 0.98),
-        None,
-        "on: a greeting, heard at 0.98"
-    );
-    assert_eq!(call(false, "Hey, Lynn.", 0.98), held, "off: strict words");
-    assert_eq!(call(true, "Hey man, what's up?", 0.905), held, "under 0.95");
-    assert_eq!(call(true, "OK Lamp", 1.0), held, "no greeting");
-    assert_eq!(
-        call(true, "Lamp, what time is it?", 0.999),
-        held,
-        "no greeting"
     );
 }
