@@ -212,9 +212,10 @@ pub enum PostureRegion {
     Trunk,
     UpperArm,
     LowerArm,
-    /// No region stood out, or no bad sample yet.
-    #[serde(rename = "none")]
-    Nothing,
+    /// Bad by the overall RULA risk (`risk_level` 2 or more) with no one
+    /// region's subscore 4 or more, or no bad sample yet: `general`, never
+    /// `none`, which the owner read as nothing wrong (27 Nov, #8377).
+    General,
 }
 
 /// How the person has sat over the current window: the time it stands for, the
@@ -489,7 +490,7 @@ mod tests {
         for field in ["window_s", "bad_share", "region"] {
             needs::<HumanPosture>(text, field);
         }
-        for region in ["neck", "trunk", "upper_arm", "lower_arm", "none"] {
+        for region in ["neck", "trunk", "upper_arm", "lower_arm", "general"] {
             let text = format!(r#"{{"window_s":0,"bad_share":0.0,"region":"{region}"}}"#);
             assert!(
                 serde_json::from_str::<HumanPosture>(&text).is_ok(),

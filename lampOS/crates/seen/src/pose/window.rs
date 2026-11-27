@@ -109,14 +109,17 @@ pub fn judge(ergo: &Ergo) -> (bool, u8) {
     (bad, high)
 }
 
-/// The first of [`REGIONS`] in `high` ([`judge`]'s bits), as
-/// `humans/posture` writes it, or `none`: for the journal.
-pub fn region_name(high: u8) -> &'static str {
+/// Every one of [`REGIONS`] in `high` ([`judge`]'s bits), as
+/// `humans/posture` writes them, joined by commas; empty when none is
+/// high: for the journal.
+pub fn high_names(high: u8) -> String {
     REGIONS
         .iter()
         .enumerate()
-        .find(|(bit, _)| high & (1 << bit) != 0)
-        .map_or("none", |(_, (name, _))| name)
+        .filter(|(bit, _)| high & (1 << bit) != 0)
+        .map(|(_, (name, _))| *name)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// `region` as `humans/posture` writes it: for the journal.
@@ -124,7 +127,7 @@ pub fn region_word(region: PostureRegion) -> &'static str {
     REGIONS
         .iter()
         .find(|(_, r)| *r == region)
-        .map_or("none", |(name, _)| name)
+        .map_or("general", |(name, _)| name)
 }
 
 impl Window {
@@ -199,7 +202,7 @@ impl Window {
             }
         }
         // The most often high; the first of them on a tie, as Python's `max`.
-        let mut region = PostureRegion::Nothing;
+        let mut region = PostureRegion::General;
         let mut most = 0;
         for (index, count) in counts.iter().enumerate() {
             if *count > most {
@@ -335,7 +338,7 @@ mod tests {
         window.add(30 * S, &arms);
         let none = window.summary(30 * S).unwrap();
         assert_eq!(none.bad_share, 0.0);
-        assert_eq!(none.region, PostureRegion::Nothing);
+        assert_eq!(none.region, PostureRegion::General);
         window.add(60 * S, &slumped);
         let neck = window.summary(60 * S).unwrap();
         assert_eq!(neck.bad_share, 0.5);
@@ -388,8 +391,8 @@ mod tests {
                 trunk_bad,
                 trunk_bad,
                 Some((60, 0.5, PostureRegion::Trunk)),
-                Some((60, 0.0, PostureRegion::Nothing)),
-                Some((60, 0.0, PostureRegion::Nothing)),
+                Some((60, 0.0, PostureRegion::General)),
+                Some((60, 0.0, PostureRegion::General)),
             ]
         );
         // Between checks the window stays full; a check missed still pairs

@@ -9127,12 +9127,25 @@ impl Engine {
     /// does ([`Engine::unwritten`], #6543): its trigger's `cooldown` (the
     /// per-kind rest counts from a line heard), and a run never heard is no
     /// longer the one that came last for its `[stop]`, so a "stop that"
-    /// stops the remark they heard. None is said.
+    /// stops the remark they heard. A trigger held a `for` (the wellbeing
+    /// nudges' sitting, Sit back's lean) or held on a value with no rearm
+    /// (Posture's region, the Reviewer-lead's HOLD on #8377) keeps its
+    /// chance too: the line comes at the trigger's next message while it
+    /// holds, not only after it leaves (the Reviewer-lead's P2 on #8868); a
+    /// trigger on a rise or with a rearm (the seen reactions) has had it,
+    /// as before. None is said.
     pub fn unsaid(&mut self, skill: &str, now_us: u64) -> Option<String> {
         let known = self.skills.iter().find(|known| known.name == skill)?;
         let Some((group, _)) = known.budget.as_ref() else {
             stop_group(known)?;
-            if self.unwritten(skill) {
+            let held = self
+                .unwritten
+                .get(skill)
+                .and_then(|spent| known.triggers.get(spent.index))
+                .is_some_and(|trigger| {
+                    trigger.for_us > 0 || (trigger.when == When::Present && !trigger.rearm)
+                });
+            if self.give_back(skill, !held) {
                 eprintln!(
                     "lamp-skills: {skill}'s line was never heard: its cooldown is given back"
                 );
@@ -9180,6 +9193,13 @@ impl Engine {
     /// next time it holds, never at the trigger's next message. Whether
     /// anything was given back.
     pub fn unwritten(&mut self, skill: &str) -> bool {
+        self.give_back(skill, true)
+    }
+
+    /// [`Engine::unwritten`], with this time's chance `spent` or kept: kept,
+    /// the trigger may run again at its next message while it holds
+    /// ([`Engine::unsaid`]).
+    fn give_back(&mut self, skill: &str, spend: bool) -> bool {
         let Some(spent) = self.unwritten.remove(skill) else {
             return false;
         };
@@ -9191,8 +9211,8 @@ impl Engine {
                 watch.disarmed = false;
             }
             if watch.since_us == spent.since_us {
-                watch.spent = true;
-                watch.unwritten = true;
+                watch.spent = spend;
+                watch.unwritten = spend;
             }
         }
         match spent.day {

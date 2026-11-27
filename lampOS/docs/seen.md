@@ -1140,10 +1140,13 @@ names"). On, they name it.
 | Failed | `burst failed (refused, HTTP 503); 1 of 8 frames, 7650 bytes, 80 ms in all; bursts held back 60 s` (or `no_answer`, `connect`, …) |
 | Stopped | `burst aborted (gate nobody) after 2 frames, 15300 bytes: its answers dropped` |
 | A posture frame handed to its socket | `posture sample sent: 7650 bytes` |
-| Its answer | `posture sample answered: scored, 640 ms`, or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
-| Its answer, with labels | `posture sample answered: score 5, risk 3, bad, region neck, 640 ms` (`score 3, risk 2, partial, bad, …` on a partial answer) |
-| `humans/posture` said | `posture said: window 60 s, 2 samples` |
-| `humans/posture` said, with labels | `posture said: window 60 s, 2 samples, bad_share 0.50, region neck` |
+| Its answer | `posture sample answered: scored, bad, high neck,trunk, risk 2, 1770 ms` (`high general` when bad by the risk alone, no `high` when good, `partial, ` before the verdict on a partial answer), or `no body found`, `busy`, `failed (handshake_5xx)`, `cancelled: the gate closed` |
+| Its answer, with labels | the same with the RULA score: `posture sample answered: scored, bad, high neck, risk 3, score 5, 640 ms` |
+| `humans/posture` said | `posture said: window 60 s, 2 samples, 100% bad, region general` |
+
+A posture line names its verdict, high regions, risk, bad share and region with
+the switch off too (the owner, 27 Nov on #8377: the 06c1 row's journal never
+said which region): flags and numbers only, nothing of the frame.
 
 With labels, `top` is the surest label any frame's answer gave; `counted` is what the
 burst counts as drinking, eating or a break (`sitting.rs`), or `none`. The

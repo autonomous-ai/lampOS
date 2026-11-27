@@ -765,7 +765,7 @@ fn the_face_lost_30_s_keeps_the_window_and_the_drink_and_samples_go_on() {
             note,
             Note::Answered {
                 bad: true,
-                region: "neck",
+                high: 0b0001,
                 kept: true,
                 ..
             }
@@ -851,15 +851,40 @@ fn the_journal_says_each_sample_sent_and_its_answer() {
     assert_eq!(
         notes[1].line(true),
         format!(
-            "posture sample answered: score 5, risk 3, bad, region neck, {} ms",
+            "posture sample answered: scored, bad, high neck, risk 3, score 5, {} ms",
             took.as_millis()
         )
     );
-    // The switch off (the default): scored, with no score, risk, bad flag
-    // or region.
+    // The switch off (the default): the verdict, the high regions and the
+    // risk all the same (the owner, 27 Nov on #8377), with no score.
     assert_eq!(
         notes[1].line(false),
-        format!("posture sample answered: scored, {} ms", took.as_millis())
+        format!(
+            "posture sample answered: scored, bad, high neck, risk 3, {} ms",
+            took.as_millis()
+        )
+    );
+    // Bad by its risk alone: `general`; two regions high, both; good, none.
+    let answered = |risk_level, bad, high| Note::Answered {
+        score: 4,
+        risk_level,
+        partial: false,
+        bad,
+        high,
+        took: Duration::from_millis(1770),
+        kept: true,
+    };
+    assert_eq!(
+        answered(2, true, 0).line(false),
+        "posture sample answered: scored, bad, high general, risk 2, 1770 ms"
+    );
+    assert_eq!(
+        answered(2, true, 0b0011).line(false),
+        "posture sample answered: scored, bad, high neck,trunk, risk 2, 1770 ms"
+    );
+    assert_eq!(
+        answered(1, false, 0).line(false),
+        "posture sample answered: scored, good, risk 1, 1770 ms"
     );
     assert!(pose.notes().is_empty(), "drained");
     // Busy, a failure, no body and a cancel each say one line.
@@ -904,30 +929,38 @@ fn a_partial_answer_is_judged_by_the_neck_and_says_so() {
     assert_eq!(
         notes[1].line(true),
         format!(
-            "posture sample answered: score 3, risk 2, partial, bad, region neck, {} ms",
+            "posture sample answered: scored, partial, bad, high neck, risk 2, score 3, {} ms",
             took.as_millis()
         )
     );
     assert_eq!(
         notes[1].line(false),
-        format!("posture sample answered: scored, {} ms", took.as_millis())
+        format!(
+            "posture sample answered: scored, partial, bad, high neck, risk 2, {} ms",
+            took.as_millis()
+        )
     );
 }
 
 #[test]
-fn the_said_line_names_the_share_and_region_only_with_the_switch() {
+fn the_said_line_names_the_share_and_region() {
     let posture = HumanPosture {
-        window_s: 90,
+        window_s: 60,
         bad_share: 0.5,
         region: PostureRegion::Neck,
     };
     assert_eq!(
-        said_line(&posture, 4, false),
-        "posture said: window 90 s, 4 samples"
+        said_line(&posture, 2),
+        "posture said: window 60 s, 2 samples, 50% bad, region neck"
     );
+    let general = HumanPosture {
+        window_s: 60,
+        bad_share: 1.0,
+        region: PostureRegion::General,
+    };
     assert_eq!(
-        said_line(&posture, 4, true),
-        "posture said: window 90 s, 4 samples, bad_share 0.50, region neck"
+        said_line(&general, 2),
+        "posture said: window 60 s, 2 samples, 100% bad, region general"
     );
 }
 

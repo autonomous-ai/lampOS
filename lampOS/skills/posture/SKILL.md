@@ -17,7 +17,8 @@ kind line, the part that was most often off and one thing to do about it:
 - back: sit back and let the chair support it;
 - shoulders: let them relax;
 - forearms: adjust the keyboard so your elbows rest comfortably;
-- no one part: stand up for a short stretch.
+- no one part (`general`: bad overall, no one part standing out): stand up
+  for a short stretch.
 
 It is not Sit back, which is your face coming nearer the lamp as you lean
 in; this one is only the posture reading.

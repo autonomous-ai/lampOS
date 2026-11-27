@@ -4616,7 +4616,7 @@ các kỹ năng nạp và chạy y hệt từng byte như trước. `lamp_skills
   - `nudges`: Stand up, Rest your eyes, Sit back (lời nhắc và lời cảm ơn của
     nó, mỗi trigger một task, `on = "leaned_in"` và `on = "sat_well"`),
     Posture (mỗi trigger theo vùng một task: `neck`, `trunk`, `upper_arm`,
-    `lower_arm`, `mixed`), Wind down, Comfort break, Meal check (trưa và tối, mỗi bữa một task), Quiet focus
+    `lower_arm`, `general`), Wind down, Comfort break, Meal check (trưa và tối, mỗi bữa một task), Quiet focus
     và Stuffy air. Meal check và Quiet focus là kỹ năng cài thêm (từ Store):
     biến thể của chúng chỉ đi theo gói của chúng.
   - Không bao giờ: một phản ứng nhanh; một kỹ năng mà lần kích hoạt chỉ là ánh
@@ -7216,8 +7216,9 @@ trên một phút gồm hai lần kiểm tra (quyết định của chủ sở h
 27/11, tại lamp-06c1: "we should tell user when they slump for like 1m (two
 posture check right?). Which health check only tell user when they are slump
 for 10m? thay is too late"). Mỗi `region` một trigger (`neck`, `trunk`, `upper_arm`, `lower_arm`, và
-`none` cho một cửa sổ xấu mà không vùng nào nổi bật, hàng "empty / mixed" của
-V1), mỗi trigger một câu nêu một cách sửa cụ thể (bảng trong `posture.md` của
+`general` cho một cửa sổ xấu theo mức rủi ro RULA chung mà không vùng nào nổi
+bật, hàng "empty / mixed" của V1; là `none` cho tới quyết định của chủ sở hữu
+ngày 27/11, vì đọc như không có gì sai), mỗi trigger một câu nêu một cách sửa cụ thể (bảng trong `posture.md` của
 V1: đưa đầu về trên vai, ngồi tựa ra để ghế đỡ lưng, thả lỏng vai, chỉnh bàn
 phím, đứng dậy vươn vai một chút), với các `[[while]]` `bad_share` trên
 0.5999 (0.6 trở lên của V1, vì `above` là so sánh ngặt) và `window_s` trên
