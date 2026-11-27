@@ -61,7 +61,11 @@ lamp also says once when the opt-in is turned off.
    (`seen_yes::STATE_WORDS`: "look", "watching", "notice", "see",
    "camera", "desk", "eye", "eyes" and the like, one word enough, so a line
    whose other words the speech-to-text lost, "Now stop watching the", is
-   told too) is told the state read just then by the same rule
+   told too; a bare looking verb counts only with no object in its clause,
+   or the desk or the lamp's own looking as its object, "stop watching my
+   desk", "are you watching me", never another, so "Lamp, watch the
+   timer." and "Look at the weather for me." are told nothing) is told
+   the state read just then by the same rule
    (`seen_yes::state_note`: on by default, on by a yes, faces only, or
    off), with the function to call and that it stands whatever earlier
    turns said, so the model never answers "are you watching my desk?" or
@@ -81,8 +85,10 @@ lamp also says once when the opt-in is turned off.
    late`. A written turn or a reminder's hears no person and is told
    nothing. The note goes to the model only, never said to the person;
    with any other note due in the same request it gives up its room under
-   the service's 1024-byte cap (`seen_yes::without_state_note`). And
-   the reply is checked as it is said, on both routes
+   the service's 1024-byte cap (`seen_yes::without_state_note`: only the
+   state and the whitespace just before it go, the rest of the note, its
+   newlines too, kept byte for byte). And the reply is checked as it is
+   said, on both routes
    (`seen_yes::claims_stopped`, `seen_yes::ClaimWatch`), for a person's
    spoken turn only (the second route's `Asker::Spoken`, Live's heard
    turns with a heard line), where `stop_looking_at_my_desk` could run;
