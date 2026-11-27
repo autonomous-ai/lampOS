@@ -764,7 +764,10 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                 (marked.inner_mut().pose.as_mut(), posture_out.as_mut())
                 && let Some(posture) = pose.step(now, posture_gate, came.stood_up)
             {
-                eprintln!("lamp-seen: {}", pose::said_line(&posture, pose.samples()));
+                eprintln!(
+                    "lamp-seen: {}",
+                    pose::said_line(&posture, pose.samples(), labels)
+                );
                 if let Err(error) = posture_out.publish_json(now, &posture) {
                     eprintln!("lamp-seen: humans/posture could not be said: {error}");
                 }

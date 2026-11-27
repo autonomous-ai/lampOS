@@ -200,9 +200,10 @@ pub const PILOTS: [Pilot; 11] = [
         tasks: &[
             Task {
                 on: Some("neck"),
-                task: "One short, kind line, the way a friend would, suggesting they gently bring the \
-                       head back over the shoulders; say only a while, never a number, name no \
-                       condition or illness, and never mention a camera.",
+                task: "One short, kind line, the way a friend would, saying a head bent down a while, \
+                       as at a phone or the desk, is hard on the neck, and suggesting they lift what \
+                       they're looking at toward eye level, or lift the head; say only a while, \
+                       never a number, name no condition or illness, and never mention a camera.",
             },
             Task {
                 on: Some("trunk"),
@@ -224,9 +225,9 @@ pub const PILOTS: [Pilot; 11] = [
             },
             Task {
                 on: Some("general"),
-                task: "One short, kind line, the way a friend would, suggesting they stand up for a \
-                       short stretch; say only a while, never a number, name no condition or \
-                       illness, and never mention a camera.",
+                task: "One short, kind line, the way a friend would, suggesting they sit up tall with \
+                       the shoulders relaxed; say only a while, never a number, name no condition \
+                       or illness, and never mention a camera.",
             },
         ],
     },
