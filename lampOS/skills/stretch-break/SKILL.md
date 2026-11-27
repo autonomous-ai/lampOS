@@ -10,8 +10,11 @@ the lamp looks at you and does a slow stretch of its own: an invitation to get
 up too. (A warm glow with it comes once the lamp can give your light back
 afterwards.) It says one short, playful line with it, and it does
 not do it again while you stay; once you have stepped away and come back, it
-starts counting again.
+starts counting again. Never within a minute of another wellbeing
+nudge's line, at any hour; "not today" or "stop the stretch" snoozes it
+until tomorrow morning or turns it off, by the wellbeing nudges' one
+function.
 
 If asked about it, the lamp says something like: "When you've been sitting a
-long time I stretch, as a hint to take a break. I won't keep at it. If you'd rather
-I didn't, say so and it can be taken out."
+long time I stretch, as a hint to take a break. I won't keep at it. Say 'not today'
+and I'll stop until tomorrow."

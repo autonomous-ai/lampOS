@@ -36,28 +36,25 @@ the wellbeing group's hour: that the silent focus takes no hour is
 | `a-short-look-up-is-let-be` | 10:00, head down from 3, a minute looking up at 25, looks up at 50 | Pass: no word at 25; the word at 50 (the minute under the 2-minute gap) |
 | `a-short-focus-is-let-be` | 10:00, head down from 3 to 40, then sat up | Pass: nothing |
 | `a-long-look-up-begins-it-again` | 10:00, head down 3 to 30, three minutes looking up, head down 33 to 50, looks up at 50 | Pass: nothing: past the gap, and 17 minutes after it |
-| `held-while-someone-else-is-in-view` | 10:00, looks up at 50, a second face in view from 49 to 52 | Pass: held at 50, said at 53, once they have been gone a minute |
-| `let-go-while-someone-else-stays` | 10:00, looks up at 50, a second face in view from 49 to 70 | Pass: nothing: its 5-minute `wait` and the 10 minutes after the focus run out |
+| `speaks-with-someone-else-in-view` | 10:00, looks up at 50, a second face in view from 49 to 52 | Pass: said at 50, with them there (the owner, 27 Nov: others in view are fine) |
 | `held-while-they-talk` | 10:00, looks up at 50 into a conversation to 52:30 | Pass: held at 50, said by 53 once the voice has rested |
 | `once-a-sitting` | 10:00, the word at 50, ten minutes looking up, head down again from 60 to 110, looks up at 110 | Pass: the word only once (`cooldown` 180 minutes, inside the sitting's 3 hours) |
-| `twice-a-day-at-most` | 09:00, three sittings of 55 minutes, looking up at 50 in each, each 3 h 50 after the last | Pass: at 50 and 280, not at 510 (`most_a_day = 2`) |
-| `quiet-in-the-evening` | 19:30, head down from 3, looks up at 50: due at 20:18 | Pass: nothing (`[active]` 09:00 to 20:00) |
+| `a-word-each-sitting` | 09:00, three sittings of 55 minutes, looking up at 50 in each, each 3 h 50 after the last | Pass: at 50, 280 and 510 (no daily most, the owner, 27 Nov) |
+| `a-word-in-the-evening` | 19:30, head down from 3, looks up at 50: due at 20:18 | Pass: the word at 20:20 (no hours of its own) |
 | `off-when-asked` | 10:00, `wellbeing_nudges(how = "off")` at a minute, head down from 3, looks up at 50 | Pass: nothing (`[stop]`) |
-| `quiet-at-night` | 22:00, head down from 3, looks up at 50 | Pass: nothing (`[quiet]` 22:00 to 08:00; outside `[active]` too) |
+| `a-word-at-night` | 22:00, head down from 3, looks up at 50 | Pass: the word at 22:50 (no quiet hours: a person may work late) |
 
 Red runs, each against these cases: with the word on `focused` instead of
 `looked_up`, it is said at 48 while they are head down
 (`a-short-look-up-is-let-be` fails, first in order); without `follows`,
 the word comes at any look up (`a-long-look-up-begins-it-again` fails);
 with `follows`' `within` at 20 minutes, the word comes at 60
-(`nothing-while-they-stay-head-down` fails); without its `faces_at_most`
-condition, the word is said at 50 with the second face in view
-(`held-while-someone-else-is-in-view` fails); without the voice resting 5 s,
+(`nothing-while-they-stay-head-down` fails); without the voice resting 5 s,
 it is said at 51 in the conversation (`held-while-they-talk` fails); with a
 1-minute `cooldown`, the second focus in the sitting is told at 110
-(`once-a-sitting` fails); with `most_a_day = 3`, the third sitting's word
-comes at 510 (`twice-a-day-at-most` fails); without `[active]`, the word
-comes at 20:20 (`quiet-in-the-evening` fails); without `[active]` and with
-`[quiet]` from 23:30, at 22:50 (`quiet-at-night` fails); with a 5-minute
+(`once-a-sitting` fails); with the old `most_a_day = 2`, the third
+sitting's word does not come (`a-word-each-sitting` fails); with the old
+`[active]` 09:00 to 20:00, nothing in the evening (`a-word-in-the-evening`
+fails) or at night (`a-word-at-night` fails); with a 5-minute
 `gap`, the three minutes looking up do not end the focus and the word comes
 at 50 (`a-long-look-up-begins-it-again` fails).

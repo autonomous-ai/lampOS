@@ -391,6 +391,8 @@ def _stop(rules: dict[str, Any], report: Report) -> None:
     stop = rules.get("stop")
     if isinstance(stop, dict) and "group" in stop and "budget" in rules:
         report.errors.append("skill.toml: [stop] group is for a skill in no [budget] group: its group shares it already")
+    if isinstance(stop, dict) and "apart" in stop and "group" not in stop:
+        report.errors.append("skill.toml: [stop] apart goes with [stop] group")
 
 
 def is_service_grant(grant: object) -> bool:

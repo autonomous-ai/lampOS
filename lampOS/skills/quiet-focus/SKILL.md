@@ -20,29 +20,19 @@ What it says and when:
   stay head down past that, or get up and go, it says nothing.
 - A glance up shorter than two minutes before the 45 minutes doesn't end
   the focus; a longer one does, and the 45 minutes begin again.
-- At most once every three hours, so never twice a sitting, and twice a
-  day, from 09:00 to 20:00: never in the evening or at night. The three
-  hours run from when the 45 minutes came due, even if no word followed
-  (you stayed head down, or someone was with you), and they carry on past
-  a break: a focus that came due at 10:45 holds the next one until 13:45,
-  lunch or not. Only a word said counts toward the two.
-- Only when nobody else is in view: someone out of the camera's sight
-  isn't seen, so it can still speak then. If someone is with you when you
-  look up, it waits until they have been gone a minute, for up to five
-  minutes while the 10 minutes last, and then speaks, or lets it go.
-- Never in the middle of a conversation, or while you talk.
+- At most once every three hours, so never twice a sitting, at any hour,
+  with no daily most. The three hours run from when the 45 minutes came
+  due, even if no word followed (you stayed head down, or left), and they
+  carry on past a break: a focus that came due at 10:45 holds the next one
+  until 13:45, lunch or not.
+- Whether or not someone else is in view; never in the middle of a
+  conversation, or while you talk (it waits for up to five minutes while
+  the 10 minutes last, and then speaks, or lets it go).
 - It is one of the wellbeing nudges (this, A comfort break, A meal check,
   A sip of water, Rest your eyes, Sit back, Stand up, Stretch break and
-  Wind down), and shares their hour: at most one of them an hour, or in the
-  product two, never within 30 minutes of each other. Only its word takes a
-  turn: the 45 minutes it waits through silently take none.
-- When another wellbeing nudge (Rest your eyes, or a sip of water) would be
-  due as you look up, this word comes in its place, not both: the nudge
-  waits for it, and counts it as its own. If the word does not come (you
-  stayed head down, or left), the others are not held back for it again
-  until it has been said.
-- If it speaks twice and you neither look back down nor move nor say
-  anything within five minutes, it rests until tomorrow morning.
+  Wind down), with no shared limit, but never within a minute of another
+  one's line: when Rest your eyes or a sip of water is due as you look up
+  too, each comes a minute after the one before.
 - "Not today" or "stop the nudges" to the lamp snoozes it until tomorrow
   morning or turns it off until you ask for it again. The wellbeing nudges
   share that one function: it stops the one that came last, unless you ask
@@ -50,8 +40,7 @@ What it says and when:
 
 It looks at nothing but how your face sits at the desk: it takes no
 picture, never speaks of your body or looks, and keeps nothing about you,
-only, in memory, how many times it spoke today and whether it is
-resting; off is one line with its name. It does not listen to what you
+only, in memory, when it last spoke; off is one line with its name. It does not listen to what you
 say.
 
 An installable skill: its owner puts it on the lamp (`lamp-skills install`)

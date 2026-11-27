@@ -362,7 +362,12 @@
         "group": {
           "type": "string",
           "pattern": "^[a-z0-9-]{1,64}$",
-          "description": "In a skill with no [budget] (#7401): the skills under the skills folder that name the same group share the stop function, with no limit of their own. Refused beside a [budget]; a pushed skill shares nothing."
+          "description": "In a skill with no [budget] (#7401): the skills under the skills folder that name the same group share the stop function, with no limit of their own; a group of a [budget] group's name shares that group's function too (the wellbeing nudges with A meal check and Quiet focus). Refused beside a [budget]; a pushed skill shares nothing."
+        },
+        "apart": {
+          "type": "string",
+          "pattern": "^[0-9]+(ms|s|m|h)$",
+          "description": "With group (the owner, 27 Nov): a member of the [stop] group never starts within this (1s to 1h) of another member's start, by the largest any member names; held back, its chance is kept and taken once it has passed. No count of its own."
         },
         "done": {
           "type": "object",

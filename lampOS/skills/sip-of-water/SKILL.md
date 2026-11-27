@@ -5,8 +5,8 @@ description: After someone has sat at the desk half an hour, the lamp turns to t
 
 # A sip of water
 
-When you have been at your desk for half an hour without getting up,
-between 10:00 and 17:00, the lamp turns to you and its light breathes once,
+When you have been at your desk for half an hour without getting up, at
+any hour, the lamp turns to you and its light breathes once,
 slowly, a cool blue, for about six seconds, and says one short, friendly
 line suggesting a sip of water. Then the light is as it was.
 
@@ -17,18 +17,15 @@ What it says and when:
   water beyond that line. If you want a reminder at a set time, ask for one
   ("remind me to drink water at three"): that is your own reminder, which
   the lamp keeps and says.
-- Once a sitting: it does not do it again while you stay. Three times a day
-  at most, never while you read or write head down (with the eyes' activity on),
-  and never in the middle of a conversation, before 10:00, after
-  17:00 or at night.
+- Once a sitting, and not again within 30 minutes, with no daily most;
+  never while you read or write head down (with the eyes' activity on), and
+  never in the middle of a conversation.
 - With the eyes' activity on, the sitting is yours: someone else sitting down in
   your chair begins it again, so it is never theirs at your 30 minutes.
-- At most one of the wellbeing nudges (this, Rest your eyes, Stand up and
-  Wind down) an hour between them.
-- If it does it twice and you neither look at it nor move nor say
-  anything, it rests until tomorrow morning.
+- No shared limit with the other wellbeing nudges, but never within a
+  minute of another one's line: it waits that minute, then speaks.
 - "Not today" or "stop the water reminders" to the lamp snoozes it until
-  tomorrow morning or turns it off until you ask for it again. The four
+  tomorrow morning or turns it off until you ask for it again. The
   wellbeing nudges share that one function: it stops the one that came
   last, unless you ask for all of them, and the lamp says which.
 - "I just had water" (or any drink) rests this nudge alone for 30
@@ -38,12 +35,10 @@ What it says and when:
   before.
 
 With the lamp's `LAMP_NUDGES_PRESENT` switch on (#5207, off unless set), it
-comes after 30 minutes at the desk, and again each 45 minutes while you
-stay, between 08:00 and 22:00, six times a day at most, and the wellbeing
-nudges share two an hour, never within half an hour of each other.
+comes after 30 minutes at the desk, and again each 30 minutes while you
+stay.
 
-It keeps nothing about you: only, in memory, how many times it went today
-and whether it is resting; off is one line with its name. How long you
+It keeps nothing about you: only, in memory, when it last went; off is one line with its name. How long you
 have sat is a time kept through a short restart of the lamp's skills (an
 update's), never across a reboot, with no person in it.
 

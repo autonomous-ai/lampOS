@@ -1,0 +1,27 @@
+# 10:00, 140 minutes at the desk without getting up: the break line at 60 minutes,
+# and again 75 minutes later, at 135 (the owner, 27 Nov: "Again 75 min later").
+clock = "10:00"
+
+[[expect]]
+at = "60m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "60m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about an hour. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health." }
+
+[[expect]]
+at = "135m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "135m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about an hour. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health." }
