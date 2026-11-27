@@ -333,6 +333,11 @@ pub struct FaceCache {
     /// The eyes' known file as the last refresh read it; `None` before the
     /// first ([`Self::known_file_read`]).
     known_mark: Mutex<Option<KnownMark>>,
+    /// Whether a refresh has named an enrolled face since this cache was
+    /// made, at the voice's start: never set back, not by a privacy change
+    /// or a forget. Only then can an unknown face be a guest
+    /// ([`Self::guest`], the Reviewer-lead's P1 on #8903, option b).
+    named_once: AtomicBool,
 }
 impl FaceCache {
     /// The lamp has answered a turn of `scope`'s at `at`: a gap is held only
@@ -408,8 +413,13 @@ impl FaceCache {
     /// refresh, and no known face was freshly seen within [`NO_FACE_QUIET`]
     /// ([`RoomReason::NeverKnown`], as [`Self::room_told`] reads it).
     /// Nobody in view, a known face, or a one-turn misread (a known face
-    /// seen moments ago) is no guest. No lock is waited for: a busy lock
-    /// reads as no guest.
+    /// seen moments ago) is no guest. Nor is anyone before the eyes have
+    /// matched an enrolled face once since the voice started (the
+    /// Reviewer-lead's P1 on #8903, option b, no new window): on a lamp with
+    /// no face enrolled, or before the owner is first matched, every line is
+    /// the room's, kept and unmarked, as before. A match is of an enrolled
+    /// face, so this also holds that one is enrolled. No lock is waited for:
+    /// a busy lock reads as no guest.
     pub fn guest(&self, now: Instant) -> bool {
         if self.snapshot(now).person().is_some() {
             return false;
@@ -479,6 +489,14 @@ impl FaceCache {
     #[cfg(test)]
     pub(crate) fn cold_since(&self, at: Instant) {
         *self.cold_at.lock().unwrap() = Some(at);
+    }
+
+    /// For tests: an enrolled face was matched `ago` before now, its
+    /// sighting ended then ([`Self::guest`]).
+    #[cfg(test)]
+    pub(crate) fn matched_ago(&self, ago: Duration) {
+        self.named_once.store(true, Ordering::Release);
+        *self.last_seen_until.lock().unwrap() = Instant::now().checked_sub(ago);
     }
 
     /// A refresh read the eyes' known file as `mark` ([`KnownMark::read`]),

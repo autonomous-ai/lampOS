@@ -245,3 +245,55 @@ fn with_no_guest_mark_nothing_changes() {
     let answer = scratch.ask_at(&json!({"op":"kept","max_bytes":4096}), NOW + 90 * DAY);
     assert_eq!(said_by(&answer).len(), 1, "{answer}");
 }
+
+/// The Reviewer-lead's P2 on #8903: a guest's correction never retires a
+/// fact the household kept. The owner's room fact stays active, and the
+/// guest's "actually …" is kept beside it as the guest's (it expires at 30
+/// days; nothing would bring the household's back). A guest's correction
+/// of a guest's own fact still retires it, as any correction does.
+#[test]
+fn a_guests_correction_never_retires_the_households_fact() {
+    let mut scratch = Scratch::new("replaces");
+    let household = scratch.kept("The wifi password is X", false);
+    let theirs = scratch.ask(&json!({"op":"remember","at_unix_ms":NOW + 1,
+        "text":"Actually the wifi password is Y","replaces":household,"shown":[household],
+        "speaker":"guest"}));
+    assert_eq!(theirs["ok"], true, "{theirs}");
+    let theirs = theirs["id"].as_u64().unwrap();
+    let listed = scratch.ask(&json!({"op":"kept","max_bytes":4096}));
+    let mut marks = said_by(&listed);
+    marks.sort();
+    assert_eq!(marks, [(household, None), (theirs, guest())], "{listed}");
+    // The guest's own fact, corrected by a guest: retired as before.
+    let again = scratch.ask(&json!({"op":"remember","at_unix_ms":NOW + 2,
+        "text":"Actually the wifi password is Z","replaces":theirs,"shown":[theirs],
+        "speaker":"guest"}));
+    assert_eq!(again["ok"], true, "{again}");
+    let again = again["id"].as_u64().unwrap();
+    let listed = scratch.ask(&json!({"op":"kept","max_bytes":4096}));
+    let mut marks = said_by(&listed);
+    marks.sort();
+    assert_eq!(marks, [(household, None), (again, guest())], "{listed}");
+    // After 30 days the household's fact is still there.
+    let answer = scratch.ask_at(&json!({"op":"kept","max_bytes":4096}), NOW + 31 * DAY);
+    assert_eq!(said_by(&answer), [(household, None)], "{answer}");
+}
+
+/// Thirteen's P3 4 on #8903: a room forget removes a guest-marked line and
+/// its mark; nothing of it is told after.
+#[test]
+fn a_room_forget_removes_a_guests_line_and_its_mark() {
+    let mut scratch = Scratch::new("forget");
+    let fact = scratch.kept("The guest's dog is called Biscuit", true);
+    let opened = scratch.ask(&json!({"op":"session_open","session":"s1","max_bytes":1200}));
+    assert_eq!(opened["snapshot"]["guest_ids"], json!([fact]), "{opened}");
+    let forgot = scratch.ask(&json!({"op":"forget","id":fact}));
+    assert_eq!(forgot["ok"], true, "{forgot}");
+    let listed = scratch.ask(&json!({"op":"kept","max_bytes":4096}));
+    assert!(said_by(&listed).is_empty(), "{listed}");
+    let asked = scratch
+        .ask(&json!({"op":"recall","recall_v2":true,"guest":true,"limit":6,"max_bytes":2400}));
+    assert!(said_by(&asked).is_empty(), "{asked}");
+    let opened = scratch.ask(&json!({"op":"session_open","session":"s2","max_bytes":1200}));
+    assert!(opened["snapshot"].get("guest_ids").is_none(), "{opened}");
+}

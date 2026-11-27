@@ -1,7 +1,11 @@
 //! #8639, the memory owner's calls of 27 Nov 2026 (17:42): a guest is an
 //! unknown face only, an unknown face in view with no known face seen in
 //! the last two minutes and no session person. With nobody in view, a known
-//! face in view or after a one-turn misread, the line stays the owner's. A
+//! face in view or after a one-turn misread, the line stays the owner's.
+//! Nor is any line a guest's before the eyes have matched an enrolled face
+//! once since the voice started (the Reviewer-lead's P1 on #8903, option
+//! b): with no face enrolled, or the owner not yet matched, a line is the
+//! room's, kept and unmarked, as before. A
 //! guest line is marked at admission (`remember::guest::mark_line`) for the
 //! room's memory, with `LAMP_MEMORY_GUEST_MARKED`.
 //!
@@ -67,7 +71,16 @@ type Refreshes = Vec<(Option<crate::known_faces::FaceObservation>, usize)>;
 /// product's no-face hold (`LAMP_FACE_NO_FACE_HOLD`, on). The engine is kept
 /// with it: dropped, it revokes the lease.
 fn admitted(refreshes: Refreshes) -> (Engine, ScopeLease) {
+    admitted_after(None, refreshes)
+}
+
+/// [`admitted`], with an enrolled face matched `matched` before (its
+/// sighting ended then) when given, before the refreshes.
+fn admitted_after(matched: Option<Duration>, refreshes: Refreshes) -> (Engine, ScopeLease) {
     let cache = Arc::new(FaceCache::holding(Some(Gap::no_face())));
+    if let Some(ago) = matched {
+        cache.matched_ago(ago);
+    }
     let (engine, _, _) = scripted(Arc::new(Script::default()));
     let runner: ScopedToolRunner =
         Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
@@ -86,9 +99,13 @@ fn admitted(refreshes: Refreshes) -> (Engine, ScopeLease) {
     (engine, lease)
 }
 
-/// A guest: one unknown face in view, no known face ever seen.
+/// A guest: an enrolled face matched earlier, past the 2 min
+/// (`memory_scope::NO_FACE_QUIET`, 120 s), and one unknown face in view now.
 fn guest() -> (Engine, ScopeLease) {
-    admitted(vec![(None, 1)])
+    admitted_after(
+        Some(crate::memory_scope::NO_FACE_QUIET + Duration::from_secs(1)),
+        vec![(None, 1)],
+    )
 }
 
 /// The reminder's record keeper a line's `set_reminder` names.
@@ -97,8 +114,9 @@ fn reminder_setter(lease: &ScopeLease) -> Value {
         .clone()
 }
 
-/// A lone unknown face, no known face seen: the line is a guest's, the
-/// room's for memory (never the owner's), and marked for the room's memory.
+/// An enrolled face matched earlier this session, none seen for 120 s, and a
+/// lone unknown face now: the line is a guest's, the room's for memory
+/// (never the owner's), and marked for the room's memory.
 #[tokio::test]
 async fn a_lone_unknown_face_is_a_guest_line_marked_for_the_room() {
     let _room = OwnersRoom::on();
@@ -151,6 +169,29 @@ async fn the_private_rooms_service_records_are_unchanged_for_a_guest() {
             );
         }
     }
+}
+
+/// The Reviewer-lead's P1 on #8903: on a lamp with no face enrolled, or
+/// enrolled but with no face matched yet since the voice started, a lone
+/// unknown face's line is the room's, kept and unmarked, as before: never a
+/// guest's, so never told "A guest said" and never expired at 30 days.
+#[tokio::test]
+async fn no_enrolled_face_or_none_matched_yet_is_never_a_guest() {
+    let _room = OwnersRoom::on();
+    // No face enrolled: nothing is ever matched, at any length of time.
+    let (_engine, lease) = admitted(vec![(None, 1), (None, 1)]);
+    assert_eq!(lease.scope().unwrap().person(), None, "the room's");
+    assert!(
+        !crate::remember::guest::line(lease.key().request),
+        "no face enrolled"
+    );
+    // Enrolled, not yet matched since the start: the same, read the same way
+    // (the voice knows a face is enrolled only by its first match).
+    let (_engine, lease) = admitted(vec![(None, 2)]);
+    assert!(
+        !crate::remember::guest::line(lease.key().request),
+        "none matched yet"
+    );
 }
 
 /// With the switch off, nothing is a guest line.

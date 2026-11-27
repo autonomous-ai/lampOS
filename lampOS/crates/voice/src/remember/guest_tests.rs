@@ -374,3 +374,39 @@ fn recall_with_guest_stays_a_valid_function() {
         }
     }
 }
+
+/// The Reviewer-lead's ask 4 on #8903: an older memory that refuses a
+/// guest's mark stops only the guest's marks; a known person's speaker
+/// (`LAMP_MEMORY_ROOM_SPEAKER`) is still sent, and the other way round.
+#[test]
+fn a_refused_guest_mark_is_counted_apart_from_a_refused_speaker() {
+    use crate::remember::{RoomSpeaker, send_with_speaker};
+    use std::sync::atomic::Ordering;
+    // An older memory: any speaker refused, the line without it kept.
+    let older = |line: &Value| {
+        Some(if line.get("speaker").is_some() {
+            json!({"ok":false,"error":"bad_request"})
+        } else {
+            json!({"ok":true,"id":1})
+        })
+    };
+    let speaker = RoomSpeaker::default();
+    let line = json!({"op":"append_linked","speaker":lamp_msgs::known::GUEST_SPEAKER});
+    assert_eq!(
+        send_with_speaker(&speaker, line, older).unwrap()["ok"],
+        true
+    );
+    assert!(!speaker.guest(None), "the guest's marks stop");
+    assert!(
+        !speaker.refused.load(Ordering::Acquire),
+        "a known person's go on"
+    );
+    let speaker = RoomSpeaker::default();
+    let line = json!({"op":"append_linked","speaker":"p-0123456789abcdef"});
+    assert_eq!(
+        send_with_speaker(&speaker, line, older).unwrap()["ok"],
+        true
+    );
+    assert!(speaker.refused.load(Ordering::Acquire));
+    assert!(speaker.guest(None), "a guest's mark goes on");
+}
