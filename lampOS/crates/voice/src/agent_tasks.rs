@@ -1668,9 +1668,10 @@ pub fn new_work_after_news(said: &str) -> bool {
         return false;
     }
     if own_lookup_after_news(&words)
-        || words
-            .iter()
-            .any(|word| AFTER_NEWS_CREATIVE.contains(&word.trim_end_matches('s')))
+        || words.iter().any(|word| {
+            AFTER_NEWS_CREATIVE.contains(&word.as_str())
+                || AFTER_NEWS_CREATIVE.contains(&word.trim_end_matches('s'))
+        })
     {
         return false;
     }
@@ -7644,6 +7645,7 @@ pub(crate) mod tests {
             // P3 on #8809, rule 8).
             "Write me a short poem about autumn",
             "Write a story about a dragon for my daughter",
+            "Write two short stories about a brave little fox for my son",
         ] {
             assert!(!super::new_work_after_news(said), "{said}");
         }
