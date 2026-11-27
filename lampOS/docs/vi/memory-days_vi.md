@@ -2350,7 +2350,13 @@ có khuôn mặt quen nào được thấy trong `NO_FACE_QUIET` (120 giây), v�
 giữ vì khoảng trống (`FaceCache::guest`; `remember::guest::mark_line` giữ 16
 câu khách mới nhất theo mã yêu cầu). Không có ai trong khung hình, một khuôn
 mặt quen trong khung hình, hoặc một khuôn mặt quen vừa thấy trong 120 giây
-(nhận nhầm một lượt) không bao giờ là khách.
+(nhận nhầm một lượt) không bao giờ là khách. Cũng không ai là khách trước khi
+mắt đã nhận ra một khuôn mặt đã đăng ký ít nhất một lần từ khi voice khởi động
+(`FaceCache::named_once`, không bao giờ đặt lại; P1 của Reviewer-lead trên
+#8903, phương án b, không thêm khoảng thời gian nào): trên đèn chưa đăng ký
+khuôn mặt nào, hoặc trước khi chủ được nhận ra lần đầu sau khi khởi động, mọi
+câu là của phòng, được giữ và không đánh dấu, như trước. Câu mà người của
+phiên (`LAMP_SESSION_PERSON`) nhận là của họ thì bị xoá dấu.
 
 **Điều được giữ.** Lời của khách vẫn được giữ trong ký ức của phòng như trước
 (lượt trao đổi 30 ngày, và điều phòng nhờ giữ), nay có đánh dấu: `append_linked`
@@ -2360,12 +2366,24 @@ và `remember` của phòng mang `"speaker":"guest"`, một hàng của bảng
 bao giờ xoá nó. Hàng đi theo mục của nó khi quên và khi hết hạn. Điều khách
 nhờ giữ hết hạn cùng ngày với các lượt trao đổi, sau `--keep-days` (30 trong
 sản phẩm) (`Days::maintain`); điều của gia đình không bao giờ hết hạn, như
-trước.
+trước. Lời đính chính của khách (`remember` có `replaces`, đánh dấu `guest`)
+chỉ thay điều của khách: điều gia đình đã giữ vẫn còn hiệu lực, và lời của
+khách được giữ bên cạnh như của khách (P2 của Reviewer-lead trên #8903).
+`adopt` xoá dấu khi câu được chuyển cho một người. Ghi chú cuộc trò chuyện và
+quan sát theo luật của phòng, như trước, và không được đánh dấu: một cuộc trò
+chuyện của phòng có lời khách vẫn có thể tạo ghi chú cuộc trò chuyện của phòng
+(`LAMP_CONVERSATION_SUMMARY`), kể như của phòng và, như mọi ghi chú cuộc trò
+chuyện, không hết hạn sau 30 ngày; chỉ đề xuất về một người bị bỏ
+(`LAMP_MEMORY_PERSONAL_NEEDS_FACE`). Điều riêng của khách ("sinh nhật tôi là
+3/5") vẫn không được giữ.
 
 **Điều được kể.** `recall`, `search` và `kept` của phòng ghi
 `"said_by":"guest"` trên mục của khách, và `session_open` của phòng thêm
 `guest_ids`. `guest:true` chỉ cho những gì khách đã nói, trong cùng 6 mục và
-2.400 byte; trên phạm vi riêng của một người thì bị bỏ qua. Voice kể một mục
+2.400 byte; trên phạm vi riêng của một người thì bị bỏ qua. Recall có
+`guest` bỏ qua chốt chặn người hỏi tự hỏi về mình (#4196), nên một người hỏi
+lạ cũng có thể nghe lại lời của các khách trước (các lượt trao đổi của phòng
+vốn đã mở cho họ). Voice kể một mục
 là `"said_by":"a guest"` và thêm vào phạm vi câu W1 ("Items with said_by were
 said by a guest, someone the lamp did not know: tell them as the guest's,
 never as the asker's or the household's."); recall nhận `guest` (W2: "true
@@ -2379,13 +2397,15 @@ gợi ý, nên không bao giờ được kể như của gia đình.
 
 **Điều không đổi.** Bản ghi dịch vụ, lời nhắc và dòng ứng dụng của phòng
 riêng như hôm nay. Bộ nhớ cũ từ chối `speaker` thì giữ câu không có nó (ghi
-nhật ký một lần); bộ nhớ cũ từ chối `guest` trong recall thì được hỏi lại
+nhật ký một lần; dấu khách bị từ chối chỉ dừng dấu khách, mã của một người bị
+từ chối chỉ dừng mã người, đếm riêng); bộ nhớ cũ từ chối `guest` trong recall thì được hỏi lại
 không có nó. Tắt công tắc, không có gì được đánh dấu và mọi chữ như trước.
 
 | Giới hạn | Giá trị | Ở đâu |
 |---|---|---|
 | Khuôn mặt quen thấy gần đây (2 phút của quyết định 1) | 120 giây | `memory_scope::NO_FACE_QUIET` |
 | Khuôn mặt trong khung hình để là khách | ít nhất 1 ở lần làm mới gần nhất | `FaceCache::guest` |
+| Đã nhận ra khuôn mặt đã đăng ký | một lần từ khi voice khởi động (không có khoảng thời gian) | `FaceCache::named_once` |
 | Câu khách giữ theo mã yêu cầu | 16 câu mới nhất | `remember::guest::LINES_HELD` |
 | Lượt trao đổi của khách | 30 ngày | `--keep-days 30`, `lamp-memory.service` |
 | Điều khách nhờ giữ | 30 ngày, cùng ngày với lượt trao đổi | `Days::maintain` |

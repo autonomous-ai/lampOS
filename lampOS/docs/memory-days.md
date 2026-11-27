@@ -1576,10 +1576,17 @@ the room's `session_open` names the note's guest facts in `guest_ids`, and
 `guest:true` asks for only what a guest said (Request contract). A guest's
 kept fact expires on the same day as the exchanges, `--keep-days` (30 in the
 product) after the day it was kept (`Days::maintain`); the household's kept
-facts never expire, as before. Nothing else changes: no observation or talk
-note is made from a guest's conversation (`LAMP_MEMORY_PERSONAL_NEEDS_FACE`,
-as before), and a guest's personal keep ("my birthday is May 3") is still not
-kept.
+facts never expire, as before. A guest's correction (`remember` with
+`replaces`, marked `guest`) retires only a guest's kept fact: one the
+household kept stays active, and the guest's is kept beside it as the
+guest's (the Reviewer-lead's P2 on #8903), so a guest's "actually …" never
+takes away the household's fact. Talk notes and observations follow the
+room's rules, as before, and are not marked: a room conversation with a
+guest's words in it can still make a room talk note (`LAMP_CONVERSATION_SUMMARY`),
+told as the room's and, like every talk note, never expired at 30 days
+(`maintain` keeps `category='talk'`); only proposals about a person are
+dropped (`LAMP_MEMORY_PERSONAL_NEEDS_FACE`). A guest's personal keep ("my
+birthday is May 3") is still not kept.
 
 ## Request contract
 
