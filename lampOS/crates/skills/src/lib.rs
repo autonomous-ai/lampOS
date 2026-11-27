@@ -7539,6 +7539,12 @@ pub struct Engine {
     /// By group, each member waiting for its hour: since when, and when it
     /// was last held back for it.
     budget_waits: HashMap<String, HashMap<String, (u64, u64)>>,
+    /// By `[stop] group` with an `apart`, each member held back by it (or
+    /// by another member waiting first): since when, and when last held,
+    /// as [`Engine::budget_waits`] is, in memory only. First come, first
+    /// served: a member whose own unheard retry is due never goes ahead of
+    /// another waiting its minute (Twelve's HOLD on #8868), so each retries.
+    apart_waits: HashMap<String, HashMap<String, (u64, u64)>>,
     /// By a skill with a `stands_in_for_group` word (#5620): how many
     /// windows for the word opened since it last ran, 2 once one closed
     /// without it (the trigger it `follows` ran again, or the word's chance
@@ -7551,7 +7557,8 @@ pub struct Engine {
     /// stops.
     group_ran: HashMap<String, u64>,
     /// By `[stop] group` with an `apart`, the member that last started and
-    /// when ([`Stop::apart_us`]); given back with a line never heard.
+    /// when ([`Stop::apart_us`]); kept for a line never heard too, so the
+    /// retries of different members stay apart (Twelve's HOLD on #8868).
     apart_ran: HashMap<String, (String, u64)>,
     /// By skill, a line never heard whose chance was kept: not run again
     /// before this ([`UNHEARD_RETRY_US`]).
@@ -7915,6 +7922,7 @@ impl Engine {
             group_day: HashMap::new(),
             group_runs: HashMap::new(),
             budget_waits: HashMap::new(),
+            apart_waits: HashMap::new(),
             word_windows: HashMap::new(),
             group_ran: HashMap::new(),
             apart_ran: HashMap::new(),
@@ -9186,16 +9194,11 @@ impl Engine {
                 .is_some_and(|trigger| {
                     trigger.for_us > 0 || (trigger.when == When::Present && !trigger.rearm)
                 });
-            // A line never heard keeps no other member a minute apart.
-            if let Some(spent) = self.unwritten.get(skill)
-                && let Some(group) = stop_group(known)
-                && self
-                    .apart_ran
-                    .get(group)
-                    .is_some_and(|(last, at)| last == skill && *at == spent.at_us)
-            {
-                self.apart_ran.remove(group);
-            }
+            // A line never heard keeps its group's `apart` mark (Twelve's
+            // HOLD on #8868, rule 8): another member still waits its minute
+            // after this try, so unheard nudges due together retry a minute
+            // apart, never in a burst; the mark never holds the member that
+            // set it, whose retry waits only [`UNHEARD_RETRY_US`].
             if self.give_back(skill, !held) {
                 eprintln!(
                     "lamp-skills: {skill}'s line was never heard: its cooldown is given back"
@@ -11048,22 +11051,22 @@ impl Engine {
                 // held (a member of the group without one, as Posture,
                 // is no nudge and never waits a minute).
                 let own_apart = skill.stop.as_ref().is_some_and(|stop| stop.apart_us > 0);
-                let apart_left =
-                    stop_group(skill)
-                        .filter(|_| counted && own_apart)
-                        .and_then(|group| {
-                            let apart_us = self
-                                .skills
-                                .iter()
-                                .filter(|other| stop_group(other) == Some(group))
-                                .filter_map(|other| other.stop.as_ref())
-                                .map(|stop| stop.apart_us)
-                                .max()
-                                .unwrap_or(0);
-                            let (last, at) = self.apart_ran.get(group)?;
-                            let since = now_us.saturating_sub(*at);
-                            (*last != skill.name && since < apart_us).then(|| apart_us - since)
-                        });
+                let apart_group = stop_group(skill)
+                    .filter(|_| counted && own_apart)
+                    .map(str::to_owned);
+                let apart_left = apart_group.as_deref().and_then(|group| {
+                    let apart_us = self
+                        .skills
+                        .iter()
+                        .filter(|other| stop_group(other) == Some(group))
+                        .filter_map(|other| other.stop.as_ref())
+                        .map(|stop| stop.apart_us)
+                        .max()
+                        .unwrap_or(0);
+                    let (last, at) = self.apart_ran.get(group)?;
+                    let since = now_us.saturating_sub(*at);
+                    (*last != skill.name && since < apart_us).then(|| apart_us - since)
+                });
                 // A line never heard, its chance kept: no sooner than
                 // [`UNHEARD_RETRY_US`] after the try.
                 let retry_left = self
@@ -11090,6 +11093,33 @@ impl Engine {
                             })
                         })
                     });
+                // The same, first come first served, among the members held
+                // by an `apart` (Twelve's HOLD on #8868): the member whose
+                // own mark does not hold it, retrying a line never heard,
+                // still waits behind another member held for the minute.
+                let apart_behind = apart_group.as_deref().is_some_and(|group| {
+                    self.apart_waits.get(group).is_some_and(|waits| {
+                        let mine = waits.get(&skill.name).map_or(now_us, |(first, _)| *first);
+                        waits.iter().any(|(name, (first, last))| {
+                            *name != skill.name
+                                && now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
+                                && *first < mine
+                        })
+                    })
+                });
+                if (apart_left.is_some() || apart_behind)
+                    && !outside
+                    && let Some(group) = &apart_group
+                {
+                    let wait = self
+                        .apart_waits
+                        .entry(group.clone())
+                        .or_default()
+                        .entry(skill.name.clone())
+                        .or_insert((now_us, now_us));
+                    wait.1 = now_us;
+                }
+                let behind = behind || apart_behind;
                 if (hour_spent || behind)
                     && !outside
                     && let Some((group, _)) = &skill.budget
@@ -11515,6 +11545,12 @@ impl Engine {
                         if counted && skill.stop.as_ref().is_some_and(|stop| stop.apart_us > 0) {
                             self.apart_ran
                                 .insert(group.to_owned(), (skill.name.clone(), now_us));
+                            if let Some(waits) = self.apart_waits.get_mut(group) {
+                                waits.remove(&skill.name);
+                                waits.retain(|_, (_, last)| {
+                                    now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
+                                });
+                            }
                         }
                     }
                     // Asked of the Policy, a run is watched for once it is
