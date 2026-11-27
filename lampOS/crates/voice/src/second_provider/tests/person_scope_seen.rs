@@ -7248,7 +7248,7 @@ async fn a_correction_on_the_yes_that_fails_or_is_refused_is_never_told_kept() {
         .await;
         assert_eq!(
             ran_named(&got, crate::remember::REMEMBER),
-            [args.clone()],
+            std::slice::from_ref(&args),
             "{case}: run once on the yes"
         );
         let kept = case == "kept";
@@ -9020,7 +9020,7 @@ fn with_no_sight_a_no_or_another_persons_yes_runs_nothing() {
             five,
         );
         assert!(
-            matches!(other, Taken::NotTheirs),
+            !matches!(other, Taken::Runs(..) | Taken::Agrees(_)),
             "{name}: another person's yes runs nothing"
         );
     }

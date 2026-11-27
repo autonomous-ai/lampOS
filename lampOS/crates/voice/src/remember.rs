@@ -33222,6 +33222,7 @@ mod tests {
         adopt_role_fixture(&client, &person);
         let lone = role_lease(907, crate::memory_scope::ScopeSnapshot::of(name));
         let lease = lone.lease();
+        assert!(lease.read_by_one_face());
         assert!(lease.forgets_need_mouth());
         let set = call(role::SET_ROLE, json!({"name":"Harry Potter"}));
         let end = call(role::END_ROLE, json!({}));
