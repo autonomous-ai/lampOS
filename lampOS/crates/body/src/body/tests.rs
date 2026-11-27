@@ -5346,6 +5346,114 @@ fn rest_glances_watched(
     (report, seen)
 }
 
+/// A computer holds the body and asks a look `down` counts below home (a degree every 200 ms from 12 s, the last one held) while
+/// Expression asks a rest glance from `GLANCE_FROM` to 18 s: each step's time, and the pitch's goal and position (#8720).
+fn rest_glance_under_a_held_look(down: f32, glance: bool) -> Vec<(Duration, u16, u16)> {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(20));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    for (servo, at) in lamp
+        .servos
+        .iter_mut()
+        .zip([2_015, 2_650, 2_600, 2_044, 1_900])
+    {
+        servo.position = f32::from(at);
+        servo.goal = at;
+    }
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 25, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .map(|limits| Limits {
+        rest_glance: true,
+        ..limits
+    })
+    .unwrap();
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let now = time.get();
+            let looking = now >= Duration::from_secs(12);
+            let steps = ((now.as_millis() as f32 - 12_000.0) / 200.0).floor() + 1.0;
+            Asked {
+                toward: None,
+                seen: None,
+                gesture: None,
+                expression: (glance && (GLANCE_FROM..Duration::from_secs(18)).contains(&now))
+                    .then_some([40.0, 0.0, 0.0]),
+                called: false,
+                still: false,
+                paused: false,
+                stand_share: None,
+                pose: None,
+                unplug: false,
+                held_by_test: false,
+                missed_by_test: 0,
+                held: looking,
+                aim: looking.then(|| [0.0, (steps * 11.4).clamp(0.0, down)]),
+                limp: false,
+                unseat: false,
+                night: false,
+                night_woke: false,
+                aim_from_home: looking,
+                asleep: false,
+                woken: false,
+                replace: false,
+                queue: false,
+                lively: false,
+                energy: 0,
+                present: false,
+                quiet: false,
+            }
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.goals[0], glimpse.positions[0])),
+    );
+    seen
+}
+
+/// #8720: a held look is not overridden by a rest glance. The head's goal followed the glance (the rest pose) and the look was answered
+/// `there` unclamped while the head had not moved; now a glance gives way to a held look and the head goes where the look asks.
+#[test]
+fn a_rest_glance_gives_way_to_a_held_look() {
+    let seen = rest_glance_under_a_held_look(20.0, true);
+    let alone = rest_glance_under_a_held_look(20.0, false);
+    // From 14 s the look is held and the glance is still asked (until 18 s): the head goes where the look asks (an expression's own
+    // few counts laid over it, as in any other mood), not to the glance's goal 40 counts above rest (home's pitch is the look's frame).
+    // The look alone reaches what it asks (20 counts is nearly the deepest a stock reach box allows: Tuning refuses a pitch reach
+    // down of more than 25), so the glance run is held to it.
+    let at = |run: &[(Duration, u16, u16)], second: u64| {
+        run.iter()
+            .find(|s| s.0 >= Duration::from_secs(second))
+            .unwrap()
+            .1
+    };
+    assert!(
+        at(&alone, 17).abs_diff(HOME[0] + 20) <= 6,
+        "alone {}",
+        at(&alone, 17)
+    );
+    for second in 14..18u64 {
+        assert!(
+            at(&seen, second) >= HOME[0] + 20 - 6 && at(&seen, second) <= HOME[0] + 20 + 45,
+            "t={second}: with a glance the head's goal is {}, alone {}, the look asks {}",
+            at(&seen, second),
+            at(&alone, second),
+            HOME[0] + 20
+        );
+    }
+}
+
 /// A stationary hand can cross the pitch's contact floor while a glance
 /// permits a higher motion load. Contact still pins it, and the hand must
 /// be reported throughout that hold before sustained pressure makes it slump.
