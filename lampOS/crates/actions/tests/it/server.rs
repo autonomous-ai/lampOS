@@ -435,7 +435,7 @@ fn the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes() {
     }
     assert_eq!(
         ask(&home, b"{\"op\":\"call\",\"name\":\"light_dimmer\"}\n")["result"]["result"],
-        "My light is a step dimmer, at level 2 of 5."
+        "My light is a step dimmer, at level 6 of 10."
     );
     // What is on the bus is the light by name, as the ring's owner reads it.
     let asked: lamp_msgs::Light = lamp_bus::Bus::new(&root)
@@ -445,7 +445,13 @@ fn the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes() {
         .unwrap()
         .parse()
         .unwrap();
-    assert_eq!(asked, lamp_msgs::Light::new(true, "blue", 2).unwrap());
+    // Level 3 is step 7; one step down is step 6, which is level 2's glow
+    // and a step beyond it, said in both.
+    assert_eq!(
+        asked,
+        lamp_msgs::Light::new(true, "blue", 3).unwrap().at_step(6)
+    );
+    assert_eq!((asked.level, asked.step), (2, Some(6)));
     // The owner goes. What it last said goes stale, and after the grace
     // (`LIGHT_GRACE`, here 300 ms) the list empties.
     owner_stop.store(true, Ordering::Release);

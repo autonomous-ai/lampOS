@@ -3,15 +3,16 @@
 //! The executive does not write the ring. It publishes the light it wants
 //! on the bus (`light/command`, the newest value kept) and reads what the
 //! ring's owner says it is showing (`light/state`), both
-//! `lamp_msgs::Light`: on or off, one of ten colours by name, a level
-//! from 1 to 5. A lamp whose ring owner has never said what it shows, or
+//! `lamp_msgs::Light`: on or off, a colour by name (the ten, and the seven
+//! soft ones), a brightness of ten steps. A lamp whose ring owner has never said what it shows, or
 //! stopped saying it more than [`LIGHT_GRACE`] ago, has no light to ask
 //! for, and the light's functions are not offered.
 //!
-//! The rules: on and off keep the colour and the level; a colour switches
-//! the light on; brighter and dimmer are one level, and stop at the ends;
-//! warmer and cooler are one step along white, warm and orange, keep the
-//! level, and stop at the ends.
+//! The rules: on and off keep the colour and the brightness; a colour
+//! switches the light on and keeps the brightness, and gives up a colour of
+//! the person's own; brighter and dimmer are one of the ten steps, and stop
+//! at the ends; warmer and cooler are one step along white, warm and
+//! orange, keep the brightness, and stop at the ends.
 //! A light that is off is not dark: the ring's owner keeps a faint glow,
 //! which is the sign that the lamp can hear, and the answer says so.
 //!
@@ -91,14 +92,16 @@ pub fn off<L: Light>(light: &mut L) -> Outcome {
     }
 }
 
-/// One of the ten colours, on, at the level it had.
+/// One of the colours by name, on, at the brightness it had. A colour of the
+/// person's own that is only near the name is not the name: asked for it,
+/// the light becomes the name.
 pub fn colour<L: Light>(light: &mut L, name: &str) -> Outcome {
     if !Wanted::is_colour(name) {
         return Outcome::Failed("That is not a colour my light can show.".into());
     }
     match light.shown() {
         None => Outcome::Failed(UNREAD.into()),
-        Some(now) if now.on && now.colour == name && !light.covered() => {
+        Some(now) if now.on && now.colour == name && now.tint.is_none() && !light.covered() => {
             Outcome::Already(format!("My light is already {}.", spoken(name)))
         }
         Some(now) => set(
@@ -107,44 +110,43 @@ pub fn colour<L: Light>(light: &mut L, name: &str) -> Outcome {
                 on: true,
                 colour: name.to_owned(),
                 level: now.level,
+                tint: None,
+                step: now.step,
             },
             colour_line(name),
         ),
     }
 }
 
-/// One level up, keeping the colour. A light that is off comes on as it
-/// was: asked for more light, the first thing is to have any.
+/// One step up of the ten, keeping the colour. A light that is off comes on
+/// as it was: asked for more light, the first thing is to have any.
 pub fn brighter<L: Light>(light: &mut L) -> Outcome {
     let Some(now) = light.shown() else {
         return Outcome::Failed(UNREAD.into());
     };
+    let step = now.step_now();
     if !now.on {
-        let said = format!(
-            "My light is on, at level {} of {}.",
-            now.level,
-            Wanted::BRIGHTEST
-        );
+        let said = format!("My light is on, at level {step} of {}.", Wanted::STEPS);
         return set(light, Wanted { on: true, ..now }, said);
     }
-    if now.level >= Wanted::BRIGHTEST {
+    if step >= Wanted::STEPS {
         if light.covered() {
             return set(light, now, "My light is at its brightest.".into());
         }
         return Outcome::Already("My light is already at its brightest.".into());
     }
-    let level = now.level + 1;
+    let step = step + 1;
     set(
         light,
-        Wanted { level, ..now },
+        now.at_step(step),
         format!(
-            "My light is a step brighter, at level {level} of {}.",
-            Wanted::BRIGHTEST
+            "My light is a step brighter, at level {step} of {}.",
+            Wanted::STEPS
         ),
     )
 }
 
-/// One level down, keeping the colour. The lowest level is not off:
+/// One step down of the ten, keeping the colour. The lowest step is not off:
 /// darkness is asked for by name.
 pub fn dimmer<L: Light>(light: &mut L) -> Outcome {
     let Some(now) = light.shown() else {
@@ -156,7 +158,8 @@ pub fn dimmer<L: Light>(light: &mut L) -> Outcome {
         }
         return Outcome::Already("My light is already off.".into());
     }
-    if now.level <= 1 {
+    let step = now.step_now();
+    if step <= 1 {
         if light.covered() {
             return set(light, now, "My light is at its dimmest.".into());
         }
@@ -164,13 +167,13 @@ pub fn dimmer<L: Light>(light: &mut L) -> Outcome {
             "My light is already at its dimmest. I can switch it off if you like.".into(),
         );
     }
-    let level = now.level - 1;
+    let step = step - 1;
     set(
         light,
-        Wanted { level, ..now },
+        now.at_step(step),
         format!(
-            "My light is a step dimmer, at level {level} of {}.",
-            Wanted::BRIGHTEST
+            "My light is a step dimmer, at level {step} of {}.",
+            Wanted::STEPS
         ),
     )
 }
@@ -221,8 +224,9 @@ fn warmth<L: Light>(light: &mut L, warmer: bool) -> Outcome {
     let way = if warmer { "warmer" } else { "cooler" };
     // A colour off the scale goes to warm or white, which is no step from
     // it: then the answer says only what it is now (the reviewer on #1316).
-    let on_scale = WARMTH.contains(&now.colour.as_str());
-    let next = match WARMTH.iter().position(|shade| *shade == now.colour) {
+    let own = now.tint.is_some();
+    let on_scale = !own && WARMTH.contains(&now.colour.as_str());
+    let next = match WARMTH.iter().position(|shade| !own && *shade == now.colour) {
         None if warmer => Some("warm"),
         None => Some("white"),
         Some(at) if warmer => WARMTH.get(at + 1).copied(),
@@ -254,6 +258,8 @@ fn warmth<L: Light>(light: &mut L, warmer: bool) -> Outcome {
             on: true,
             colour: colour.to_owned(),
             level: now.level,
+            tint: None,
+            step: now.step,
         },
         said,
     )
@@ -367,7 +373,14 @@ pub(crate) mod tests {
             on,
             colour: colour.into(),
             level,
+            tint: None,
+            step: None,
         }
+    }
+
+    /// A light at one of the ten steps.
+    fn stepped(on: bool, colour: &str, step: u8) -> Wanted {
+        light(on, colour, 1).at_step(step)
     }
 
     /// A ring owner that shows what it is asked, or does not.
@@ -483,7 +496,7 @@ pub(crate) mod tests {
         );
         let mut top = covered(light(true, "pink", 5));
         assert_eq!(said(brighter(&mut top)), "My light is at its brightest.");
-        let mut bottom = covered(light(true, "pink", 1));
+        let mut bottom = covered(stepped(true, "pink", 1));
         assert_eq!(said(dimmer(&mut bottom)), "My light is at its dimmest.");
         assert_eq!((top.asked.len(), bottom.asked.len()), (1, 1));
         // At either end of the warmth too (the reviewer on #1316).
@@ -634,42 +647,99 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn brighter_and_dimmer_are_one_level_keep_the_colour_and_stop_at_the_ends() {
+    fn brighter_and_dimmer_are_one_step_of_ten_keep_the_colour_and_stop_at_the_ends() {
+        // A light asked for at level 3 is step 7; one step up is step 8,
+        // which no level is.
         let mut lamp = Fake::showing(light(true, "pink", 3));
         assert_eq!(
             said(brighter(&mut lamp)),
-            "My light is a step brighter, at level 4 of 5."
+            "My light is a step brighter, at level 8 of 10."
         );
-        assert_eq!(
-            said(brighter(&mut lamp)),
-            "My light is a step brighter, at level 5 of 5."
-        );
-        assert_eq!(lamp.shown, Some(light(true, "pink", 5)));
+        for step in [9, 10] {
+            assert_eq!(
+                said(brighter(&mut lamp)),
+                format!("My light is a step brighter, at level {step} of 10.")
+            );
+        }
+        assert_eq!(lamp.shown, Some(stepped(true, "pink", 10)));
+        assert_eq!(lamp.shown.as_ref().map(|shown| shown.level), Some(5));
         assert_eq!(
             already(brighter(&mut lamp)),
             "My light is already at its brightest."
         );
-        for level in [4, 3, 2, 1] {
+        for step in (1..=9).rev() {
             assert_eq!(
                 said(dimmer(&mut lamp)),
-                format!("My light is a step dimmer, at level {level} of 5.")
+                format!("My light is a step dimmer, at level {step} of 10.")
             );
         }
-        // The lowest level is not off, and dimmer does not switch it off.
+        // The lowest step is not off, and dimmer does not switch it off; it
+        // is under the lowest level, and the level that goes with it is 1.
         assert_eq!(
             already(dimmer(&mut lamp)),
             "My light is already at its dimmest. I can switch it off if you like."
         );
-        assert_eq!(lamp.shown, Some(light(true, "pink", 1)));
-        assert_eq!(lamp.asked.len(), 6);
+        assert_eq!(lamp.shown, Some(stepped(true, "pink", 1)));
+        assert_eq!(lamp.shown.as_ref().map(|shown| shown.level), Some(1));
+        assert_eq!(lamp.asked.len(), 12);
         // Off: brighter brings it on as it was, and dimmer has nothing to do.
         let mut dark = Fake::showing(light(false, "green", 2));
         assert_eq!(already(dimmer(&mut dark)), "My light is already off.");
         assert_eq!(
             said(brighter(&mut dark)),
-            "My light is on, at level 2 of 5."
+            "My light is on, at level 5 of 10."
         );
         assert_eq!(dark.shown, Some(light(true, "green", 2)));
+        // The colour of the person's own stays through a step.
+        let own = Wanted {
+            tint: Some([255, 128, 32]),
+            ..stepped(true, "warm", 4)
+        };
+        let mut chosen = Fake::showing(own.clone());
+        assert_eq!(
+            said(dimmer(&mut chosen)),
+            "My light is a step dimmer, at level 3 of 10."
+        );
+        assert_eq!(chosen.shown.as_ref().unwrap().tint, own.tint);
+    }
+
+    /// A colour asked for by name is that colour, the soft ones too, at the
+    /// brightness it had; a colour of the person's own that is only near the
+    /// name is not the name, and a step along the warmth never starts from it.
+    #[test]
+    fn a_named_colour_replaces_the_persons_own_and_keeps_the_brightness() {
+        let own = Wanted {
+            tint: Some([255, 140, 0]),
+            ..stepped(true, "warm", 4)
+        };
+        let mut lamp = Fake::showing(own);
+        assert_eq!(
+            said(colour(&mut lamp, "warm")),
+            "My light is warm white now.",
+            "its own warm is not yet the name"
+        );
+        assert_eq!(lamp.shown, Some(stepped(true, "warm", 4)));
+        assert_eq!(
+            already(colour(&mut lamp, "warm")),
+            "My light is already warm white."
+        );
+        for soft in lamp_msgs::Light::SOFT_COLOURS {
+            assert_eq!(
+                said(colour(&mut lamp, soft)),
+                format!("My light is {soft} now.")
+            );
+            assert_eq!(lamp.shown, Some(stepped(true, soft, 4)));
+        }
+        let mut own = Fake::showing(Wanted {
+            tint: Some([255, 140, 0]),
+            ..stepped(true, "warm", 4)
+        });
+        assert_eq!(said(warmer(&mut own)), "My light is warm white now.");
+        assert_eq!(own.shown, Some(stepped(true, "warm", 4)));
+        // A soft colour is off the warmth scale: warmer is warm.
+        let mut candle = Fake::showing(stepped(true, "candle", 6));
+        assert_eq!(said(warmer(&mut candle)), "My light is warm white now.");
+        assert_eq!(candle.shown, Some(stepped(true, "warm", 6)));
     }
 
     /// A ring owner that is not saying what it shows, and one that takes a
