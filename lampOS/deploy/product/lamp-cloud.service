@@ -164,6 +164,9 @@ Environment=LAMP_STORE_APPS=on
 # LAMP_OWN_KEYS: #2094, #8367, a person's own model, hearing and voice keys from the app; on in the product by the first
 # builder's DEFAULT-ON (#8367); its rules are its row in docs/switches.md and docs/own-keys.md.
 Environment=LAMP_OWN_KEYS=on
+# LAMP_PRIVACY_LIGHT: #8696, led.privacy.get/set through root's change helper (with LAMP_SETTINGS_CHANGE, on a lamp
+# with a slide); on in the product by the lead's call (c7207644723, 27 Nov). The same line in lamp-voice.service.
+Environment=LAMP_PRIVACY_LIGHT=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

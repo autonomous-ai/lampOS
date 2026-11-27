@@ -362,7 +362,8 @@ unknown state or stale evidence.
   mute whatever the ring shows.
 - **The journal:** one line per look shown, `lamp-voice: privacy light: dim
   (painted at_us N)`. No bus topic carries the look.
-- **Without the switch** (off unless `on` exactly, as in the product today),
+- **Without the switch** (off unless `on` exactly; on in the product's
+  `lamp-voice` and `lamp-cloud` since the lead's call of 27 Nov),
   the worker gets no flag and paints red, and the app is not offered the
   choice. A lamp with no slide never shows the indication, so it never lists
   the two kinds.

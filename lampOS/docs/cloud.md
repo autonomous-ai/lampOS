@@ -3097,8 +3097,8 @@ pick" (Mobile's words). It is shown only when `can` lists `led.privacy.set`.
 - **Fail safe:** a missing or unknown kept value reads as red, here and on the
   ring; a factory reset wipes it, so red again.
 - **Off is the switch's:** `LAMP_PRIVACY_LIGHT` is off unless `on` exactly,
-  and off in the product until its row on a lamp (switches.md). A lamp with
-  no slide never lists the two kinds.
+  and on in the product's `lamp-cloud` and `lamp-voice` (the lead's call,
+  27 Nov; switches.md). A lamp with no slide never lists the two kinds.
 - **Tests:** `crates/cloud/src/privacy_light.rs` (the switches and a slide,
   the line handed on, an answer naming no look) and `led_privacy_get_and_set_answer_the_look` in
   `crates/cloud/src/answer.rs` (get, set and refusals through a stand-in
