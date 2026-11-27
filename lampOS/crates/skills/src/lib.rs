@@ -407,6 +407,11 @@ pub const MORNING: u16 = 6 * 60;
 pub const NOTICED_MOVE: f32 = 0.15;
 pub const NOTICED_SIZE: f32 = 0.25;
 const HOUR_US: u64 = 3_600_000_000;
+/// A `[stop] group` skill's line never heard keeps its chance
+/// ([`Engine::unsaid`]), but runs again no sooner than this after the try
+/// (the owner, 27 Nov, ~17:15: "Retry no sooner than 30 s"): a muted lamp
+/// does not turn to the face each few seconds.
+pub const UNHEARD_RETRY_US: u64 = 30_000_000;
 /// How long a member's wait for its group's hour still counts after it was
 /// last held back for it: past that it is not waiting any more (its trigger
 /// ended, or something else holds it back).
@@ -7548,6 +7553,9 @@ pub struct Engine {
     /// By `[stop] group` with an `apart`, the member that last started and
     /// when ([`Stop::apart_us`]); given back with a line never heard.
     apart_ran: HashMap<String, (String, u64)>,
+    /// By skill, a line never heard whose chance was kept: not run again
+    /// before this ([`UNHEARD_RETRY_US`]).
+    unheard_until: HashMap<String, u64>,
     /// By skill, when its latest run began, while that run is a nudge that
     /// spent its group's hour: what [`Engine::unsaid`] may give back. A
     /// later run of the skill that spends nothing (a `follows` word, a
@@ -7910,6 +7918,7 @@ impl Engine {
             word_windows: HashMap::new(),
             group_ran: HashMap::new(),
             apart_ran: HashMap::new(),
+            unheard_until: HashMap::new(),
             unsaid_from: HashMap::new(),
             unwritten: HashMap::new(),
             privacy_told: None,
@@ -9191,6 +9200,10 @@ impl Engine {
                 eprintln!(
                     "lamp-skills: {skill}'s line was never heard: its cooldown is given back"
                 );
+                if held {
+                    self.unheard_until
+                        .insert(skill.to_owned(), now_us + UNHEARD_RETRY_US);
+                }
             } else if let Some(ran) = self.unsaid_from.remove(skill)
                 && self.group_ran.get(skill) == Some(&ran)
             {
@@ -11031,21 +11044,33 @@ impl Engine {
                     });
                 // Within its `[stop] group`'s `apart` of another member's
                 // start (the owner, 27 Nov): held back as a group's gap is,
-                // with no count.
-                let apart_left = stop_group(skill).filter(|_| counted).and_then(|group| {
-                    let apart_us = self
-                        .skills
-                        .iter()
-                        .filter(|other| stop_group(other) == Some(group))
-                        .filter_map(|other| other.stop.as_ref())
-                        .map(|stop| stop.apart_us)
-                        .max()
-                        .unwrap_or(0);
-                    let (last, at) = self.apart_ran.get(group)?;
-                    let since = now_us.saturating_sub(*at);
-                    (*last != skill.name && since < apart_us).then(|| apart_us - since)
-                });
-                let gap_left = gap_left.or(apart_left);
+                // with no count. Only a member naming its own `apart` is
+                // held (a member of the group without one, as Posture,
+                // is no nudge and never waits a minute).
+                let own_apart = skill.stop.as_ref().is_some_and(|stop| stop.apart_us > 0);
+                let apart_left =
+                    stop_group(skill)
+                        .filter(|_| counted && own_apart)
+                        .and_then(|group| {
+                            let apart_us = self
+                                .skills
+                                .iter()
+                                .filter(|other| stop_group(other) == Some(group))
+                                .filter_map(|other| other.stop.as_ref())
+                                .map(|stop| stop.apart_us)
+                                .max()
+                                .unwrap_or(0);
+                            let (last, at) = self.apart_ran.get(group)?;
+                            let since = now_us.saturating_sub(*at);
+                            (*last != skill.name && since < apart_us).then(|| apart_us - since)
+                        });
+                // A line never heard, its chance kept: no sooner than
+                // [`UNHEARD_RETRY_US`] after the try.
+                let retry_left = self
+                    .unheard_until
+                    .get(&skill.name)
+                    .and_then(|until| (now_us < *until).then(|| until - now_us));
+                let gap_left = gap_left.or(apart_left).or(retry_left);
                 let hour_spent = hour_spent || gap_left.is_some();
                 // First come, first served: with the hour free, a member
                 // that has waited for it longer, and still waits, goes first,

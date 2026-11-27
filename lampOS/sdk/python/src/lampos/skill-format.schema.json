@@ -362,7 +362,7 @@
         "group": {
           "type": "string",
           "pattern": "^[a-z0-9-]{1,64}$",
-          "description": "In a skill with no [budget] (#7401): the skills under the skills folder that name the same group share the stop function, with no limit of their own; a group of a [budget] group's name shares that group's function too (the wellbeing nudges with A meal check and Quiet focus). Refused beside a [budget]; a pushed skill shares nothing."
+          "description": "In a skill with no [budget] (#7401): the skills under the skills folder that name the same group share the stop function, with no limit of their own; a group of a [budget] group's name shares that group's function too (no shipped skill since the owner's 27 Nov call: the nine wellbeing nudges are in no [budget]). Refused beside a [budget]; a pushed skill shares nothing."
         },
         "apart": {
           "type": "string",

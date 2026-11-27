@@ -44,11 +44,15 @@ use serde_json::{Value, json};
 /// on #7473), the only words read. A kind is read only when the function
 /// offers it (an enabled skill's `[stop] kind`), and only before one of
 /// [`NOUNS`].
-pub const KIND_WORDS: [(&str, &[&str]); 9] = [
+pub const KIND_WORDS: [(&str, &[&str]); 10] = [
     ("water", &["water", "drink", "drinking", "sip"]),
     ("eyes", &["eye", "eyes", "screen"]),
     ("stand-up", &["stand", "standing", "stand up"]),
     ("break", &["break", "breaks"]),
+    // Stretch break, in the shared stop since the owner's 27 Nov minute
+    // apart: "the stretch break reminders" is its, never Comfort break's
+    // (the Reviewer-lead's P3 on #8868).
+    ("stretch", &["stretch", "stretches", "stretch break"]),
     ("sit-back", &["sit back", "lean"]),
     ("posture", &["posture", "slouch"]),
     ("wind-down", &["wind down", "bedtime", "evening"]),
@@ -207,12 +211,18 @@ pub fn read(heard: &str, kinds: &[&str]) -> Option<Scope> {
     if named.is_empty() && ALL_WORDS.iter().any(|said| has(&words, said)) {
         return Some(Scope::All);
     }
-    for start in 0..words.len() {
-        if let Some((kind, past)) = kind_at(&words, start, kinds)
-            && qualifies(&words, past, kinds)
-            && !named.contains(&kind)
-        {
-            named.push(kind);
+    // A kind's words, once read, are not read again from inside: "stretch
+    // break reminders" is the stretch, not the stretch and a break too.
+    let mut start = 0;
+    while start < words.len() {
+        match kind_at(&words, start, kinds) {
+            Some((kind, past)) if qualifies(&words, past, kinds) => {
+                if !named.contains(&kind) {
+                    named.push(kind);
+                }
+                start = past;
+            }
+            _ => start += 1,
         }
     }
     if named.is_empty() {
@@ -333,7 +343,7 @@ mod tests {
         }
     }
 
-    const EVERY: [&str; 9] = [
+    const EVERY: [&str; 10] = [
         "break",
         "eyes",
         "focus",
@@ -341,6 +351,7 @@ mod tests {
         "posture",
         "sit-back",
         "stand-up",
+        "stretch",
         "water",
         "wind-down",
     ];
@@ -386,6 +397,16 @@ mod tests {
         assert_eq!(
             read("snooze the stand-up one", &EVERY),
             Some(Scope::Kinds(vec!["stand-up".into()]))
+        );
+        // The Reviewer-lead's P3 on #8868: Stretch break's reminders, not
+        // Comfort break's too.
+        assert_eq!(
+            read("Lamp, stop the stretch break reminders.", &EVERY),
+            Some(Scope::Kinds(vec!["stretch".into()]))
+        );
+        assert_eq!(
+            read("stop the break and stretch reminders", &EVERY),
+            Some(Scope::Kinds(vec!["break".into(), "stretch".into()]))
         );
     }
 
