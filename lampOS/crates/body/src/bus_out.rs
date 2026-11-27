@@ -1130,7 +1130,14 @@ mod tests {
             (0, 4_095, None)
         );
         assert!(!said.stands);
-        assert_eq!((said.speed, said.heat_stop, said.force), (50.0, 62, None));
+        assert_eq!((said.speed, said.heat_stop, said.force), (50.0, 69, None));
+        // The heat stop is 69, for a commanded joint and a held arm alike
+        // (#8828, the lead's ruling with the product owner: at 62 lamp-74ff's
+        // elbow sat the lamp down while it only stood).
+        assert_eq!(
+            (limits.temperature, crate::body::Standing::TEMPERATURE),
+            (69, 69)
+        );
         // A pitch home near the window's edge is cut to the window.
         let edge = body_limits(&limits, None, [1_750, 2_044, 2_015]);
         assert_eq!((edge.joints[4].min, edge.joints[4].max), (1_740, 1_765));
@@ -1519,7 +1526,7 @@ mod tests {
         assert_eq!(report.level, Level::Warn);
         assert_eq!(
             report.message,
-            "shoulder is warm: it reads 55, and the body stops at 62"
+            "shoulder is warm: it reads 55, and the body stops at 69"
         );
         // Resting folded after three strains in half an hour is said, as
         // a warning, until it may rise again (lamp-4ace folded unseen from
