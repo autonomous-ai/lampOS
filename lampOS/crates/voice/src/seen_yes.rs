@@ -2409,6 +2409,54 @@ mod tests {
         assert_eq!(without_state_note("(First.) (Last.)"), None);
     }
 
+    /// The Reviewer-lead's P3 on #8807 (c7205367542): the state's room is
+    /// given up with only the whitespace around it trimmed, so the rest of
+    /// the note, its newlines too, stays byte for byte.
+    #[test]
+    fn a_note_giving_up_the_state_keeps_the_rest_byte_for_byte() {
+        let state = state_words(true, true, true);
+        for (note, rest) in [
+            (
+                format!("(First.)\nSecond  line.\n\n{state}\n(Last.)\n  end"),
+                "(First.)\nSecond  line.\n(Last.)\n  end",
+            ),
+            (format!("{state}\n(Last.)\n\nend"), "(Last.)\n\nend"),
+            (format!("(First.)\n\nmore\n{state}"), "(First.)\n\nmore"),
+        ] {
+            assert_eq!(without_state_note(&note).as_deref(), Some(rest), "{note}");
+        }
+    }
+
+    /// Twelve's P3 on #8807 (c7205447473, and on #8804, c7204615282): a
+    /// bare looking word names the noticing only with the desk or the
+    /// lamp's own looking as its object, or none; "watch" in a timer line
+    /// is about the timer, not the desk.
+    #[test]
+    fn a_looking_word_about_something_else_does_not_name_the_noticing() {
+        for heard in [
+            "Lamp, watch the timer.",
+            "Look at the weather for me.",
+            "Lamp, watch the oven.",
+            "Can you see the clock?",
+            "Lamp, look up the news.",
+        ] {
+            assert!(!names_the_noticing(heard), "{heard}");
+        }
+        for heard in [
+            "Lamp, stop watching my desk.",
+            "Are you watching my desk?",
+            "Lamp, stop watching.",
+            "Are you watching me?",
+            "Lamp, desk noticing on.",
+            "Lamp, stop looking now, and play some music.",
+            "Turn off noticing.",
+            "Do you see anything?",
+            "Watch over me.",
+        ] {
+            assert!(names_the_noticing(heard), "{heard}");
+        }
+    }
+
     /// #7767: only the descriptions of the look and the stop change with
     /// the switch; the names, the offer and the count stay.
     #[test]
