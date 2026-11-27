@@ -1054,12 +1054,17 @@ fn the_switch_is_off_unless_shadow_or_on() {
     assert!(tiers::mirrored(P1) && tiers::mirrored(R1));
 }
 
-/// The product leaves the tiers off: no product unit or drop-in names the
-/// switch (off until the played test and two reads).
+/// The product sets the tiers to `shadow` (the owner's call of 27 Nov, C143
+/// and C144): lamp-memory's unit and lamp-voice's (for the night) each name
+/// the switch on exactly one line, `Environment=LAMP_MEMORY_TIERS=shadow`,
+/// and no other product file or drop-in names it. `on` stays unset until
+/// its recall wait is measured on a lamp.
 #[test]
-fn the_product_does_not_set_the_switch() {
+fn the_product_sets_the_switch_to_shadow_in_memory_and_the_voice_only() {
     let product = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let line = format!("Environment={}=shadow", tiers::SWITCH);
     let mut read = 0;
+    let mut set = Vec::new();
     let mut stack = vec![product];
     while let Some(dir) = stack.pop() {
         for entry in fs::read_dir(&dir).unwrap() {
@@ -1068,10 +1073,22 @@ fn the_product_does_not_set_the_switch() {
                 stack.push(path);
             } else if let Ok(text) = fs::read_to_string(&path) {
                 read += 1;
-                assert!(!text.contains(tiers::SWITCH), "{}", path.display());
+                let name = path.file_name().unwrap().to_string_lossy().into_owned();
+                let named: Vec<&str> = text
+                    .lines()
+                    .map(str::trim)
+                    .filter(|l| !l.starts_with('#') && l.contains(tiers::SWITCH))
+                    .collect();
+                if named.is_empty() {
+                    continue;
+                }
+                assert_eq!(named, [line.as_str()], "{}", path.display());
+                set.push(name);
             }
         }
     }
+    set.sort();
+    assert_eq!(set, ["lamp-memory.service", "lamp-voice.service"]);
     assert!(read > 10);
 }
 
