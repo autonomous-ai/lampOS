@@ -13,6 +13,9 @@
 #
 #   input-check.py            30 s touch and press, 30 s hands off, write the pins
 #   input-check.py --dry-run  the same reading, nothing written
+#   input-check.py --touch-from FILE   the touches and presses already counted
+#                             (servo-calibrate.py, while the joints were moved:
+#                             kyle-aus 10 Nov), so only the quiet window is read
 #
 # 1. Each pad candidate is read with a pull-up and with a pull-down: a line
 #    that reads the same both ways is driven (a pad's chip), its level its
@@ -106,9 +109,9 @@ def watch(inputs, seconds, every=0.01, cue=None, settle=None):
     out = {k: {"pulses": 0, "longest_s": 0.0, "changes": 0, "away_at_end": False} for k in inputs}
     away = {k: None for k in inputs}
     prev = {k: r for k, (_, r) in inputs.items()}
-    start = last = time.time()
-    while time.time() < start + seconds:
-        now = time.time()
+    start = last = time.monotonic()
+    while time.monotonic() < start + seconds:
+        now = time.monotonic()
         if settle and now - last >= settle and all(a is None for a in away.values()):
             break
         if cue and now - start >= cue[0]:
@@ -131,7 +134,7 @@ def watch(inputs, seconds, every=0.01, cue=None, settle=None):
         if away[k] is not None:
             out[k]["away_at_end"] = True
             out[k]["pulses"] += 1
-            out[k]["longest_s"] = max(out[k]["longest_s"], time.time() - away[k])
+            out[k]["longest_s"] = max(out[k]["longest_s"], time.monotonic() - away[k])
     return out
 
 
@@ -143,8 +146,8 @@ def merged(a, b):
 
 def first_touch(inputs, seconds, every=0.01):
     """Wait for any input to leave its rest; True when one does."""
-    end = time.time() + seconds
-    while time.time() < end:
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
         for l, rest in inputs.values():
             if l.value() != rest:
                 return True
@@ -165,6 +168,8 @@ def main():
     ap.add_argument("--speaker", default="device_speaker")
     ap.add_argument("--no-voice", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="read and judge, write nothing")
+    ap.add_argument("--touch-from", default="",
+                    help="JSON of touches already counted (servo-calibrate.py): skip the touch window")
     args = ap.parse_args()
     voice = Voice(args)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -208,16 +213,32 @@ def main():
             held[key] = (l, l.value() if idle is None else idle)
             print(f"{key.lower()}: {chip} line {line}, now {'at rest' if l.value() == held[key][1] else 'PRESSED'}")
 
-        voice.say("factory_inputs_wait")
-        print(f"waiting up to {args.wait_seconds:g} s for the first touch or press", flush=True)
-        if not first_touch(held, args.wait_seconds):
+        started = True
+        if args.touch_from:
+            counted = json.load(open(args.touch_from))
+            zero = {"pulses": 0, "longest_s": 0.0, "changes": 0, "away_at_end": False}
+            touch = {k: counted.get(k, zero) for k in held}
+            print(f"touch: counted while calibrating ({args.touch_from})", flush=True)
+            voice.say("factory_padcheck_rest")
+            time.sleep(args.settle_seconds)
+            print(f"quiet: {args.quiet_seconds:g} s, hands off", flush=True)
+            quiet = watch(held, args.quiet_seconds)
+            started = None
+        else:
+            voice.say("factory_inputs_wait")
+            print(f"waiting up to {args.wait_seconds:g} s for the first touch or press", flush=True)
+        if started is None:
+            pass
+        elif not first_touch(held, args.wait_seconds):
             started = False
         else:
             started = True
             voice.say("factory_inputs_touch")
             print(f"touch: {args.touch_seconds:g} s from the first touch, touch each head pad, press the button "
                   f"and the reset briefly, any order", flush=True)
-        if started:
+        if started is None:
+            pass
+        elif started:
             # The first touch is still under the hand: watch() starts from rest, so it counts.
             touch = watch(held, args.touch_seconds,
                           cue=(args.touch_seconds - 10, lambda: voice.say("factory_padcheck_10")))
