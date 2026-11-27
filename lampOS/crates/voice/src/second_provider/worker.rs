@@ -5745,6 +5745,18 @@ pub fn serve(
                 heeding.taking_simple_calls();
             }
             engine = engine.taking_simple_calls();
+            // A greeting and a sure start hearing call too
+            // (`LAMP_SIMPLE_CALL_HEARD=on`, in no product unit).
+            if std::env::var(crate::second_provider::SIMPLE_CALL_HEARD_ENVIRONMENT)
+                .is_ok_and(|value| value == "on")
+            {
+                eprintln!(
+                    "lamp-voice second: a line whose words open with a greeting also calls when lamp-name heard the name at its start at 0.95 or more (LAMP_SIMPLE_CALL_HEARD)"
+                );
+                if let Ok(mut heeding) = heeding.lock() {
+                    heeding.taking_simple_calls_heard();
+                }
+            }
         }
         // Short replies carry (`LAMP_SHORT_REPLIES_CARRY=on`, #8772, the
         // product owner's rule of 26 Nov 2026).
@@ -10841,6 +10853,11 @@ impl Heeding {
         self.simple_call = true;
         self.attention.only_hey_lamp(true);
     }
+
+    /// With [`Self::taking_simple_calls`], `LAMP_SIMPLE_CALL_HEARD=on`: a
+    /// greeting in the words and a sure hearing of the name at the line's
+    /// start call too ([`crate::attention::Attention::simple_calls_heard`]).
+    pub(crate) fn taking_simple_calls_heard(&mut self) {}
 
     /// With [`Self::taking_simple_calls`], the verdict on a line begun at
     /// `began_us`: let out when it calls the lamp (its words open with "Hey
