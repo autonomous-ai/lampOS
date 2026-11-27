@@ -135,6 +135,9 @@ pub async fn pings(
     let tls = crate::online::tls_on();
     // The ping's last state, said only when it changes.
     let mut failing: Option<String> = None;
+    // The heartbeat's engines part last said, with LAMP_BEAT_ENGINES=on
+    // (#8881): said at the first ping and again only when it changes.
+    let mut parts_said: Option<String> = None;
     loop {
         if accounts.is_closed() {
             return;
@@ -156,6 +159,13 @@ pub async fn pings(
                     .as_ref()
                     .and_then(|bus| bus.latest(lamp_msgs::UpdateStatus::TOPIC).ok().flatten()),
             );
+            if engines.is_some() {
+                let parts = payload.engines_part();
+                if parts_said.as_deref() != Some(parts.as_str()) {
+                    say.line(&format!("lamp-cloud: the heartbeat says {parts}"));
+                    parts_said = Some(parts);
+                }
+            }
             let result = once(&client, &url, &key, &payload).await;
             if let Some(login) = login.as_deref_mut() {
                 let answer = match &result {
