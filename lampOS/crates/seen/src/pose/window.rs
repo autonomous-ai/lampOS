@@ -39,7 +39,7 @@ use std::collections::VecDeque;
 
 /// The window: a minute (the owner, #8377; V1's production
 /// `POSE_WINDOW_DURATION_S` was an hour, V2 had ten minutes).
-pub const WINDOW_US: u64 = 60_000_000;
+pub const WINDOW_US: u64 = HumanPosture::SAID_WINDOW_S as u64 * 1_000_000;
 /// Two checks, the window's samples: the newest two are kept, and fewer
 /// say nothing (V1's `POSE_WINDOW_MIN_SAMPLES` was 3).
 pub const MIN_SAMPLES: usize = 2;
