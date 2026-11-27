@@ -65,9 +65,12 @@ struct SocketLink {
     after_receive: Arc<Mutex<VecDeque<Control>>>,
     /// The rig's hold-ups, as a loaded runner makes them (#8466).
     holds: Arc<Mutex<Holds>>,
+    /// When each control read began, to tell a held-up attempt (#8466).
+    controls_at: Arc<Mutex<Vec<u64>>>,
 }
 impl RingLink for SocketLink {
     fn receive_control(&mut self) -> io::Result<Option<Control>> {
+        self.controls_at.lock().unwrap().push(monotonic_us());
         let stall = self.holds.lock().unwrap().stall.take();
         if let Some(stall) = stall {
             thread::sleep(stall);
@@ -118,6 +121,7 @@ struct Rig {
     writes: Arc<Mutex<Writes>>,
     after_receive: Arc<Mutex<VecDeque<Control>>>,
     holds: Arc<Mutex<Holds>>,
+    controls_at: Arc<Mutex<Vec<u64>>>,
     completion: mpsc::Receiver<io::Result<()>>,
     worker: Option<thread::JoinHandle<()>>,
 }
@@ -160,11 +164,13 @@ impl Rig {
         }));
         let after_receive = Arc::new(Mutex::new(VecDeque::new()));
         let holds = Arc::new(Mutex::new(Holds::default()));
+        let controls_at = Arc::new(Mutex::new(Vec::new()));
         let link = SocketLink {
             channels,
             parent: parent.clone(),
             after_receive: after_receive.clone(),
             holds: holds.clone(),
+            controls_at: controls_at.clone(),
         };
         let sink = Sink(writes.clone());
         let (tx, completion) = mpsc::channel();
@@ -181,6 +187,7 @@ impl Rig {
             writes,
             after_receive,
             holds,
+            controls_at,
             completion,
             worker: Some(worker),
         }
@@ -228,6 +235,17 @@ impl Rig {
     /// The worker held up `stall` once, at its next control read.
     fn stall_next_control(&self, stall: Duration) {
         self.holds.lock().unwrap().stall = Some(stall);
+    }
+    /// The longest the worker went between two control reads, or from its
+    /// last one to now, over any of `from_us..to_us`: how long, and when it
+    /// began.
+    fn worker_gap(&self, from_us: u64, to_us: u64) -> Option<(u64, u64)> {
+        let mut at = self.controls_at.lock().unwrap().clone();
+        at.push(monotonic_us());
+        at.windows(2)
+            .filter(|read| read[0] < to_us && read[1] > from_us)
+            .map(|read| (read[1] - read[0], read[0]))
+            .max()
     }
     fn colored(&self) -> usize {
         self.writes
@@ -378,45 +396,265 @@ fn output_caps_start_dark_before_any_snapshot_even_with_a_valid_turn() {
     rig.finish().unwrap();
 }
 
-/// How a [`caps_dim_latched`] run is held up.
+/// How a [`caps_dim_latched`] run is held up, or broken by the test itself.
 #[derive(Clone, Copy, Default)]
 struct DimCase {
     /// Each blank said [`BLANKED_LATE`] late ([`Holds::blanked_late`]).
     blanked_late: bool,
     /// The worker held up [`STALL`] once just after the cap drops.
     worker_stall: bool,
+    /// The test's own thread held up [`STALL`], a time it did not ask for,
+    /// just before the cap drop is sent.
+    test_stall: bool,
+    /// The cap is never dropped, so nothing dims: a regression's run.
+    keep_cap: bool,
+    /// The test asks for a [`STALL`]'s sleep before the cap drop, so the
+    /// permit runs out with neither thread held up.
+    late_cap_drop: bool,
 }
 
 /// Longer than a turn frame's 250 ms permit.
 const STALL: Duration = Duration::from_millis(300);
 
+/// Attempts of [`caps_dim_latched`] before a run held up in each fails, as
+/// #8779's `STALLED_ATTEMPTS` in `privacy_bus.rs`.
+const HELD_UP_ATTEMPTS: usize = 20;
+
 #[test]
 fn output_caps_clamp_turn_frames_and_tightening_dims_latched_pixels_without_a_new_frame() {
-    caps_dim_latched(DimCase::default());
+    caps_dim_latched(DimCase::default()).unwrap();
 }
 
 /// #8466, the Reviewer-lead's ARM64 log: a frame's own expiry blank said a
 /// little late came after the drain, and the next frame's present read it
-/// (`Blanked { AuthorityLost(ExpiredPermit) }`).
+/// (`Blanked { AuthorityLost(ExpiredPermit) }`). The run waits for that
+/// blank instead of sleeping the permit's length.
 #[test]
 fn a_frames_expiry_blank_said_late_is_waited_for() {
     caps_dim_latched(DimCase {
         blanked_late: true,
         ..DimCase::default()
-    });
+    })
+    .unwrap();
 }
 
 /// #8466: "tightening did not dim the latched frame before its permit
-/// ended", the worker held up past the permit.
+/// ended", the worker held up past the permit, is an attempt made again.
 #[test]
 fn a_worker_held_up_after_the_cap_drop_is_a_held_up_attempt() {
-    caps_dim_latched(DimCase {
+    let attempts = caps_dim_latched(DimCase {
         worker_stall: true,
         ..DimCase::default()
-    });
+    })
+    .unwrap();
+    assert!(attempts >= 2, "{attempts}");
 }
 
-fn caps_dim_latched(case: DimCase) {
+/// #8466, the Reviewer-lead's ruling (c7221951066): the test's own thread
+/// held up past the permit before the cap drop is an attempt made again.
+#[test]
+fn the_test_thread_held_up_before_the_cap_drop_is_a_held_up_attempt() {
+    let attempts = caps_dim_latched(DimCase {
+        test_stall: true,
+        ..DimCase::default()
+    })
+    .unwrap();
+    assert!(attempts >= 2, "{attempts}");
+}
+
+/// No dim with neither thread held up still fails, at once.
+#[test]
+fn a_missing_dim_with_no_stall_still_fails() {
+    let failed = caps_dim_latched(DimCase {
+        keep_cap: true,
+        ..DimCase::default()
+    })
+    .unwrap_err();
+    assert!(failed.contains("did not dim"), "{failed}");
+    assert!(!failed.contains("held up in all"), "{failed}");
+}
+
+/// A cap drop late only by the test's own asked sleep still fails, at once.
+#[test]
+fn a_cap_drop_late_only_by_an_asked_sleep_still_fails() {
+    let failed = caps_dim_latched(DimCase {
+        late_cap_drop: true,
+        ..DimCase::default()
+    })
+    .unwrap_err();
+    assert!(failed.contains("did not dim"), "{failed}");
+    assert!(!failed.contains("held up in all"), "{failed}");
+}
+
+/// Capture and admission open for 900 ms from now, as the resting test
+/// keeps them while it settles.
+fn renew(controller: &mut Controller) {
+    let until = now().checked_add(900_000).unwrap();
+    controller
+        .set_capture(now(), CaptureState::RetainingUntil(until))
+        .unwrap();
+    controller
+        .set_admission(now(), AdmissionState::OpenUntil(until))
+        .unwrap();
+}
+
+/// Waits, at most 2 s, for the blank of `shown`'s own expiry, then reads
+/// every event said so far (#8466). Sleeping the permit's length instead
+/// raced that blank: said a little late, it came after the drain and the
+/// next present read it.
+///
+/// The blank is `AuthorityLost` with `ExpiredPermit` or `ExpiredState`,
+/// written at or after the earlier of the frame's permit and snapshot
+/// expiries, both on the one monotonic clock that issued them. Both reasons
+/// are the same expiry: the snapshot and the permit are issued together,
+/// each for 250 ms, and the guard checks the snapshot first, so which one
+/// the ring names is only the order of the checks and of the microseconds
+/// between the two issues. Any other event, or a blank before the expiry,
+/// fails.
+fn wait_expiry(rig: &Rig, shown: RingFrame, name: &str) {
+    let expires = shown
+        .permit
+        .expires_at()
+        .as_micros()
+        .min(shown.snapshot.expires_at().as_micros());
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let event = rig.parent.lock().unwrap().control.receive().unwrap();
+        match event {
+            Some(WorkerEvent::Ring {
+                report:
+                    RingFeedback::Blanked {
+                        reason:
+                            RingBlankReason::AuthorityLost {
+                                reason: RingRejection::ExpiredPermit | RingRejection::ExpiredState,
+                            },
+                        write_started_at_us,
+                        ..
+                    },
+            }) if write_started_at_us >= expires => break,
+            Some(event) => {
+                panic!("waiting for {name}'s expiry blank at {expires} us, the ring said {event:?}")
+            }
+            None => {}
+        }
+        assert!(
+            Instant::now() < deadline,
+            "{name}'s expiry blank at {expires} us never came within 2 s"
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
+    rig.drain();
+}
+
+/// The test thread's own time from each present's end to its next send,
+/// less the sleeps it asked for: time a loaded runner took from it (#8466).
+struct TestClock {
+    since: Instant,
+    since_us: u64,
+    asked: Duration,
+    sends: usize,
+    /// Each send's gap: how long, when it began and ended, and after which
+    /// send.
+    gaps: Vec<(u64, u64, u64, usize)>,
+}
+impl TestClock {
+    fn new() -> Self {
+        Self {
+            since: Instant::now(),
+            since_us: monotonic_us(),
+            asked: Duration::ZERO,
+            sends: 0,
+            gaps: Vec::new(),
+        }
+    }
+    /// A sleep the test asks for, left out of the gap.
+    fn sleep(&mut self, sleep: Duration) {
+        thread::sleep(sleep);
+        self.asked += sleep;
+    }
+    /// The test held up `hold`, a time it did not ask for, as a loaded
+    /// runner holds it.
+    fn hold(&mut self, hold: Duration) {
+        thread::sleep(hold);
+    }
+    /// Just before a send.
+    fn send(&mut self) {
+        let gap = self.since.elapsed().saturating_sub(self.asked);
+        self.gaps.push((
+            gap.as_micros() as u64,
+            self.since_us,
+            monotonic_us(),
+            self.sends,
+        ));
+        self.sends += 1;
+    }
+    /// From here the test's time is its own again: just after a send's
+    /// answer, or a wait on the worker.
+    fn mark(&mut self) {
+        self.since = Instant::now();
+        self.since_us = monotonic_us();
+        self.asked = Duration::ZERO;
+    }
+    /// The longest gap over any of `from_us..to_us`: how long, when it
+    /// began, and after which send.
+    fn gap(&self, from_us: u64, to_us: u64) -> Option<(u64, u64, usize)> {
+        self.gaps
+            .iter()
+            .filter(|(_, began, ended, _)| *began < to_us && *ended > from_us)
+            .map(|&(us, began, _, after)| (us, began, after))
+            .max()
+    }
+}
+
+/// Which thread, if either, was held up [`lamp_voice::stalls::OVER`] or
+/// more inside the permit `from_us..to_us`, and how: the retry's reason.
+fn held_up(rig: &Rig, clock: &TestClock, from_us: u64, to_us: u64) -> Option<String> {
+    let over = lamp_voice::stalls::OVER.as_micros() as u64;
+    let into = |at: u64| (at as i64 - from_us as i64) / 1_000;
+    let worker = rig
+        .worker_gap(from_us, to_us)
+        .filter(|(us, _)| *us >= over)
+        .map(|(us, at)| {
+            format!(
+                "worker thread {} ms between control reads, from {} ms into the permit",
+                us / 1_000,
+                into(at)
+            )
+        });
+    let test = clock
+        .gap(from_us, to_us)
+        .filter(|(us, _, _)| *us >= over)
+        .map(|(us, at, after)| {
+            format!(
+                "test thread {} ms between send {} and {}, from {} ms into the permit",
+                us / 1_000,
+                after,
+                after + 1,
+                into(at)
+            )
+        });
+    match (worker, test) {
+        (Some(worker), Some(test)) => Some(format!("{worker}; {test}")),
+        (worker, test) => worker.or(test),
+    }
+}
+
+/// A [`dim_attempt`] whose latched frame was not dimmed before its permit
+/// ended: what it saw, and the hold-up inside that permit, if either thread
+/// had one.
+struct Undimmed {
+    said: String,
+    held: Option<String>,
+}
+
+/// A cap tightened from 30 to 12 dims the latched turn frame before its
+/// permit ends. An attempt that missed the dim with the worker or the
+/// test's own thread held up [`lamp_voice::stalls::OVER`] or more inside
+/// that permit, which a loaded runner does (#8466), says nothing either way
+/// and is made again, saying why; a missed dim with neither held up fails,
+/// and so does anything else. The number of attempts made, or why it
+/// failed.
+fn caps_dim_latched(case: DimCase) -> Result<usize, String> {
     let (directory, mut publisher, caps) = cap_input(30);
     let mut rig = Rig::start_with_senses(Senses {
         caps: Some(caps),
@@ -425,31 +663,121 @@ fn caps_dim_latched(case: DimCase) {
     rig.holds.lock().unwrap().blanked_late = case.blanked_late;
     rig.ready();
     let (mut controller, owner) = conversation(rig.boot);
-    let mut bright = frame(&mut controller, owner, 250_000);
-    bright.ceiling = 120;
-    present(&rig, bright);
-    // Past the startup's ease up to the cap (#8615), and the face eased up
-    // again over a few frames.
-    thread::sleep(Duration::from_millis(250));
-    rig.drain();
-    for _ in 0..4 {
-        let mut bright = frame(&mut controller, owner, 250_000);
-        bright.ceiling = 120;
-        present(&rig, bright);
-        thread::sleep(Duration::from_millis(30));
+    let mut revision = 1;
+    let mut held = Vec::new();
+    let mut ended = None;
+    for attempt in 1..=HELD_UP_ATTEMPTS {
+        if attempt > 1 {
+            // Back to the first attempt's start: the cap at 30, eased up.
+            renew(&mut controller);
+            revision += 1;
+            publish_cap(&mut publisher, revision, 30);
+            thread::sleep(Duration::from_millis(250));
+            rig.drain();
+        }
+        // Only the first attempt is held up by hand.
+        let case = DimCase {
+            worker_stall: case.worker_stall && attempt == 1,
+            test_stall: case.test_stall && attempt == 1,
+            ..case
+        };
+        match dim_attempt(
+            &rig,
+            &mut controller,
+            owner,
+            &mut publisher,
+            &mut revision,
+            case,
+        ) {
+            Ok(()) => {
+                ended = Some(Ok(attempt));
+                break;
+            }
+            Err(Undimmed {
+                said,
+                held: Some(why),
+            }) => {
+                eprintln!("retry {attempt}: {why}");
+                held.push(format!("{said} ({why})"));
+            }
+            Err(Undimmed { said, held: None }) => {
+                ended = Some(Err(said));
+                break;
+            }
+        }
     }
-    let mut original = frame(&mut controller, owner, 250_000);
+    let ended = ended.unwrap_or_else(|| {
+        Err(format!(
+            "held up in all {HELD_UP_ATTEMPTS} attempts: {held:?}"
+        ))
+    });
+    rig.control(Control::Stop);
+    rig.finish().unwrap();
+    drop(publisher);
+    std::fs::remove_dir_all(&directory.path).unwrap();
+    ended
+}
+
+/// One [`present`] in a [`dim_attempt`], timed on its [`TestClock`].
+fn show(rig: &Rig, clock: &mut TestClock, frame: RingFrame) {
+    clock.send();
+    present(rig, frame);
+    clock.mark();
+}
+
+/// One attempt of [`caps_dim_latched`], on its rig.
+fn dim_attempt(
+    rig: &Rig,
+    controller: &mut Controller,
+    owner: TurnOwner,
+    publisher: &mut lamp_bus::Publisher,
+    revision: &mut u64,
+    case: DimCase,
+) -> Result<(), Undimmed> {
+    // Each attempt, and its end past the dim, under capture and admission
+    // renewed: a 900 ms window from `conversation` would end the turn
+    // within a retried run.
+    renew(controller);
+    let mut clock = TestClock::new();
+    let mut bright = frame(controller, owner, 250_000);
+    bright.ceiling = 120;
+    show(rig, &mut clock, bright);
+    // Past the startup's ease up to the cap (#8615): its permit's own end.
+    wait_expiry(rig, bright, "the first bright frame");
+    clock.mark();
+    // The face eased up again over a few frames.
+    for _ in 0..4 {
+        let mut bright = frame(controller, owner, 250_000);
+        bright.ceiling = 120;
+        show(rig, &mut clock, bright);
+        clock.sleep(Duration::from_millis(30));
+    }
+    let mut original = frame(controller, owner, 250_000);
     original.ceiling = 120;
-    present(&rig, original);
+    show(rig, &mut clock, original);
     let before = rig.writes.lock().unwrap().frames.len();
     let peak = cap_peak(&rig.writes.lock().unwrap().frames[before - 1]);
     assert!(peak > 12 && peak <= 30, "turn peak {peak}");
-    publish_cap(&mut publisher, 2, 12);
+    if case.test_stall {
+        clock.hold(STALL);
+    } else if case.late_cap_drop {
+        clock.sleep(STALL);
+    }
+    if !case.keep_cap {
+        *revision += 1;
+        clock.send();
+        publish_cap(publisher, *revision, 12);
+        clock.mark();
+    }
     if case.worker_stall {
         rig.stall_next_control(STALL);
     }
     // The latched frame is dimmed toward the cap with no new turn frame,
     // and never blanked: the cap eases (#8615).
+    let (issued, expires) = (
+        original.permit.issued_at().as_micros(),
+        original.permit.expires_at().as_micros(),
+    );
     loop {
         let dimmed = {
             let writes = rig.writes.lock().unwrap();
@@ -462,31 +790,36 @@ fn caps_dim_latched(case: DimCase) {
         }
         // The cap eases over 200 ms, so the dim comes while the cue is
         // still displayed under its own permit, not at once.
-        assert!(
-            monotonic_us() < original.permit.expires_at().as_micros(),
-            "tightening did not dim the latched frame before its permit ended: {peak} then {:?}",
-            rig.writes.lock().unwrap().frames[before..]
-                .iter()
-                .map(cap_peak)
-                .collect::<Vec<_>>()
-        );
+        if monotonic_us() >= expires {
+            return Err(Undimmed {
+                said: format!(
+                    "tightening did not dim the latched frame before its permit ended: {peak} then {:?}",
+                    rig.writes.lock().unwrap().frames[before..]
+                        .iter()
+                        .map(cap_peak)
+                        .collect::<Vec<_>>()
+                ),
+                held: held_up(rig, &clock, issued, expires),
+            });
+        }
         thread::sleep(Duration::from_millis(1));
     }
+    let dimmed_at = Instant::now();
+    renew(controller);
     assert!(
         !rig.writes.lock().unwrap().frames[before..].contains(&EncodedFrame::black()),
         "a tighter cap blanked the ring"
     );
-    // Once the ease is over, a new bright frame is under the new cap.
-    thread::sleep(Duration::from_millis(250));
+    // Once the ease is over, a new bright frame is under the new cap: past
+    // the latched frame's own end, and 250 ms after the dim began.
+    wait_expiry(rig, original, "the latched turn frame");
+    thread::sleep(Duration::from_millis(250).saturating_sub(dimmed_at.elapsed()));
     rig.drain();
-    let mut bright = frame(&mut controller, owner, 200_000);
+    let mut bright = frame(controller, owner, 200_000);
     bright.ceiling = 120;
-    present(&rig, bright);
+    present(rig, bright);
     assert!(cap_peak(rig.writes.lock().unwrap().frames.last().unwrap()) <= 12);
-    rig.control(Control::Stop);
-    rig.finish().unwrap();
-    drop(publisher);
-    std::fs::remove_dir_all(&directory.path).unwrap();
+    Ok(())
 }
 
 #[test]
