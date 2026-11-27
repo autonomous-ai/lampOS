@@ -774,6 +774,10 @@ fn held_at(held: Duration, from: [f32; 5], speed: [f32; 5]) -> ([f32; 5], Durati
 /// moved (a pace of nothing) still comes home: 5 counts a second.
 const EASE_LEAST: f32 = 0.1;
 
+/// A move waiting for the one playing (`Asked::queue`): itself, who asked
+/// it (its priority and source), and the move it waits for.
+type Queued = (&'static Clip, (Priority, Option<Source>), &'static Clip);
+
 /// An ease out under way: steps since it began, the offsets then, how far
 /// they moved in the step before, and each joint's pace, counts a step.
 type EaseOut = (u32, [f32; 5], [f32; 5], [f32; 5]);
@@ -966,6 +970,15 @@ pub struct Asked {
     /// and is refused with [`crate::moves::PERSON_USING`] over anything
     /// higher. Without it, a gesture asked over one playing is as before.
     pub replace: bool,
+    /// The move asked waits for the one playing and starts on the step it
+    /// ends (`"queue": true` on the mood socket, sent by `lamp-control` for
+    /// a paired computer, under [`Limits::move_queue`]): honoured only
+    /// behind a move of the same asker (its priority and source), with
+    /// nothing easing out and no pause; the one playing is not ended, and
+    /// anything that ends it early drops the one waiting
+    /// ([`crate::moves::QUEUED_FIRST_ENDED`]). Otherwise it is asked as if
+    /// unqueued.
+    pub queue: bool,
     /// The gesture asked is one only an energy level above 1 starts of
     /// itself (`"lively": true` on the mood socket, #6893): the voice's fill
     /// on an answer with no gesture of its own, a `lively` skill's run. It
@@ -1027,6 +1040,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        queue: false,
         lively: false,
         energy: 0,
         present: false,
@@ -1061,6 +1075,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        queue: false,
         lively: false,
         energy: 0,
         present: false,
@@ -1421,6 +1436,13 @@ pub struct Limits {
     /// [`crate::presence_in::enabled`], as presence is.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub presence: bool,
+    /// `LAMP_BODY_MOVE_QUEUE=on`: a paired computer's move asked with
+    /// `"queue": true` behind its own move playing starts on the step that
+    /// one ends, with no ease back to the stand between ([`Asked::queue`]).
+    /// Off: `queue` is not read, and such a move is asked as before. Off in
+    /// the product (`moves::tests`).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub move_queue: bool,
     /// A load above this on `load_steps` steps in a row makes the joint give
     /// way, and ends the run if it stays or comes back too often.
     pub load: [u16; 3],
@@ -1613,6 +1635,7 @@ impl Limits {
         strain_guard: None,
         energy: false,
         presence: false,
+        move_queue: false,
     };
 }
 
@@ -1700,6 +1723,11 @@ pub struct Glimpse {
     pub face: Option<[f32; 3]>,
     /// The gesture it is making.
     pub gesture: Option<&'static str>,
+    /// The gesture it is making began on this step: a queued move of the
+    /// same name as the one before it ([`Asked::queue`]) is a new gesture
+    /// though `gesture` reads the same, so `body/gesture` says the first
+    /// `over` and this one `began`.
+    pub gesture_began: bool,
     /// Under `--overload release`: times so far it let go, and whether its
     /// torque is off now.
     pub released: u16,
@@ -5540,6 +5568,7 @@ pub(crate) fn run_looking(
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        queue: false,
         lively: false,
         energy: 0,
         present: false,
@@ -7151,6 +7180,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // offsets it has the five joints at; and steps left of the allowance a
     // gesture is given.
     let mut playing: Option<(&'static Clip, Duration)> = None;
+    // A move waiting for the one playing (`Asked::queue`): itself, who asked
+    // it, and the move it waits for, which must still be the one playing
+    // when it ends.
+    let mut queued: Option<Queued> = None;
     let mut pending: Option<(&'static Clip, Duration)> = None;
     // Who asked for the gesture playing and the one waiting (weighed
     // against each other only under `Limits::arbitration`), each priority with the name its asker gave (the
@@ -7434,6 +7467,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
+        // A gesture began on this step (`Glimpse::gesture_began`).
+        let mut began_now = false;
         test_misses = test_misses.max(asked_now.missed_by_test);
         // A new energy level only once settled, so that a cap never drops
         // under a joint still moving: no gesture playing or waiting, the
@@ -7559,6 +7594,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // Only lamp-control's asks (a paired computer's) replace what
         // plays; any other asker's mark is taken as absent.
+        // Only lamp-control's asks wait for its own move, and only with the
+        // queue on (`LAMP_BODY_MOVE_QUEUE`).
+        asked_now.queue &= limits.move_queue
+            && asked_source.is_some_and(|source| crate::moves::from_control(source.as_str()));
         asked_now.replace &=
             asked_source.is_some_and(|source| crate::moves::from_control(source.as_str()));
         // A hand from the test input (`--hold-from`) holds through anything
@@ -8238,6 +8277,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     let arm_free = stalls[3..].iter().all(|stall| stall.hold.is_none());
                     let tilts = limits.stand_roll > limits.roll;
                     playing = Some((idler.pick(tilts, arm_free), now));
+                    began_now = true;
                     report.idles += 1;
                     idle_due = None;
                 }
@@ -8245,6 +8285,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
         }
         if let Some(clip) = asked_now.gesture {
+            // Queued behind this asker's own move playing, with nothing
+            // easing out and no pause: it waits for that one to end and is
+            // not weighed against it (`Asked::queue`).
+            let queue_behind = asked_now.queue
+                && easing_out.is_none()
+                && paused.is_none()
+                && playing.is_some_and(|(old, _)| from_outside(old))
+                && playing_by == (asked_by, asked_source);
             // Why it is dropped, if it is, and who holds the body then: a
             // skill or the conversation that named itself, or nobody.
             let dropped = if asked_now.paused {
@@ -8284,6 +8332,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 Some((crate::moves::PERSON_USING, None))
             } else if standing.is_none() {
                 Some(("dropped: it does not stand this run", None))
+            } else if queue_behind {
+                None
             } else if !(playing.is_none() || idling) {
                 let by = playing
                     .filter(|(clip, _)| from_outside(clip))
@@ -8344,6 +8394,36 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         by,
                     },
                 ),
+                None if queue_behind => {
+                    // It waits; the one playing plays on, never ended or
+                    // eased back. One waits at a time: a newer takes the
+                    // place of the one waiting.
+                    let clip = if stretch.is_some() {
+                        crate::energy::livelier(clip, energy)
+                    } else {
+                        clip
+                    };
+                    if let Some((first, since)) = playing {
+                        if let Some((before, by, _)) =
+                            queued.replace((clip, (asked_by, asked_source), first))
+                        {
+                            report.gestures_dropped += 1;
+                            gesture_fates.push_told(
+                                (before.name, "dropped: another was asked after it"),
+                                Told {
+                                    source: by.1,
+                                    by: None,
+                                },
+                            );
+                        }
+                        // It stays up for both, as for a gesture waiting.
+                        let needed = since
+                            + Duration::from_micros(first.duration_within_us(stretch))
+                            + GESTURE_WAIT
+                            + Duration::from_micros(clip.duration_within_us(stretch));
+                        awake_until = awake_until.max(Some(needed));
+                    }
+                }
                 None => {
                     // Asked over a gesture playing: it ends now and eases
                     // out at the gesture's own step, and this one waits
@@ -8430,6 +8510,32 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
         }
         let mut began_woke = None;
+        // A move queued behind the one playing takes the body on the step that
+        // one ends, with no ease back between (`Asked::queue`): begun here,
+        // before the reach and the anti-tip checks, as a gesture waiting is.
+        if let (Some((first, since)), Some((next, by, behind))) = (playing, queued)
+            && std::ptr::eq(first, behind)
+            && paused.is_none()
+            && now.saturating_sub(since) >= Duration::from_micros(first.duration_within_us(stretch))
+        {
+            queued = None;
+            if upright && !yielding {
+                playing = Some((next, now));
+                playing_by = by;
+                report.gestures += 1;
+                began_woke = Some(false);
+                began_now = true;
+            } else {
+                report.gestures_dropped += 1;
+                gesture_fates.push_told(
+                    (next.name, "dropped: it did not stand when its turn came"),
+                    Told {
+                        source: by.1,
+                        by: None,
+                    },
+                );
+            }
+        }
         if let Some((clip, since)) = pending {
             if upright && !yielding {
                 playing = Some((clip, now));
@@ -8437,6 +8543,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 pending = None;
                 report.gestures += 1;
                 began_woke = Some(pending_woke);
+                began_now = true;
             } else if now.saturating_sub(since) >= GESTURE_WAIT {
                 pending = None;
                 if from_outside(clip) {
@@ -8620,6 +8727,22 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
                 _ => playing = None,
             }
+        }
+        // A move waiting for one no longer playing (ended before it played
+        // out: a hand, a stop, a higher ask, the lease, a sit-down) never
+        // plays, and is said dropped.
+        if let Some((next, by, behind)) = queued
+            && !playing.is_some_and(|(clip, _)| std::ptr::eq(clip, behind))
+        {
+            queued = None;
+            report.gestures_dropped += 1;
+            gesture_fates.push_told(
+                (next.name, crate::moves::QUEUED_FIRST_ENDED),
+                Told {
+                    source: by.1,
+                    by: None,
+                },
+            );
         }
         // Played on blind, it holds the frame it has: the arm's offsets as
         // the head's goals (below), nothing new asked until the wire answers.
@@ -9571,6 +9694,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
         }
         let mut glimpse = Glimpse {
+            gesture_began: began_now && playing.is_some(),
             unplug_safe: false,
             unplug_unsafe: None,
             unplug_gap: false,
