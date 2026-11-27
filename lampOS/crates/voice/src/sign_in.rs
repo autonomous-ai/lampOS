@@ -702,12 +702,12 @@ fn owner_language() -> Option<crate::language::Language> {
 }
 
 /// [`may_start`] for `request`, with the person's words and the lamp's line
-/// before them as this process's thread has them. English words only, as
-/// the other English-only gates and the confirm's yes: with the owner's
-/// language another ([`owner_language`]) it is not refused.
+/// before them as this process's thread has them. English and Vietnamese
+/// words only ([`allowed`]): with the owner's language another
+/// ([`owner_language`]) it is not refused.
 fn asked_now(request: u64) -> bool {
     let language = owner_language();
-    if language.is_some() {
+    if language.is_some_and(|language| language != crate::language::Language::Vietnamese) {
         return true;
     }
     let words = crate::agent_tasks::heard_words(request, true);
@@ -728,15 +728,252 @@ fn asked_now(request: u64) -> bool {
     )
 }
 
-/// [`may_start`] for an owner speaking `language`: English words only, as
-/// the confirm's yes, so in another language a START is not refused.
+/// [`may_start`] for an owner speaking `language`: English words for an
+/// English owner, Vietnamese ones ([`vi_may_start`]) for a Vietnamese
+/// owner; in any other language a START is not refused.
 fn allowed(
     language: Option<crate::language::Language>,
     words: Option<&str>,
     last: Option<(&str, Duration, bool)>,
     open: bool,
 ) -> bool {
-    language.is_some() || may_start(words, last, open)
+    match language {
+        None => may_start(words, last, open),
+        Some(crate::language::Language::Vietnamese) => vi_may_start(words, last, open),
+        Some(_) => true,
+    }
+}
+
+// The gate in Vietnamese (#8700), for an owner whose language is "vi".
+// Kept apart from the English words above so each changes on its own.
+// Speech to text may keep or drop the marks: each word here is written
+// with them, and a heard word matches it written the same, or, when the
+// heard word has no marks at all, by its bare form ([`vi_is`]: "dang
+// nhap" is "đăng nhập"). A heard word with marks matches only itself, so
+// "dùng" is never "đừng", nor "mà" "mã". Words in decomposed letters are
+// composed first ([`vi_words`]).
+
+/// Sign-in words in Vietnamese, as [`sign_in_word`]'s `Some(true)`.
+const VI_SIGN_IN: [&str; 1] = ["đăng nhập"];
+
+/// Words that sign in only with a computer named ([`VI_PLACES`]), as
+/// [`sign_in_word`]'s `Some(false)`: "kết nối wifi", "cài đặt báo thức"
+/// are none.
+const VI_PAIRING: [&str; 4] = ["kết nối", "ghép", "liên kết", "cài đặt"];
+
+/// The person's computer in Vietnamese ("máy", "máy tính"), beside
+/// [`SIGN_IN_PLACES`] (laptop, Mac, Harness …).
+const VI_PLACES: [&str; 1] = ["máy"];
+
+/// Words that say no to a sign-in word at most two words after them, in
+/// its clause, beside [`refusal_word`]'s.
+const VI_REFUSALS: [&str; 5] = ["không", "đừng", "chưa", "thôi", "khỏi"];
+
+/// A plain yes to the lamp's offer, alone or together: "ừ", "vâng",
+/// "được", "ừ, làm đi", "dạ, đồng ý", "đăng nhập đi".
+const VI_YES: [&str; 11] = [
+    "ừ",
+    "ừm",
+    "có",
+    "vâng",
+    "dạ",
+    "được",
+    "ok",
+    "okay",
+    "làm đi",
+    "đăng nhập đi",
+    "đồng ý",
+];
+
+/// Words beside a plain yes that change nothing: "vâng ạ", "được, làm
+/// giúp tôi nhé".
+const VI_BESIDE: [&str; 13] = [
+    "ạ", "nhé", "nha", "luôn", "giúp", "tôi", "mình", "em", "anh", "chị", "bạn", "rồi", "ơi",
+];
+
+/// The words of `text`, composed (NFC), lower case ([`crate::agent_tasks::plain_words`]).
+fn vi_words(text: &str) -> Vec<String> {
+    use unicode_normalization::UnicodeNormalization;
+    crate::agent_tasks::plain_words(&text.nfc().collect::<String>())
+}
+
+/// `word` with its marks taken off: "đăng" is "dang", "được" "duoc".
+fn bare(word: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    word.nfd()
+        .filter(|c| !('\u{300}'..='\u{36f}').contains(c))
+        .map(|c| if c == 'đ' { 'd' } else { c })
+        .collect()
+}
+
+/// Whether the heard `word` is the word `said`: the same, or, with no
+/// marks at all, its bare form ([`bare`]).
+fn vi_is(word: &str, said: &str) -> bool {
+    word == said || (word.is_ascii() && word == bare(said))
+}
+
+/// How many words of `words` from `at` the phrase `said` takes ("đăng
+/// nhập" two), or none when they are not it.
+fn vi_phrase_at(words: &[String], at: usize, said: &str) -> Option<usize> {
+    let said: Vec<&str> = said.split(' ').collect();
+    (words.len() - at >= said.len()
+        && said
+            .iter()
+            .zip(&words[at..])
+            .all(|(said, word)| vi_is(word, said)))
+    .then_some(said.len())
+}
+
+/// The first of `phrases` at `at` and how many words it takes.
+fn vi_any_at(words: &[String], at: usize, phrases: &[&str]) -> Option<usize> {
+    phrases
+        .iter()
+        .find_map(|said| vi_phrase_at(words, at, said))
+}
+
+/// [`sign_in_word`] in Vietnamese: `Some(true)` for [`VI_SIGN_IN`],
+/// `Some(false)` for [`VI_PAIRING`], and the English words as said inside
+/// a Vietnamese sentence ("log in máy tính giúp tôi").
+fn vi_sign_in_word(words: &[String], at: usize) -> Option<bool> {
+    if vi_any_at(words, at, &VI_SIGN_IN).is_some() {
+        Some(true)
+    } else if vi_any_at(words, at, &VI_PAIRING).is_some() {
+        Some(false)
+    } else {
+        sign_in_word(words, at)
+    }
+}
+
+/// Whether `word` says no ([`VI_REFUSALS`], [`refusal_word`]).
+fn vi_refusal_word(word: &str) -> bool {
+    VI_REFUSALS.iter().any(|said| vi_is(word, said)) || refusal_word(word)
+}
+
+/// [`refuses_whole`] in Vietnamese: the reply begins with "không",
+/// "chưa", "đừng", "thôi" or "khỏi", says "để sau" anywhere ("chưa, để
+/// sau", "đăng nhập để sau"), or says no in English.
+fn vi_refuses_whole(text: &str) -> bool {
+    let words = vi_words(text);
+    words.first().is_some_and(|word| vi_refusal_word(word))
+        || (0..words.len()).any(|at| vi_phrase_at(&words, at, "để sau").is_some())
+        || refuses_whole(text)
+}
+
+/// [`free_sign_in_words`] in Vietnamese: a refusal at most two words
+/// before the sign-in word, in its clause, governs it ("đừng đăng nhập",
+/// "không cần đăng nhập"); "Máy tính chưa đăng nhập, đăng nhập giúp tôi"
+/// has one free.
+fn vi_free_sign_in_words(text: &str) -> Vec<bool> {
+    let mut free = Vec::new();
+    for clause in text.split([',', '.', '?', '!', ';', ':', '—', '–']) {
+        let words = vi_words(clause);
+        for at in 0..words.len() {
+            if let Some(strong) = vi_sign_in_word(&words, at)
+                && !words[at.saturating_sub(2)..at]
+                    .iter()
+                    .any(|word| vi_refusal_word(word))
+            {
+                free.push(strong);
+            }
+        }
+    }
+    free
+}
+
+/// [`asks_to_sign_in`] in Vietnamese: a sign-in word no refusal governs
+/// with no agent named ("đăng nhập giúp tôi") or with a computer
+/// ([`VI_PLACES`], [`SIGN_IN_PLACES`]); a pairing word only with one
+/// ("kết nối máy tính của tôi đi"). "Nhờ Codex đăng nhập GitHub" is an
+/// agent's work.
+fn vi_asks_to_sign_in(text: &str) -> bool {
+    if vi_refuses_whole(text) {
+        return false;
+    }
+    let agent = crate::agent_tasks::names_an_agent(text);
+    let words = vi_words(text);
+    let place = words.iter().any(|word| {
+        SIGN_IN_PLACES.contains(&word.as_str()) || VI_PLACES.iter().any(|said| vi_is(word, said))
+    });
+    vi_free_sign_in_words(text)
+        .iter()
+        .any(|&strong| if strong { place || !agent } else { place })
+}
+
+/// Whether the lamp's `line` offers a sign-in in its question, as
+/// [`offers_sign_in`], by the Vietnamese words too: "Máy tính chưa đăng
+/// nhập. Tôi đăng nhập giúp nhé?" does, "… Bạn muốn dùng Hermes không?"
+/// does not.
+fn vi_offers_sign_in(line: &str) -> bool {
+    let line = line.trim_end_matches(|c: char| {
+        c.is_whitespace() || matches!(c, '"' | '”' | '\'' | '’' | ')' | '?')
+    });
+    let question = line
+        .rfind(['.', '!', '?'])
+        .map_or(line, |at| &line[at + 1..]);
+    let words = vi_words(question);
+    (0..words.len()).any(|at| vi_sign_in_word(&words, at).is_some())
+}
+
+/// Whether `text` is a plain yes in Vietnamese and nothing else: [`VI_YES`]
+/// with only [`VI_BESIDE`] around it, at most eight words (a word is a
+/// syllable), no question. "Có không?" and "ừ, nhưng để sau" are not.
+fn vi_plain_yes(text: &str) -> bool {
+    if text.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = vi_words(text);
+    if words.is_empty() || words.len() > 8 {
+        return false;
+    }
+    let mut yes = false;
+    let mut at = 0;
+    while at < words.len() {
+        if let Some(taken) = vi_any_at(&words, at, &VI_YES) {
+            yes = true;
+            at += taken;
+        } else if let Some(taken) = vi_any_at(&words, at, &VI_BESIDE) {
+            at += taken;
+        } else {
+            return false;
+        }
+    }
+    yes
+}
+
+/// [`yes_to_the_offer`] in Vietnamese: to a fresh offer
+/// ([`vi_offers_sign_in`]), a plain yes in either language
+/// ([`vi_plain_yes`], [`crate::agent_tasks::yes_to_a_question`]), or any
+/// reply with a sign-in word no refusal governs, unless the whole reply
+/// says no or not now ([`vi_refuses_whole`]).
+fn vi_yes_to_the_offer(words: &str, last: Option<(&str, Duration, bool)>) -> bool {
+    let Some((line, ago, cut)) = last else {
+        return false;
+    };
+    if ago > crate::agent_tasks::CONFIRM_WITHIN
+        || cut
+        || !crate::agent_tasks::asks(line)
+        || !vi_offers_sign_in(line)
+    {
+        return false;
+    }
+    if vi_plain_yes(words) || crate::agent_tasks::yes_to_a_question(true, Some(words), last) {
+        return true;
+    }
+    !vi_refuses_whole(words) && !vi_free_sign_in_words(words).is_empty()
+}
+
+/// [`may_start`] for a Vietnamese owner: while a code is kept, always (so
+/// "nói lại mã đi", "đọc lại số" need no word of it), words not known
+/// are not refused, else the person's ask ([`vi_asks_to_sign_in`]) or
+/// yes to the offer ([`vi_yes_to_the_offer`]).
+fn vi_may_start(words: Option<&str>, last: Option<(&str, Duration, bool)>, open: bool) -> bool {
+    if open {
+        return true;
+    }
+    let Some(words) = words else {
+        return true;
+    };
+    vi_asks_to_sign_in(words) || vi_yes_to_the_offer(words, last)
 }
 
 /// One of the two functions, in the voice's `request`, within `deadline`.
@@ -3604,10 +3841,10 @@ mod tests {
     /// The rows written blind from #8700's spec (thirteen-kit's
     /// `sign-in-table-8808.rs.txt`, 39 rows, kept as written): (owner's
     /// language, the lamp's last line, fresh and not cut, a code kept, the
-    /// person's words, allowed, why). Every failing row is printed at
-    /// once. One row is a named exception, never edited: the gate is off
-    /// for a Vietnamese owner until First decides on Vietnamese words (the
-    /// Queue ask), so its refusal is let through today.
+    /// person's words, allowed, why), and 22 Vietnamese rows added
+    /// with the Vietnamese words (`vi_*`), no exception left: "đừng đăng
+    /// nhập" is refused as any other row. Every failing row is printed at
+    /// once.
     #[test]
     fn the_blind_table_of_asks_yeses_and_refusals() {
         /// (owner's language, the lamp's last line, a code kept, words,
@@ -3620,7 +3857,7 @@ mod tests {
             bool,
             &'static str,
         );
-        const ROWS: [Row; 39] = [
+        const ROWS: [Row; 61] = [
             (
                 "en",
                 None,
@@ -3926,8 +4163,183 @@ mod tests {
                 false,
                 "Vietnamese refusal after the offer",
             ),
+            (
+                "vi",
+                None,
+                false,
+                "kết nối máy tính của tôi đi",
+                true,
+                "Vietnamese connect with a computer named",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "dang nhap may tinh giup toi",
+                true,
+                "Vietnamese ask with no diacritics",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "\u{111}a\u{306}ng nha\u{323}\u{302}p ma\u{301}y ti\u{301}nh",
+                true,
+                "Vietnamese ask in decomposed (NFD) letters",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "log in máy tính giúp tôi",
+                true,
+                "English sign-in words in a Vietnamese sentence",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "cài đặt máy tính giúp tôi",
+                true,
+                "set up with a computer named",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "Máy tính chưa đăng nhập, đăng nhập giúp tôi",
+                true,
+                "negation describes state, does not govern the ask",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "vâng",
+                true,
+                "Vietnamese plain yes to the offer",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "được",
+                true,
+                "Vietnamese plain yes to the offer",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "dạ, đồng ý",
+                true,
+                "Vietnamese polite yes to the offer",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "đăng nhập đi",
+                true,
+                "Vietnamese yes that repeats the verb",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "u, lam di",
+                true,
+                "Vietnamese yes with no diacritics",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "không",
+                false,
+                "Vietnamese no after the offer",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "khong",
+                false,
+                "Vietnamese no with no diacritics",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "chưa, để sau",
+                false,
+                "Vietnamese deferral after the offer",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "thôi",
+                false,
+                "Vietnamese never mind after the offer",
+            ),
+            (
+                "vi",
+                Some("Máy tính chưa đăng nhập. Tôi đăng nhập giúp nhé?"),
+                false,
+                "không cần đăng nhập đâu",
+                false,
+                "refusal two words before the verb",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "hỏi Codex thủ đô Nhật Bản",
+                false,
+                "Vietnamese agent ask, not a sign-in",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "nhờ Codex đăng nhập GitHub",
+                false,
+                "agent signing in to another service",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "kết nối wifi",
+                false,
+                "connect with no computer named",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "cài đặt báo thức lúc bảy giờ",
+                false,
+                "set up an alarm, not a computer",
+            ),
+            (
+                "vi",
+                None,
+                false,
+                "đừng kết nối máy tính",
+                false,
+                "negated imperative",
+            ),
+            (
+                "vi",
+                Some("Codex chưa sẵn sàng trên máy tính nào. Bạn muốn dùng Hermes không?"),
+                false,
+                "ừ",
+                false,
+                "yes, but the last line offered no sign-in",
+            ),
         ];
-        const VI_GATE_OFF: &str = "đừng đăng nhập";
         let fresh = Duration::from_secs(5);
         let mut failed = Vec::new();
         let mut passed = 0;
@@ -3941,10 +4353,6 @@ mod tests {
             );
             if got == expected {
                 passed += 1;
-            } else if language.is_some() && words == VI_GATE_OFF && got {
-                eprintln!(
-                    "exception (vi gate off until First decides on Vietnamese words): {words:?} let through"
-                );
             } else {
                 failed.push(format!("{words:?} (last {last:?}, code kept {kept}): expected {expected}, got {got}: {why}"));
             }
@@ -3956,17 +4364,14 @@ mod tests {
             failed.len(),
             failed.join("\n")
         );
-        assert_eq!(
-            passed,
-            ROWS.len() - 1,
-            "only the named exception may differ"
-        );
+        assert_eq!(passed, ROWS.len());
     }
 
     /// A Vietnamese owner (the owner's language, `language.rs`): the
-    /// words are read in English only, as the confirm's yes, so the check
-    /// is off and their own ask, the code asked again and a yes to the
-    /// offer each start a sign-in.
+    /// words are read in Vietnamese ([`vi_may_start`]), so an agent's ask
+    /// is refused before the tasks part is asked anything, and their own
+    /// ask, the code asked again and a yes to the offer each start a
+    /// sign-in.
     #[test]
     fn a_vietnamese_owners_ask_code_again_and_yes_are_never_refused() {
         use crate::agent_tasks::tests::HEARD_HERE;
@@ -4006,6 +4411,10 @@ mod tests {
             told
         };
         LANGUAGE_HERE.set(Some(crate::language::Language::Vietnamese));
+        let (refused, handled) = start(2, "Hỏi Codex thủ đô Nhật Bản");
+        assert!(handled);
+        assert_eq!(refused, json!({"error": NOT_ASKED}));
+        assert!(replies.seen.try_recv().is_err(), "nothing asked");
         let (asked, _) = start(3, "Đăng nhập máy tính giúp tôi");
         assert!(asked.get("error").is_none(), "{asked}");
         // Its code is kept: asked again.

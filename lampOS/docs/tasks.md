@@ -8945,13 +8945,44 @@ never have asked or taken an answer on a lamp).
   yes." The journal says `lamp-voice: sign-in: request N:
   sign_in_computer refused: the person did not ask to sign in, nor say yes
   to the lamp's offer (#8700)`. "Ask Codex to sign in to GitHub" is an
-  agent's work, not a sign-in. The words are read in English only, as the
-  other English-only gates: with the owner's language set to another
-  ([`language.rs`](../crates/voice/src/language.rs)) the check is off, and
-  words not known for the request are not refused either (a false refusal
-  of the person's own ask is worse than none, as #6537). So for a
-  Vietnamese owner nothing is refused: the confirm's yes has no Vietnamese
-  words either. Tests:
+  agent's work, not a sign-in. The words are read in English for an
+  English owner and in Vietnamese for an owner whose language is "vi"
+  ([`language.rs`](../crates/voice/src/language.rs), `sign_in::allowed`);
+  with any other language the check is off. Words not known for the
+  request are not refused either (a false refusal of the person's own ask
+  is worse than none, as #6537).
+
+  For a Vietnamese owner (`sign_in::vi_may_start`) the same rules run on
+  Vietnamese words, kept apart from the English ones in the `vi_*`
+  functions and tables:
+  - sign-in words: "đăng nhập" (`VI_SIGN_IN`), and the English words
+    ("log in", "sign in" …) said inside a Vietnamese sentence; pairing
+    words, counted only with a computer word: "kết nối", "ghép", "liên
+    kết", "cài đặt" (`VI_PAIRING`; "kết nối wifi" and "cài đặt báo thức"
+    are none);
+  - computer words: "máy" (so "máy tính" too, `VI_PLACES`), beside
+    laptop, Mac, Harness …;
+  - refusal words (`VI_REFUSALS`): "không", "đừng", "chưa", "thôi",
+    "khỏi", beside the English ones, by the same two-words-before rule in
+    the clause ("đừng đăng nhập", "không cần đăng nhập"); the whole reply
+    is refused when it begins with one or says "để sau" anywhere
+    (`sign_in::vi_refuses_whole`);
+  - a yes to the lamp's offer (`sign_in::vi_plain_yes`): only "ừ", "ừm",
+    "có", "vâng", "dạ", "được", "ok", "làm đi", "đăng nhập đi", "đồng ý",
+    with "ạ", "nhé", "giúp", "tôi" … beside them, at most eight words
+    (syllables), no question; or a reply with a sign-in word no refusal
+    governs;
+  - the lamp's offer is found by the same words ("Máy tính chưa đăng
+    nhập. Tôi đăng nhập giúp nhé?", `sign_in::vi_offers_sign_in`);
+  - the code asked again ("nói lại mã đi", "đọc lại số") always runs while
+    a code is kept, as any START does.
+
+  Speech to text may keep or drop the marks. Each word is written with
+  them; a heard word matches it written the same, or, when it has no
+  marks at all, by its bare form ("dang nhap may tinh" is "đăng nhập máy
+  tính"; `sign_in::vi_is`). A heard word with marks matches only itself,
+  so "dùng" is never "đừng". Decomposed (NFD) letters are composed (NFC)
+  first (`sign_in::vi_words`). Tests:
   `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
   `a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`,
   `the_code_asked_again_in_any_words_starts_while_one_is_kept`,
@@ -8961,8 +8992,9 @@ never have asked or taken an answer on a lamp).
   `a_yes_with_the_offers_verb_starts_and_a_no_never`,
   `a_refusal_counts_only_where_it_governs_the_sign_in`,
   `the_blind_table_of_asks_yeses_and_refusals` (39 rows written from the
-  spec alone; one named exception: "đừng đăng nhập" from a Vietnamese
-  owner is let through while the check is off in Vietnamese),
+  spec alone, and 22 Vietnamese rows added after, with no marks and in
+  NFD among them; no exception left: "đừng đăng nhập" is refused as any
+  other row),
   `a_vietnamese_owners_ask_code_again_and_yes_are_never_refused`.
 - **The news, in the coordinator, from the tasks part**
   (`sign_in::news`, read every 2 s while a sign-in is open, every 10 s

@@ -356,12 +356,41 @@ isn't available, offer to sign it in, and call this only on their yes."
 Nhật ký ghi `lamp-voice: sign-in: request N: sign_in_computer refused: the
 person did not ask to sign in, nor say yes to the lamp's offer (#8700)`.
 "Ask Codex to sign in to GitHub" là việc của agent, không phải đăng nhập
-đèn. Lời chỉ được đọc bằng tiếng Anh, như các cổng chỉ-tiếng-Anh khác: khi
-ngôn ngữ của chủ là ngôn ngữ khác (`crates/voice/src/language.rs`) thì không
-kiểm tra, và khi không biết lời của request thì cũng không từ chối (từ chối
-nhầm lời nhờ của chính người dùng tệ hơn là không kiểm tra, như #6537). Vì
-vậy với chủ dùng tiếng Việt, không lần gọi nào bị từ chối: phép thử "có" của
-bước xác nhận cũng chưa có từ tiếng Việt.
+đèn. Lời được đọc bằng tiếng Anh với chủ dùng tiếng Anh, và bằng tiếng Việt
+với chủ có ngôn ngữ là "vi" (`crates/voice/src/language.rs`,
+`sign_in::allowed`); với mọi ngôn ngữ khác thì không kiểm tra. Khi không biết
+lời của request thì cũng không từ chối (từ chối nhầm lời nhờ của chính người
+dùng tệ hơn là không kiểm tra, như #6537).
+
+Với chủ dùng tiếng Việt (`sign_in::vi_may_start`), cùng các quy tắc trên,
+bằng từ tiếng Việt (tách riêng khỏi bộ từ tiếng Anh, trong các hàm và bảng
+`vi_*`):
+
+- từ đăng nhập: "đăng nhập" (`VI_SIGN_IN`), và các từ tiếng Anh ("log in",
+  "sign in" …) nói trong câu tiếng Việt; từ ghép đôi, chỉ tính khi kèm một
+  từ chỉ máy tính: "kết nối", "ghép", "liên kết", "cài đặt" (`VI_PAIRING`;
+  "kết nối wifi" hay "cài đặt báo thức" không phải đăng nhập);
+- từ chỉ máy tính: "máy" (cả "máy tính", `VI_PLACES`), cùng laptop, Mac,
+  Harness …;
+- từ từ chối (`VI_REFUSALS`): "không", "đừng", "chưa", "thôi", "khỏi", cùng
+  các từ tiếng Anh, với cùng quy tắc tối đa hai từ trước, trong cùng mệnh đề
+  ("đừng đăng nhập", "không cần đăng nhập"); cả câu bị từ chối khi bắt đầu
+  bằng một từ từ chối, hoặc có "để sau" ở bất kỳ đâu
+  (`sign_in::vi_refuses_whole`);
+- đồng ý với lời đề nghị của đèn (`sign_in::vi_plain_yes`): chỉ gồm "ừ",
+  "ừm", "có", "vâng", "dạ", "được", "ok", "làm đi", "đăng nhập đi", "đồng
+  ý", với "ạ", "nhé", "giúp", "tôi" … bên cạnh, tối đa tám tiếng, không phải
+  câu hỏi; hoặc câu trả lời có một từ đăng nhập không bị từ chối;
+- lời đề nghị của đèn được nhận ra bằng cùng bộ từ ("Máy tính chưa đăng
+  nhập. Tôi đăng nhập giúp nhé?", `sign_in::vi_offers_sign_in`);
+- hỏi lại mã ("nói lại mã đi", "đọc lại số") luôn chạy khi mã còn được giữ,
+  như mọi START.
+
+Speech-to-text có thể giữ hoặc bỏ dấu. Mỗi từ được viết có dấu; một từ nghe
+được khớp khi giống hệt, hoặc khi nó không có dấu nào thì khớp với dạng bỏ
+dấu ("dang nhap may tinh" là "đăng nhập máy tính"; `sign_in::vi_is`). Một từ
+có dấu chỉ khớp với chính nó, nên "dùng" không bao giờ là "đừng". Chữ ở dạng
+tách dấu (NFD) được ghép lại (NFC) trước (`sign_in::vi_words`).
 
 Test: `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
 `a_start_the_person_did_not_ask_for_is_refused_before_any_sign_in`,
@@ -371,9 +400,9 @@ Test: `a_sign_in_starts_only_on_the_persons_ask_or_yes_to_the_offer`,
 `a_sign_in_said_with_into_or_signed_starts`,
 `a_yes_with_the_offers_verb_starts_and_a_no_never`,
 `a_refusal_counts_only_where_it_governs_the_sign_in`,
-`the_blind_table_of_asks_yeses_and_refusals` (39 dòng viết chỉ từ đặc tả;
-một ngoại lệ có tên: "đừng đăng nhập" từ chủ dùng tiếng Việt được cho qua
-trong lúc phép kiểm tra tắt với tiếng Việt),
+`the_blind_table_of_asks_yeses_and_refusals` (39 dòng viết chỉ từ đặc tả và
+22 dòng tiếng Việt thêm sau, gồm cả không dấu và NFD; không còn ngoại lệ:
+"đừng đăng nhập" bị từ chối như mọi dòng khác),
 `a_vietnamese_owners_ask_code_again_and_yes_are_never_refused`.
 
 ### Giữ trong bộ nhớ của người dùng (bản ghi liên kết, lát 3, `LAMP_SERVICE_RECORDS_TASKS`, bật trong sản phẩm)
