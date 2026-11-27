@@ -379,8 +379,9 @@ and its gate needs a ready session.
   ring play each clip in turn. Played whole, the reminder is completed as
   said. A clip goes at the next walk's end (about a second) once its id
   leaves Schedule (said, cancelled, an edit's old id, its person forgotten),
-  and all of them for a new store. A failed render (the link down) is tried
-  again after 60 s, then twice as long each time, at most hourly.
+  and all of them for a new store. Off, every clip goes when the voice or
+  its Schedule consumer starts (#8894). A failed render (the link down) is
+  tried again after 60 s, then twice as long each time, at most hourly.
 - **No clip of its own** (set offline, or its render failed): the generic
   "You have a reminder." plays, and the item is marked "rung, not told" in
   the consumer's ledger (`delivery::SCHEMA` 3, kept across a restart). It
@@ -402,10 +403,14 @@ and its gate needs a ready session.
 - **A factory reset takes them** (the first builder's add 1): the clips are
   the person's reminders as sound, so `/var/lib/lampOS/voice/ring-clips` is
   in the product reset plan ([setup.md](setup.md)).
-- **Turned off again, nothing is swept (the Reviewer-lead's P3 2 on #8800):**
-  clips are swept only while the switch is on, so a deleted reminder's clip
-  (said, cancelled, edited, or its person forgotten) stays until a reset if
-  the switch is turned off. A factory reset still removes them all.
+- **Turned off again, every clip goes (#8894, the Reviewer-lead's P3 2 on
+  #8800):** off, every clip goes when the voice or its Schedule consumer
+  starts. The consumer's start removes every file in the folder; with
+  Schedule speech off the consumer never starts, so the voice's own start
+  does it. Turning the switch off takes a restart, so a deleted reminder's
+  clip (said, cancelled, edited, or its person forgotten) never stays. One
+  folder read at each start, one journal line if any went, nothing rendered
+  and no network. A factory reset still removes them all.
 - **No second line for a scrap:** a follow-up with under 400 ms of speech,
   ending within 8 s of the outage's line, gets no line of its own
   ([failure-notices.md](failure-notices.md)).

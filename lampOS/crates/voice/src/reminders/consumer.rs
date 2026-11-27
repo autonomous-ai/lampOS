@@ -1311,13 +1311,20 @@ impl<P: Persistence> Consumer<P> {
 /// The reminders' clips at the consumer's start. With the switch and a
 /// speech service, each reminder's own clip is rendered on a thread of its
 /// own (#8708); the tick only hands it each walk's end, never waiting on
-/// it.
+/// it. Off, every file in `clips` goes (#8894): nothing renders or sweeps
+/// them then, and turning the switch off takes a restart.
 fn clips_at_start<P: Persistence>(
     consumer: &mut Consumer<P>,
     on: bool,
-    _clips: &crate::ring_clips::Clips,
+    clips: &crate::ring_clips::Clips,
 ) -> Option<std::sync::mpsc::SyncSender<crate::ring_clips::Wanted>> {
     if !on {
+        let gone = clips.clear();
+        if gone > 0 {
+            consumer.journal.say(format!(
+                "the offline ring clips were cleared ({gone} files): LAMP_OFFLINE_RINGS is off"
+            ));
+        }
         return None;
     }
     let renderer = crate::ring_clips::renderer_from_environment();
