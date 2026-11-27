@@ -460,31 +460,22 @@ impl ReachMap {
         !self.is_safe(self.to_map_counts(lamp), SHADOW_MARGIN)
     }
 
-    /// The pose to write when the map refuses (`goal` and `held` in the lamp's counts): `goal` when it is inside; else the first of
-    /// each joint alone (pitch, shoulder, elbow), then each pair, then all three, put back to `held` (where it was last written) that
-    /// leaves the pose inside; and `goal` as asked when none does (the lamp is outside already: it is never trapped).
+    /// The pose to write when the map refuses (`goal` and `held` in the lamp's counts): `goal` when it is inside; otherwise the WHOLE pose
+    /// where it was last written (`held`), so no joint is frozen while the others go on and nothing jumps on release. When the pose last
+    /// written is outside itself (the lamp is outside already: it is never trapped) a goal passes only if it is no farther from the
+    /// map's safe poses than that pose is, else `held` (the page guard's rule, `reach-guard.js` `restrict`).
     pub fn refused(&self, goal: Pose, held: Pose) -> Pose {
         if !self.outside(goal) {
             return goal;
         }
-        let joints = ["pitch", "shoulder", "elbow"];
-        let back = |pose: Pose, joint: &str| with(pose, joint, get(held, joint));
-        for joint in joints {
-            let one = back(goal, joint);
-            if !self.outside(one) {
-                return one;
-            }
+        if !self.outside(held) {
+            return held;
         }
-        for a in 0..3 {
-            for b in a + 1..3 {
-                let two = back(back(goal, joints[a]), joints[b]);
-                if !self.outside(two) {
-                    return two;
-                }
-            }
+        if self.distance(self.to_map_counts(goal)) <= self.distance(self.to_map_counts(held)) {
+            goal
+        } else {
+            held
         }
-        let all = back(back(back(goal, "pitch"), "shoulder"), "elbow");
-        if !self.outside(all) { all } else { goal }
     }
 
     /// The map for lamp `unit`, or why not: the file names this lamp, and the stand pose is inside it.
@@ -728,28 +719,25 @@ mod tests {
         assert!(!map.outside(stand) && map.outside(folded));
         // Inside: as asked, whatever was held.
         assert_eq!(map.refused(stand, folded), stand);
-        // Only the pitch goes out: that joint alone is put back where it was written, the others are as asked.
+        // Outside: the whole pose where it was last written.
         let wild = Pose {
             pitch: 4_000.0,
             ..stand
         };
         assert!(map.outside(wild));
         assert_eq!(map.refused(wild, stand), stand);
-        // The arm goes out (folded elbow with the head at the stand's pitch): the arm joint that makes it is put back, not the pitch.
         let arm_out = Pose {
             elbow: 2_047.0,
             ..stand
         };
         assert!(map.outside(arm_out));
-        let back = map.refused(arm_out, stand);
-        assert!(!map.outside(back), "{back:?}");
-        assert_eq!(back.pitch, stand.pitch);
-        // Written outside already (the lamp is outside): no goal can be held to a pose that is outside, so it is as asked.
+        assert_eq!(map.refused(arm_out, stand), stand);
+        // Written outside already (the lamp is outside): it is never trapped, a goal no farther out passes as asked.
         let wild_folded = Pose {
             pitch: 4_000.0,
             ..folded
         };
-        assert_eq!(map.refused(wild_folded, folded), wild_folded);
+        assert_eq!(map.refused(wild_folded, wild_folded), wild_folded);
         // The hysteresis: out at the edge, back in only HYSTERESIS counts farther in.
         let mut shadow = Shadow::default();
         let (_, run) = map.limits(stand, "pitch", 0.0).unwrap();
@@ -766,6 +754,55 @@ mod tests {
         assert_eq!(
             shadow.judge(&map, at(run - SHADOW_MARGIN - HYSTERESIS - 1.0)),
             Some(false)
+        );
+    }
+
+    /// #8928's must-fix 2 and sim-2's P3 1: a refusal holds the WHOLE pose where it was last written (no joint frozen while the others go
+    /// on, so no jump on release), and a lamp already outside lets only a goal that is no farther from the map's safe poses pass.
+    #[test]
+    fn a_refusal_holds_the_whole_pose_and_a_lamp_outside_passes_only_goals_no_farther_out() {
+        let map = ReachMap::parse(MAP).unwrap();
+        let stand = Pose {
+            shoulder: 2_657.0,
+            elbow: 2_602.0,
+            pitch: 1_772.0,
+        };
+        let held = stand;
+        // The pitch goes out AND the elbow moves on: the whole pose goes back, the elbow too.
+        let goal = Pose {
+            shoulder: 2_657.0,
+            elbow: 2_560.0,
+            pitch: 4_000.0,
+        };
+        assert!(map.outside(goal));
+        assert_eq!(
+            map.refused(goal, held),
+            held,
+            "the elbow went on while the pitch was held"
+        );
+        // Already outside (written outside): a goal farther out is held where it was written, one no farther passes.
+        let out = Pose {
+            pitch: 4_000.0,
+            ..stand
+        };
+        assert!(map.outside(out));
+        let deeper = Pose {
+            pitch: 4_090.0,
+            ..stand
+        };
+        assert_eq!(
+            map.refused(deeper, out),
+            out,
+            "a goal deeper outside passed"
+        );
+        let nearer = Pose {
+            pitch: 3_800.0,
+            ..stand
+        };
+        assert_eq!(
+            map.refused(nearer, out),
+            nearer,
+            "a goal coming back in was held"
         );
     }
 }

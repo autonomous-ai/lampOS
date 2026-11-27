@@ -9543,6 +9543,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // in the journal (only at full height: the folded pose and the way up are not the map's, and not on a step that lets go again,
         // which writes nothing). `on` also holds a goal that would put the pose outside where its joint was last written (the other
         // joints at their goals, per pose), unless the lamp is outside already: `ReachMap::refused`. Shadow holds nothing.
+        // `on` never holds anything for a safety move or a hand: a joint held by a hand, a joint left relaxed, a base taken back, a stall's
+        // hold, the stand moving (a sit-down or the way up), or a fold on its way: the goals those write are not asked of the map.
+        let safety_move = held.iter().any(|joint_held| *joint_held)
+            || relaxed
+            || leaving.is_some()
+            || limp_base
+            || stand_velocity != 0.0
+            || stalls.iter().any(|stall| stall.hold.is_some())
+            || test_held;
         if let Some(map) = limits.reach_map
             && slump_again.is_none()
             && standing.is_some()
@@ -9553,7 +9562,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 elbow: f64::from(arm_goals[1]),
                 pitch: f64::from(goals[0]),
             };
-            let held = limits.reach_refuse.then(|| {
+            let held = (limits.reach_refuse && !safety_move).then(|| {
                 let held = crate::reach_map::Pose {
                     shoulder: f64::from(arm_written[0]),
                     elbow: f64::from(arm_written[1]),
@@ -9574,8 +9583,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     } else {
                         "back inside"
                     },
-                    if limits.reach_refuse && went_outside {
-                        "the goals that leave it are held where they were written"
+                    if limits.reach_refuse && !safety_move && went_outside {
+                        "the pose is held where it was written"
                     } else {
                         "nothing is held"
                     }
