@@ -223,7 +223,7 @@ pub const PILOTS: [Pilot; 11] = [
                        name no condition or illness, and never mention a camera.",
             },
             Task {
-                on: Some("mixed"),
+                on: Some("general"),
                 task: "One short, kind line, the way a friend would, suggesting they stand up for a \
                        short stretch; say only a while, never a number, name no condition or \
                        illness, and never mention a camera.",

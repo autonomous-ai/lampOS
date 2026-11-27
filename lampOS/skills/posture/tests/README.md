@@ -25,7 +25,7 @@ from Sit back is Sit back's `a-bad-posture-alone-is-let-be`.
 | `a-word-for-the-back` | As the neck's, region `trunk` | Pass: the back's line at 30 s, once |
 | `a-word-for-the-shoulders` | As the neck's, region `upper_arm` | Pass: the shoulders' line at 30 s, once |
 | `a-word-for-the-forearms` | As the neck's, region `lower_arm` | Pass: the forearms' line at 30 s, once |
-| `a-word-when-no-region-stands-out` | As the neck's, region `none` (bad by the RULA risk alone) | Pass: V1's "empty / mixed" line, a short stretch, at 30 s |
+| `a-word-when-no-region-stands-out` | As the neck's, region `general` (bad by the RULA risk alone) | Pass: V1's "empty / mixed" line, a short stretch, at 30 s |
 | `a-word-once-both-checks-are-bad` | One check of two bad (`bad_share` 0.5) to 3 minutes, then both bad | Pass: nothing at 0.5; the neck's line at 3m30 (V1's 0.6 or more is both checks bad) |
 | `let-be-below-v1s-share` | `bad_share` 0.5 all through | Pass: nothing |
 | `let-be-before-the-window-is-full` | `window_s` 30 (today's lamp-seen never says it), both bad, up and gone at 9 minutes 30 | Pass: nothing: the window never full |
