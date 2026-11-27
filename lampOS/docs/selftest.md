@@ -119,7 +119,17 @@ next words too (the seventh on #1245). It looks for at most two minutes, and lea
 conversation longer than that for the next run, exit 0, saying so.
 A run a person asked for begins at once. Passive, it wakes nothing in sleep hours.
 A passive run that failed a part checks that part again half a minute later
-(`lamp_selftest::again`), and keeps the fail only if it fails twice: a part restarting
+(`lamp_selftest::again`), after the same quiet wait succeeds. If the voice
+stays in a turn for that whole wait, no part is retried. Each first-pass
+failure becomes `not_checked`, with a retry-deferred reason that retains
+the first failure and its readings. Other parts keep their first results;
+the run is published and kept, and exits 3. The report is not a pass.
+`lamp-health` retains previously confirmed failures under its existing
+build rules: same-build failures stay errors, while an older passive
+build's failure may become a warning. With no retained failure, Health
+currently labels unchecked parts `ok` with a count; that label does not
+establish that those checks passed.
+When the quiet wait succeeds, it keeps the fail only if it fails twice: a part restarting
 at that moment, or a hand resting on a pad, would otherwise mark a sound lamp
 `error` for six hours (the reviewer on #1245). Every timed run reports
 `occasion: first_boot`, the passive one. The timer comes with `lamp-update install`,
@@ -128,6 +138,13 @@ lacks it, with the self-test it starts (updater 8 and later, updates.md, "A part
 added over the air").
 `lamp-health` then carries the newest run in `lamp/health`, so a part that failed since is said
 before its person finds out. The factory's run and an on-demand one are started by hand.
+
+The quiet gate checks admission only; it does not cancel a check already
+running. Its existing missing/stale-voice rule also does not prove that a
+room is quiet. Reusing these checks for nightly fleet evaluation still needs
+fresh voice and presence evidence, continuous cancellation, bounded reads,
+an upcoming-reminder signal and coordination with updates. This retry fix
+does not add or enable that nightly schedule.
 
 Exit status: 0 every part passed or is not fitted, or a first-boot run was
 left for the next time because the voice stayed in a turn; 1 a part failed,
