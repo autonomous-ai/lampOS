@@ -1968,9 +1968,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   off or not reached, the skill is removed still and the journal says its
   yes may stay. Agreed already, the read-back says so and asks nothing.
 - **No folder yes, with `LAMP_TASK_NO_YES=on`** (#8475, the first
-  builder's approved design; off unless set, and off in the product: no
-  product unit sets it until #8475's part 2 (#8535) lands, switched on then
-  with its own row (docs/switches.md); one switch,
+  builder's approved design; off unless set, and on in the product: the
+  four product units that read it, lamp-control, lamp-skills,
+  lamp-services and lamp-voice, set it since #8475's switch-on, after its
+  part 2 (#8535) landed (docs/switches.md); one switch,
   `lamp_services::task_no_yes::on`, `lamp_skills::task_no_yes_on`).
   (1) No skill's task waits for a folder yes, whatever its source (pushed,
   Store, added by hand, made) and whoever started the run (the voice, a

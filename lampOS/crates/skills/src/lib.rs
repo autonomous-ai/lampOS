@@ -3849,8 +3849,8 @@ pub fn set_no_yes_switch_here(on: Option<bool>) {
 /// Whether a skill's task runs on its declared grants with no folder yes,
 /// whatever its source (#8475, `LAMP_TASK_NO_YES`,
 /// `lamp_services::task_no_yes`, the one switch read alike by lamp-control,
-/// lamp-skills, lamp-services and lamp-voice; off in the product until
-/// #8475's part 2, #8535): on, lamp-control mints every source's declared
+/// lamp-skills, lamp-services and lamp-voice; on in the product's four
+/// units since #8475's switch-on): on, lamp-control mints every source's declared
 /// grants, `net` among them, with no kept yes (its folder's SHA-256 still
 /// checked at the yes check, a changed folder a new one), the hand-over
 /// asks no yes ([`task::hand`]), and the voice's call of a skill's task
