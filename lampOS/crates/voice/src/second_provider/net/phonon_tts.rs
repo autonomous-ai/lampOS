@@ -16,8 +16,18 @@ use tokio::{
 
 use super::PACKET_SAMPLES;
 
-/// How long one read of the service's answer may stall.
+/// How long one read of the service's answer may stall, once its first
+/// sound has come.
 pub const STALL: Duration = Duration::from_secs(4);
+
+/// How long the service has to send a sentence's first sound. Well inside
+/// the voice's first-sound window (4 s), so a service busy with another
+/// asker (`lamp-phonon` makes one sentence at a time, the speech cache's
+/// lines too) fails the piece in time for the lamp's one voice to say it
+/// (the Reviewer-lead's P2 on #8754's pull request: at 4 s, as [`STALL`],
+/// it failed just as the window ran out, and the piece went unsaid). The
+/// service's first sound took 158 to 475 ms on a lamp (`docs/phonon.md`).
+pub const FIRST_WITHIN: Duration = Duration::from_millis(1_500);
 
 /// The service, at its socket, in the person's chosen voice.
 #[derive(Clone, Debug)]
@@ -53,7 +63,7 @@ impl PhononTts {
 
     /// `text`'s speech from its first packet on, or why there is none: no
     /// service (not chosen, still fetching, stopped), a refusal, or a
-    /// first packet later than [`STALL`].
+    /// first sound later than [`FIRST_WITHIN`].
     pub async fn speak(&self, text: &str) -> Result<BoxStream<'static, Result<Vec<i16>>>> {
         let turn = self.turn().await;
         self.speak_in_turn(text, turn).await
@@ -86,6 +96,7 @@ impl PhononTts {
             held: Vec::new(),
             ended: false,
             turn: Some(turn),
+            stall: FIRST_WITHIN,
         };
         let first = reader.packet().await?;
         let rest = stream::try_unfold(reader, |mut reader| async move {
@@ -102,6 +113,8 @@ struct Reader {
     ended: bool,
     /// Given back at the end: the service is free for the next sentence.
     turn: Option<Turn>,
+    /// [`FIRST_WITHIN`] until the first frame's head is read, then [`STALL`].
+    stall: Duration,
 }
 
 impl Reader {
@@ -109,7 +122,8 @@ impl Reader {
     async fn packet(&mut self) -> Result<Option<Vec<i16>>> {
         while !self.ended && self.held.len() < PACKET_SAMPLES {
             let mut bytes = [0; 4];
-            read_within(&mut self.connection, &mut bytes).await?;
+            read_within(&mut self.connection, &mut bytes, self.stall).await?;
+            self.stall = STALL;
             match head(bytes) {
                 Head::End => {
                     self.ended = true;
@@ -118,7 +132,7 @@ impl Reader {
                 Head::Failed => return Err(Error::Protocol("the lamp's voice's failure")),
                 Head::Samples(n) => {
                     let mut pcm = vec![0; n * 2];
-                    read_within(&mut self.connection, &mut pcm).await?;
+                    read_within(&mut self.connection, &mut pcm, STALL).await?;
                     self.held.extend(
                         pcm.chunks_exact(2)
                             .map(|pair| i16::from_le_bytes([pair[0], pair[1]])),
@@ -134,8 +148,8 @@ impl Reader {
     }
 }
 
-async fn read_within(connection: &mut UnixStream, bytes: &mut [u8]) -> Result<()> {
-    match tokio::time::timeout(STALL, connection.read_exact(bytes)).await {
+async fn read_within(connection: &mut UnixStream, bytes: &mut [u8], stall: Duration) -> Result<()> {
+    match tokio::time::timeout(stall, connection.read_exact(bytes)).await {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(_)) => Err(Error::Transport("the lamp's voice's answer")),
         Err(_) => Err(Error::Timeout("the lamp's voice's answer")),
@@ -244,6 +258,32 @@ mod tests {
             tts.speak("Hello.").await.err(),
             Some(Error::Protocol(_))
         ));
+    }
+
+    /// A service that takes the request and sends no sound (busy with
+    /// another asker's sentence) is a timeout within [`FIRST_WITHIN`], well
+    /// before the voice's 4 s first-sound window runs out.
+    #[tokio::test]
+    async fn a_service_with_no_first_sound_is_a_timeout_well_inside_the_window() {
+        let folder = Folder::new();
+        let path = folder.0.join("p.sock");
+        let listener = UnixListener::bind(&path).unwrap();
+        let _held = tokio::spawn(async move {
+            let (connection, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            drop(connection);
+        });
+        let tts = PhononTts::new(&path, freya());
+        let started = std::time::Instant::now();
+        assert!(matches!(
+            tts.speak("Hello.").await.err(),
+            Some(Error::Timeout(_))
+        ));
+        let took = started.elapsed();
+        assert!(
+            took >= FIRST_WITHIN && took < Duration::from_millis(2_500),
+            "{took:?}"
+        );
     }
 
     /// Dropping the speech after its first packet (a barge-in) closes the

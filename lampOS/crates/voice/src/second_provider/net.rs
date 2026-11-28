@@ -24,7 +24,7 @@ pub use chat::{
     Narrow, ToolCall, cache_counts,
 };
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
-pub use phonon_tts::{PhononTts, Turn as PhononTurn};
+pub use phonon_tts::{FIRST_WITHIN as PHONON_FIRST_WITHIN, PhononTts, Turn as PhononTurn};
 pub(crate) use public::{DOH_ENVIRONMENT, get_public_json_within};
 pub use sentences::Sentences;
 pub use stt::{

@@ -1091,29 +1091,12 @@ impl Voice {
     }
 
     /// The speech of `text` from its first packet on, or why there is none.
+    /// Bound by the caller to [`START_WITHIN`], but for Phonon, which bounds
+    /// each of its own steps ([`Voice::times_itself`]).
     async fn first(
         &self,
         text: &str,
         turn: Option<net::Turn>,
-    ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
-        self.first_held(text, turn, None).await
-    }
-
-    /// Phonon's turn ([`net::PhononTts::turn`]), taken before a piece's
-    /// first-sound window starts; `None` for any other voice.
-    async fn phonon_turn(&self) -> Option<net::PhononTurn> {
-        match self {
-            Self::Phonon(phonon, _) => Some(phonon.turn().await),
-            _ => None,
-        }
-    }
-
-    /// [`Voice::first`], with Phonon's turn already `held` if taken.
-    async fn first_held(
-        &self,
-        text: &str,
-        turn: Option<net::Turn>,
-        held: Option<net::PhononTurn>,
     ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
         match self {
             Self::Gemini(gemini) => gemini_first(gemini, text).await,
@@ -1142,20 +1125,36 @@ impl Voice {
             }
             // #8754: Phonon says it if it can start; else the lamp's one
             // voice does, with no notice (the model may still be fetching).
-            Self::Phonon(phonon, lamps) => match match held {
-                Some(held) => phonon.speak_in_turn(text, held).await,
-                None => phonon.speak(text).await,
-            } {
-                Ok(speech) => Ok(speech),
-                Err(why) => {
-                    if !PHONON_PASSED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-                        eprintln!(
-                            "lamp-voice second: Phonon could not say a sentence ({why}); the lamp's one voice said it (first time only)"
-                        );
+            // Phonon makes one sentence at a time: a piece waits for its
+            // turn, at most PHONON_TURN_WITHIN (the Reviewer-lead's P3 1 on
+            // #8754's pull request), and its first sound is due within
+            // net::PHONON_FIRST_WITHIN of it. A failure at either step,
+            // `lamp-phonon` busy with another asker included (the speech
+            // cache's line, P2), leaves the lamp's one voice its whole
+            // START_WITHIN for the piece.
+            Self::Phonon(phonon, lamps) => {
+                let said = match tokio::time::timeout(PHONON_TURN_WITHIN, phonon.turn()).await {
+                    Ok(held) => {
+                        tokio::time::timeout(PHONON_START_WITHIN, phonon.speak_in_turn(text, held))
+                            .await
+                            .unwrap_or(Err(net::Error::Timeout("the lamp's voice's answer")))
                     }
-                    Box::pin(lamps.first(text, turn)).await
+                    Err(_) => Err(net::Error::Timeout("the lamp's voice's turn")),
+                };
+                match said {
+                    Ok(speech) => Ok(speech),
+                    Err(why) => {
+                        if !PHONON_PASSED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                            eprintln!(
+                                "lamp-voice second: Phonon could not say a sentence ({why}); the lamp's one voice said it (first time only)"
+                            );
+                        }
+                        tokio::time::timeout(START_WITHIN, Box::pin(lamps.first(text, turn)))
+                            .await
+                            .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
+                    }
                 }
-            },
+            }
             Self::Configured(tts, _) => {
                 let mut speech = match turn {
                     Some(turn) => tts.speak_for(text, turn).await?,
@@ -1170,14 +1169,26 @@ impl Voice {
         }
     }
 
+    /// Whether [`Voice::first`] bounds each of its own steps, so the caller
+    /// adds no [`START_WITHIN`] of its own: Phonon, whose wait for its turn
+    /// and first sound come before the lamp's one voice's window.
+    fn times_itself(&self) -> bool {
+        matches!(self, Self::Phonon(..))
+    }
+
     /// [`Voice::first`] asked again after a piece failed to start (#4338):
     /// the configured voice over a connection of its own
-    /// ([`net::Tts::speak_fresh`]); Gemini as before.
+    /// ([`net::Tts::speak_fresh`]); Gemini as before. For Phonon, the
+    /// lamp's one voice alone: Phonon and the lamp's voice behind it both
+    /// failed the piece once.
     async fn first_fresh(
         &self,
         text: &str,
         turn: Option<net::Turn>,
     ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
+        if let Self::Phonon(_, lamps) = self {
+            return Box::pin(lamps.first_fresh(text, turn)).await;
+        }
         match (self, turn) {
             (Self::Configured(tts, _), Some(turn)) => {
                 let mut speech = tts.speak_fresh(text, turn).await?;
@@ -1206,6 +1217,7 @@ impl Voice {
     fn asks_fresh(&self, turn: Option<net::Turn>) -> bool {
         match self {
             Self::OwnGemini(_, lamps, lost) => lost.is_lost() && lamps.asks_fresh(turn),
+            Self::Phonon(_, lamps) => lamps.asks_fresh(turn),
             _ => matches!((self, turn), (Self::Configured(..), Some(_))),
         }
     }
@@ -1246,6 +1258,20 @@ pub(crate) fn unsaid(error: &net::Error) -> bool {
 /// (#1844's C): a host that never answers costs 4 s, not the connection's
 /// 10 s plus its response's.
 const START_WITHIN: std::time::Duration = std::time::Duration::from_secs(4);
+
+/// How long a piece waits for Phonon's turn ([`net::PhononTts::turn`]) while
+/// another piece's sentence is being made (the Reviewer-lead's P3 1 on
+/// #8754's pull request): past it, the lamp's one voice says the piece, so
+/// a `lamp-phonon` sending its sound slowly holds back no piece longer.
+/// Long enough for the two sentences the reply asks ahead to be made at
+/// Phonon's measured pace (`docs/phonon.md`).
+const PHONON_TURN_WITHIN: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// How long Phonon has for a piece's first sound once its turn comes: its
+/// own first-sound bound ([`net::PHONON_FIRST_WITHIN`]) and the connection,
+/// clearly shorter than [`START_WITHIN`] (the Reviewer-lead's P2 on #8754's
+/// pull request), and kept apart from the lamp's one voice's window.
+const PHONON_START_WITHIN: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// `text` in the lamp's one voice, never another's (#1712, the owner: "one
 /// voice per lamp"). A sentence the voice fails to start within
@@ -1288,8 +1314,10 @@ fn in_one_voice_near(
             async move {
                 // #8754: Phonon makes one sentence at a time; a piece's
                 // window starts once its turn comes, not while it waits.
-                let held = voice.phonon_turn().await;
-                tokio::time::timeout(START_WITHIN, voice.first_held(&text, turn, held))
+                if voice.times_itself() {
+                    return voice.first(&text, turn).await;
+                }
+                tokio::time::timeout(START_WITHIN, voice.first(&text, turn))
                     .await
                     .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
             }
@@ -1298,14 +1326,6 @@ fn in_one_voice_near(
             let text = text.clone();
             let voice = voice.clone();
             async move {
-                if let Some(held) = voice.phonon_turn().await {
-                    return tokio::time::timeout(
-                        START_WITHIN,
-                        voice.first_held(&text, turn, Some(held)),
-                    )
-                    .await
-                    .unwrap_or(Err(net::Error::Timeout("speech's first sound")));
-                }
                 tokio::time::timeout(START_WITHIN, voice.first_fresh(&text, turn))
                     .await
                     .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
@@ -2687,6 +2707,147 @@ pub(crate) mod tests {
         assert_eq!(first, Ok(first_whole));
         assert_eq!(second, Ok(second_whole));
         assert!(lamps_asked.lock().unwrap().is_empty());
+    }
+
+    /// A `lamp-phonon` of the test's own that makes one sentence at a time
+    /// for every asker, as the service does: a sentence holding `slow` in
+    /// its text sends its first frame at once, then `frames` more of `[3]`
+    /// one every `every` ms; any other sentence `[1; PACKET_SAMPLES]` at once.
+    async fn one_at_a_time_service(slow: &'static str, frames: usize, every: u64) -> PhononFolder {
+        use tokio::io::AsyncBufReadExt;
+        let folder = PhononFolder::new();
+        let listener = tokio::net::UnixListener::bind(folder.socket()).unwrap();
+        let one_at_a_time = Arc::new(tokio::sync::Mutex::new(()));
+        tokio::spawn(async move {
+            while let Ok((connection, _)) = listener.accept().await {
+                let one_at_a_time = one_at_a_time.clone();
+                tokio::spawn(async move {
+                    let mut connection = tokio::io::BufReader::new(connection);
+                    let mut line = String::new();
+                    connection.read_line(&mut line).await.unwrap();
+                    let mut connection = connection.into_inner();
+                    let _turn = one_at_a_time.lock().await;
+                    let first = vec![1; net::PACKET_SAMPLES];
+                    if connection
+                        .write_all(&lamp_msgs::phonon::frame(&first))
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                    for _ in 0..if line.contains(slow) { frames } else { 0 } {
+                        tokio::time::sleep(std::time::Duration::from_millis(every)).await;
+                        if connection
+                            .write_all(&lamp_msgs::phonon::frame(&[3]))
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                    let _ = connection.write_all(&lamp_msgs::phonon::END).await;
+                });
+            }
+        });
+        folder
+    }
+
+    /// The Reviewer-lead's P2 on #8754's pull request: the speech cache asks
+    /// `lamp-phonon` for a say line on a connection of its own, apart from
+    /// the reply's turn, and `lamp-phonon` makes one sentence at a time for
+    /// every asker. A reply's piece waiting behind that line ran out its
+    /// first-sound window just as Phonon's read gave up, so the lamp's voice
+    /// was never asked, both tries failed and the piece went unsaid. Now
+    /// Phonon's first sound is due well inside the window, and the lamp's
+    /// voice says the piece, inside the window.
+    #[tokio::test]
+    async fn a_piece_is_said_in_the_lamps_voice_while_lamp_phonon_is_busy_with_another_asker() {
+        let folder = one_at_a_time_service("say line", 8, 1_000).await;
+        let freya = || lamp_msgs::phonon::voice("Freya").unwrap();
+        // The speech cache's say line, as `tts_cache::render_phonon` asks it.
+        let cache = net::PhononTts::new(folder.socket(), freya());
+        let say_line = tokio::spawn(async move {
+            let speech = cache.speak("A long say line.").await.unwrap();
+            speech
+                .map(|packet| packet.unwrap().len())
+                .collect::<Vec<_>>()
+                .await
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, LAMPS_KEY, None).unwrap();
+        let voice = Voice::Phonon(
+            Arc::new(net::PhononTts::new(folder.socket(), freya())),
+            Box::new(Voice::Configured(Arc::new(lamps), "ElevenLabs")),
+        );
+        let started = std::time::Instant::now();
+        assert_eq!(
+            spoken(in_one_voice(
+                voice,
+                "A reply's piece.".into(),
+                turn_of(8754)
+            ))
+            .await,
+            Ok(vec![10, 12]),
+            "said in the lamp's voice"
+        );
+        assert!(started.elapsed() < START_WITHIN, "{:?}", started.elapsed());
+        assert_eq!(texts(&lamps_asked), ["A reply's piece."]);
+        say_line.abort();
+    }
+
+    /// The Reviewer-lead's P3 1 on #8754's pull request: a piece waited for
+    /// Phonon's turn with no bound, so a `lamp-phonon` sending a sentence's
+    /// sound slowly held back every piece after it. A piece waits at most
+    /// [`PHONON_TURN_WITHIN`], then the lamp's voice says it.
+    #[tokio::test]
+    async fn a_piece_waits_for_phonons_turn_no_longer_than_its_bound() {
+        let folder = one_at_a_time_service("First", 10, 1_500).await;
+        let (lamps_url, lamps_asked) = recording(
+            answer_head(200, 4),
+            bytes(&[5, 6]),
+            LAMPS_KEY,
+            std::time::Duration::ZERO,
+        )
+        .await;
+        let lamps = Tts::with(TtsProvider::ElevenLabs, &lamps_url, LAMPS_KEY, None).unwrap();
+        let voice = Voice::Phonon(
+            Arc::new(net::PhononTts::new(
+                folder.socket(),
+                lamp_msgs::phonon::voice("Freya").unwrap(),
+            )),
+            Box::new(Voice::Configured(Arc::new(lamps), "ElevenLabs")),
+        );
+        let mut first = in_one_voice(voice.clone(), "First sentence.".into(), turn_of(8754));
+        assert_eq!(
+            first.next().await.unwrap().unwrap(),
+            vec![1; net::PACKET_SAMPLES],
+            "Phonon's"
+        );
+        let started = std::time::Instant::now();
+        assert_eq!(
+            spoken(in_one_voice(
+                voice,
+                "Second sentence.".into(),
+                turn_of(8754)
+            ))
+            .await,
+            Ok(vec![10, 12]),
+            "said in the lamp's voice"
+        );
+        let waited = started.elapsed();
+        assert!(
+            waited >= PHONON_TURN_WITHIN
+                && waited < PHONON_TURN_WITHIN + std::time::Duration::from_secs(2),
+            "{waited:?}"
+        );
+        assert_eq!(texts(&lamps_asked), ["Second sentence."]);
     }
 
     /// #8754: with no service (not ready yet, stopped, crashed), a sentence

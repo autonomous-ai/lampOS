@@ -96,6 +96,11 @@ const REFUSED: &str = "not in the speech cache, and rendered empty or too long";
 const FOR_NOW: &str =
     "said in the lamp's own voice for now, the voice the person chose asked again later";
 
+/// Why the voice in front never says a line: Phonon's model speaks English
+/// only, and the line is in another script (the Reviewer-lead's P3 3 on
+/// #8754's pull request). The lamp's own voice says it; no failure.
+const NOT_ENGLISH: &str = "in another script, and the voice speaks English only";
+
 /// The voice a line was said in ([`TtsCache::said_in`], #8762's review).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SaidIn {
@@ -104,7 +109,7 @@ enum SaidIn {
     Own,
     /// The lamp's own voice for the rest of this run: the person's was
     /// refused (#8367), or rendered this line empty or too long, which is
-    /// never asked of it again.
+    /// never asked of it again, or never speaks it ([`NOT_ENGLISH`]).
     Lamps,
     /// The lamp's own voice for now, for the person's Gemini voice (#8762)
     /// or Phonon (#8754) only: it failed this line, or is giving way
@@ -464,12 +469,14 @@ impl TtsCache {
     /// `say` in the voice the lamp speaks in now (#8367), and which voice
     /// that was: the person's own until it is refused, then the lamp's
     /// own. For their Gemini voice (#8762) or Phonon (#8754), the lamp's
-    /// for any line it fails too, and for every line while theirs gives way after two
-    /// failures in a row ([`Strikes`]), apart from a line `theirs_kept`
-    /// finds kept in their voice already. A line the person's voice was
-    /// refused for is said again in the lamp's, and kept, if at all, under
-    /// the lamp's key only: the person's render has no fallback of its
-    /// own, so it never hands back the lamp's voice to keep under theirs.
+    /// for any line it fails too, and for every line while it gives way
+    /// after two failures in a row ([`Strikes`]), apart from a line
+    /// `theirs_kept` finds kept in its voice already; a line Phonon never
+    /// says ([`NOT_ENGLISH`]) is the lamp's, and no failure. A line the
+    /// person's voice was refused for is said again in the lamp's, and
+    /// kept, if at all, under the lamp's key only: the voice in front has
+    /// no fallback of its own, so it never hands back the lamp's voice to
+    /// keep under its key.
     fn said_in<T>(
         &self,
         say: impl Fn(&TtsCache) -> Result<T, String>,
@@ -501,7 +508,7 @@ impl TtsCache {
                 Ok((said, SaidIn::Own))
             }
             Err(_) if (lamps.lost)() => lamps_say(SaidIn::Lamps),
-            Err(why) if why == REFUSED => lamps_say(SaidIn::Lamps),
+            Err(why) if why == REFUSED || why.ends_with(NOT_ENGLISH) => lamps_say(SaidIn::Lamps),
             Err(why) => {
                 strikes.failed(&why);
                 lamps_say(SaidIn::LampsForNow)
@@ -554,20 +561,21 @@ impl TtsCache {
 
     /// [`Self::render_once`], and whether the line may be kept under
     /// [`Self::identity`] (an offline ring's clip, `crate::ring_clips`;
-    /// #8762's review): not when the lamp's own voice said it in place of
-    /// the person's Gemini voice, so a clip under their key is always
-    /// theirs. The person's ElevenLabs voice keeps every line as before
+    /// #8762's review, the Reviewer-lead's P3 2 on #8754's pull request):
+    /// not when the lamp's own voice said it in place of the person's
+    /// Gemini voice or Phonon, so a clip under that voice's key is always
+    /// its own. The person's ElevenLabs voice keeps every line as before
     /// (#8367).
     pub fn render_once_to_keep(&self, text: &str) -> Result<(Vec<i16>, bool), String> {
         let (samples, said_in) = self.said_in(
             |cache| in_pieces(text, |piece| (cache.render)(piece)),
             || None,
         )?;
-        let gemini = self
+        let gives_way = self
             .lamps
             .as_ref()
             .is_some_and(|lamps| lamps.strikes.is_some());
-        Ok((samples, said_in == SaidIn::Own || !gemini))
+        Ok((samples, said_in == SaidIn::Own || !gives_way))
     }
 
     /// `text` rendered now in the lamp's voice named `voice`, never kept:
@@ -603,7 +611,7 @@ impl TtsCache {
             }
             .map(Played::Whole);
         }
-        let first = self.render_piece(&pieces[0], voice)?;
+        let (first, said_in) = self.render_piece(&pieces[0], voice, false)?;
         // Room for the piece playing and the one rendered after it, each
         // within the cap.
         let feed = Feed::for_line(2 * MOST_FRAMES as usize);
@@ -614,7 +622,15 @@ impl TtsCache {
         let fed = Arc::clone(&feed);
         let spawned = std::thread::Builder::new()
             .name("say-pieces".into())
-            .spawn(move || cache.render_rest(&rest, voice.as_deref(), first.len(), &fed));
+            .spawn(move || {
+                cache.render_rest(
+                    &rest,
+                    voice.as_deref(),
+                    first.len(),
+                    said_in != SaidIn::Own,
+                    &fed,
+                )
+            });
         if let Err(why) = spawned {
             eprintln!("lamp-voice: a long exact line's later pieces are not rendered: {why}");
             feed.close_short();
@@ -623,15 +639,25 @@ impl TtsCache {
     }
 
     /// One piece rendered, in `voice` when given, or why not, as
-    /// [`Self::render_once`] says it.
-    fn render_piece(&self, piece: &str, voice: Option<&str>) -> Result<Vec<i16>, String> {
-        match voice {
-            None => self.in_voice(|cache| in_pieces(piece, |piece| (cache.render)(piece))),
-            Some(voice) => {
+    /// [`Self::render_once`] says it, and the voice that said it. With
+    /// `lamps_only`, in the lamp's own voice behind this one: a piece
+    /// before it in the line was (the Reviewer-lead's P3 2 on #8754's pull
+    /// request), so the line never goes back to Phonon in the middle.
+    fn render_piece(
+        &self,
+        piece: &str,
+        voice: Option<&str>,
+        lamps_only: bool,
+    ) -> Result<(Vec<i16>, SaidIn), String> {
+        let render = |cache: &TtsCache| in_pieces(piece, |piece| (cache.render)(piece));
+        match (voice, &self.lamps) {
+            (None, Some(lamps)) if lamps_only => render(&lamps.cache).map(|s| (s, SaidIn::Lamps)),
+            (None, _) => self.said_in(render, || None),
+            (Some(voice), _) => {
                 let render_in = self.render_in.as_ref().ok_or_else(|| {
                     "this lamp's speech service speaks in its own voice only".to_owned()
                 })?;
-                in_pieces(piece, |piece| render_in(piece, voice))
+                in_pieces(piece, |piece| render_in(piece, voice)).map(|s| (s, SaidIn::Own))
             }
         }
     }
@@ -643,7 +669,17 @@ impl TtsCache {
     /// and nothing more rendered, once nobody plays the line
     /// ([`Feed::abandoned`]); a piece not rendered ends the line there,
     /// not said whole ([`Feed::close_short`]).
-    fn render_rest(&self, rest: &[String], voice: Option<&str>, mut last: usize, feed: &Feed) {
+    ///
+    /// Once a piece is said in the lamp's own voice in place of the voice in
+    /// front (`lamps_only` for the first), every piece after it is too.
+    fn render_rest(
+        &self,
+        rest: &[String],
+        voice: Option<&str>,
+        mut last: usize,
+        mut lamps_only: bool,
+        feed: &Feed,
+    ) {
         for piece in rest {
             while feed.held_samples() > last && !feed.abandoned() {
                 std::thread::sleep(PIECE_LOOK);
@@ -651,9 +687,10 @@ impl TtsCache {
             if feed.abandoned() {
                 return;
             }
-            match self.render_piece(piece, voice) {
+            match self.render_piece(piece, voice, lamps_only) {
                 Ok(_) if feed.abandoned() => return,
-                Ok(samples) => {
+                Ok((samples, said_in)) => {
+                    lamps_only |= said_in != SaidIn::Own;
                     last = samples.len();
                     feed.push(&samples);
                 }
@@ -1176,7 +1213,17 @@ pub(crate) fn voiced(
     // the lamp's own ElevenLabs voice. The keys helper keeps it alone, never
     // beside the person's ElevenLabs or Gemini voice.
     if let Some(voice) = phonon {
-        let render = (renderers.phonon)(voice);
+        let phonon_render = (renderers.phonon)(voice);
+        // Phonon's model speaks English only: a line in another script (a
+        // paired computer's or a Store app's words) is never asked of it,
+        // and the lamp's own voice says it (the Reviewer-lead's P3 3 on
+        // #8754's pull request).
+        let render: Render = Box::new(move |text: &str| {
+            if crate::not_speech::in_another_script(text) {
+                return Err(NOT_ENGLISH.to_owned());
+            }
+            phonon_render(text)
+        });
         eprintln!(
             "lamp-voice: the speech cache keeps its lines in Phonon on the lamp, voice {}, apart from the lamp's (LAMP_OWN_KEYS)",
             voice.name
@@ -1979,10 +2026,16 @@ mod tests {
     /// as a `lamp-phonon` not serving yet does; each asking is kept in the
     /// returned list.
     fn phonon_stand_ins(serving: bool) -> (Renderers, Asked) {
-        stand_ins_all(
-            Arc::new(Mutex::new(Google::Fails)),
-            Arc::new(move |_: &str| serving),
-        )
+        phonon_stand_ins_with(Arc::new(move |_: &str| serving))
+    }
+
+    /// [`phonon_stand_ins`] with Phonon's stand-in serving a line when
+    /// `serves` says so at its asking, so a test can change it between
+    /// lines or fail one piece of a line.
+    fn phonon_stand_ins_with(
+        serves: Arc<dyn Fn(&str) -> bool + Send + Sync>,
+    ) -> (Renderers, Asked) {
+        stand_ins_all(Arc::new(Mutex::new(Google::Fails)), serves)
     }
 
     /// Every stand-in voice: the person's Gemini one answering as `google`
@@ -2473,6 +2526,173 @@ mod tests {
         assert_eq!(
             *asked.lock().unwrap(),
             ["phonon:Freya", "lamp:Rachel", "phonon:Freya", "lamp:Rachel"]
+        );
+    }
+
+    /// The Reviewer-lead's P3 2 on #8754's pull request, as #8762's review
+    /// on the person's Gemini voice: a slow or failing `lamp-phonon` made
+    /// every say line wait its whole bound before the lamp's own voice said
+    /// it. Two lines in a row Phonon fails give way to the lamp's own for
+    /// [`GIVE_WAY_FOR`]: the lines in that time never ask Phonon, and a
+    /// line already kept in Phonon's voice still plays it. Past it, Phonon
+    /// is asked again; a line it says starts the count over.
+    #[test]
+    fn two_phonon_failures_in_a_row_give_say_lines_to_the_lamps_own_for_a_while() {
+        let dir = scratch("phonon_two_strikes");
+        let serving = Arc::new(AtomicBool::new(true));
+        let up = Arc::clone(&serving);
+        let (renderers, asked) =
+            phonon_stand_ins_with(Arc::new(move |_: &str| up.load(Ordering::SeqCst)));
+        let freya = lamp_msgs::phonon::voice("Freya");
+        let cache = voiced(route("phonon-strikes"), freya, &dir, renderers, &|cache| {
+            cache
+        })
+        .giving_way_for(Duration::from_millis(300));
+        let fixed = cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap();
+        assert_eq!(fixed, vec![2; 2_400], "kept in Phonon's voice");
+        serving.store(false, Ordering::SeqCst);
+        assert_eq!(cache.render_once("One.").unwrap(), vec![1; 2_400]);
+        assert_eq!(cache.render_once("Two.").unwrap(), vec![1; 2_400]);
+        asked.lock().unwrap().clear();
+        assert_eq!(cache.render_once("Three.").unwrap(), vec![1; 2_400]);
+        assert_eq!(cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap(), fixed);
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["lamp:Rachel"],
+            "Phonon is not asked while it gives way"
+        );
+        std::thread::sleep(Duration::from_millis(350));
+        serving.store(true, Ordering::SeqCst);
+        assert_eq!(cache.render_once("Four.").unwrap(), vec![2; 2_400]);
+        serving.store(false, Ordering::SeqCst);
+        assert_eq!(cache.render_once("Five.").unwrap(), vec![1; 2_400]);
+        serving.store(true, Ordering::SeqCst);
+        assert_eq!(cache.render_once("Six.").unwrap(), vec![2; 2_400]);
+        serving.store(false, Ordering::SeqCst);
+        assert_eq!(cache.render_once("Seven.").unwrap(), vec![1; 2_400]);
+        assert_eq!(
+            asked.lock().unwrap()[1..],
+            [
+                "phonon:Freya",
+                "phonon:Freya",
+                "lamp:Rachel",
+                "phonon:Freya",
+                "phonon:Freya",
+                "lamp:Rachel"
+            ],
+            "past the while Phonon is asked again, and a line said starts the count over"
+        );
+    }
+
+    /// As #8762's review, P3 3: one Phonon failure while warming said that
+    /// fixed line in the lamp's own voice and counted it warmed, so it was
+    /// never asked of Phonon again until the voice restarted. The lamp's
+    /// render is kept under the lamp's key only, the warming says the line
+    /// is not done, and its next try asks Phonon again.
+    #[test]
+    fn a_warm_line_phonon_failed_is_kept_as_the_lamps_and_warmed_in_phonon_again() {
+        let dir = scratch("phonon_warm_again");
+        let serving = Arc::new(AtomicBool::new(false));
+        let up = Arc::clone(&serving);
+        let (renderers, asked) =
+            phonon_stand_ins_with(Arc::new(move |_: &str| up.load(Ordering::SeqCst)));
+        let freya = lamp_msgs::phonon::voice("Freya");
+        let cache = voiced(route("phonon-warm"), freya, &dir, renderers, &|cache| cache);
+        let line = [lamp_msgs::GOING_TO_SLEEP];
+        assert!(cache.warm(&line).is_err(), "not warmed in Phonon's voice");
+        assert_eq!(cache.kept(lamp_msgs::GOING_TO_SLEEP), Some(vec![1; 2_400]));
+        assert_eq!(
+            kept_names(&dir),
+            [format!(
+                "{}.wav",
+                lamps_key(&dir, lamp_msgs::GOING_TO_SLEEP)
+            )],
+            "kept under the lamp's key only"
+        );
+        serving.store(true, Ordering::SeqCst);
+        assert_eq!(cache.warm(&line), Ok(()));
+        assert_eq!(cache.kept(lamp_msgs::GOING_TO_SLEEP), Some(vec![2; 2_400]));
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["phonon:Freya", "lamp:Rachel", "phonon:Freya"]
+        );
+    }
+
+    /// The Reviewer-lead's P3 2 on #8754's pull request: a long say line is
+    /// rendered piece by piece as it plays, and each piece asked Phonon
+    /// again, so a line whose pieces Phonon failed one by one went from
+    /// Phonon's voice to the lamp's and back in the middle. Once a piece is
+    /// the lamp's, the rest of the line is too.
+    #[test]
+    fn a_long_say_line_stays_in_the_lamps_voice_after_a_piece_phonon_failed() {
+        let dir = scratch("phonon_mid_line");
+        let (renderers, asked) =
+            phonon_stand_ins_with(Arc::new(|text: &str| !text.contains("Bravo")));
+        let freya = lamp_msgs::phonon::voice("Freya");
+        let cache = Arc::new(voiced(
+            route("phonon-mid-line"),
+            freya,
+            &dir,
+            renderers,
+            &|cache| cache,
+        ));
+        let part = |name: &str| {
+            format!(
+                "{name} is the part of this long line that the lamp says, and it runs on for a good while past the length of one piece of speech so it is split here."
+            )
+        };
+        let line = ["Alpha", "Bravo", "Charlie", "Delta"].map(part).join(" ");
+        assert_eq!(pieces(&line).len(), 4, "{:?}", pieces(&line));
+        let Played::Pieces(played) = cache.render_played(&line, None).unwrap() else {
+            panic!("a long line is rendered in pieces");
+        };
+        let feed = played.feed();
+        let mut heard = Vec::new();
+        loop {
+            match feed.take() {
+                Some((chunk, last)) => {
+                    heard.extend(chunk);
+                    if last {
+                        break;
+                    }
+                }
+                None => std::thread::sleep(Duration::from_millis(1)),
+            }
+        }
+        assert!(!feed.short(), "said whole");
+        assert_eq!(
+            *asked.lock().unwrap(),
+            [
+                "phonon:Freya",
+                "phonon:Freya",
+                "lamp:Rachel",
+                "lamp:Rachel",
+                "lamp:Rachel"
+            ],
+            "Phonon, then the lamp's to the end"
+        );
+    }
+
+    /// The Reviewer-lead's P3 3 on #8754's pull request: Phonon's model
+    /// speaks English only, and a say line in another script (a paired
+    /// computer's words, a Store app's) went to it while the lamp spoke
+    /// English. It is said in the lamp's own voice, Phonon is not asked,
+    /// and it counts as no failure of Phonon's.
+    #[test]
+    fn a_say_line_in_another_script_is_said_in_the_lamps_own_voice() {
+        let dir = scratch("phonon_not_english");
+        let (renderers, asked) = phonon_stand_ins(true);
+        let freya = lamp_msgs::phonon::voice("Freya");
+        let cache = voiced(route("phonon-script"), freya, &dir, renderers, &|cache| {
+            cache
+        });
+        for line in ["ビルドが通りました。", "빌드 통과.", "Message from 李明."] {
+            assert_eq!(cache.render_once(line).unwrap(), vec![1; 2_400], "{line}");
+        }
+        assert_eq!(cache.render_once("Build passed.").unwrap(), vec![2; 2_400]);
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["lamp:Rachel", "lamp:Rachel", "lamp:Rachel", "phonon:Freya"]
         );
     }
 

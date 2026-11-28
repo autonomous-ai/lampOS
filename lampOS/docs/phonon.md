@@ -75,6 +75,15 @@ comes.
   the service stopped or crashed, or it failed before its first sound), the
   lamp's one voice says that sentence as it is, with no notice. The first
   time, the journal says so once. The next sentence asks Phonon again.
+- **One sentence at a time:** `lamp-phonon` makes one sentence at a time
+  for every asker, the speech cache's lines (below) included. A reply's
+  piece waits for the piece before it at most 10 s
+  (`PHONON_TURN_WITHIN`), then Phonon has 1.5 s for its first sound
+  (`FIRST_WITHIN`, within a 2 s bound on the whole start). If either runs
+  out (another asker's sentence still being made, or sound sent slowly),
+  the lamp's one voice says the piece, with its own full 4 s window. Before,
+  a piece waiting behind a say line ran out the 4 s window just as Phonon
+  gave up, and went unsaid; a slow sentence held back every piece after it.
 - **Not English:** with the lamp in another language, the voice journals
   that Phonon is chosen but speaks English only, and uses the lamp's one
   voice.
@@ -99,7 +108,24 @@ comes.
   or a person's ElevenLabs voice's. A line Phonon can't say (not serving
   yet, stopped, a failure, no sound within the render's bound) is said in
   the lamp's own voice, never left unsaid, and kept, if at all, under the
-  lamp's key; the next line asks Phonon again. A fixed line not kept in
+  lamp's key; the next line asks Phonon again. Two lines in a row Phonon
+  fails give way to the lamp's own for 10 minutes (`GIVE_WAY_FOR`), so a
+  busy or failing `lamp-phonon` costs at most two lines their whole bound;
+  one journal line, "Phonon on the lamp failed two lines in a row (<why>);
+  the lamp's own voice for the next 600 s, then it again". A line kept
+  in Phonon's voice already still plays it in that time; past it Phonon is
+  asked again, and a line it says starts the count over. A long say line
+  rendered piece by piece as it plays stays in the lamp's voice from the
+  first piece Phonon fails to its end, never back to Phonon in the middle.
+  A line said in the lamp's voice in Phonon's place is never kept under
+  Phonon's key: a warmed fixed line is kept under the lamp's key and
+  warmed in Phonon's voice on a later try, and an offline reminder's clip
+  is not kept and is rendered again after the clips' backoff. A say line
+  with any letter of another script (Japanese, Chinese, Korean, Cyrillic
+  and so on) is never asked of Phonon, whose model speaks English only:
+  the lamp's own voice says it, and it is no failure. Lines in other
+  languages written in the Latin script are not told apart, and still go
+  to Phonon. A fixed line not kept in
   Phonon's voice yet plays the lamp's kept one where nothing may wait
   (the shutdown's, the sleep line), and is kept in Phonon's voice the next
   time the say service asks for it. The lines warmed at start fall back the

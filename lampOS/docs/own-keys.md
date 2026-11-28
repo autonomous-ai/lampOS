@@ -466,7 +466,7 @@ yet run on a lamp.
   minutes (`GIVE_WAY_FOR`), so a slow Google costs at most two lines their
   whole bound (5 s for a short line), never every line; one journal line,
   "the person's own Gemini voice failed two lines in a row (<why>); the
-  lamp's own voice for the next 600 s, then theirs again". A line kept in
+  lamp's own voice for the next 600 s, then it again". A line kept in
   their voice already still plays theirs in that time, and past it theirs
   is asked again; a line theirs says starts the count over. Unlike the
   reply path, which keeps the lamp's voice until the voice restarts, the
@@ -942,7 +942,9 @@ at a time. While it is chosen, the answers and every other line the lamp
 says itself (the say service's lines and the cached fixed lines, rendered
 by the speech cache in the voice's main process) are said by
 `lamp-phonon`, kept under `phonon:<voice>`, and a line it can't say is
-the lamp's own voice. Its `offers[]` entry has `"runs": "lamp"`, its
+the lamp's own voice: a reply's piece when `lamp-phonon` is busy or slow,
+a say line in another script, and, for 10 minutes after Phonon fails two
+say lines in a row, every say line not already kept in its voice. Its `offers[]` entry has `"runs": "lamp"`, its
 `voices`, and `"agent": false`. Choosing or removing it restarts
 `lamp-phonon.service` before the voice, in the same quiet moment and under
 the same update lock (`keys::restart_after`, `Done::restart_phonon`):
