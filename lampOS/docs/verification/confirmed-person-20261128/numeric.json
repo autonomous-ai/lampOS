@@ -1,0 +1,6146 @@
+{
+  "audit": {
+    "audited_grid_rows": {
+      "cal": 5642,
+      "test": 5642
+    },
+    "changed_thresholds": false,
+    "check_count": 77,
+    "device_access": false,
+    "elapsed_s": 24.27647888706997,
+    "implementation_sha256": "85a9c3beb6a319fc744a95cd876d95d07526e9ce3f22f15c87427e79fec76d23",
+    "independent_implementation": true,
+    "independent_reviewer": false,
+    "model_calls": 0,
+    "schema": "confirmed-person-independent-scalar-audit/1",
+    "status": "PASS"
+  },
+  "candidate_count": 5642,
+  "counts": {
+    "cal": {
+      "families": {
+        "ceramic_bust": 36,
+        "constructed_display": 268,
+        "constructed_print": 268,
+        "headphones": 36,
+        "photo_screen": 4,
+        "public_object_scene": 308,
+        "public_person_scene": 804,
+        "rendered_person": 36,
+        "round_lamp": 36,
+        "unresolved_scene": 12
+      },
+      "labels": {
+        "object": 956,
+        "person": 840,
+        "unknown": 12
+      },
+      "primary_real": 67,
+      "primary_synthetic": 36,
+      "rows": 1808,
+      "source_groups": 221
+    },
+    "test": {
+      "families": {
+        "ceramic_bust": 36,
+        "constructed_display": 268,
+        "constructed_print": 268,
+        "framed_photo": 4,
+        "game_screen": 4,
+        "headphones": 36,
+        "public_object_scene": 308,
+        "public_person_scene": 816,
+        "rendered_person": 36,
+        "round_lamp": 36,
+        "unresolved_scene": 16
+      },
+      "labels": {
+        "object": 960,
+        "person": 852,
+        "unknown": 16
+      },
+      "primary_real": 67,
+      "primary_synthetic": 36,
+      "rows": 1828,
+      "source_groups": 226
+    }
+  },
+  "date": "2026-11-28",
+  "descriptive_prespecified_grid_points": {
+    "draft_face_0_8_height_0_06": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 116,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 116,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 165,
+              "missed": 639,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.20522388059701493
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 201
+        },
+        "false_presence": 232,
+        "false_presence_source_groups": 39,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 201,
+          "missed": 639,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.2392857142857143
+        },
+        "primary_real": {
+          "accepted": 39,
+          "missed": 28,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.582089552238806
+        },
+        "primary_real_gold_nose_in_passing_face": 39,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_height_fraction": 0.06,
+        "face_score": 0.8,
+        "family": "face_score_height_unclipped",
+        "maximum_clipped_fraction": 0
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 94,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 95,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 2,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 135,
+              "missed": 681,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.16544117647058823
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 171
+        },
+        "false_presence": 191,
+        "false_presence_source_groups": 33,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 171,
+          "missed": 681,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.2007042253521127
+        },
+        "primary_real": {
+          "accepted": 33,
+          "missed": 34,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.4925373134328358
+        },
+        "primary_real_gold_nose_in_passing_face": 33,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "face_floor_0_6": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 166,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 166,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 7,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 322,
+              "missed": 482,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.40049751243781095
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 358
+        },
+        "false_presence": 339,
+        "false_presence_source_groups": 56,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 358,
+          "missed": 482,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.4261904761904762
+        },
+        "primary_real": {
+          "accepted": 49,
+          "missed": 18,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.7313432835820896
+        },
+        "primary_real_gold_nose_in_passing_face": 49,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_score": 0.6,
+        "family": "face_score"
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 139,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 138,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 6,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 262,
+              "missed": 554,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.32107843137254904
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 298
+        },
+        "false_presence": 283,
+        "false_presence_source_groups": 48,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_real": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 298,
+          "missed": 554,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.34976525821596244
+        },
+        "primary_real": {
+          "accepted": 45,
+          "missed": 22,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.6716417910447762
+        },
+        "primary_real_gold_nose_in_passing_face": 44,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "face_plus_associated_pose_0.2": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 112,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 113,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 158,
+              "missed": 646,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.19651741293532338
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 194
+        },
+        "false_presence": 225,
+        "false_presence_source_groups": 39,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 194,
+          "missed": 646,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.23095238095238096
+        },
+        "primary_real": {
+          "accepted": 38,
+          "missed": 29,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.5671641791044776
+        },
+        "primary_real_gold_nose_in_passing_face": 38,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_height_fraction": 0.06,
+        "face_score": 0.8,
+        "family": "face_plus_associated_pose",
+        "maximum_clipped_fraction": 0,
+        "pose_score": 0.2
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 92,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 92,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 2,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 128,
+              "missed": 688,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.1568627450980392
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 164
+        },
+        "false_presence": 186,
+        "false_presence_source_groups": 33,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 164,
+          "missed": 688,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.19248826291079812
+        },
+        "primary_real": {
+          "accepted": 32,
+          "missed": 35,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.47761194029850745
+        },
+        "primary_real_gold_nose_in_passing_face": 32,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "face_plus_associated_pose_0.3": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 105,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 108,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 142,
+              "missed": 662,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.17661691542288557
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 178
+        },
+        "false_presence": 213,
+        "false_presence_source_groups": 38,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_real": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 178,
+          "missed": 662,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.2119047619047619
+        },
+        "primary_real": {
+          "accepted": 36,
+          "missed": 31,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.5373134328358209
+        },
+        "primary_real_gold_nose_in_passing_face": 36,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_height_fraction": 0.06,
+        "face_score": 0.8,
+        "family": "face_plus_associated_pose",
+        "maximum_clipped_fraction": 0,
+        "pose_score": 0.3
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 89,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 88,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 2,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 117,
+              "missed": 699,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.14338235294117646
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 153
+        },
+        "false_presence": 179,
+        "false_presence_source_groups": 32,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 153,
+          "missed": 699,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.1795774647887324
+        },
+        "primary_real": {
+          "accepted": 31,
+          "missed": 36,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.4626865671641791
+        },
+        "primary_real_gold_nose_in_passing_face": 31,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "face_plus_pose_0.2": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 113,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 113,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 159,
+              "missed": 645,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.19776119402985073
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 195
+        },
+        "false_presence": 226,
+        "false_presence_source_groups": 39,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 195,
+          "missed": 645,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.23214285714285715
+        },
+        "primary_real": {
+          "accepted": 38,
+          "missed": 29,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.5671641791044776
+        },
+        "primary_real_gold_nose_in_passing_face": 38,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_height_fraction": 0.06,
+        "face_score": 0.8,
+        "family": "face_plus_pose",
+        "maximum_clipped_fraction": 0,
+        "pose_score": 0.2
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 92,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 94,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 2,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 133,
+              "missed": 683,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.16299019607843138
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 169
+        },
+        "false_presence": 188,
+        "false_presence_source_groups": 33,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 169,
+          "missed": 683,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.1983568075117371
+        },
+        "primary_real": {
+          "accepted": 33,
+          "missed": 34,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.4925373134328358
+        },
+        "primary_real_gold_nose_in_passing_face": 33,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "face_plus_pose_0.3": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 106,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 108,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 143,
+              "missed": 661,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.17786069651741293
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 179
+        },
+        "false_presence": 214,
+        "false_presence_source_groups": 38,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_real": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 179,
+          "missed": 661,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.2130952380952381
+        },
+        "primary_real": {
+          "accepted": 36,
+          "missed": 31,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.5373134328358209
+        },
+        "primary_real_gold_nose_in_passing_face": 36,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_height_fraction": 0.06,
+        "face_score": 0.8,
+        "family": "face_plus_pose",
+        "maximum_clipped_fraction": 0,
+        "pose_score": 0.3
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 89,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 89,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 2,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 122,
+              "missed": 694,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.14950980392156862
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 158
+        },
+        "false_presence": 180,
+        "false_presence_source_groups": 32,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 158,
+          "missed": 694,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.18544600938967137
+        },
+        "primary_real": {
+          "accepted": 32,
+          "missed": 35,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.47761194029850745
+        },
+        "primary_real_gold_nose_in_passing_face": 32,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "face_score_0_8": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 118,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 118,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 217,
+              "missed": 587,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.26990049751243783
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 253
+        },
+        "false_presence": 236,
+        "false_presence_source_groups": 39,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 253,
+          "missed": 587,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.3011904761904762
+        },
+        "primary_real": {
+          "accepted": 41,
+          "missed": 26,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.6119402985074627
+        },
+        "primary_real_gold_nose_in_passing_face": 41,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_score": 0.8,
+        "family": "face_score"
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 95,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 96,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 2,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 163,
+              "missed": 653,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.19975490196078433
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 199
+        },
+        "false_presence": 193,
+        "false_presence_source_groups": 33,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 199,
+          "missed": 653,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.2335680751173709
+        },
+        "primary_real": {
+          "accepted": 34,
+          "missed": 33,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.5074626865671642
+        },
+        "primary_real_gold_nose_in_passing_face": 34,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "face_score_0_9": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 50,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 51,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 74,
+              "missed": 730,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.09203980099502487
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 32,
+              "missed": 4,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 0.8888888888888888
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 106
+        },
+        "false_presence": 101,
+        "false_presence_source_groups": 20,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 106,
+          "missed": 734,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.1261904761904762
+        },
+        "primary_real": {
+          "accepted": 21,
+          "missed": 46,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.31343283582089554
+        },
+        "primary_real_gold_nose_in_passing_face": 21,
+        "primary_synthetic": {
+          "accepted": 32,
+          "missed": 4,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 0.8888888888888888
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "face_score": 0.9,
+        "family": "face_score"
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 31,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 30,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 49,
+              "missed": 767,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.06004901960784314
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 32,
+              "missed": 4,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 0.8888888888888888
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 81
+        },
+        "false_presence": 61,
+        "false_presence_source_groups": 12,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 3,
+            "missed": 3,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.5
+          },
+          "primary_real": {
+            "accepted": 3,
+            "missed": 3,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.5
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 81,
+          "missed": 771,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.09507042253521127
+        },
+        "primary_real": {
+          "accepted": 16,
+          "missed": 51,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.23880597014925373
+        },
+        "primary_real_gold_nose_in_passing_face": 16,
+        "primary_synthetic": {
+          "accepted": 32,
+          "missed": 4,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 0.8888888888888888
+        },
+        "source_groups": 226
+      }
+    },
+    "pose_mean_0.2": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 34,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 257,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 257,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 2,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 84,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 625,
+              "missed": 179,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.777363184079602
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 340
+        },
+        "false_presence": 634,
+        "false_presence_source_groups": 117,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 661,
+          "missed": 179,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.7869047619047619
+        },
+        "primary_real": {
+          "accepted": 64,
+          "missed": 3,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.9552238805970149
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "family": "pose_score",
+        "pose_score": 0.2
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 32,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 250,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 251,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 96,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 637,
+              "missed": 179,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.7806372549019608
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 286
+        },
+        "false_presence": 629,
+        "false_presence_source_groups": 121,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 673,
+          "missed": 179,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.789906103286385
+        },
+        "primary_real": {
+          "accepted": 65,
+          "missed": 2,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.9701492537313433
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "pose_mean_0.3": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 20,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 231,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 230,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 15,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 447,
+              "missed": 357,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.5559701492537313
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 291
+        },
+        "false_presence": 496,
+        "false_presence_source_groups": 80,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_real": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 483,
+          "missed": 357,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.575
+        },
+        "primary_real": {
+          "accepted": 60,
+          "missed": 7,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.8955223880597015
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "family": "pose_score",
+        "pose_score": 0.3
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 20,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 208,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 210,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 16,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 407,
+              "missed": 409,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.4987745098039216
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 241
+        },
+        "false_presence": 454,
+        "false_presence_source_groups": 77,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_real": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 443,
+          "missed": 409,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.5199530516431925
+        },
+        "primary_real": {
+          "accepted": 60,
+          "missed": 7,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.8955223880597015
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "pose_mean_0.4": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 1,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 129,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 131,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 192,
+              "missed": 612,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.23880597014925373
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 167
+        },
+        "false_presence": 261,
+        "false_presence_source_groups": 45,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 228,
+          "missed": 612,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.2714285714285714
+        },
+        "primary_real": {
+          "accepted": 42,
+          "missed": 25,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.6268656716417911
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "family": "pose_score",
+        "pose_score": 0.4
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 122,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 119,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 172,
+              "missed": 644,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.2107843137254902
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 153
+        },
+        "false_presence": 241,
+        "false_presence_source_groups": 47,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_real": {
+            "accepted": 4,
+            "missed": 2,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.6666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 208,
+          "missed": 644,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.24413145539906103
+        },
+        "primary_real": {
+          "accepted": 41,
+          "missed": 26,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.6119402985074627
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    },
+    "pose_mean_0.5": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 41,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 44,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 65,
+              "missed": 739,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.08084577114427861
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 15,
+              "missed": 21,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 0.4166666666666667
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 75
+        },
+        "false_presence": 85,
+        "false_presence_source_groups": 22,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 1,
+            "missed": 5,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.16666666666666666
+          },
+          "primary_real": {
+            "accepted": 1,
+            "missed": 5,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.16666666666666666
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 80,
+          "missed": 760,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.09523809523809523
+        },
+        "primary_real": {
+          "accepted": 22,
+          "missed": 45,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.3283582089552239
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 15,
+          "missed": 21,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 0.4166666666666667
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "family": "pose_score",
+        "pose_score": 0.5
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 25,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 30,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 0,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 40,
+              "missed": 776,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.049019607843137254
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 17,
+              "missed": 19,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 0.4722222222222222
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 50
+        },
+        "false_presence": 55,
+        "false_presence_source_groups": 17,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 3,
+            "missed": 3,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.5
+          },
+          "primary_real": {
+            "accepted": 3,
+            "missed": 3,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.5
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 57,
+          "missed": 795,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.06690140845070422
+        },
+        "primary_real": {
+          "accepted": 18,
+          "missed": 49,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.26865671641791045
+        },
+        "primary_real_gold_nose_in_passing_face": null,
+        "primary_synthetic": {
+          "accepted": 17,
+          "missed": 19,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 0.4722222222222222
+        },
+        "source_groups": 226
+      }
+    },
+    "unclipped": {
+      "cal": {
+        "ambiguous_source_cases": 12,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 166,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 166,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "photo_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 7,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 253,
+              "missed": 551,
+              "planned": 804,
+              "processing_unknown": 0,
+              "retention": 0.31467661691542287
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 358,
+          "retained": 289
+        },
+        "false_presence": 339,
+        "false_presence_source_groups": 56,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_real": {
+            "accepted": 6,
+            "missed": 0,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 1.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 956,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 289,
+          "missed": 551,
+          "planned": 840,
+          "processing_unknown": 0,
+          "retention": 0.34404761904761905
+        },
+        "primary_real": {
+          "accepted": 49,
+          "missed": 18,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.7313432835820896
+        },
+        "primary_real_gold_nose_in_passing_face": 49,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 221
+      },
+      "config": {
+        "family": "face_clipping",
+        "maximum_clipped_fraction": 0
+      },
+      "test": {
+        "ambiguous_source_cases": 16,
+        "by_family": {
+          "ceramic_bust": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_display": {
+            "false_presence": 139,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "constructed_print": {
+            "false_presence": 138,
+            "negative_planned": 268,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "framed_photo": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "game_screen": {
+            "false_presence": 0,
+            "negative_planned": 4,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "headphones": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_object_scene": {
+            "false_presence": 6,
+            "negative_planned": 308,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "public_person_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 217,
+              "missed": 599,
+              "planned": 816,
+              "processing_unknown": 0,
+              "retention": 0.2659313725490196
+            }
+          },
+          "rendered_person": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 36,
+              "missed": 0,
+              "planned": 36,
+              "processing_unknown": 0,
+              "retention": 1.0
+            }
+          },
+          "round_lamp": {
+            "false_presence": 0,
+            "negative_planned": 36,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          },
+          "unresolved_scene": {
+            "false_presence": 0,
+            "negative_planned": 0,
+            "negative_unknown": 0,
+            "people": {
+              "accepted": 0,
+              "missed": 0,
+              "planned": 0,
+              "processing_unknown": 0,
+              "retention": null
+            }
+          }
+        },
+        "conditional_people_found_by_existing_floor": {
+          "planned": 298,
+          "retained": 253
+        },
+        "false_presence": 283,
+        "false_presence_source_groups": 48,
+        "manual_desk_primary": {
+          "ambiguous_source_cases": 0,
+          "false_presence": 0,
+          "negative_planned": 0,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_real": {
+            "accepted": 5,
+            "missed": 1,
+            "planned": 6,
+            "processing_unknown": 0,
+            "retention": 0.8333333333333334
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 0,
+            "planned": 0,
+            "processing_unknown": 0,
+            "retention": null
+          }
+        },
+        "negative_planned": 960,
+        "negative_unknown": 0,
+        "people": {
+          "accepted": 253,
+          "missed": 599,
+          "planned": 852,
+          "processing_unknown": 0,
+          "retention": 0.29694835680751175
+        },
+        "primary_real": {
+          "accepted": 45,
+          "missed": 22,
+          "planned": 67,
+          "processing_unknown": 0,
+          "retention": 0.6716417910447762
+        },
+        "primary_real_gold_nose_in_passing_face": 44,
+        "primary_synthetic": {
+          "accepted": 36,
+          "missed": 0,
+          "planned": 36,
+          "processing_unknown": 0,
+          "retention": 1.0
+        },
+        "source_groups": 226
+      }
+    }
+  },
+  "distributions": {
+    "cal": {
+      "ceramic_bust": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.40592464804649353,
+          "median": 0.31291067600250244,
+          "min": 0.11661239713430405,
+          "n": 36,
+          "p10": 0.21286597847938538,
+          "p90": 0.36551423370838165,
+          "p95": 0.3744093179702759
+        }
+      },
+      "constructed_display": {
+        "cases": 268,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.6072111129760742,
+          "median": 0.12710079550743103,
+          "min": 0.036430228501558304,
+          "n": 167,
+          "p10": 0.05748184770345688,
+          "p90": 0.33255154490470895,
+          "p95": 0.4375991851091384
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9356334209442139,
+          "median": 0.8578484654426575,
+          "min": 0.6045892834663391,
+          "n": 167,
+          "p10": 0.7152316451072693,
+          "p90": 0.9241670846939087,
+          "p95": 0.9274458348751068
+        },
+        "faces_at_floor": 167,
+        "person_mean_score": {
+          "max": 0.6806301474571228,
+          "median": 0.398102730512619,
+          "min": 0.10013240575790405,
+          "n": 268,
+          "p10": 0.26688867509365083,
+          "p90": 0.5192186057567597,
+          "p95": 0.5491084218025207
+        }
+      },
+      "constructed_print": {
+        "cases": 268,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.602810800075531,
+          "median": 0.12816354632377625,
+          "min": 0.036177076399326324,
+          "n": 166,
+          "p10": 0.05829186365008354,
+          "p90": 0.33522719144821167,
+          "p95": 0.4493941366672516
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9357761144638062,
+          "median": 0.8632833659648895,
+          "min": 0.6015298366546631,
+          "n": 166,
+          "p10": 0.7212017476558685,
+          "p90": 0.9249409437179565,
+          "p95": 0.9275854229927063
+        },
+        "faces_at_floor": 166,
+        "person_mean_score": {
+          "max": 0.6847898960113525,
+          "median": 0.39779524505138397,
+          "min": 0.08333832025527954,
+          "n": 268,
+          "p10": 0.27366802692413333,
+          "p90": 0.5277203500270844,
+          "p95": 0.5688183069229125
+        }
+      },
+      "headphones": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.1857178807258606,
+          "median": 0.08670301735401154,
+          "min": 0.033158570528030396,
+          "n": 36,
+          "p10": 0.04915834590792656,
+          "p90": 0.16657047718763351,
+          "p95": 0.17247013375163078
+        }
+      },
+      "photo_screen": {
+        "cases": 4,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.2169870287179947,
+          "median": 0.1965986043214798,
+          "min": 0.15441572666168213,
+          "n": 4,
+          "p10": 0.16418635696172715,
+          "p90": 0.21375473439693451,
+          "p95": 0.2153708815574646
+        }
+      },
+      "public_object_scene": {
+        "cases": 308,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.7341306805610657,
+          "median": 0.10186870396137238,
+          "min": 0.07296330481767654,
+          "n": 9,
+          "p10": 0.07337103635072709,
+          "p90": 0.34454698562622077,
+          "p95": 0.539338833093643
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.7200145125389099,
+          "median": 0.6744966506958008,
+          "min": 0.6080376505851746,
+          "n": 9,
+          "p10": 0.6276988863945008,
+          "p90": 0.7055847525596619,
+          "p95": 0.7127996325492859
+        },
+        "faces_at_floor": 9,
+        "person_mean_score": {
+          "max": 0.3660735487937927,
+          "median": 0.1608630269765854,
+          "min": 0.04535215348005295,
+          "n": 308,
+          "p10": 0.09597183763980865,
+          "p90": 0.26448994576931,
+          "p95": 0.2969559222459792
+        }
+      },
+      "public_person_scene": {
+        "cases": 804,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.9476674199104309,
+          "median": 0.14583584666252136,
+          "min": 0.03989078104496002,
+          "n": 327,
+          "p10": 0.06788244843482971,
+          "p90": 0.38364437818527225,
+          "p95": 0.5029974818229676
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9459402561187744,
+          "median": 0.8462721705436707,
+          "min": 0.6027342677116394,
+          "n": 327,
+          "p10": 0.6716244459152222,
+          "p90": 0.9167846202850342,
+          "p95": 0.9277094542980194
+        },
+        "faces_at_floor": 327,
+        "person_mean_score": {
+          "max": 0.6846101880073547,
+          "median": 0.32052181661129,
+          "min": 0.03253244608640671,
+          "n": 804,
+          "p10": 0.14599065780639647,
+          "p90": 0.47490524053573613,
+          "p95": 0.5238211184740066
+        }
+      },
+      "rendered_person": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.36267492175102234,
+          "median": 0.16160910576581955,
+          "min": 0.09836246073246002,
+          "n": 36,
+          "p10": 0.11513827368617058,
+          "p90": 0.35490603744983673,
+          "p95": 0.358932763338089
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9374004006385803,
+          "median": 0.9223610460758209,
+          "min": 0.8364031314849854,
+          "n": 36,
+          "p10": 0.8942590951919556,
+          "p90": 0.9312557280063629,
+          "p95": 0.9327782690525055
+        },
+        "faces_at_floor": 36,
+        "person_mean_score": {
+          "max": 0.5752207636833191,
+          "median": 0.49546773731708527,
+          "min": 0.40037399530410767,
+          "n": 36,
+          "p10": 0.4364607483148575,
+          "p90": 0.5591139197349548,
+          "p95": 0.5625243335962296
+        }
+      },
+      "round_lamp": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.1004989892244339,
+          "median": 0.06234049238264561,
+          "min": 0.02773945964872837,
+          "n": 36,
+          "p10": 0.0345122367143631,
+          "p90": 0.09116960316896439,
+          "p95": 0.09212139248847961
+        }
+      },
+      "unresolved_scene": {
+        "cases": 12,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.1968666911125183,
+          "median": 0.1968666911125183,
+          "min": 0.1968666911125183,
+          "n": 1,
+          "p10": 0.1968666911125183,
+          "p90": 0.1968666911125183,
+          "p95": 0.1968666911125183
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.741767168045044,
+          "median": 0.741767168045044,
+          "min": 0.741767168045044,
+          "n": 1,
+          "p10": 0.741767168045044,
+          "p90": 0.741767168045044,
+          "p95": 0.741767168045044
+        },
+        "faces_at_floor": 1,
+        "person_mean_score": {
+          "max": 0.41392242908477783,
+          "median": 0.1659933105111122,
+          "min": 0.07133813202381134,
+          "n": 12,
+          "p10": 0.09008316919207573,
+          "p90": 0.3868580222129822,
+          "p95": 0.40039823204278946
+        }
+      }
+    },
+    "test": {
+      "ceramic_bust": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.3986109793186188,
+          "median": 0.30313368141651154,
+          "min": 0.17646044492721558,
+          "n": 36,
+          "p10": 0.20081117004156113,
+          "p90": 0.37241026759147644,
+          "p95": 0.37791335582733154
+        }
+      },
+      "constructed_display": {
+        "cases": 268,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.3929124176502228,
+          "median": 0.10814132168889046,
+          "min": 0.04216079041361809,
+          "n": 144,
+          "p10": 0.06004844568669796,
+          "p90": 0.24515276402235034,
+          "p95": 0.2959749847650527
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9339801073074341,
+          "median": 0.8502484560012817,
+          "min": 0.610546886920929,
+          "n": 144,
+          "p10": 0.6764394044876099,
+          "p90": 0.9168173670768738,
+          "p95": 0.9234081983566285
+        },
+        "faces_at_floor": 144,
+        "person_mean_score": {
+          "max": 0.6917186379432678,
+          "median": 0.39293141663074493,
+          "min": 0.09217933565378189,
+          "n": 268,
+          "p10": 0.22487685084342957,
+          "p90": 0.4956244796514511,
+          "p95": 0.5347547858953475
+        }
+      },
+      "constructed_print": {
+        "cases": 268,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.3913653790950775,
+          "median": 0.10944302380084991,
+          "min": 0.045312296599149704,
+          "n": 143,
+          "p10": 0.06177003905177116,
+          "p90": 0.24705795645713804,
+          "p95": 0.3041834384202959
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9338493943214417,
+          "median": 0.8483392596244812,
+          "min": 0.609291672706604,
+          "n": 143,
+          "p10": 0.6758670926094056,
+          "p90": 0.9165388226509095,
+          "p95": 0.9228304386138916
+        },
+        "faces_at_floor": 143,
+        "person_mean_score": {
+          "max": 0.6865732073783875,
+          "median": 0.38900895416736603,
+          "min": 0.07145784795284271,
+          "n": 268,
+          "p10": 0.2206131920218468,
+          "p90": 0.5034954190254212,
+          "p95": 0.5415509074926376
+        }
+      },
+      "framed_photo": {
+        "cases": 4,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.17166627943515778,
+          "median": 0.14423025399446487,
+          "min": 0.12889210879802704,
+          "n": 4,
+          "p10": 0.13255078941583634,
+          "p90": 0.16437823474407195,
+          "p95": 0.16802225708961485
+        }
+      },
+      "game_screen": {
+        "cases": 4,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.1626611053943634,
+          "median": 0.15326429158449173,
+          "min": 0.10214799642562866,
+          "n": 4,
+          "p10": 0.11569157391786575,
+          "p90": 0.16163337230682373,
+          "p95": 0.16214723885059357
+        }
+      },
+      "headphones": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.1663619875907898,
+          "median": 0.10114330798387527,
+          "min": 0.033875077962875366,
+          "n": 36,
+          "p10": 0.055275943130254745,
+          "p90": 0.15029552578926086,
+          "p95": 0.16426606103777885
+        }
+      },
+      "public_object_scene": {
+        "cases": 308,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.5221573114395142,
+          "median": 0.294434554874897,
+          "min": 0.17180079221725464,
+          "n": 6,
+          "p10": 0.18071980774402618,
+          "p90": 0.4505331516265869,
+          "p95": 0.48634523153305054
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.8506072163581848,
+          "median": 0.7746152877807617,
+          "min": 0.6373217701911926,
+          "n": 6,
+          "p10": 0.684851199388504,
+          "p90": 0.8313402831554413,
+          "p95": 0.840973749756813
+        },
+        "faces_at_floor": 6,
+        "person_mean_score": {
+          "max": 0.3945862054824829,
+          "median": 0.16787772625684738,
+          "min": 0.06398781388998032,
+          "n": 308,
+          "p10": 0.10039445832371711,
+          "p90": 0.26579144597053533,
+          "p95": 0.30295716077089296
+        }
+      },
+      "public_person_scene": {
+        "cases": 816,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.8227049112319946,
+          "median": 0.13927453011274338,
+          "min": 0.04278288781642914,
+          "n": 268,
+          "p10": 0.06818825528025627,
+          "p90": 0.2948843866586685,
+          "p95": 0.36177223175764084
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9378768801689148,
+          "median": 0.8320895135402679,
+          "min": 0.6021760106086731,
+          "n": 268,
+          "p10": 0.678770923614502,
+          "p90": 0.9112457990646362,
+          "p95": 0.9221956700086593
+        },
+        "faces_at_floor": 268,
+        "person_mean_score": {
+          "max": 0.6607064008712769,
+          "median": 0.29987864196300507,
+          "min": 0.04808042198419571,
+          "n": 816,
+          "p10": 0.151658333837986,
+          "p90": 0.45385943353176117,
+          "p95": 0.4966678321361542
+        }
+      },
+      "rendered_person": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.37751832604408264,
+          "median": 0.15952634811401367,
+          "min": 0.1039072573184967,
+          "n": 36,
+          "p10": 0.11539953202009201,
+          "p90": 0.35688643157482147,
+          "p95": 0.36582794040441513
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.9389446973800659,
+          "median": 0.9216723740100861,
+          "min": 0.823467493057251,
+          "n": 36,
+          "p10": 0.8956450521945953,
+          "p90": 0.9321456849575043,
+          "p95": 0.9346264153718948
+        },
+        "faces_at_floor": 36,
+        "person_mean_score": {
+          "max": 0.580512523651123,
+          "median": 0.49966563284397125,
+          "min": 0.4057956337928772,
+          "n": 36,
+          "p10": 0.43226097524166107,
+          "p90": 0.5542629957199097,
+          "p95": 0.5780771523714066
+        }
+      },
+      "round_lamp": {
+        "cases": 36,
+        "face_height_fraction_conditional_on_detection": {
+          "n": 0
+        },
+        "face_score_conditional_on_detection": {
+          "n": 0
+        },
+        "faces_at_floor": 0,
+        "person_mean_score": {
+          "max": 0.14166259765625,
+          "median": 0.06150511093437672,
+          "min": 0.02809501625597477,
+          "n": 36,
+          "p10": 0.038054460659623146,
+          "p90": 0.08929949998855591,
+          "p95": 0.10109870880842209
+        }
+      },
+      "unresolved_scene": {
+        "cases": 16,
+        "face_height_fraction_conditional_on_detection": {
+          "max": 0.072233185172081,
+          "median": 0.07007980719208717,
+          "min": 0.06792642921209335,
+          "n": 2,
+          "p10": 0.06835710480809212,
+          "p90": 0.07180250957608222,
+          "p95": 0.07201784737408161
+        },
+        "face_score_conditional_on_detection": {
+          "max": 0.6457456946372986,
+          "median": 0.625920981168747,
+          "min": 0.6060962677001953,
+          "n": 2,
+          "p10": 0.6100612103939056,
+          "p90": 0.6417807519435883,
+          "p95": 0.6437632232904434
+        },
+        "faces_at_floor": 2,
+        "person_mean_score": {
+          "max": 0.45851752161979675,
+          "median": 0.24011997133493423,
+          "min": 0.12072127312421799,
+          "n": 16,
+          "p10": 0.14683907479047775,
+          "p90": 0.3741438239812851,
+          "p95": 0.4099692478775978
+        }
+      }
+    }
+  },
+  "hashes": {
+    "adapter-controls-v1.json": "eb98f8176dedf944ccfcfdf829e9388345f5691f7879d9caa59639d892aa030b",
+    "calibration-grid-v1.json": "7171bfe3ed49c2c3a2330b39be46e7a788fd181b575573b8fd899aa8c24216ef",
+    "held-out-grid-v1.json": "05c853abf6af71cd0999a74d1a3c653160ebb2d80b4ff3ad3671c8ab0eea5792",
+    "inference-v1/predictions.jsonl": "50336d0f284aabf85bd64837b03dad0efa7e14a8bbc05f54aa568172d6a9564b",
+    "inputs-v2/manifest.jsonl": "f3847a4ff01434d031407e428e3c22896800676c29259b0e560846d47072e89f",
+    "protocol-v1.json": "63d61cf665dc58d595d5a15fc51e42ef82602f752991e292959997ac1f7f4eac",
+    "result-audit-v1.json": "90315b656f726354574b9b7eeb019b9604880f3cfdafe5fbe280daef3cfdf348",
+    "selected-thresholds-v1.json": "93ed2c275eb04c2eb5ed5d01e27acc463b94d861eb8e52085b0e942f6617c4df",
+    "source-review-v1.json": "27b2b42dd3cdf1f06394996a3a499cae644c5ae68b2c5f252c867fe2752667db",
+    "threshold-test-report-v1.json": "cfadb233d09fdb9033748cc0275ad948386722128e1a183d8cd39bc6fd2bdbf4",
+    "threshold_rules_v1.json": "862c59b156ef4b67d681ebfbd94978cd16391f3ce9a917d7684445496d8384fd"
+  },
+  "integrity": {
+    "exact_image_bytes_unique": true,
+    "processing_errors": 0,
+    "source_before_after_equal": true,
+    "source_groups_disjoint": true
+  },
+  "licenses": {
+    "avatar_meshes": "CC0 MPFB assets; prior sensor4 source receipts",
+    "coco_annotations": "CC-BY-4.0; COCO Consortium",
+    "coco_images": "Selected annotation licence IDs 4,5,7,8; original per-image attribution retained locally; no redistribution",
+    "movenet_weights": "Apache-2.0; exact float16/v4 publisher card",
+    "procedural_objects": "Authored; no downloaded object model",
+    "yunet_weights": "MIT; OpenCV Zoo YuNet directory license"
+  },
+  "limitations": [
+    "No qualifying grid configuration is not a proof about all possible classifiers or thresholds.",
+    "Primary public retention is 67 cases per split, not guaranteed independent people; render conditions are correlated within identities.",
+    "Scene labels were manually reviewed by the same builder; seven ambiguous sources remain unknown.",
+    "Constructed screens/prints are 2D proxies and busts are low-poly; no measured lamp optics, camera JPEG quality or lux.",
+    "COCO val2017 is a published MoveNet evaluation dataset; publisher training included COCO train2017. Identity/pretraining leakage was not audited.",
+    "Presence is evaluated per image, not per sitting/event. Static confidence and the mean of 17 keypoint scores are not liveness evidence.",
+    "No temporal movement, moving screens, camera ego-motion, empty-room day/night run, or private lamp/customer data.",
+    "Public float16 CPU model; no accuracy parity to the shipped int16 NPU model and no ARM64/end-to-end/voice-load measurement.",
+    "No calibrated yaw/blur operating limits follow from this study; these need separate recognition and temporal evidence.",
+    "No training, deployment, merge, or change to product defaults."
+  ],
+  "models": {
+    "movenet_v4_float16_sha256": "0fac2226112d0371903ca86e3853cec24ef603a0b2f96f589b180f0ebdd135ab",
+    "yunet_sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+  },
+  "private_full_aggregate_sha256": "e0a59af005c4ea5dce2ecdb7b4c942d7ff962e003bcafe99eae9aa1503f2c7e9",
+  "product_base": "16e5d147bd7dc31dbf61d1ef7e0b1f68516700c3",
+  "rows": 3636,
+  "runtime": {
+    "LiteRT_delegate": "XNNPACK CPU, default delegate reported by generated controls",
+    "OpenCV_backend": "DNN_BACKEND_OPENCV",
+    "OpenCV_target": "DNN_TARGET_CPU",
+    "machine": "x86_64",
+    "openblas_threads": 1,
+    "opencv_after_request_one_reported_threads": 16,
+    "opencv_before_constructor_reported_threads": 16,
+    "opencv_opencl_enabled": false,
+    "os": "macOS-26.6.2-x86_64-i386-64bit",
+    "python": "3.11.13 (main, Jun  3 2025, 18:38:25) [Clang 16.0.0 (clang-1600.0.26.6)]",
+    "requested_litert_threads": 1,
+    "versions": {
+      "ai-edge-litert": "1.0.1",
+      "numpy": "1.26.4",
+      "opencv-python-headless": "4.10.0.84",
+      "pillow": "10.4.0"
+    }
+  },
+  "schema": "confirmed-person-offline-evidence/1",
+  "selected_thresholds": {
+    "descriptive_test_grid_not_used_for_selection": true,
+    "descriptive_test_grid_sha256": "05c853abf6af71cd0999a74d1a3c653160ebb2d80b4ff3ad3671c8ab0eea5792",
+    "not_qualified_calibration_families": [
+      "face_clipping"
+    ],
+    "protocol_sha256": "63d61cf665dc58d595d5a15fc51e42ef82602f752991e292959997ac1f7f4eac",
+    "schema": "confirmed-person-held-out-threshold-report/1",
+    "selected": {
+      "face_height": {
+        "calibration": {
+          "ambiguous_source_cases": 12,
+          "false_presence": 0,
+          "negative_planned": 956,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 840,
+            "planned": 840,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "calibration_pass": false,
+        "config": {
+          "face_height_fraction": 1.1,
+          "family": "face_height"
+        },
+        "qualification": false,
+        "test": {
+          "ambiguous_source_cases": 16,
+          "false_presence": 0,
+          "negative_planned": 960,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 852,
+            "planned": 852,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "test_pass": false
+      },
+      "face_plus_associated_pose": {
+        "calibration": {
+          "ambiguous_source_cases": 12,
+          "false_presence": 0,
+          "negative_planned": 956,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 834,
+            "planned": 840,
+            "processing_unknown": 0,
+            "retention": 0.007142857142857143
+          },
+          "primary_real": {
+            "accepted": 1,
+            "missed": 66,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.014925373134328358
+          },
+          "primary_synthetic": {
+            "accepted": 4,
+            "missed": 32,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.1111111111111111
+          }
+        },
+        "calibration_pass": false,
+        "config": {
+          "face_height_fraction": 0.3,
+          "face_score": 0.6,
+          "family": "face_plus_associated_pose",
+          "maximum_clipped_fraction": 0,
+          "pose_score": 0.45
+        },
+        "qualification": false,
+        "test": {
+          "ambiguous_source_cases": 16,
+          "false_presence": 3,
+          "negative_planned": 960,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 8,
+            "missed": 844,
+            "planned": 852,
+            "processing_unknown": 0,
+            "retention": 0.009389671361502348
+          },
+          "primary_real": {
+            "accepted": 1,
+            "missed": 66,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.014925373134328358
+          },
+          "primary_synthetic": {
+            "accepted": 6,
+            "missed": 30,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.16666666666666666
+          }
+        },
+        "test_pass": false
+      },
+      "face_plus_pose": {
+        "calibration": {
+          "ambiguous_source_cases": 12,
+          "false_presence": 0,
+          "negative_planned": 956,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 6,
+            "missed": 834,
+            "planned": 840,
+            "processing_unknown": 0,
+            "retention": 0.007142857142857143
+          },
+          "primary_real": {
+            "accepted": 1,
+            "missed": 66,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.014925373134328358
+          },
+          "primary_synthetic": {
+            "accepted": 4,
+            "missed": 32,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.1111111111111111
+          }
+        },
+        "calibration_pass": false,
+        "config": {
+          "face_height_fraction": 0.3,
+          "face_score": 0.6,
+          "family": "face_plus_pose",
+          "maximum_clipped_fraction": 0,
+          "pose_score": 0.45
+        },
+        "qualification": false,
+        "test": {
+          "ambiguous_source_cases": 16,
+          "false_presence": 3,
+          "negative_planned": 960,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 8,
+            "missed": 844,
+            "planned": 852,
+            "processing_unknown": 0,
+            "retention": 0.009389671361502348
+          },
+          "primary_real": {
+            "accepted": 1,
+            "missed": 66,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.014925373134328358
+          },
+          "primary_synthetic": {
+            "accepted": 6,
+            "missed": 30,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.16666666666666666
+          }
+        },
+        "test_pass": false
+      },
+      "face_score": {
+        "calibration": {
+          "ambiguous_source_cases": 12,
+          "false_presence": 0,
+          "negative_planned": 956,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 840,
+            "planned": 840,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "calibration_pass": false,
+        "config": {
+          "face_score": 0.95,
+          "family": "face_score"
+        },
+        "qualification": false,
+        "test": {
+          "ambiguous_source_cases": 16,
+          "false_presence": 0,
+          "negative_planned": 960,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 852,
+            "planned": 852,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "test_pass": false
+      },
+      "face_score_height_unclipped": {
+        "calibration": {
+          "ambiguous_source_cases": 12,
+          "false_presence": 0,
+          "negative_planned": 956,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 840,
+            "planned": 840,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "calibration_pass": false,
+        "config": {
+          "face_height_fraction": 1.1,
+          "face_score": 0.6,
+          "family": "face_score_height_unclipped",
+          "maximum_clipped_fraction": 0
+        },
+        "qualification": false,
+        "test": {
+          "ambiguous_source_cases": 16,
+          "false_presence": 0,
+          "negative_planned": 960,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 852,
+            "planned": 852,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "test_pass": false
+      },
+      "pose_score": {
+        "calibration": {
+          "ambiguous_source_cases": 12,
+          "false_presence": 0,
+          "negative_planned": 956,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 840,
+            "planned": 840,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "calibration_pass": false,
+        "config": {
+          "family": "pose_score",
+          "pose_score": 0.7
+        },
+        "qualification": false,
+        "test": {
+          "ambiguous_source_cases": 16,
+          "false_presence": 0,
+          "negative_planned": 960,
+          "negative_unknown": 0,
+          "people": {
+            "accepted": 0,
+            "missed": 852,
+            "planned": 852,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_real": {
+            "accepted": 0,
+            "missed": 67,
+            "planned": 67,
+            "processing_unknown": 0,
+            "retention": 0.0
+          },
+          "primary_synthetic": {
+            "accepted": 0,
+            "missed": 36,
+            "planned": 36,
+            "processing_unknown": 0,
+            "retention": 0.0
+          }
+        },
+        "test_pass": false
+      }
+    },
+    "test_rows": 1828,
+    "test_source_groups": 226,
+    "threshold_freeze_sha256": "93ed2c275eb04c2eb5ed5d01e27acc463b94d861eb8e52085b0e942f6617c4df"
+  },
+  "source_groups": {
+    "cal": 221,
+    "test": 226
+  },
+  "timing": {
+    "boundary": "Decoded RGB through output features, includes fixed 192x192 CPU crop and image-only measurement. File/decode/model-load excluded; first model call cold, no study warmup. Same shared Mac, not voice-path or board latency.",
+    "constructor_ms": 34.83898611739278,
+    "first_case_ms": {
+      "pose_model": 7.39,
+      "pose_preprocess_and_face_features": 3.821,
+      "total": 22.226,
+      "yunet_picture_and_decode": 11.015
+    },
+    "warm_cases": 3635,
+    "warm_ms": {
+      "pose_model": {
+        "max": 17.452,
+        "median": 7.025,
+        "min": 6.689,
+        "n": 3635,
+        "p10": 6.801,
+        "p90": 7.7716,
+        "p95": 8.278499999999998
+      },
+      "pose_preprocess_and_face_features": {
+        "max": 11.343,
+        "median": 4.063,
+        "min": 3.592,
+        "n": 3635,
+        "p10": 3.771,
+        "p90": 5.0322,
+        "p95": 5.5656
+      },
+      "total": {
+        "max": 42.719,
+        "median": 17.952,
+        "min": 16.259,
+        "n": 3635,
+        "p10": 17.0504,
+        "p90": 20.584,
+        "p95": 21.8904
+      },
+      "yunet_picture_and_decode": {
+        "max": 25.861,
+        "median": 6.685,
+        "min": 5.859,
+        "n": 3635,
+        "p10": 6.235,
+        "p90": 8.301,
+        "p95": 9.2556
+      }
+    }
+  },
+  "verdict": "NO_QUALIFYING_CONFIGURATION_ON_DECLARED_GRID"
+}
