@@ -582,6 +582,58 @@ fn simple_call_a_stop_ends_the_lamps_words_where_it_cut_them() {
     );
 }
 
+/// A line begun over the lamp's voice cuts it, as a stop does (the
+/// coordinator cuts the answer to take the line), and the lamp's words end
+/// there: what was sent ahead and never played counts for nothing. A long
+/// answer begun 5 s ago and sent 40 s ahead is cut now by talk-over with no
+/// words in it, which is not answered. A line 5 s after the cut is answered
+/// as the conversation going on, and a room line 25 s after it is held,
+/// though it began before the words sent would have ended.
+#[test]
+fn simple_call_a_cut_in_ends_the_lamps_words_where_it_cut_them() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    use crate::second_provider::{Did, Heard};
+    let none = || signs(None, Room::Unknown, vec![]);
+    let mut heeding = heeding(true, None);
+    let now = monotonic_us();
+    heeding.lamp_did(Did::Said(1, now.saturating_sub(5 * S) + 40 * S));
+    // The talk-over begins over the lamp's voice, as the route tells it.
+    heeding.hear(
+        2,
+        Heard::Began {
+            over_the_lamps_voice: true,
+        },
+    );
+    assert_eq!(
+        judged(&mut heeding, 2, now, "", none()),
+        Some(crate::second_provider::SIMPLE_NO_WORDS),
+        "the talk-over, no words"
+    );
+    assert_eq!(
+        judged(
+            &mut heeding,
+            3,
+            now + 5 * S,
+            "So which one is bigger?",
+            none()
+        ),
+        None,
+        "5 s after the cut"
+    );
+    assert_eq!(
+        judged(
+            &mut heeding,
+            4,
+            now + 25 * S,
+            "And then we went to the market.",
+            none()
+        ),
+        Some(crate::second_provider::SIMPLE_HELD),
+        "25 s after the cut"
+    );
+}
+
 /// A stop ends the call's carry (kept): "Hey Lamp, …", stopped before the
 /// lamp said anything, and a line 5 s after it is held. The carry covers
 /// only a line said right after the call, before the lamp spoke.

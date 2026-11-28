@@ -16580,6 +16580,52 @@ async fn with_simple_call_a_spoken_stop_tells_the_rule_it_stopped() {
     }
 }
 
+/// `LAMP_SIMPLE_CALL`: a line begun over the lamp's voice cuts it (the
+/// coordinator cuts the answer to take the line), so the route's own end of
+/// the lamp's words is brought back to the cut, never left at the end of an
+/// answer sent 40 s ahead, and what the lamp says next counts from there. A
+/// line begun with the lamp quiet ends nothing. Without the switch, as
+/// before: the words sent count.
+#[tokio::test]
+async fn with_simple_call_a_line_begun_over_the_lamps_voice_ends_its_words() {
+    const S: u64 = 1_000_000;
+    let _thread = thread_held();
+    for simple in [true, false] {
+        let (built, _, _) = scripted(Arc::new(Script::default()));
+        let mut engine = if simple {
+            built.taking_simple_calls()
+        } else {
+            built
+        };
+        let before = lamp_ipc::monotonic_us();
+        let sent_until = before.saturating_sub(5 * S) + 40 * S;
+        engine
+            .shared
+            .said_until_us
+            .store(sent_until, Ordering::Relaxed);
+        // Begun in the clear: nothing cut.
+        engine.submit(start_marked(2, false, false, false));
+        assert_eq!(
+            engine.shared.said_until_us.load(Ordering::Relaxed),
+            sent_until,
+            "{simple}: in the clear"
+        );
+        // Begun over the lamp's voice: cut.
+        engine.submit(start_marked(3, true, false, false));
+        let after = lamp_ipc::monotonic_us();
+        let until = engine.shared.said_until_us.load(Ordering::Relaxed);
+        if simple {
+            assert!(
+                before <= until && until <= after,
+                "cut at {until}, between {before} and {after}"
+            );
+        } else {
+            assert_eq!(until, sent_until, "off: as before");
+        }
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    }
+}
+
 /// `LAMP_SIMPLE_CALL` (the Reviewer-lead's P2 on #8892): a long answer sent
 /// 40 s ahead, stopped 5 s in by "Okay, okay, never mind.", then the lamp's
 /// "Okay, I'll stop there.": what was sent ahead and never played counts for
