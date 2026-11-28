@@ -25,6 +25,23 @@ Cả tám giọng ElevenLabs và năm trong sáu giọng Gemini có tiếng gọ
 
 Trên máy Mac, mô hình theo khung mất 3,062 ms ở cặp đầu, p50/p95 là 2,915/7,918 ms ở 1.107 cặp sau. CAM++ đủ độ dài để chạy ở 210 cặp, mất 79,338 ms ở cặp đầu và 76,652/86,900 ms ở p50/p95 sau đó. Thời gian nạp tệp mô hình tương ứng là 2,158 ms và 866,426 ms. Phép đo bắt đầu khi cả hai đoạn PCM đã có trong bộ nhớ. Bộ chấm chung đã đối chiếu đủ 2.216 kết quả của hai phương pháp. Bản ghi micrô vật lý của lượt D do trưởng nhóm giữ trên máy thu. [Hướng dẫn đối chiếu lượt D](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224605726)
 
+## Phát qua micrô của lamp-dbda
+
+Trưởng nhóm phát các giọng tổng hợp đã có nhãn qua loa vào micrô của đèn và chấm bản thu 16 kHz trên Mac 2. Mô hình theo khung giữ đúng **16/16** câu của người gọi và loại đúng **1/28 (3,6%)** cặp ghép với giọng khác. Trong 27 cặp còn lại, 25 cặp bị nhận nhầm là người gọi và hai cặp cho kết quả chưa xác định. CAM++ cho kết quả chưa xác định ở cả 44 cặp vì đoạn mẫu chỉ dài 0,55–0,81 giây. [Kết quả trên micrô và mã băm](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7226611814)
+
+| Câu nói tiếp và môi trường | Theo khung, giữ đúng | Theo khung, loại đúng giọng ghép khác | CAM++ đúng, cùng người / người khác |
+|---|---:|---:|---|
+| 1–3 từ, yên tĩnh | 9/9 | 1/18 (5,6%) | 0/9 · 0/18 |
+| Từ 4 từ, yên tĩnh | 7/7 | 0/10 | 0/7 · 0/10 |
+| 1–3 từ, có tiếng nền | Chưa đo | Chưa đo | Chưa đo |
+| Từ 4 từ, có tiếng nền | Chưa đo | Chưa đo | Chưa đo |
+
+Máy thu dừng từ 00:42:56 đến 01:36:09 GMT+7. Cả ba câu tự nhiên của giọng khác và hai câu có tiếng nền đều rơi vào khoảng này. Sổ theo dõi giữ đủ **53 cặp thiếu bản thu**, gồm 28 câu nói tiếp và 25 cặp ghép giọng khác. Có 31/91 tiếng gọi chưa xác minh được ranh giới hai từ. Mười hai câu tiếp không có mẫu mở đầu của chính lượt đó được ghi riêng. Khi đối chiếu với mẫu xác minh được từ lượt gọi khác của cùng giọng, mô hình giữ đúng 8/9 câu ngắn và 3/3 câu dài.
+
+Trên máy Mac dùng để chấm, mô hình theo khung mất 6,6 ms ở cặp đầu và 5,6/10,5 ms ở p50/p95 của 43 cặp sau. Thời gian nạp mô hình theo khung là 3,3 ms, còn CAM++ là 3,9 giây. Khi bỏ qua điều kiện độ dài, CAM++ có p50/p95 là 246/372 ms. Thời điểm sẵn sàng trực tiếp trên đèn chưa được đo. Trưởng nhóm giữ toàn bộ 6.211 tệp trên Mac 2.
+
+Ở phép đối chứng riêng trên dữ liệu nhà cung cấp, chỉ 300 ms nhiễu cộng thêm được đưa vào mô hình. Với mẫu giọng có nhiễu, 550/554 lượt được xếp là cùng người. Khi dùng mẫu giọng yên tĩnh với chính các đoạn nhiễu ấy, chỉ 19/554 lượt được xếp là cùng người. Cả 1.108 lượt dùng mẫu PCM bằng 0 cho kết quả chưa xác định. Các phép đối chứng này không được tính vào bảng độ chính xác.
+
 ## Kết quả phát triển trên giọng macOS và LibriSpeech
 
 Trên 288 cặp giọng tổng hợp của macOS, bộ phân loại theo khung giữ đúng 134/144 câu của người gọi (93,1%) và loại đúng 40/144 câu của người khác (27,8%). Trên 288 cặp từ 12 người đọc LibriSpeech, hai con số là 124/144 (86,1%) và 42/144 (29,2%). Trong nhiễu +5 dB, cả hai bộ đều nhận nhầm toàn bộ giọng người khác. Với cả 144 câu có nhiễu, đổi đoạn mẫu của người gọi sang đoạn mẫu của người khác vẫn cho cùng tỷ lệ khung giọng đích là 1,00. Trong môi trường yên tĩnh, mẫu đúng có điểm cao hơn trên 56/72 câu tổng hợp và 46/72 câu LibriSpeech. Cảm biến chưa đạt ngưỡng để đưa vào bộ xét chung. [Kết quả theo từng điều kiện và độ trễ](../verification/caller-frame-8849/bench.md)

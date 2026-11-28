@@ -17,9 +17,26 @@ The complete release contains 44,981 original 16 kHz mono WAVs. Its plan lists 1
 
 All eight ElevenLabs test voices and five of six Gemini test voices supplied bare openings. The remaining voice supplied 19 ordinary probes in a separate other-voice check. Frames rejected 10/76 of its impostor comparisons, including 0/38 in noise. Two independently verified wake-only cuts from its compound openings gave 35/38 same-caller comparisons correct. Guarded CAM++ rejected 12/76 impostors and kept 0/38 same callers on that supplement. Those opportunities have separate denominators. In a separate whole-line control, longer same-voice, same-style compound references gave guarded CAM++ 0/554 callers kept and 252/554 other speakers rejected (45.5%).
 
-On the benchmark Mac, the frame model’s first paired inference took 3.062 ms and warm p50/p95 were 2.915/7.918 ms (1,107 warm pairs). Guarded CAM++ reached inference on 210 pairs. Its first eligible result took 79.338 ms and warm p50/p95 were 76.652/86.900 ms. Model-file load took 2.158 ms for frames and 866.426 ms for CAM++. These timings start with both PCM buffers available. The team lead’s run D provides a separate physical microphone check. The digital run contributes zero qualifying real-person pairs. [Run D handoff](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224605726)
+On the benchmark Mac, the frame model’s first paired inference took 3.062 ms and warm p50/p95 were 2.915/7.918 ms (1,107 warm pairs). Guarded CAM++ reached inference on 210 pairs. Its first eligible result took 79.338 ms and warm p50/p95 were 76.652/86.900 ms. Model-file load took 2.158 ms for frames and 866.426 ms for CAM++. These timings start with both PCM buffers available. The team lead measured the physical microphone separately in run D. The digital run contributes zero qualifying real-person pairs. [Run D handoff](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224605726)
 
 The official #8885 scorer reconciled all 2,216 method-by-pair predictions. The private corpus inventory SHA-256 is `907573417595c3347c56f9a152fb00a0dc5b9ac3f46014bf92071af7d16f873a`. Archive `sensor6-8849-20261127` holds the complete provider tar, original and processed WAVs, acoustic stages and noise stems, source metadata, posteriors, timing, executables and all failed attempts. Real people’s recordings stay on their collecting Mac.
+
+## Played through lamp-dbda’s microphone
+
+The team lead played labelled synthetic voices into the lamp’s microphone and scored the recorded 16 kHz audio on Mac 2. Frames kept **16/16** same-caller follow-ups and rejected **1/28 (3.6%)** constructed impostor comparisons. Of the remaining impostors, 25 were classified as the caller and two were unknown. Guarded CAM++ abstained on all 44 measured pairs. Each wake-only cut was 0.55–0.81 s. [Lead’s physical EVAL and archive](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7226611814)
+
+| Recorded cell | Frames same kept | Frames impostors rejected | Guarded CAM++ same / other correct |
+|---|---:|---:|---|
+| 1–3 words, quiet | 9/9 | 1/18 (5.6%) | 0/9 · 0/18 |
+| 4+ words, quiet | 7/7 | 0/10 | 0/7 · 0/10 |
+| 1–3 words, background | Unmeasured | Unmeasured | Unmeasured |
+| 4+ words, background | Unmeasured | Unmeasured | Unmeasured |
+
+The recorder stopped at 00:42:56 GMT+7 and restarted at 01:36:09. All three natural other-voice lines and both background lines occurred in that gap. The ledger retains **53 missing planned pairs** (28 follow-ups plus 25 associated impostors). The lead could not verify wake boundaries for 31 of 91 calls. Twelve follow-ups without their own verified opening were recorded as uncertain. A separate comparison against another verified call by the same voice kept 8/9 short and 3/3 longer follow-ups.
+
+First frame inference on the busy replay Mac took 6.6 ms and warm p50/p95 were 5.6/10.5 ms over 43 pairs. The frame model loaded in 3.3 ms. CAM++ loaded in 3.9 s. Forcing it past its duration guard gave warm p50/p95 of 246/372 ms. Live lamp readiness remains unmeasured. All 6,211 physical files stay with the lead on Mac 2. The folder seal is `fe2e0021f56f6512d51ab5165cd661d18440ad19846883890bb0636f06209130`.
+
+A separate provider diagnostic submitted each saved 300 ms additive-noise stem alone. With noisy enrollments, frames returned same caller on 550/554 comparisons. With quiet enrollments, the same stems gave 19/554 same-caller results. All 1,108 digital-zero controls gave unknown. These controls carry zero weight in the accuracy tables. Their verified local inventory is `623e254bc21db9793ea516d25ea605d42267f539df1209136e9b55ab71e3cc9c`.
 
 ## Development runs before the provider holdout
 
