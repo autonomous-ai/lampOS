@@ -182,6 +182,12 @@ pub struct Wider {
     /// order changes: the same records, the same `more`. A known person's
     /// own scope only: for the room's (`Person::everyone`) it is ignored.
     pub newer_first: bool,
+    /// The voice's `LAMP_MEMORY_GUEST_MARKED` (`guest`, #8639): only the
+    /// room's lines and kept facts marked a guest's
+    /// ([`lamp_msgs::known::GUEST_SPEAKER`] in `speakers`), the kept facts
+    /// with or without a day. The limit and bytes are the same. A known
+    /// person's own scope is never filtered: there it is ignored.
+    pub guest: bool,
 }
 
 /// No service thread, network client or model belongs to this store.
@@ -503,6 +509,12 @@ impl Days {
         keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
         tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling','chapter') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        // A guest's kept fact (#8639, the memory owner's call of 27 Nov
+        // 17:58) expires as the exchanges do, by the same `keep_days`.
+        tx.execute(
+            "INSERT OR IGNORE INTO doomed SELECT e.rid FROM entries e JOIN speakers s ON s.rid=e.rid WHERE e.kind='kept' AND e.day<?1 AND e.person=?2 AND s.speaker=?3",
+            params![day, Person::EVERYONE, lamp_msgs::known::GUEST_SPEAKER],
+        )?;
         tx.execute(
             "INSERT OR IGNORE INTO doomed SELECT rid FROM app_facts WHERE kept_day<=?1",
             [&app_facts],
@@ -835,13 +847,21 @@ impl Days {
         let on = on.and_then(|on| kept_day(on, at, &self.local));
         let text = self.kept_text(person, text, from)?;
         self.kept_room(person)?;
+        // A guest's correction (#8639, the Reviewer-lead's P2 on #8903)
+        // retires only a guest's fact: one the household kept stays active,
+        // and the guest's words are kept beside it as the guest's, so a
+        // guest's "actually …" never takes away the household's fact (theirs
+        // expires at 30 days; nothing would bring the household's back).
+        let replaced = (speaker != Some(lamp_msgs::known::GUEST_SPEAKER)
+            || self.guest_ids(person)?.contains(&old))
+        .then_some(old);
         self.add(
             person,
             at,
             ("", "", &text),
             from,
             &[],
-            Some(old),
+            replaced,
             on_said(on, speaker),
         )
     }
@@ -1218,6 +1238,22 @@ impl Days {
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
+    /// The ids of the room's lines and kept facts marked a guest's (#8639,
+    /// [`lamp_msgs::known::GUEST_SPEAKER`]); none for a person's own scope,
+    /// which is never marked. In one query, as [`Self::event_days`].
+    pub fn guest_ids(&self, person: &Person) -> Result<BTreeSet<u64>> {
+        if person.as_str() != Person::EVERYONE {
+            return Ok(BTreeSet::new());
+        }
+        let mut statement = self.db.prepare(
+            "SELECT e.id FROM speakers s JOIN entries e ON e.rid=s.rid WHERE e.person=?1 AND s.speaker=?2",
+        )?;
+        let rows = statement.query_map(
+            params![person.as_str(), lamp_msgs::known::GUEST_SPEAKER],
+            |row| row.get::<_, u64>(0),
+        )?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
     /// The records a search or recall gives, and whether more matched than
     /// it gives: one record past `limit`, or one that `max_bytes` left out
     /// (#3627: a voice tells a span's answer partial only when it is).
@@ -1238,10 +1274,22 @@ impl Days {
         // One day is a span from it to itself; `day_to` without a first day
         // is never asked ([`crate::days_protocol`]).
         let last = wider.last_day.or(ask.day).map(|d| d.to_string());
-        let sql = if expression.is_some() {
-            "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR ((e.kind='exchange' OR (?8 AND e.kind='kept')) AND e.day BETWEEN ?3 AND ?7)) AND (?4 OR e.kind!='observation') AND coalesce(e.category,'')!='talk' AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
-        } else {
-            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND coalesce(e.category,'')!='talk' AND (?5 OR e.active=1) ORDER BY CASE WHEN ?8 AND ?3 IS NOT NULL AND e.kind='kept' THEN 0 ELSE 1 END,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+        // A guest's lines only (#8639): the room's, never a person's own.
+        let guest = wider.guest && person.as_str() == Person::EVERYONE;
+        let sql = match (expression.is_some(), guest) {
+            (true, false) => {
+                "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR ((e.kind='exchange' OR (?8 AND e.kind='kept')) AND e.day BETWEEN ?3 AND ?7)) AND (?4 OR e.kind!='observation') AND coalesce(e.category,'')!='talk' AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            }
+            (false, false) => {
+                "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND coalesce(e.category,'')!='talk' AND (?5 OR e.active=1) ORDER BY CASE WHEN ?8 AND ?3 IS NOT NULL AND e.kind='kept' THEN 0 ELSE 1 END,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            }
+            // Its lines and its kept facts, a day or not; nothing else.
+            (true, true) => {
+                "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND e.kind IN ('exchange','kept') AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND (?5 OR e.active=1) AND ?4 IN (0,1) AND ?8 IN (0,1) AND EXISTS (SELECT 1 FROM speakers s WHERE s.rid=e.rid AND s.speaker='guest') ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            }
+            (false, true) => {
+                "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND e.kind IN ('exchange','kept') AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND (?5 OR e.active=1) AND ?4 IN (0,1) AND ?8 IN (0,1) AND EXISTS (SELECT 1 FROM speakers s WHERE s.rid=e.rid AND s.speaker='guest') ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            }
         };
         let mut statement = self.db.prepare(sql)?;
         let ids = statement
@@ -3008,7 +3056,8 @@ fn keeper_of<'a>(
 
 /// A write's `speaker` (#2849), checked before anything is written: only
 /// on the room's lines, and only the id of one person the eyes know
-/// (`lamp_msgs::known::is_person_id`); else `bad_request`.
+/// (`lamp_msgs::known::is_person_id`), or a guest's mark
+/// ([`lamp_msgs::known::GUEST_SPEAKER`], #8639); else `bad_request`.
 fn speaker_of<'a>(person: &Person, speaker: Option<&'a str>) -> Result<Option<&'a str>> {
     let Some(speaker) = speaker else {
         return Ok(None);
@@ -3016,7 +3065,7 @@ fn speaker_of<'a>(person: &Person, speaker: Option<&'a str>) -> Result<Option<&'
     if person.as_str() != Person::EVERYONE {
         return Err(bad("a speaker is kept only on the room's lines"));
     }
-    if !lamp_msgs::known::is_person_id(speaker) {
+    if speaker != lamp_msgs::known::GUEST_SPEAKER && !lamp_msgs::known::is_person_id(speaker) {
         return Err(bad("a speaker is the id of one person the eyes know"));
     }
     Ok(Some(speaker))

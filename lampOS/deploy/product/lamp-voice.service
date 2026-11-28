@@ -717,6 +717,10 @@ Environment=LAMP_MEMORY_DOUBT_UNDOES=on
 # whose words the model doubts, or with a near spelling of a heard word, keeps nothing and asks no "did you say ...?";
 # a doubted keep is taken back and never held for a yes. "Forget everything" still asks "sure?". Its row is owed.
 Environment=LAMP_MEMORY_UNSURE_NOT_KEPT=on
+# LAMP_MEMORY_GUEST_MARKED: a guest's words go to the room's memory marked as a guest's, so the owner or an enrolled
+# user can ask what their guest said; a guest's kept facts expire after 30 days, as their exchanges do (the memory
+# owner's calls of 27 Nov 2026 on #8639). Needs a lamp-memory from the same build. Its row in docs/switches.md.
+Environment=LAMP_MEMORY_GUEST_MARKED=on
 # Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md). The session note keeps the
 # person's tastes and kept facts first (PROFILE): the memory owner's call on 5 Nov, off for the candidate on 6 Nov
 # (#5464), back on after its played check passed on lamp-06c1 with ElevenLabs voices on 6 Nov (PASS bd98421414,

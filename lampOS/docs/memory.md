@@ -5653,6 +5653,110 @@ look that saw the face (row 5 on lamp-06c1, 20 Nov: covered faces were lost
 A new face sitting down there later is not named, and its line is the
 room's. Off, any gap within the sticky hold follows, as before.
 
+### A guest's words in the room's memory (`LAMP_MEMORY_GUEST_MARKED`, #8639)
+
+On in the product (`lamp-voice.service`); the second route reads it
+(`process::second_route_worker_environment`), with the Days memory.
+
+The memory owner's calls (asked in this session, posted on #8639):
+
+- **27 Nov 2026, 17:42:** a guest is an unknown face only: an unknown face in
+  view, with no known face seen in the last 2 minutes and no session person.
+  With nobody in view, or after a one-turn misread, the line stays the
+  owner's. A guest's words: "go to the room memory or something, like if
+  owner/enrolled user want to ask about visitor converstaion, we can tell
+  them". The private-room leak (service records told to whoever speaks):
+  "Keep as today".
+- **27 Nov 2026, 17:58:** "use guest, W1-W3 ok, expire after 30 days": the
+  model-facing lines say *guest*; a guest's kept facts expire after 30 days,
+  as their exchanges do. A guest still hears the household's room notes, as
+  today. "Forget what my guest said" is not built.
+- **27 Nov 2026, 21:06, the first builder's ruling on #8903 (c7220367618),
+  option b:** "a line is a guest's only while an unknown face is in view
+  **alongside** a known one, so the owner is there with them. An unknown
+  face alone stays the owner's." It narrows the memory owner's "unknown
+  face only" call, which the owner can widen later.
+
+**Who is a guest.** A heard line admitted with the camera allowed while
+the face cache names a known face, freshly matched (not held by a gap, not
+the eyes' held name), and its last refresh saw at least two faces in view:
+an unknown face beside a known one, so the owner is there with them
+(`FaceCache::guest`, the cache's current view, no window, no lock waited
+for; `remember::guest::mark_line` holds the newest 16 guest lines by
+request id). An unknown face alone (an owner the eyes miss: backlight, a
+profile, back at the desk in the evening, even after an earlier match and
+over 120 s unmatched), no face enrolled, two unknown faces, nobody in view,
+the owner alone, and a one-turn misread are never guests: those lines stay
+the owner's, kept and unmarked, as today. Only a guest line written as the
+room's is marked: the known person's own line, seen speaking, stays theirs,
+and a line the session person (`LAMP_SESSION_PERSON`) takes as theirs has
+its mark cleared (`session_judged`). The journal says `request N: an unknown
+face beside a known one, a guest: marked for the room's memory
+(LAMP_MEMORY_GUEST_MARKED)`. The marks are kept by request id alone: every
+admitted line sets its own mark or clears it, so a request id used again
+finds its own.
+
+**What is kept.** A guest's words are kept in the room's memory as before
+(the 30-day raw exchange, and a room kept fact), now marked: the room's
+`append_linked` and `remember` carry `"speaker":"guest"`, a row of the
+memory's `speakers` table. A person's own write never carries it. A guest's
+kept fact expires after 30 days, with the exchanges. A guest's correction
+retires only a guest's kept fact: the household's stays active, and the
+guest's words are kept beside it as the guest's (the Reviewer-lead's P2 on
+#8903).
+
+**Talk notes.** They follow the room's rules, as before (the Reviewer-lead's
+ask 1 on #8903): with `LAMP_CONVERSATION_SUMMARY` on, a room conversation
+with a guest's words in it can still make a room talk note. It is told as
+the room's, not marked, and, like every talk note, not expired at 30 days
+(`Days::maintain` keeps `category='talk'`). Observation proposals about a
+person are dropped (`LAMP_MEMORY_PERSONAL_NEEDS_FACE`), as before. So a
+guest's words can still reach the household's memory through a talk note;
+only the exchanges and kept facts are marked and expire.
+
+**What is told.** A recall item a guest said says `"said_by":"a guest"`, and
+the answer's scope adds W1: "Items with said_by were said by a guest, someone
+the lamp did not know: tell them as the guest's, never as the asker's or the
+household's." Recall takes `guest` (W2: "true for only what a guest, someone
+the lamp did not know, said here."). W2's other half, "For what a guest
+said, give guest true." in recall's description, is left out: under the
+product's switches recall's description is 1,020 of a function's 1,024
+bytes, and with it 1,060, so recall would be dropped. A recall with it asks
+the room's memory alone, for whoever asks (the owner on camera, an enrolled
+user, or the owner off camera by the private room), with no talk notes,
+within the same 6 entries and 2,400 bytes. It skips the unplaced-self guard
+(#4196): "what did my guest say?" asks about the guest, never the asker. So
+an unknown asker, a guest too, can list earlier guests' lines (the
+Reviewer-lead's ask 3 on #8903); the room's exchanges were already open to
+them. A guest's kept fact is told "A guest said: …" (W3) in the session note
+and the hits, so it is never told as the household's; it is then never also
+"Someone in the room said: …". So the owner who asks "what did my guest
+say?" hears, in the model's words, something like "Your guest said the coffee
+here is lovely and asked about the weekend."
+
+**What does not change.** The private room's service records, reminders and
+app lines are as today (call 3). A guest still hears the household's room
+notes, recall and hits (call 4). "Forget what my guest said" is not built. An
+older memory that refuses the speaker keeps the line without it (journalled
+once, as `LAMP_MEMORY_ROOM_SPEAKER`'s). A refused guest's mark stops only
+the guest's marks for the run, and a refused person's id only those, each
+counted apart (`RoomSpeaker::guest_refused`, the Reviewer-lead's ask 4 on
+#8903). One that refuses `guest` on a recall is asked again without it. The journal's room-scope line adds `, a guest:
+marked for the room's memory (LAMP_MEMORY_GUEST_MARKED)`, never a word or a
+name. Off, nothing is marked and every word is as before.
+
+| Limit | Value | Where |
+|---|---|---|
+| Faces in view for a guest | at least 2 at the last refresh, one of them a known face freshly matched | `FaceCache::guest` |
+| A time window for a guest | none: the cache's current view only | `FaceCache::guest` |
+| Guest lines held by request id | the newest 16 | `remember::guest::LINES_HELD` |
+| A guest's exchanges | 30 days | `--keep-days 30`, `lamp-memory.service` |
+| A guest's kept facts | 30 days, the same day as the exchanges | `Days::maintain` |
+| Recall, the guest filter included | 6 entries, 2,400 bytes | `remember::RECALL_ENTRIES`, `RECALL_BYTES` |
+
+Tests: `remember::guest::tests`, `second_provider::tests::guest_words`, and
+the memory's `tests/guest_room.rs`.
+
 ### Live route session scope
 
 With `LAMP_LIVE_SCOPED_SESSION=on` (off unless set), a spoken line on the Live

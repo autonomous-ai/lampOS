@@ -402,6 +402,27 @@ impl FaceCache {
         ))
     }
 
+    /// Whether a line admitted now is a guest's (#8639,
+    /// `LAMP_MEMORY_GUEST_MARKED`): the memory owner's "unknown face only"
+    /// (27 Nov 17:42) as the first builder narrowed it (21:06 on #8903,
+    /// option b): an unknown face in view beside a known one, so the owner
+    /// is there with them. The cache names a known face, freshly matched
+    /// (not held by a gap, not the eyes' held name), and the last refresh
+    /// saw at least two faces in view. The cache's current view only: no
+    /// window. An unknown face alone (an owner the eyes miss: backlight, a
+    /// profile), nobody in view, the owner alone, or a one-turn misread is
+    /// no guest, and stays the room's or the owner's, unmarked. A write of a
+    /// guest line is marked only when it is the room's: the known person's
+    /// own line, seen speaking, stays theirs. No lock is waited for.
+    pub fn guest(&self, now: Instant) -> bool {
+        let snapshot = self.snapshot(now);
+        if snapshot.person().is_none() || snapshot.held() || snapshot.sticky() {
+            return false;
+        }
+        // `in_view` holds the faces plus one; 0 when not known.
+        self.in_view.load(Ordering::Acquire) >= 3
+    }
+
     /// Acquire before starting the source read, never after it completes.
     pub fn begin_refresh(&self) -> RefreshToken {
         RefreshToken {
@@ -457,6 +478,13 @@ impl FaceCache {
     #[cfg(test)]
     pub(crate) fn cold_since(&self, at: Instant) {
         *self.cold_at.lock().unwrap() = Some(at);
+    }
+
+    /// For tests: a known face was matched `ago` before now, its sighting
+    /// ended then ([`Self::guest`], [`Self::room_told`]).
+    #[cfg(test)]
+    pub(crate) fn matched_ago(&self, ago: Duration) {
+        *self.last_seen_until.lock().unwrap() = Instant::now().checked_sub(ago);
     }
 
     /// A refresh read the eyes' known file as `mark` ([`KnownMark::read`]),

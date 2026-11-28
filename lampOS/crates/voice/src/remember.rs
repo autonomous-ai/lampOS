@@ -56,6 +56,7 @@ use unicode_normalization::UnicodeNormalization;
 
 pub mod asked;
 pub mod doubted;
+pub mod guest;
 pub mod heard;
 pub mod named;
 pub mod needs_face;
@@ -2790,6 +2791,10 @@ pub fn speaker_of(line: Option<&crate::speaking_faces::LineSeen>) -> Option<Stri
 struct RoomSpeaker {
     on: AtomicBool,
     refused: AtomicBool,
+    /// An older memory refused a guest's mark (#8639), counted apart from
+    /// [`Self::refused`] (the Reviewer-lead's ask 4 on #8903): a refused
+    /// mark stops only the guest's marks, never a known person's.
+    guest_refused: AtomicBool,
 }
 
 impl RoomSpeaker {
@@ -2805,6 +2810,14 @@ impl RoomSpeaker {
         }
         let request = request.filter(|request| *request != 0)?;
         speaker_of(crate::speaking_faces::line_seen(request).as_ref())
+    }
+
+    /// Whether a guest line's write in `person`'s scope carries the guest's
+    /// mark (#8639, [`guest`]): only the room's, while no older memory
+    /// refused the mark ([`send_with_speaker`]). Whatever
+    /// [`ROOM_SPEAKER_ENVIRONMENT`] is: the mark is the guest switch's.
+    fn guest(&self, person: Option<&str>) -> bool {
+        person.is_none() && !self.guest_refused.load(Ordering::Acquire)
     }
 }
 
@@ -2825,16 +2838,44 @@ fn send_with_speaker(
     let refused = answer.as_ref().is_some_and(|answer| {
         answer["ok"] == false && answer["error"] == "bad_request" && !source_gone(answer)
     });
-    if !refused || line.as_object_mut()?.remove("speaker").is_none() {
+    if !refused {
         return answer;
     }
+    let Some(was) = line.as_object_mut()?.remove("speaker") else {
+        return answer;
+    };
     let again = send(&line);
-    if again.as_ref().is_some_and(|again| again["ok"] == true)
-        && !speaker.refused.swap(true, Ordering::AcqRel)
+    // A guest's mark refused is counted apart: a known person's marks go on.
+    let flag = if was == lamp_msgs::known::GUEST_SPEAKER {
+        &speaker.guest_refused
+    } else {
+        &speaker.refused
+    };
+    if again.as_ref().is_some_and(|again| again["ok"] == true) && !flag.swap(true, Ordering::AcqRel)
     {
         eprintln!("lamp-voice provider: {ROOM_SPEAKER_KEPT_WITHOUT}");
     }
     again
+}
+
+/// Sends a recall or search by `send`. One with `guest` (#8639) that the
+/// memory refuses as `bad_request` (an older memory, whose requests are
+/// strict) is sent again once without it, and answers as that memory
+/// always did. Any other line is sent as it is.
+fn send_with_guest(line: &Value, send: impl Fn(&Value) -> Option<Value>) -> Option<Value> {
+    let answer = send(line);
+    let refused = answer
+        .as_ref()
+        .is_some_and(|answer| answer["ok"] == false && answer["error"] == "bad_request");
+    if !refused || line.get("guest").is_none() {
+        return answer;
+    }
+    let mut line = line.clone();
+    line.as_object_mut()?.remove("guest");
+    eprintln!(
+        "lamp-voice provider: a recall for what a guest said, asked again without it (older memory)"
+    );
+    send(&line)
 }
 
 /// Sends a `forget` by `send`. One with `selective` that the memory refuses
@@ -3247,7 +3288,11 @@ fn room_as_someone_s(snapshot: &Value) -> (Value, usize, usize) {
     };
     let mut someone = 0;
     for fact in facts.iter_mut() {
-        let Some(text) = fact["text"].as_str().filter(|text| about_a_person(text)) else {
+        // A guest's fact already says whose it is (#8639, W3).
+        let Some(text) = fact["text"]
+            .as_str()
+            .filter(|text| about_a_person(text) && !(guest::on() && text.starts_with(guest::SAID)))
+        else {
             continue;
         };
         fact["text"] = json!(format!("{SOMEONE_SAID}{text}"));
@@ -3833,7 +3878,7 @@ pub fn tools_with(rules: bool) -> Vec<Tool> {
     } else {
         tools
     };
-    let mut tools = dated(tools, events_on());
+    let mut tools = guest::described(dated(tools, events_on()));
     if role::on() {
         tools.extend(role::tools());
     }
@@ -6719,7 +6764,12 @@ fn request(call: &ToolCall, now_unix_ms: u64, zone: Option<&LocalTime>) -> Optio
                 .and_then(Value::as_u64)
                 .filter(|days| *days <= 3_650)
                 .map(|days| day_name(local_day(now_unix_ms, zone) - days as i64));
-            json!({"op":"recall","query":about,"day":day,"limit":RECALL_ENTRIES,"max_bytes":RECALL_BYTES})
+            let mut asked = json!({"op":"recall","query":about,"day":day,"limit":RECALL_ENTRIES,"max_bytes":RECALL_BYTES});
+            // Only what a guest said (#8639, W2): with the switch alone.
+            if call.args.get("guest") == Some(&json!(true)) && guest::on() {
+                asked["guest"] = json!(true);
+            }
+            asked
         }
     })
 }
@@ -7992,6 +8042,9 @@ fn opened_note(
     theirs: Option<&Value>,
 ) -> (String, Option<(usize, usize, usize)>) {
     let mut counted = None;
+    // A guest's kept facts, told as the guest's (#8639, W3).
+    let guests_told = guest::told_in_note(snapshot);
+    let snapshot = guests_told.as_ref().unwrap_or(snapshot);
     let (snapshot, room_rule, first, second) = if room_not_asker {
         let (snapshot, room, someone) = room_as_someone_s(snapshot);
         counted = Some((room, someone, theirs.map_or(0, facts_in)));
@@ -10523,7 +10576,13 @@ fn hits_told(
                 .iter()
                 .filter(|word| wanted.contains(word))
                 .count();
-            (shared > 0).then(|| (shared, at, text.chars().take(HIT_CHARS).collect(), id, day))
+            // A guest's kept fact, told as the guest's (#8639, W3).
+            let told = if guest::said(entry) {
+                format!("{}{text}", guest::SAID)
+            } else {
+                text.to_owned()
+            };
+            (shared > 0).then(|| (shared, at, told.chars().take(HIT_CHARS).collect(), id, day))
         })
         .collect();
     found.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
@@ -10623,6 +10682,9 @@ enum DaysJob {
         /// words of, and those ids ([`keeper_cited`]): sent as `keeper` and
         /// `keeper_ids`, so their forget reaches this line.
         keeper: Option<(String, Vec<u64>)>,
+        /// A room line admitted as a guest's, with `LAMP_MEMORY_GUEST_MARKED`
+        /// ([`guest::line`], #8639): sent with the guest's mark.
+        guest: bool,
     },
     Close(String, Option<String>),
     End,
@@ -11840,6 +11902,13 @@ impl DaysClient {
             && let Some(speaker) = self.hand_ons.room_speaker.of(person, asked_in)
         {
             request["speaker"] = json!(speaker);
+        } else if call.name == REMEMBER
+            && asked_in.is_some_and(guest::line)
+            && self.hand_ons.room_speaker.guest(person)
+        {
+            // A guest's kept fact, marked (#8639): it expires with the
+            // exchanges, and is told as the guest's.
+            request["speaker"] = json!(lamp_msgs::known::GUEST_SPEAKER);
         }
         let request_text = request["text"].as_str().map(str::to_owned);
         // #8259: a forget by the id recall gave, on a line that named what
@@ -11898,8 +11967,12 @@ impl DaysClient {
         // The kept thing a correction replaced (`LAMP_MEMORY_REPLACES`): it
         // follows nobody ([`crate::follows_face`]).
         let mut replaced = None;
+        // A recall for only what a guest said (#8639) asks about the guest,
+        // never about the one asking: "what did my guest say?" with nobody
+        // in view is the owner's, by the private room.
         let (told, ids) = if call.name == RECALL
             && person.is_none()
+            && request["guest"] != true
             && unplaced_self_ask(asked_in, || heard_of(asked_in))
         {
             eprintln!("{UNPLACED_SELF_LINE}");
@@ -12936,14 +13009,21 @@ impl DaysClient {
         // and only when it was asked for.
         let dated = self.replaces.load(Ordering::Acquire);
         let history = dated && request["history"] == true;
+        // Only what a guest said (#8639): the room's alone, for anyone.
+        let guest_only = request["guest"] == true;
+        let person = person.filter(|_| !guest_only);
         let Some(person) = person else {
             // The room's own history, when asked for (`history_allowed`).
-            let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
+            // An older memory refuses `guest`: asked again without it.
+            let answer = send_with_guest(request, |line| {
+                bounded_exchange_scoped(&self.socket, line, deadline, lease)
+            })?;
             let partial = bounded_span(request, &answer, None);
             let (mut told, mut ids) = days_answer(&answer, now, zone, dated.then_some(history))?;
             // The room's talk notes (`LAMP_CONVERSATION_SUMMARY`), as the
-            // room's.
+            // room's; none for only what a guest said.
             if crate::conversation_summary::on()
+                && !guest_only
                 && let Some(left) = deadline.checked_sub(started.elapsed())
                 && let Some(answer) = bounded_exchange_scoped(
                     &self.socket,
@@ -13070,7 +13150,8 @@ impl DaysClient {
                 }
             }
         }
-        let mut told = json!({"found":found,"untrusted":true,"scope":BOTH_SCOPE});
+        let scope = guest_scope(BOTH_SCOPE, &found);
+        let mut told = json!({"found":found,"untrusted":true,"scope":scope});
         // Their service records that the words fit, whatever their age
         // (`LAMP_SERVICE_RECORDS_TOLD`).
         let taken = told.to_string().len();
@@ -13575,6 +13656,8 @@ impl DaysClient {
                 forgotten,
                 observe_forgets: OBSERVE_FORGETS.load(Ordering::Acquire),
                 keeper,
+                // Read as it is queued, right after the reply (#8639).
+                guest: person.is_none() && request.is_some_and(guest::line),
             })
             .is_ok();
         if sent {
@@ -14572,13 +14655,28 @@ fn days_answer(
         {
             item["strength"] = json!(told);
         }
+        // What a guest said, told as theirs (#8639, W1).
+        if guest::said(entry) {
+            item["said_by"] = json!(guest::SAID_BY);
+        }
         found.push(item);
     }
-    let mut told = json!({"found":found,"untrusted":true,"scope":ROOM_SCOPE});
+    let scope = guest_scope(ROOM_SCOPE, &found);
+    let mut told = json!({"found":found,"untrusted":true,"scope":scope});
     if sources.is_empty() {
         told["note"] = json!("Nothing about that in what I remember.");
     }
     Some((told, sources))
+}
+
+/// A recall answer's `scope`, with W1's rule when any item `found` says
+/// it is a guest's (#8639); else `scope` as it is.
+fn guest_scope(scope: &str, found: &[Value]) -> String {
+    if found.iter().any(|item| item.get("said_by").is_some()) {
+        format!("{scope}{}", guest::SAID_BY_RULE)
+    } else {
+        scope.to_owned()
+    }
 }
 
 #[derive(Default)]
@@ -15629,6 +15727,7 @@ fn days_writer(
                 forgotten,
                 observe_forgets,
                 keeper,
+                guest,
             }) => {
                 // Made before a forget: not written after it.
                 if forgotten < hand_ons.forgotten.load(Ordering::Acquire) {
@@ -15691,9 +15790,12 @@ fn days_writer(
                     ),
                     person.as_deref(),
                 );
-                // Who said a room line, seen (#2849).
+                // Who said a room line, seen (#2849), or a guest's mark
+                // (#8639, `LAMP_MEMORY_GUEST_MARKED`).
                 if let Some(speaker) = hand_ons.room_speaker.of(person.as_deref(), Some(request)) {
                     line["speaker"] = json!(speaker);
+                } else if guest && hand_ons.room_speaker.guest(person.as_deref()) {
+                    line["speaker"] = json!(lamp_msgs::known::GUEST_SPEAKER);
                 }
                 // The known person whose kept things a room line cites.
                 if let (None, Some((keeper, ids))) = (&person, keeper) {
@@ -25757,6 +25859,7 @@ mod tests {
                 forgotten: 0,
                 observe_forgets: 0,
                 keeper: None,
+                guest: false,
             })
             .unwrap();
         }
@@ -25857,6 +25960,7 @@ mod tests {
                 forgotten: 0,
                 observe_forgets: 0,
                 keeper: None,
+                guest: false,
             })
             .unwrap();
         }
@@ -25932,6 +26036,7 @@ mod tests {
             forgotten: 0,
             observe_forgets: 0,
             keeper: None,
+            guest: false,
         };
         send.send(exchange(
             unix_ms() - 2_000,
@@ -26048,6 +26153,7 @@ mod tests {
             forgotten: 0,
             observe_forgets: 0,
             keeper: None,
+            guest: false,
         }
     }
 
@@ -26933,6 +27039,7 @@ mod tests {
             forgotten: 0,
             observe_forgets: 0,
             keeper: None,
+            guest: false,
         };
         send.send(exchange("before", now - Duration::from_secs(2)))
             .unwrap();
@@ -28126,6 +28233,7 @@ mod tests {
                 forgotten: 0,
                 observe_forgets: 0,
                 keeper: None,
+                guest: false,
             })
             .unwrap();
         }
@@ -30677,6 +30785,7 @@ mod tests {
                 forgotten,
                 observe_forgets: 0,
                 keeper: None,
+                guest: false,
             })
             .unwrap();
         }
@@ -34283,6 +34392,7 @@ mod tests {
                 forgotten: 0,
                 observe_forgets: 0,
                 keeper: None,
+                guest: false,
             };
             let queue = &client.jobs;
             queue.try_send(exchange("zero", vec![], vec![])).unwrap();
@@ -34435,6 +34545,7 @@ mod tests {
             forgotten: 0,
             observe_forgets: 0,
             keeper: None,
+            guest: false,
         };
         send.send(line("a", now.checked_sub(Duration::from_secs(80)).unwrap()))
             .unwrap();

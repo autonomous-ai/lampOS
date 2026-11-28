@@ -93,6 +93,13 @@ pub fn person_id(name: &str) -> String {
         .fold(String::from("p-"), |id, byte| id + &format!("{byte:02x}"))
 }
 
+/// The `speakers` row a guest's room line carries (#8639, the voice's
+/// `LAMP_MEMORY_GUEST_MARKED`): an unknown face in view, no known face seen
+/// in the last two minutes and no session person. Never a [`person_id`]
+/// ([`is_person_id`] refuses it), so it never mixes with a known speaker,
+/// and `forget_said` never takes it.
+pub const GUEST_SPEAKER: &str = "guest";
+
 /// Whether `id` is one the eyes give: [`person_id`]'s shape, or it with a
 /// `-` and up to three digits, given when that id is already another's.
 pub fn is_person_id(id: &str) -> bool {
