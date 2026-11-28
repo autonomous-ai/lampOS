@@ -76,10 +76,88 @@ pub const WARM: &[&str] = &[
 pub(crate) const WARM_EVERY: Duration = Duration::from_secs(60);
 /// The longest wait between tries: a lamp offline for days asks the speech
 /// service at most once an hour.
+/// How long the person's own Gemini voice gives way to the lamp's own
+/// after it fails two lines in a row (#8762's review, [`Strikes`]): the
+/// lines in that time never wait on Google. Past it, theirs is asked again,
+/// so a fixed line the warming said in the lamp's voice is warmed in theirs
+/// on a later try ([`TtsCache::warm`]), never left the lamp's until the
+/// voice restarts. The reply path gives way until the voice restarts
+/// (`own-keys.md`); a say line is rarer and kept, so it tries again.
+pub(crate) const GIVE_WAY_FOR: Duration = Duration::from_secs(600);
 pub(crate) const WARM_EVERY_MOST: Duration = Duration::from_secs(3_600);
 
 /// Why a line that rendered empty or too long is not played.
 const REFUSED: &str = "not in the speech cache, and rendered empty or too long";
+
+/// Why a warm line is not done yet: said in the lamp's own voice in place
+/// of the person's Gemini voice, which is asked again on a later try.
+const FOR_NOW: &str =
+    "said in the lamp's own voice for now, the person's Gemini voice asked again later";
+
+/// The voice a line was said in ([`TtsCache::said_in`], #8762's review).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SaidIn {
+    /// This cache's own voice: the person's, or the lamp's when no
+    /// person's voice is in front of it.
+    Own,
+    /// The lamp's own voice for the rest of this run: the person's was
+    /// refused (#8367), or rendered this line empty or too long, which is
+    /// never asked of it again.
+    Lamps,
+    /// The lamp's own voice for now, for the person's Gemini voice only
+    /// (#8762): theirs failed this line, or is giving way ([`Strikes`]);
+    /// theirs is asked again later.
+    LampsForNow,
+}
+
+/// The person's own Gemini voice's failures in a row (#8762's review): two
+/// in a row give way to the lamp's own voice for [`GIVE_WAY_FOR`], as the
+/// reply path gives way to it after a piece fails twice, so a slow or
+/// failing Google costs at most two lines their whole bound.
+struct Strikes {
+    give_way_for: Duration,
+    /// Failures since the last line theirs said, and until when theirs
+    /// gives way.
+    state: Mutex<(u8, Option<std::time::Instant>)>,
+}
+
+impl Strikes {
+    fn new(give_way_for: Duration) -> Self {
+        Self {
+            give_way_for,
+            state: Mutex::new((0, None)),
+        }
+    }
+
+    fn state(&self) -> std::sync::MutexGuard<'_, (u8, Option<std::time::Instant>)> {
+        self.state.lock().unwrap_or_else(|held| held.into_inner())
+    }
+
+    /// Theirs gives way now: not asked.
+    fn giving_way(&self) -> bool {
+        self.state()
+            .1
+            .is_some_and(|until| std::time::Instant::now() < until)
+    }
+
+    /// Theirs said a line: the count starts over.
+    fn said(&self) {
+        *self.state() = (0, None);
+    }
+
+    /// Theirs failed a line (`why`): the second in a row gives way.
+    fn failed(&self, why: &str) {
+        let mut state = self.state();
+        state.0 = state.0.saturating_add(1);
+        if state.0 >= 2 {
+            *state = (0, Some(std::time::Instant::now() + self.give_way_for));
+            eprintln!(
+                "lamp-voice: the speech cache: the person's own Gemini voice failed two lines in a row ({why}); the lamp's own voice for the next {} s, then theirs again (LAMP_OWN_KEYS)",
+                self.give_way_for.as_secs()
+            );
+        }
+    }
+}
 
 /// Renders a line to 24 kHz mono samples, or says why not.
 pub type Render = Box<dyn Fn(&str) -> Result<Vec<i16>, String> + Send + Sync>;
@@ -98,8 +176,10 @@ struct Lamps {
     cache: TtsCache,
     lost: Lost,
     /// Every line the person's voice fails is said in the lamp's, not only
-    /// once it is refused ([`TtsCache::giving_way_to`], #8762).
-    each_failure: bool,
+    /// once it is refused, and two in a row give way for a while
+    /// ([`TtsCache::giving_way_to`], #8762). None for the person's
+    /// ElevenLabs voice ([`TtsCache::falling_back_to`]).
+    strikes: Option<Strikes>,
 }
 
 /// The voice part of the cache's key: `voice` as it is, or, for the
@@ -196,7 +276,7 @@ impl TtsCache {
         self.lamps = Some(Box::new(Lamps {
             cache: lamps,
             lost,
-            each_failure: false,
+            strikes: None,
         }));
         self
     }
@@ -205,13 +285,24 @@ impl TtsCache {
     /// as the reply path gives way (#8754): a line theirs fails for any
     /// reason is said in the lamp's own voice, never left unsaid, and kept,
     /// if at all, under the lamp's key; the next line asks theirs again,
-    /// until `lost` says it was refused.
+    /// until `lost` says it was refused. Two lines in a row theirs fails
+    /// give way to the lamp's for [`GIVE_WAY_FOR`] ([`Strikes`], #8762's
+    /// review), so a slow Google never makes every line wait its bound.
     pub fn giving_way_to(mut self, lamps: TtsCache, lost: Lost) -> Self {
         self.lamps = Some(Box::new(Lamps {
             cache: lamps,
             lost,
-            each_failure: true,
+            strikes: Some(Strikes::new(GIVE_WAY_FOR)),
         }));
+        self
+    }
+
+    /// [`Self::giving_way_to`]'s while as `give_way_for`, for a test.
+    #[cfg(test)]
+    pub(crate) fn giving_way_for(mut self, give_way_for: Duration) -> Self {
+        if let Some(strikes) = self.lamps.as_mut().and_then(|lamps| lamps.strikes.as_mut()) {
+            strikes.give_way_for = give_way_for;
+        }
         self
     }
 
@@ -339,27 +430,66 @@ impl TtsCache {
     /// `text`'s samples: from the cache, or rendered once and kept, in the
     /// voice the lamp speaks in now ([`Self::in_voice`]).
     pub fn samples(&self, text: &str) -> Result<Vec<i16>, String> {
-        self.in_voice(|cache| cache.samples_here(text))
+        self.samples_said(text).map(|(samples, _)| samples)
     }
 
-    /// `say` in the voice the lamp speaks in now (#8367): the person's own
-    /// until it is refused, then the lamp's own; for their Gemini voice
-    /// (#8762), the lamp's for any line theirs fails too. A line the
-    /// person's voice was refused for is said again in the lamp's, and
-    /// kept, if at all, under the lamp's key only: the person's render has
-    /// no fallback of its own, so it never hands back the lamp's voice to
-    /// keep under theirs.
+    /// [`Self::samples`] and the voice that said them: a line kept in the
+    /// person's voice plays theirs even while it gives way.
+    fn samples_said(&self, text: &str) -> Result<(Vec<i16>, SaidIn), String> {
+        self.said_in(|cache| cache.samples_here(text), || read(&self.path(text)))
+    }
+
+    /// `say` in the voice the lamp speaks in now, as [`Self::said_in`].
     fn in_voice<T>(&self, say: impl Fn(&TtsCache) -> Result<T, String>) -> Result<T, String> {
+        self.said_in(say, || None).map(|(said, _)| said)
+    }
+
+    /// `say` in the voice the lamp speaks in now (#8367), and which voice
+    /// that was: the person's own until it is refused, then the lamp's
+    /// own. For their Gemini voice (#8762), the lamp's for any line theirs
+    /// fails too, and for every line while theirs gives way after two
+    /// failures in a row ([`Strikes`]), apart from a line `theirs_kept`
+    /// finds kept in their voice already. A line the person's voice was
+    /// refused for is said again in the lamp's, and kept, if at all, under
+    /// the lamp's key only: the person's render has no fallback of its
+    /// own, so it never hands back the lamp's voice to keep under theirs.
+    fn said_in<T>(
+        &self,
+        say: impl Fn(&TtsCache) -> Result<T, String>,
+        theirs_kept: impl FnOnce() -> Option<T>,
+    ) -> Result<(T, SaidIn), String> {
         let Some(lamps) = &self.lamps else {
-            return say(self);
+            return say(self).map(|said| (said, SaidIn::Own));
         };
-        if !(lamps.lost)() {
-            match say(self) {
-                Err(_) if lamps.each_failure || (lamps.lost)() => {}
-                said => return said,
+        let lamps_say = |said_in| say(&lamps.cache).map(|said| (said, said_in));
+        if (lamps.lost)() {
+            return lamps_say(SaidIn::Lamps);
+        }
+        let Some(strikes) = &lamps.strikes else {
+            // The person's ElevenLabs voice (#8367): theirs until refused.
+            return match say(self) {
+                Err(_) if (lamps.lost)() => lamps_say(SaidIn::Lamps),
+                said => said.map(|said| (said, SaidIn::Own)),
+            };
+        };
+        if strikes.giving_way() {
+            if let Some(said) = theirs_kept() {
+                return Ok((said, SaidIn::Own));
+            }
+            return lamps_say(SaidIn::LampsForNow);
+        }
+        match say(self) {
+            Ok(said) => {
+                strikes.said();
+                Ok((said, SaidIn::Own))
+            }
+            Err(_) if (lamps.lost)() => lamps_say(SaidIn::Lamps),
+            Err(why) if why == REFUSED => lamps_say(SaidIn::Lamps),
+            Err(why) => {
+                strikes.failed(&why);
+                lamps_say(SaidIn::LampsForNow)
             }
         }
-        say(&lamps.cache)
     }
 
     /// [`Self::samples`] in this cache's own voice only.
@@ -403,6 +533,24 @@ impl TtsCache {
     /// order.
     pub fn render_once(&self, text: &str) -> Result<Vec<i16>, String> {
         self.in_voice(|cache| in_pieces(text, |piece| (cache.render)(piece)))
+    }
+
+    /// [`Self::render_once`], and whether the line may be kept under
+    /// [`Self::identity`] (an offline ring's clip, `crate::ring_clips`;
+    /// #8762's review): not when the lamp's own voice said it in place of
+    /// the person's Gemini voice, so a clip under their key is always
+    /// theirs. The person's ElevenLabs voice keeps every line as before
+    /// (#8367).
+    pub fn render_once_to_keep(&self, text: &str) -> Result<(Vec<i16>, bool), String> {
+        let (samples, said_in) = self.said_in(
+            |cache| in_pieces(text, |piece| (cache.render)(piece)),
+            || None,
+        )?;
+        let gemini = self
+            .lamps
+            .as_ref()
+            .is_some_and(|lamps| lamps.strikes.is_some());
+        Ok((samples, said_in == SaidIn::Own || !gemini))
     }
 
     /// `text` rendered now in the lamp's voice named `voice`, never kept:
@@ -530,11 +678,17 @@ impl TtsCache {
     ///
     /// A line that rendered empty or too long is done with: it is not
     /// kept, and not tried again, so it never holds the warming open.
+    ///
+    /// A line said in the lamp's own voice in place of the person's Gemini
+    /// voice (#8762's review) is kept under the lamp's key only, and is not
+    /// done: the warming tries it in theirs again later, so a fixed line is
+    /// never left in the lamp's voice for the run by one failure.
     pub fn warm(&self, lines: &[&str]) -> Result<(), String> {
         lines
             .iter()
-            .map(|line| match self.samples(line) {
+            .map(|line| match self.samples_said(line) {
                 Err(why) if why == REFUSED => Ok(()),
+                Ok((_, SaidIn::LampsForNow)) => Err(FOR_NOW.to_owned()),
                 other => other.map(drop),
             })
             .fold(Ok(()), Result::and)
@@ -1724,6 +1878,12 @@ mod tests {
     /// voice `[3; 2_400]`, their Gemini voice `[2; 2_400]`, as `google`
     /// says; each asking is kept in the returned list.
     fn stand_ins(google: Google) -> (Renderers, Asked) {
+        stand_ins_as(Arc::new(Mutex::new(google)))
+    }
+
+    /// [`stand_ins`] with the person's Gemini stand-in answering as
+    /// `google` says at each asking, so a test can change it between lines.
+    fn stand_ins_as(google: Arc<Mutex<Google>>) -> (Renderers, Asked) {
         let asked: Asked = Arc::default();
         let seen = Arc::clone(&asked);
         let configured = Box::new(
@@ -1742,9 +1902,11 @@ mod tests {
         let gemini = Box::new(
             move |own: crate::second_config::OwnGeminiVoice, refused: Refused| -> Render {
                 let seen = Arc::clone(&seen);
+                let google = Arc::clone(&google);
                 Box::new(move |_: &str| {
                     seen.lock().unwrap().push(format!("gemini:{}", own.voice));
-                    match google {
+                    let answer = *google.lock().unwrap();
+                    match answer {
                         Google::Speaks => Ok(vec![2; 2_400]),
                         Google::Refuses => {
                             refused(401);
@@ -1891,6 +2053,90 @@ mod tests {
         assert_eq!(
             *asked.lock().unwrap(),
             ["gemini:Kore", "lamp:Rachel", "gemini:Kore", "lamp:Rachel"]
+        );
+    }
+
+    /// #8762's review, P3 2: a slow or failing Google made every say line
+    /// wait its whole bound before the lamp's own voice said it. As the
+    /// reply path gives way after two failures, two lines in a row that
+    /// the person's Gemini voice fails give way to the lamp's own for
+    /// [`GIVE_WAY_FOR`]: the lines in that time never ask Google, and a
+    /// line already kept in their voice still plays theirs. Past it, theirs
+    /// is asked again; a line it says starts the count over.
+    #[test]
+    fn two_gemini_failures_in_a_row_give_say_lines_to_the_lamps_own_for_a_while() {
+        let dir = scratch("own_gemini_two_strikes");
+        let google = Arc::new(Mutex::new(Google::Speaks));
+        let (renderers, asked) = stand_ins_as(Arc::clone(&google));
+        let cache = voiced(with_gemini("strikes"), &dir, renderers, &|cache| cache)
+            .giving_way_for(Duration::from_millis(300));
+        let fixed = cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap();
+        assert_eq!(fixed, vec![2; 2_400], "kept in their voice");
+        *google.lock().unwrap() = Google::Fails;
+        assert_eq!(cache.render_once("One.").unwrap(), vec![1; 2_400]);
+        assert_eq!(cache.render_once("Two.").unwrap(), vec![1; 2_400]);
+        asked.lock().unwrap().clear();
+        assert_eq!(cache.render_once("Three.").unwrap(), vec![1; 2_400]);
+        assert_eq!(cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap(), fixed);
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["lamp:Rachel"],
+            "Google is not asked while theirs gives way"
+        );
+        std::thread::sleep(Duration::from_millis(350));
+        *google.lock().unwrap() = Google::Speaks;
+        assert_eq!(cache.render_once("Four.").unwrap(), vec![2; 2_400]);
+        *google.lock().unwrap() = Google::Fails;
+        assert_eq!(cache.render_once("Five.").unwrap(), vec![1; 2_400]);
+        *google.lock().unwrap() = Google::Speaks;
+        assert_eq!(cache.render_once("Six.").unwrap(), vec![2; 2_400]);
+        *google.lock().unwrap() = Google::Fails;
+        assert_eq!(cache.render_once("Seven.").unwrap(), vec![1; 2_400]);
+        assert_eq!(
+            asked.lock().unwrap()[1..],
+            [
+                "gemini:Kore",
+                "gemini:Kore",
+                "lamp:Rachel",
+                "gemini:Kore",
+                "gemini:Kore",
+                "lamp:Rachel"
+            ],
+            "past the while theirs is asked again, and a line said starts the count over"
+        );
+    }
+
+    /// #8762's review, P3 3: one Gemini failure while warming said that
+    /// fixed line in the lamp's own voice and counted it warmed, so it was
+    /// never asked in theirs again until the voice restarted. The lamp's
+    /// render is kept under the lamp's key only, the warming says the line
+    /// is not done, and its next try asks the person's voice again.
+    #[test]
+    fn a_warm_line_gemini_failed_is_kept_as_the_lamps_and_warmed_in_theirs_again() {
+        let dir = scratch("own_gemini_warm_again");
+        let google = Arc::new(Mutex::new(Google::Fails));
+        let (renderers, asked) = stand_ins_as(Arc::clone(&google));
+        let cache = voiced(with_gemini("warm_again"), &dir, renderers, &|cache| cache);
+        let line = [lamp_msgs::GOING_TO_SLEEP];
+        assert!(
+            cache.warm(&line).is_err(),
+            "not warmed in the person's voice"
+        );
+        assert_eq!(cache.kept(lamp_msgs::GOING_TO_SLEEP), Some(vec![1; 2_400]));
+        assert_eq!(
+            kept_names(&dir),
+            [format!(
+                "{}.wav",
+                lamps_key(&dir, lamp_msgs::GOING_TO_SLEEP)
+            )],
+            "kept under the lamp's key only"
+        );
+        *google.lock().unwrap() = Google::Speaks;
+        assert_eq!(cache.warm(&line), Ok(()));
+        assert_eq!(cache.kept(lamp_msgs::GOING_TO_SLEEP), Some(vec![2; 2_400]));
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["gemini:Kore", "lamp:Rachel", "gemini:Kore"]
         );
     }
 
