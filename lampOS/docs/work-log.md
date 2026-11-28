@@ -1,5 +1,10 @@
 Ready for lamp-voice: no
 
+## 28 November 2026 — sensor 6 WavLM trial and the call-to-face path
+
+- The frozen WavLM cutoff (cosine ≥0.86) kept 120/307 callers and rejected 291/307 other voices on the repeated dbda mic benchmark. On the digital provider benchmark it kept 151/554 and rejected 525/554. All 1,722 pairs scored. No cutoff met ≥95% kept and ≥90% rejected on either dataset. Isolated warm complete pairs on Mac 2’s Intel CPU took 728/1,765 ms wall and 725/1,760 ms process CPU at p50/p95. Sensor 6 stays default-off. Original model, raw data, failed preparations, full sweeps and timing remain in the private checksum archives. [Frozen rule](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7239539527) · [Complete EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7241193232)
+- For #8971 piece 3, traced the name hearing to the fixed body glance, the eyes’ independent cadence, the stillness gate and the explicit-look paths. dbda’s measured microphone timebase cannot supply a reliable caller bearing. The design reuses the default-off #8846 face-led motion with one calibrated lift and at most one bounded yaw. The proposed lead/Tests row measures labelled call end to the correct caller’s first full-face exposure, with folded starts, timeouts and wrong faces accounted for. Both the 90% within two seconds target and the earlier physical qualification gate await a lamp row. [Source map and row](https://github.com/autonomous-ai/lampOS/issues/8971#issuecomment-7241147828)
+
 ## 28 November 2026 — sensor 6, full-call enrollment on the R1 lamp mic
 
 - The frozen whole-line ECAPA comparator kept 213/307 callers (69.4%) and rejected 218/307 other voices (71.0%) on 614 recorded comparisons. The first-second control kept 130/307 and rejected 269/307 on the same pairs. The 1,108 digital provider pairs gave 322/554 kept and 501/554 rejected with the full line. The 95% / 90% accuracy gate stays closed. Sensor 6 remains default-off and outside the combined judge. [R1 EVAL and evidence inventories](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7239168223)
