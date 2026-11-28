@@ -1,0 +1,38 @@
+{
+  "boundary": "Validated upstream ids and normalized candidate frame to bounded history output; caller quality and interval validation excluded",
+  "device_access": false,
+  "first_frame_us": 1.47,
+  "generated_inputs": true,
+  "later_frames": 1000,
+  "max_us": 0.5780000000000001,
+  "p50_us": 0.237,
+  "p95_us": 0.255,
+  "physical_presence_measured": false,
+  "schema": "candidate-history-mechanics/1",
+  "tracks_per_frame": 8,
+  "host": {
+    "os": "macOS 26.6.2",
+    "architecture": "x86_64",
+    "model": "iMac20,1",
+    "cpu": "Intel Core i7-10700K",
+    "shared": true,
+    "rust": "1.96.0",
+    "profile": "release"
+  },
+  "target_p95_us_per_eight_face_frame": 100,
+  "target_met": true,
+  "source_sha256": {
+    "crates/eyes/src/candidate_history.rs": "eaf873811f6a112ed1a60778cffc7de09abbf094362462ff0291ecf3d74fd049",
+    "crates/eyes/examples/candidate_history_measure.rs": "2e5e1835aada9204da5392c30a35ca240acdf87c3d9ea93a349ce92a1522d05c"
+  },
+  "raw_timings_sha256": "fdbcfd56b854e30f86ee96a7a9daa0c0c69512c1c31e6762002f1e422ce566f3",
+  "protocol_sha256": "66af4fe7617b240a1033b1aa8a9dc0290ba53a3aebae801e3b5acf408db8510b",
+  "validation": {
+    "focused_controls_passed": 16,
+    "all_target_tests_passed": 526,
+    "existing_ignored_tests": 5,
+    "physical_presence_measured": false,
+    "arm64_latency_measured": false,
+    "voice_under_load_measured": false
+  }
+}

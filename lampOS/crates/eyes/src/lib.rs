@@ -28,6 +28,7 @@ pub mod away;
 pub mod blendshapes;
 pub mod bus_out;
 pub mod camera_helper;
+pub mod candidate_history;
 pub mod change;
 pub mod face_repair;
 pub mod faces;

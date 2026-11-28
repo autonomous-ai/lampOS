@@ -1,5 +1,18 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Candidate history without a presence verdict (#8971, 28 November 2026)
+
+Reuse `bus_out::Ids::of` for upstream one-to-one assignment rather than the
+inherited confirmation draft's per-face nearest-centre loop. The inactive
+`candidate_history` module accepts unique passing ids, expires an origin before
+measuring displacement, and breaks evidence on stale/replayed frames, camera
+epochs, missing quality or unverified camera motion. No default durations,
+presence decision, runtime caller or additional geometric tracker is added.
+`speaking::JointHistory` supplies capture-time context but does not by itself
+prove a whole camera interval still. Association, operating limits and liveness
+remain unqualified. Contracts: [English](candidate-history.md),
+[Vietnamese](candidate-history_vi.md).
+
 ## Keep retirement before requested music; distinguish cues (2026-11-10)
 
 V1 `hal/drivers/voice/music_service.py` waits while TTS is speaking before
