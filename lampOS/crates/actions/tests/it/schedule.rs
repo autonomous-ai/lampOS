@@ -580,6 +580,152 @@ fn move_by_text_keeps_the_repeat_and_changes_only_the_time() {
     assert_eq!(texts.iter().filter(|t| **t == "Call the bank").count(), 1);
 }
 
+/// #8840, the Reviewer-lead's P2 on #8945: a one-time reminder set for
+/// tomorrow and moved with no `day` ("move it to 10") stays tomorrow, in its
+/// own zone, never today's.
+#[test]
+fn a_one_time_reminder_moved_with_no_day_stays_on_its_date() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter().with_moving(true)));
+    let set = actions.call(
+        "set_reminder",
+        json!({"text":"Call Mom","time":"09:00","day":"tomorrow","zone":"Asia/Ho_Chi_Minh"}),
+    );
+    let before = set["result"]["local"].as_str().unwrap().to_owned();
+    let moved = actions.call("move_reminder", json!({"text":"mom","time":"10:00"}));
+    assert_eq!(moved["result"]["moved"], true, "{moved}");
+    assert_eq!(moved["result"]["clock"], "10:00", "{moved}");
+    let after = moved["result"]["local"].as_str().unwrap();
+    assert_eq!(
+        after[..10],
+        before[..10],
+        "the same date: {before} then {after}"
+    );
+    assert!(
+        after.ends_with("[Asia/Ho_Chi_Minh]"),
+        "its own zone: {after}"
+    );
+}
+
+/// #8840: a weekly reminder moved by its id keeps its weekday and its zone.
+#[test]
+fn a_weekly_reminder_moved_by_id_keeps_its_weekday_and_zone() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter().with_moving(true)));
+    let set = actions.call(
+        "repeat_reminder",
+        json!({"text":"Bins out","time":"19:00","every":"weekly","weekday":"thursday","zone":"Asia/Ho_Chi_Minh"}),
+    );
+    let id = set["result"]["id"].as_u64().unwrap();
+    let moved = actions.call("move_reminder", json!({"id":id,"time":"20:30"}));
+    assert_eq!(moved["result"]["moved"], true, "{moved}");
+    assert_eq!(moved["result"]["old_id"], id, "{moved}");
+    let list = actions.call("list_reminders", json!({}));
+    let items = list["result"]["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1, "{list}");
+    let repeat = &items[0]["repeat"];
+    assert_eq!(
+        (
+            &repeat["kind"],
+            &repeat["weekday"],
+            &repeat["time"],
+            &repeat["zone"]
+        ),
+        (
+            &json!("weekly"),
+            &json!("thursday"),
+            &json!("20:30"),
+            &json!("Asia/Ho_Chi_Minh")
+        ),
+        "{list}"
+    );
+}
+
+/// #8840, the Reviewer-lead's P3 1 on #8945: the room's reminder (set by no
+/// one), moved by Bo's line, is still the room's: Ann's line still hears of
+/// it. Bo's own, moved by Bo, is still Bo's alone.
+#[test]
+fn a_room_reminder_moved_by_a_person_stays_the_rooms() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter().with_moving(true)));
+    let room = json!({"asker":{"person":null,"owner":false},"setter":null});
+    for (text, who) in [
+        ("Water plants", &room),
+        ("Bo's call", &caller(Some(BO), false)),
+    ] {
+        let set = actions.call_as(
+            "repeat_reminder",
+            json!({"text":text,"time":"10:00","every":"daily"}),
+            who.clone(),
+        );
+        assert_eq!(set["ok"], true, "{set}");
+    }
+    for text in ["water", "bo's call"] {
+        let moved = actions.call_as(
+            "move_reminder",
+            json!({"text":text,"time":"11:00"}),
+            caller(Some(BO), false),
+        );
+        assert_eq!(moved["result"]["moved"], true, "{text}: {moved}");
+    }
+    let ann = actions.call_as("list_reminders", json!({}), caller(Some(ANN), false));
+    assert_eq!(texts(&ann), ["Water plants"], "Ann hears the room's: {ann}");
+    let bo = actions.call_as("list_reminders", json!({}), caller(Some(BO), false));
+    let mut both = texts(&bo);
+    both.sort();
+    assert_eq!(both, ["Bo's call", "Water plants"], "{bo}");
+}
+
+/// #8840, the first builder's P2 on #8945: the set goes through and the
+/// cancel of the old one then fails. The move is told as not done, with both
+/// ids and what to say, never as moved; both stay set.
+#[test]
+fn a_move_whose_cancel_fails_says_both_are_set() {
+    let schedule = Schedule::new();
+    let real = schedule.socket.clone();
+    let setup = Actions::new(Some(schedule.adapter()));
+    let set = setup.call(
+        "repeat_reminder",
+        json!({"text":"Go home","time":"16:00","every":"daily"}),
+    );
+    let old = set["result"]["id"].as_u64().unwrap();
+    // Every request reaches the real Schedule but the cancel, refused as
+    // busy: list_set, status and set, then status and the cancel.
+    let mut script = Script::with(5, move |request, _| {
+        if request["op"] == "cancel" {
+            json!({"ok":false,"error":"busy"})
+        } else {
+            ask(&real, request.clone())
+        }
+    });
+    let moved = script
+        .adapter()
+        .with_deadline(REAL_WAIT)
+        .with_moving(true)
+        .call("move_reminder", &json!({"text":"go home","time":"16:30"}));
+    let ops: Vec<Value> = script.finish().iter().map(|r| r["op"].clone()).collect();
+    assert_eq!(
+        ops,
+        ["list_set", "status", "set", "status", "cancel"],
+        "{moved}"
+    );
+    let result = &moved["result"];
+    assert_eq!(moved["ok"], true, "{moved}");
+    assert_eq!(result["moved"], false, "{moved}");
+    assert_eq!(result["old_kept"], true, "{moved}");
+    assert_eq!(result["old_id"], old, "{moved}");
+    assert!(
+        result["id"].as_u64().is_some_and(|new| new != old),
+        "{moved}"
+    );
+    assert!(
+        result["next"].as_str().unwrap().contains("old_id"),
+        "{moved}"
+    );
+    let list = setup.call("list_reminders", json!({}));
+    assert_eq!(texts(&list), ["Go home", "Go home"], "both stay: {list}");
+}
+
 /// #8840: `LAMP_SCHEDULE_MOVE` off, the catalog is as it was and
 /// `move_reminder` is refused without a schedule connection.
 #[test]

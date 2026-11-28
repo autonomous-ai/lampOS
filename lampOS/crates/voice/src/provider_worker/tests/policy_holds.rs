@@ -802,11 +802,14 @@ async fn a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_s
         ]}}))
         .await;
     let told = rig.service_message(&mut dial).await;
-    assert_eq!(
+    // Said back to the lamp, a cancel runs as a set does (#8840, the first
+    // builder's ruling of 28 Nov 08:18).
+    assert_ne!(
         response(&told),
-        json!({"done": false, "next": crate::policy_holds::HELD})
+        json!({"done": false, "next": crate::policy_holds::HELD}),
+        "{told}"
     );
-    assert!(desk.asked.try_recv().is_err(), "cancel_reminder was run");
+    assert!(desk.asked.try_recv().is_ok(), "cancel_reminder was not run");
     rig.stop().await;
 }
 
@@ -832,7 +835,8 @@ async fn with_follows_run_a_reply_to_the_lamp_turns_the_volume_back_up() {
         (true, true, 0.89, "volume_up", true),
         (false, true, 0.89, "volume_up", false),
         (true, true, 0.89, "light_brighter", true),
-        (true, true, 0.89, "cancel_reminder", false),
+        // A cancel said back to the lamp runs (#8840).
+        (true, true, 0.89, "cancel_reminder", true),
         (true, true, 0.89, "volume_mute", false),
         (true, true, 0.89, "check_my_work", false),
         (true, true, 0.89, "dance", false),

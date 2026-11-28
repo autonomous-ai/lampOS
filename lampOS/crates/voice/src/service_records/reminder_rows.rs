@@ -204,10 +204,11 @@ pub fn after_call(
     if !on() {
         return Kept::Off;
     }
-    // A move (#8840) is the old one's dismissal and the new one's set: its
-    // creator's record follows the reminder to its new time.
-    if name == lamp_actions::schedule::MOVE && told["moved"] == true {
-        if let Some(old) = told["old_id"].as_u64() {
+    // A move (#8840) is the new one's set and, when the old one went, its
+    // dismissal: its creator's record follows the reminder to its new time.
+    // A move whose cancel failed (`old_kept`) keeps both followed.
+    if name == lamp_actions::schedule::MOVE && told["status"] == "committed" {
+        if let Some(old) = told["old_id"].as_u64().filter(|_| told["moved"] == true) {
             let followed = kept::followed(|all| {
                 let at = all.iter().position(|one| one.id == old)?;
                 all.remove(at)
@@ -338,6 +339,33 @@ mod tests {
             .into_iter()
             .map(|change| change.key)
             .collect()
+    }
+
+    /// #8840: a move is the new one's set and the old one's dismissal; a
+    /// move whose cancel failed (`old_kept`) sets the new one's row and
+    /// keeps the old one's followed (the Reviewer-lead's P3 2 on #8945).
+    #[test]
+    fn a_move_follows_the_reminder_and_one_with_the_old_kept_keeps_both() {
+        on();
+        assert_eq!(set(Some(OWNER), 41, "Go home"), Kept::Written(Deed::Set));
+        let move_told = |old: u64, new: u64, moved: bool| {
+            after_call(
+                lamp_actions::schedule::MOVE,
+                &json!({"text":"go home","time":"16:30"}),
+                Some(&setter(Some(OWNER))),
+                &json!({"moved":moved,"status":"committed","id":new,"old_id":old,"text":"Go home","old_kept":!moved}),
+                2_000,
+            )
+        };
+        assert_eq!(move_told(41, 42, true), Kept::Written(Deed::Set));
+        assert_eq!(set(Some(OWNER), 43, "Go out"), Kept::Written(Deed::Set));
+        assert_eq!(move_told(43, 44, false), Kept::Written(Deed::Set));
+        let keys = keys();
+        for key in ["r-41-dismissed", "r-42-set", "r-44-set"] {
+            assert!(keys.iter().any(|k| k == key), "{key}: {keys:?}");
+        }
+        assert!(!keys.iter().any(|k| k == "r-43-dismissed"), "{keys:?}");
+        assert_eq!(said(&[43, 44], 3_000), [Kept::Written(Deed::Fired); 2]);
     }
 
     /// Creator is mapped: a reminder a known person set is their row, the

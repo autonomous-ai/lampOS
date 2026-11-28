@@ -1296,6 +1296,8 @@ fn a_list_set_item_says_when_it_was_set_in_the_lamps_zone() {
     let mut plain = item.as_object().unwrap().clone();
     plain.remove("set_local");
     plain.remove("set_day");
+    // Set by no one: the room's (#8840), never who set it.
+    assert_eq!(plain.remove("set_by_room"), Some(json!(true)));
     assert_eq!(
         plain.remove("set_unix_ms"),
         Some(json!(WALL + 15 * 3_600_000 + 1_800_000))
