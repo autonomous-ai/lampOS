@@ -6731,6 +6731,24 @@ after a take-over, but now for every turn:
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
   still through the whole line, needs its name or a follow-up.
+- **A face turned to the lamp starts no conversation**
+  (`LAMP_FACE_NOT_A_CALL=on`; off unless set, and on in the product's
+  `lamp-voice.service` since the product owner's word of 27 Nov 2026, "a
+  simple 'hey lamp' to trigger and 20s renew window"). The product
+  owner's rule of 26 Nov 2026: "Hey Lamp" is the only way to start a
+  conversation, and facing the lamp counts as talking to it only once head
+  direction is measured reliable on the body (#8847). With the switch, out
+  of a conversation, the face lets no line out of its own in any room:
+  `attention::Attention::face_calls` gives it to `spoken_to`, to
+  `decide_called`'s `TURNED` arm and to a short sound's `SOUND_TURNED` only
+  in a conversation going on. A question said facing the lamp, with no name,
+  no tap and no words calling it, is held: `its answer is held back: nobody
+  spoke to the lamp: someone is turned to it, but no name, no call, no
+  conversation with it going on`. The face still confirms the name heard
+  (its second sign), and in a conversation it counts as before, follow-ups
+  and short sounds alike. Risk: a person alone at the desk who faces the lamp
+  and asks without "Hey Lamp" isn't answered until head direction is
+  measured and the switch goes off again.
 - **A line is answered when it was said to the lamp** (`LAMP_SAID_TO_ME=on`,
   #7442; needs `LAMP_EYES_SPEAKING`). On lamp-74ff on 17 Nov lip smacks,
   heard as 1 to 3 words while the owner faced the lamp, were answered as

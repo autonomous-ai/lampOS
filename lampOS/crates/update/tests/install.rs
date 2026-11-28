@@ -2821,6 +2821,26 @@ fn the_product_turns_beat_engines_on_only_in_lamp_cloud() {
     }
 }
 
+/// The product owner, 27 Nov 2026: "a simple 'hey lamp' to trigger and 20s
+/// renew window". Out of a conversation a face turned to the lamp starts
+/// none (#8872): on lamp-dbda that afternoon 21 lines were answered by a
+/// face alone. "Hey Lamp" calls, and follow-ups in the window need no look.
+#[test]
+fn the_product_starts_a_conversation_only_with_hey_lamp() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    for line in [
+        "Environment=LAMP_FACE_NOT_A_CALL=on",
+        "Environment=LAMP_NAME_HEY_ONLY=on",
+        "Environment=LAMP_FOLLOW_UPS=on",
+    ] {
+        assert!(voice.lines().any(|set| set == line), "{line}");
+    }
+}
+
 /// #8839 (the lead's test on lamp-52e6 at stable 16443, 27 Nov): a line
 /// begun over the lamp's own answer is a follow-up like any line in the
 /// conversation's 20 s, with no look and no test of its words, by the

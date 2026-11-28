@@ -5703,6 +5703,19 @@ pub fn serve(
                 heeding.attention.only_hey_lamp(true);
             }
         }
+        // A face turned to the lamp starts no conversation
+        // (`LAMP_FACE_NOT_A_CALL=on`, the product owner's rule of 26 Nov
+        // 2026, until head direction is measured on the body, #8847).
+        if std::env::var(crate::second_provider::FACE_NOT_A_CALL_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: out of a conversation a face turned to the lamp is no call of its own; it still confirms the name heard, and in a conversation it counts as before (LAMP_FACE_NOT_A_CALL)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.attention.face_not_a_call(true);
+            }
+        }
         // Short replies carry (`LAMP_SHORT_REPLIES_CARRY=on`, #8772, the
         // product owner's rule of 26 Nov 2026).
         if std::env::var(crate::second_provider::SHORT_REPLIES_CARRY_ENVIRONMENT)

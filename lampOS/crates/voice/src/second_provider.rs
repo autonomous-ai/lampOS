@@ -1111,6 +1111,15 @@ pub const NAME_FACE_OR_WORDS_ENVIRONMENT: &str = "LAMP_NAME_FACE_OR_WORDS";
 /// owner's own calls.
 pub const NAME_HEY_ONLY_ENVIRONMENT: &str = "LAMP_NAME_HEY_ONLY";
 
+/// `on` exactly, off unless set (the product owner's rule of 26 Nov 2026:
+/// "Hey Lamp" is the only way to start a conversation, and facing the lamp
+/// counts as talking to it only once head direction is measured reliable on
+/// the body, #8847): out of a conversation, a face turned to the lamp lets
+/// no line out of its own, in any room, a short sound or not
+/// ([`crate::attention::Attention::face_not_a_call`]). The face still
+/// confirms the name heard, and in a conversation it counts as before.
+pub const FACE_NOT_A_CALL_ENVIRONMENT: &str = "LAMP_FACE_NOT_A_CALL";
+
 /// `on` exactly, off unless set (the product owner, 26 Nov 2026): the lamp's
 /// own news is replied to within the conversation's 20 s, as any answer is,
 /// and a line about its work opens no window of its own
