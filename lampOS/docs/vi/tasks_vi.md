@@ -4820,7 +4820,11 @@ là phần của một coder khác trong #6226; thiết kế:
 - `agents.defaults.workspace`: thư mục làm việc riêng của đèn
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` trong
   home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn
-  (`AGENTS.md`) được ghi, như với Hermes. Mục cuối của nó, "Your last
+  (`AGENTS.md`) được ghi, như với Hermes. Các quy tắc của nó bảo agent tìm
+  thông tin trên web bằng `web_search`, rồi `web_fetch` để đọc một trang nó
+  tìm được, không bao giờ qua `exec`, `curl` hay trang của một công cụ tìm
+  kiếm (trên lamp-ee17 OpenClaw tìm bằng `exec` + `curl` dù đã có
+  `web_search`; `the_written_guidance_says_to_search_with_web_search`). Mục cuối của nó, "Your last
   answer" (#7930), yêu cầu agent đưa ra câu trả lời cuối nói trước tiên
   điều nó tìm được hoặc đã làm, bằng câu ngắn, rõ, không bao giờ chỉ
   "done" hay "saved", nói file nó ghi chứa gì và ở đâu, trong khoảng 800

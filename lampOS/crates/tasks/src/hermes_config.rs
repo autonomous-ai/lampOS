@@ -1001,6 +1001,9 @@ play sounds on your own.
 - To write a new skill, read two or three existing ones for the format, write \
 it in this work folder, and tell the person where it is. Installing it on the \
 lamp is the person's step, never yours.
+- To look something up on the web, call `web_search`, then `web_fetch` to \
+read a page it found; never search through `exec`, `curl` or a search \
+engine's page.
 
 ## Your last answer
 
@@ -1514,6 +1517,21 @@ skills:
             "skills:\n- /a\n",
         ] {
             assert!(merge_config(text, 7741).is_err(), "{text:?}");
+        }
+    }
+
+    /// On lamp-ee17 OpenClaw had `web_search` and still searched with
+    /// `exec` + `curl` and `web_fetch`: the written guidance of both
+    /// engines tells the model to search with `web_search`.
+    #[test]
+    fn the_written_guidance_says_to_search_with_web_search() {
+        const LINE: &str = "- To look something up on the web, call `web_search`, then `web_fetch` to read a page it found; never search through `exec`, `curl` or a search engine's page.\n";
+        for write in [write_guidance, crate::openclaw_config::write_guidance] {
+            let folder = tempfile::tempdir().unwrap();
+            write(folder.path()).unwrap();
+            let text = fs::read_to_string(folder.path().join(GUIDANCE_FILE)).unwrap();
+            let at = text.find(LINE).unwrap_or_else(|| panic!("not in {text}"));
+            assert!(at < text.find("## Your last answer").unwrap());
         }
     }
 

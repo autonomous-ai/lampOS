@@ -3343,7 +3343,11 @@ them) (`crates/tasks/src/openclaw_config.rs`):
 - `agents.defaults.workspace`: the lamp's own work folder
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
   `lampos`'s home), where the lamp's skills keys point and the guidance
-  (`AGENTS.md`) is written, as for Hermes. Its last section, "Your last
+  (`AGENTS.md`) is written, as for Hermes. Its rules tell the agent to look
+  things up on the web with `web_search`, then `web_fetch` for a page it
+  found, never through `exec`, `curl` or a search engine's page (on
+  lamp-ee17 OpenClaw searched with `exec` + `curl` while `web_search` was
+  there; `the_written_guidance_says_to_search_with_web_search`). Its last section, "Your last
   answer" (#7930), asks the agent for a last answer that says what it
   found or did first, in short plain sentences, never only "done" or
   "saved", saying what a file it wrote holds and where, within about 800
