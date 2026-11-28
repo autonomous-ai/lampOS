@@ -114,6 +114,8 @@ impl Default for HeadTiming {
 }
 pub const BUTTON_DEBOUNCE_US: u64 = 200_000;
 pub const PRIMARY_HOLD_US: u64 = 2_000_000;
+/// Ask on the first fresh pressed acquisition at ten seconds, without release.
+pub const PRIMARY_SHUTDOWN_HELD_US: u64 = 10_000_000;
 pub const RESET_HOLD_US: u64 = 5_000_000;
 /// The reset button arms only after it has read released this long running:
 /// a line that rests pressed (a pad driving it low) and lifts briefly never
@@ -274,6 +276,10 @@ pub struct StripSample {
 #[serde(deny_unknown_fields)]
 pub struct TouchOutput {
     pub events: Vec<TouchEvent>,
+    /// Existing lamp/shutdown_request messages, separate from TouchEvent so
+    /// older Voice readers never receive an invented held/released gesture.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shutdown_requests: Vec<ShutdownRequest>,
     pub state: TouchState,
     /// `controls/pet`, only with `LAMP_HEAD_PET` on: left out when empty, so
     /// a replay's frames are as before.
@@ -828,6 +834,10 @@ pub struct TouchEngine {
     /// The unmasked, successful twelve-bit acquisition, not inferred levels.
     strip_mask: u16,
     pending: Vec<TouchEvent>,
+    pending_shutdowns: Vec<(u64, ShutdownRequest)>,
+    shutdown_sequence: u64,
+    shutdown_contact: Option<u64>,
+    shutdown_inhibited_contact: Option<u64>,
     pending_pets: Vec<HeadPet>,
     latest: Vec<TouchEvent>,
     event_sequence: u64,
@@ -892,6 +902,10 @@ impl TouchEngine {
             strip_selected_mask,
             strip_mask: 0,
             pending: Vec::new(),
+            pending_shutdowns: Vec::new(),
+            shutdown_sequence: 0,
+            shutdown_contact: None,
+            shutdown_inhibited_contact: None,
             pending_pets: Vec::new(),
             latest: Vec::new(),
             event_sequence: 0,
@@ -901,13 +915,14 @@ impl TouchEngine {
             shutdown: false,
         })
     }
-    /// With the shutdown switch on (#3697, `docs/shutdown.md`), the primary
-    /// button released after [`lamp_msgs::SHUTDOWN_HOLD_US`] to
-    /// [`lamp_msgs::SHUTDOWN_HOLD_MOST_US`] asks for [`TouchIntent::Shutdown`];
-    /// one released later asks for nothing (cancelled). From 2 s to 5 s it is
-    /// the mute, as with the switch off.
+    /// With the shutdown switch on, a fresh primary hold asks at ten seconds.
+    /// The earlier 5-to-10-second release still asks; 2-to-5 seconds is mute.
+    /// Requests are separate from the unchanged legacy release TouchEvent.
     pub fn set_shutdown(&mut self, on: bool) {
         self.shutdown = on;
+        if !on {
+            self.pending_shutdowns.clear();
+        }
     }
     /// Whether the body feels the head being pushed by hand now. A head
     /// contact that overlaps a push asks for nothing more (#711).
@@ -937,6 +952,7 @@ impl TouchEngine {
         self.head.reset();
         self.pulse_pads.iter_mut().for_each(PulsePad::reset);
         self.pending_pets.clear();
+        self.pending_shutdowns.clear();
         self.pending
             .retain(|event| event.source == TouchSource::Strip);
         self.latest
@@ -1051,6 +1067,15 @@ impl TouchEngine {
                 mask &= !pad.bit;
             }
         }
+        // A valid reset press wins for this entire primary contact, even if
+        // reset is released before ten seconds. Check before processing a
+        // simultaneous primary release/reset press. A boot-stuck refused
+        // reset line is not an armed contact and cannot disable the button.
+        if self.reset.contact.is_some()
+            || (sample.reset == Some(true) && self.reset.armed && !self.reset.refused())
+        {
+            self.inhibit_primary_shutdown();
+        }
         for (source, level) in [
             (TouchSource::Primary, sample.primary),
             (TouchSource::Reset, sample.reset),
@@ -1078,7 +1103,8 @@ impl TouchEngine {
                     TouchIntent::FactoryReset
                 } else if self.shutdown && held >= lamp_msgs::SHUTDOWN_HOLD_US {
                     if !lamp_msgs::shutdown_hold(held) {
-                        // Held past the window: the shutdown is cancelled.
+                        // No legacy release event past its old window. The
+                        // held request, if any, was already sent at ten seconds.
                         continue;
                     }
                     TouchIntent::Shutdown
@@ -1091,7 +1117,20 @@ impl TouchEngine {
                 event.when_quiet = intent;
                 event.when_asleep = Some(intent);
                 self.emit(event)?;
+                if source == TouchSource::Primary && intent == TouchIntent::Shutdown {
+                    self.ask_primary_shutdown(contact, at, now)?;
+                }
             }
+        }
+        // Both new contacts may have begun in this acquisition.
+        if self.reset.contact.is_some() {
+            self.inhibit_primary_shutdown();
+        }
+        if sample.primary == Some(true)
+            && let Some(contact) = self.primary.contact
+            && at - contact.began >= PRIMARY_SHUTDOWN_HELD_US
+        {
+            self.ask_primary_shutdown(contact, at, now)?;
         }
         if !self.config.head_pads.is_empty() {
             for (contact, gesture, released) in self.head.observe(mask, at)? {
@@ -1304,6 +1343,68 @@ impl TouchEngine {
             speed: 0.0,
         }
     }
+    fn inhibit_primary_shutdown(&mut self) {
+        if let Some(contact) = self.primary.contact {
+            if self.shutdown && self.shutdown_inhibited_contact != Some(contact.id) {
+                eprintln!(
+                    "lamp-controls: primary contact {} shutdown hold cancelled by reset overlap",
+                    contact.id
+                );
+            }
+            self.shutdown_inhibited_contact = Some(contact.id);
+            // Several acquisitions can be drained before tick publishes. A
+            // later reset overlap must remove an undelivered threshold ask.
+            self.pending_shutdowns.retain(|(id, _)| *id != contact.id);
+        }
+    }
+
+    fn ask_primary_shutdown(
+        &mut self,
+        contact: Contact,
+        observed: u64,
+        now: u64,
+    ) -> Result<(), InputError> {
+        if !self.shutdown
+            || !self.config.enabled
+            || self.shutdown_contact == Some(contact.id)
+            || self.shutdown_inhibited_contact == Some(contact.id)
+        {
+            return Ok(());
+        }
+        if self.pending_shutdowns.len() == MAX_PENDING_EVENTS {
+            return Err(error(
+                ControlFault::Overflow,
+                "shutdown request queue is full",
+            ));
+        }
+        self.shutdown_sequence = self.shutdown_sequence.checked_add(1).ok_or_else(|| {
+            error(
+                ControlFault::Overflow,
+                "shutdown request identity exhausted",
+            )
+        })?;
+        let request = ShutdownRequest {
+            stamp: ClockStamp {
+                clock_id: self.clock_id.clone(),
+                at_us: now,
+                sequence: self.shutdown_sequence,
+            },
+            source: ShutdownSource::Button,
+            reason: format!(
+                "primary button held {} ms",
+                (observed - contact.began) / 1_000
+            ),
+        };
+        request
+            .check()
+            .map_err(|_| error(ControlFault::Invalid, "invalid primary shutdown request"))?;
+        self.pending_shutdowns.push((contact.id, request));
+        // Draining the request does not release this latch: refusal or a
+        // failed publish is not retried by holding or releasing the same hand.
+        self.shutdown_contact = Some(contact.id);
+        Ok(())
+    }
+
     fn emit(&mut self, mut event: TouchEvent) -> Result<(), InputError> {
         if self.pending.len() == MAX_PENDING_EVENTS {
             return Err(error(ControlFault::Overflow, "touch event queue is full"));
@@ -1400,6 +1501,15 @@ impl TouchEngine {
                 state.held_us = state.observed_us.map(|at| at - contact.began);
             }
         }
+        if source == TouchSource::Primary
+            && self.shutdown
+            && state.contact_id.is_some()
+            && state.contact_id == self.shutdown_inhibited_contact
+        {
+            // The contact remains physically held, but cannot request shutdown;
+            // its duration must not keep the ring's amber warning alive.
+            state.held_us = None;
+        }
         if source == TouchSource::Head {
             // Through a pulse's short gap too; nothing for a pushed head.
             state.held_us = state
@@ -1452,16 +1562,20 @@ impl TouchEngine {
         );
         TouchOutput {
             events: std::mem::take(&mut self.pending),
+            shutdown_requests: std::mem::take(&mut self.pending_shutdowns)
+                .into_iter()
+                .map(|(_, request)| request)
+                .collect(),
             state,
             pets: std::mem::take(&mut self.pending_pets),
         }
     }
 }
 
-/// The general request to turn the lamp off ([`ShutdownRequest`], on its own
-/// topic) for an enabled primary-button release that asked for
-/// [`TouchIntent::Shutdown`], or `None`. Setup's watcher acts on the request,
-/// never on the touch event (#3697).
+/// Legacy conversion of a released primary event, for earlier callers and
+/// replay comparisons. Runtime dispatch uses TouchOutput::shutdown_requests,
+/// which also enforces per-contact deduplication and reset-overlap inhibition.
+/// Setup acts on ShutdownRequest, never on the touch event itself.
 pub fn shutdown_request(event: &TouchEvent) -> Option<ShutdownRequest> {
     (event.enabled
         && event.source == TouchSource::Primary

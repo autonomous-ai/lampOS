@@ -236,12 +236,12 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         let state =
             bus.publisher_declared(TouchState::TOPIC, &TouchState::declaration(), "controls")?;
         let mut engine = TouchEngine::new(touch, clock, state.boot()).map_err(io::Error::other)?;
-        // The primary button held 5 to 15 s turns the lamp off (#3697).
+        // Keep the existing request wire: held ten seconds or released earlier in the shutdown window.
         let shutdown = lamp_msgs::shutdown_switched_on();
         engine.set_shutdown(shutdown);
         if shutdown {
             eprintln!(
-                "lamp-controls: LAMP_SHUTDOWN=on: the primary button released after 5 to 15 s asks to turn the lamp off"
+                "lamp-controls: LAMP_SHUTDOWN=on: the primary button asks to turn the lamp off at 10 s held, or on an earlier release after 5 s"
             );
         }
         // Preserve the installed Voice receiver's primary-button behavior in
@@ -625,14 +625,14 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         );
         for event in &output.events {
             account(&mut self.counts, self.events.publish_json(at_us, event));
-            if let Some(requests) = &mut self.shutdown_requests
-                && let Some(request) = crate::touch::shutdown_request(event)
-            {
+        }
+        if let Some(requests) = &mut self.shutdown_requests {
+            for request in &output.shutdown_requests {
                 eprintln!(
                     "lamp-controls: {}: asking to turn the lamp off",
                     request.reason
                 );
-                account(&mut self.counts, requests.publish_json(at_us, &request));
+                account(&mut self.counts, requests.publish_json(at_us, request));
             }
         }
         if let Some(pets) = &mut self.pets {

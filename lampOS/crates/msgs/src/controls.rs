@@ -402,10 +402,11 @@ pub enum TouchIntent {
     Slide,
     FactoryReset,
     SoftwareMute,
-    /// The primary button released after a hold in the shutdown window
-    /// ([`shutdown_hold`]), only with [`crate::SHUTDOWN_SWITCH`] on: turn the
-    /// lamp off. Never with the mute. Controls then asks on
-    /// [`crate::ShutdownRequest::TOPIC`], which setup's watcher acts on.
+    /// The legacy primary release observation in the shutdown window
+    /// ([`shutdown_hold`]), only with [`crate::SHUTDOWN_SWITCH`] on, never
+    /// with mute. Controls sends its separate ShutdownRequest once per contact
+    /// at ten seconds held or on release from five to under ten; runtime does
+    /// not convert this compatibility event into another request.
     Shutdown,
 }
 

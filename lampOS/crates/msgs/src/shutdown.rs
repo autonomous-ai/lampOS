@@ -16,7 +16,8 @@ pub const SHUTDOWN_SWITCH: &str = "LAMP_SHUTDOWN";
 /// The primary button released after this long asks to turn the lamp off,
 /// with [`SHUTDOWN_SWITCH`] on (V1's shutdown hold, HAL-5.7).
 pub const SHUTDOWN_HOLD_US: u64 = 5_000_000;
-/// Released after this long, the shutdown is cancelled: nothing is asked.
+/// Upper bound of the legacy released TouchEvent. Controls may already have
+/// sent its separate request at ten seconds held; this does not cancel it.
 pub const SHUTDOWN_HOLD_MOST_US: u64 = 15_000_000;
 
 /// Whether [`SHUTDOWN_SWITCH`] is on in this process's environment.
@@ -24,8 +25,10 @@ pub fn shutdown_switched_on() -> bool {
     std::env::var(SHUTDOWN_SWITCH).as_deref() == Ok("on")
 }
 
-/// Whether a primary-button hold of `held_us` asks to turn the lamp off:
-/// from [`SHUTDOWN_HOLD_US`] to [`SHUTDOWN_HOLD_MOST_US`], both included.
+/// The legacy released TouchEvent's window, from [`SHUTDOWN_HOLD_US`] to
+/// [`SHUTDOWN_HOLD_MOST_US`], both included. Controls separately queues one
+/// ShutdownRequest at ten seconds held or on release from five to under ten;
+/// this compatibility predicate does not decide whether another request sends.
 pub fn shutdown_hold(held_us: u64) -> bool {
     (SHUTDOWN_HOLD_US..=SHUTDOWN_HOLD_MOST_US).contains(&held_us)
 }
@@ -44,8 +47,8 @@ pub const SHUTDOWN_REQUEST_TTL_US: u64 = 2_000_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ShutdownSource {
-    /// The primary button released after a hold in the shutdown window
-    /// ([`shutdown_hold`]), from `lamp-controls`.
+    /// The primary button held to the threshold, or released in the legacy
+    /// shutdown window ([`shutdown_hold`]), from `lamp-controls`.
     Button,
 }
 

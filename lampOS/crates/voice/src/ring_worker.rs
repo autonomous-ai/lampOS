@@ -76,7 +76,7 @@ pub struct Senses {
     /// `LAMP_RING_UPDATE=on` ([`crate::ring_update`]).
     pub update: Option<crate::ring_update::RingUpdate>,
     /// The primary button held, for the shutdown's warning (#3697): with
-    /// `LAMP_SHUTDOWN=on`, held 5 to 15 s ([`lamp_msgs::shutdown_hold`]),
+    /// `LAMP_SHUTDOWN=on`, held at least 5 s (including after the ten-second request),
     /// the ring shows [`shutdown_warning`] in place of its face.
     pub button: Option<crate::ring_head::RingHead>,
     /// The reset button held, for the reset's red (#5929): from 2 s it
@@ -87,11 +87,10 @@ pub struct Senses {
     pub marks: Option<crate::ring_mark::Marks>,
 }
 
-/// The shutdown's warning while the primary button is held in its window
-/// (#3697, `docs/shutdown.md`): the whole ring in the setup light's amber
-/// ([`SetupLook::Failed`]), steady, no brighter than the setup light. Released
-/// there, the lamp turns off; held past it, the warning goes and nothing is
-/// asked.
+/// The shutdown warning from five seconds while the primary button stays
+/// held (#7943, `docs/shutdown.md`): the setup light's steady amber
+/// ([`SetupLook::Failed`]), no brighter than setup. It continues after the
+/// ten-second request; amber does not acknowledge admission or safe power-off.
 pub fn shutdown_warning() -> [lamp_ring::Rgb; PIXEL_COUNT] {
     use lamp_ring::setup::{SetupLook, setup_pixels};
     setup_pixels(SetupLook::Failed, SetupLook::Failed, 1.0, 1.0)
@@ -1046,10 +1045,10 @@ fn rest_wins(warning: Option<[lamp_ring::Rgb; PIXEL_COUNT]>, unplugging: bool) -
 
 /// [`reset_warning`] while the reset button is held (`reset`), else
 /// [`shutdown_warning`] while the primary button is held (`held`, as
-/// Controls last said) in the shutdown's window, or `None`.
+/// Controls last said) from five seconds until release, or `None`.
 fn warning(held: Option<u64>, reset: Option<u64>) -> Option<[lamp_ring::Rgb; PIXEL_COUNT]> {
     reset_warning(reset).or_else(|| {
-        held.filter(|&held| lamp_msgs::shutdown_hold(held))
+        held.filter(|&held| held >= lamp_msgs::SHUTDOWN_HOLD_US)
             .map(|_| shutdown_warning())
     })
 }
@@ -1628,7 +1627,7 @@ mod shutdown_warning_tests {
     use lamp_msgs::{ClockStamp, TouchSource, TouchState};
 
     #[test]
-    fn the_warning_shows_only_while_the_button_is_held_in_the_shutdown_window() {
+    fn the_warning_stays_while_the_button_is_held_after_the_shutdown_request() {
         for (held, shows) in [
             (None, false),
             (Some(1_000_000), false),
@@ -1637,8 +1636,8 @@ mod shutdown_warning_tests {
             (Some(5_000_000), true),
             (Some(6_000_000), true),
             (Some(15_000_000), true),
-            (Some(15_000_001), false),
-            (Some(20_000_000), false),
+            (Some(15_000_001), true),
+            (Some(20_000_000), true),
         ] {
             assert_eq!(warning(held, None).is_some(), shows, "{held:?}");
         }

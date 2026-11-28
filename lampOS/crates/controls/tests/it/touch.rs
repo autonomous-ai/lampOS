@@ -1281,16 +1281,18 @@ fn a_reset_line_released_once_in_its_first_second_still_arms() {
 /// The primary button held `held` µs and released, on an engine with the
 /// shutdown switch `on`: what it asks, and whether its state said the hold
 /// past 5 s while it lasted (the ring's warning reads that `held_us`).
-fn primary_hold(on: bool, held: u64) -> (Vec<TouchEvent>, bool) {
+fn primary_hold(on: bool, held: u64) -> (Vec<TouchEvent>, Vec<lamp_msgs::ShutdownRequest>, bool) {
     let mut rig = Rig::new(buttons());
     rig.engine.set_shutdown(on);
     rig.gpio(0, false, false, 0);
     let mut warned = false;
+    let mut requests = Vec::new();
     for at in (50_000..=50_000 + held).step_by(50_000) {
         let sample = rig.sample(at, true, false, 0);
         rig.engine.ingest_gpio(at, sample).unwrap();
         let output = rig.engine.tick(at);
-        assert!(output.events.is_empty(), "nothing before the release");
+        assert!(output.events.is_empty(), "no invented release event");
+        requests.extend(output.shutdown_requests);
         let primary = output
             .state
             .sources
@@ -1299,14 +1301,19 @@ fn primary_hold(on: bool, held: u64) -> (Vec<TouchEvent>, bool) {
             .unwrap();
         warned |= primary.held_us.is_some_and(lamp_msgs::shutdown_hold);
     }
-    (rig.gpio(50_000 + held + 1, false, false, 0), warned)
+    let at = 50_000 + held + 1;
+    let sample = rig.sample(at, false, false, 0);
+    rig.engine.ingest_gpio(at, sample).unwrap();
+    let output = rig.engine.tick(at);
+    requests.extend(output.shutdown_requests);
+    (output.events, requests, warned)
 }
 
 /// #3697: 1 s is Stop, 3 s the mute, either way; with the switch on 6 s is
-/// one shutdown and 20 s nothing (cancelled); off, both are the mute, as
-/// before.
+/// one shutdown on release, and 20 s has already asked once while held.
+/// Off, both remain mute. Released TouchEvents retain the old wire window.
 #[test]
-fn a_primary_hold_turns_off_in_its_window_only_with_the_switch_on() {
+fn a_primary_hold_asks_at_ten_seconds_or_on_shorter_release_only_when_on() {
     for (on, held, wanted, warned) in [
         (false, 1_000_000, Some(TouchIntent::Stop), false),
         (false, 3_000_000, Some(TouchIntent::SoftwareMute), false),
@@ -1315,9 +1322,10 @@ fn a_primary_hold_turns_off_in_its_window_only_with_the_switch_on() {
         (true, 1_000_000, Some(TouchIntent::Stop), false),
         (true, 3_000_000, Some(TouchIntent::SoftwareMute), false),
         (true, 6_000_000, Some(TouchIntent::Shutdown), true),
+        (true, 10_000_000, Some(TouchIntent::Shutdown), true),
         (true, 20_000_000, None, true),
     ] {
-        let (events, saw_window) = primary_hold(on, held);
+        let (events, requests, saw_window) = primary_hold(on, held);
         assert_eq!(
             events
                 .iter()
@@ -1329,17 +1337,17 @@ fn a_primary_hold_turns_off_in_its_window_only_with_the_switch_on() {
         // The state says the hold's time either way; the ring warns only
         // with its own switch on.
         assert_eq!(saw_window, warned, "on {on}, held {held}");
-        let requests = events
-            .iter()
-            .filter_map(shutdown_request)
-            .collect::<Vec<_>>();
-        if wanted == Some(TouchIntent::Shutdown) {
-            assert_eq!(requests.len(), 1, "exactly one request");
+        if on && held >= lamp_msgs::SHUTDOWN_HOLD_US {
+            assert_eq!(requests.len(), 1, "exactly one request including release");
             assert_eq!(requests[0].source, lamp_msgs::ShutdownSource::Button);
-            assert_eq!(requests[0].stamp, events[0].stamp);
+            if held < PRIMARY_SHUTDOWN_HELD_US {
+                assert_eq!(requests[0].stamp.at_us, events[0].stamp.at_us);
+            } else {
+                assert_eq!(requests[0].stamp.at_us, 50_000 + PRIMARY_SHUTDOWN_HELD_US);
+            }
             assert!(
                 requests[0]
-                    .accept("controls", "boot", events[0].stamp.at_us)
+                    .accept("controls", "boot", requests[0].stamp.at_us)
                     .is_ok()
             );
         } else {
@@ -1351,8 +1359,260 @@ fn a_primary_hold_turns_off_in_its_window_only_with_the_switch_on() {
 /// A Controls in shadow asks nothing of setup, even in the window.
 #[test]
 fn a_shadow_controls_shutdown_hold_is_no_request() {
-    let (mut events, _) = primary_hold(true, 6_000_000);
+    let (mut events, _, _) = primary_hold(true, 6_000_000);
     let mut event = events.pop().unwrap();
     event.enabled = false;
     assert!(shutdown_request(&event).is_none());
+}
+
+fn acquired(rig: &mut Rig, at: u64, primary: bool, reset: bool) -> TouchOutput {
+    let sample = rig.sample(at, primary, reset, 0);
+    rig.engine.ingest_gpio(at, sample).unwrap();
+    let output = rig.engine.tick(at);
+    output.state.check().unwrap();
+    for request in &output.shutdown_requests {
+        request.check().unwrap();
+    }
+    output
+}
+
+fn before_primary_shutdown_threshold() -> Rig {
+    let mut rig = Rig::new(buttons());
+    rig.engine.set_shutdown(true);
+    for at in (0..10_050_000).step_by(50_000) {
+        assert!(
+            acquired(&mut rig, at, at >= 50_000, false)
+                .shutdown_requests
+                .is_empty()
+        );
+    }
+    rig
+}
+
+#[test]
+fn held_shutdown_requires_an_enabled_switched_on_new_contact() {
+    for (enabled, on, startup_pressed) in [
+        (false, true, false),
+        (true, false, false),
+        (true, true, true),
+    ] {
+        let mut config = buttons();
+        config.enabled = enabled;
+        let mut rig = Rig::new(config);
+        rig.engine.set_shutdown(on);
+        for at in (0..=20_000_000).step_by(50_000) {
+            assert!(
+                acquired(&mut rig, at, startup_pressed || at >= 50_000, false)
+                    .shutdown_requests
+                    .is_empty(),
+                "enabled={enabled}, on={on}, startup={startup_pressed}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_tick_cannot_extend_old_gpio_evidence_into_a_shutdown() {
+    let mut rig = before_primary_shutdown_threshold();
+    assert!(rig.engine.tick(10_050_000).shutdown_requests.is_empty());
+    assert!(rig.engine.tick(10_100_000).shutdown_requests.is_empty());
+    // The first acquisition after the gap is itself rejected. A still-held
+    // level after that cannot re-arm the contact.
+    let sample = rig.sample(10_100_001, true, false, 0);
+    assert_eq!(
+        rig.engine
+            .ingest_gpio(10_100_001, sample)
+            .unwrap_err()
+            .fault,
+        ControlFault::Stale
+    );
+    assert!(rig.engine.tick(10_100_001).shutdown_requests.is_empty());
+    for at in (10_150_001..=20_000_001).step_by(50_000) {
+        assert!(
+            acquired(&mut rig, at, true, false)
+                .shutdown_requests
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn reset_overlap_inhibits_the_whole_primary_contact_but_not_the_next_one() {
+    for (primary_end, reset_start, reset_end) in [
+        (12_000_000, 2_000_000, 3_000_000),
+        (12_000_000, 11_100_000, 11_200_000),
+        (12_000_000, 10_900_000, 12_000_000),
+        (6_100_000, 6_100_000, 6_200_000),
+    ] {
+        let mut rig = Rig::new(buttons());
+        rig.engine.set_shutdown(true);
+        for at in (0..=12_500_000).step_by(50_000) {
+            let output = acquired(
+                &mut rig,
+                at,
+                (1_100_000..primary_end).contains(&at),
+                (reset_start..reset_end).contains(&at),
+            );
+            assert!(
+                output.shutdown_requests.is_empty(),
+                "reset overlap must inhibit both held and released requests: {primary_end}/{reset_start}/{reset_end} at {at}"
+            );
+            for event in output.events {
+                event.check().unwrap();
+            }
+        }
+        let mut requests = Vec::new();
+        for at in (12_550_000..=23_500_000).step_by(50_000) {
+            requests.extend(
+                acquired(&mut rig, at, (13_000_000..23_200_000).contains(&at), false)
+                    .shutdown_requests,
+            );
+        }
+        assert_eq!(
+            requests.len(),
+            1,
+            "a new independent contact can request again"
+        );
+        assert_eq!(requests[0].stamp.at_us, 23_000_000);
+    }
+}
+
+#[test]
+fn cancelled_primary_contact_clears_held_state_until_next_press() {
+    for reset_start in [2_000_000, 6_500_000] {
+        let mut rig = Rig::new(buttons());
+        rig.engine.set_shutdown(true);
+        let mut saw_warning = false;
+        for at in (0..=12_500_000).step_by(50_000) {
+            let output = acquired(
+                &mut rig,
+                at,
+                (1_100_000..12_000_000).contains(&at),
+                (reset_start..reset_start + 100_000).contains(&at),
+            );
+            let primary = output
+                .state
+                .sources
+                .iter()
+                .find(|state| state.source == TouchSource::Primary)
+                .unwrap();
+            if at >= reset_start && at < 12_000_000 {
+                assert_eq!(primary.active, Some(true));
+                assert_eq!(
+                    primary.held_us, None,
+                    "a reset-cancelled primary contact must not drive amber, even after reset release at {at}"
+                );
+            } else {
+                saw_warning |= primary
+                    .held_us
+                    .is_some_and(|held| held >= lamp_msgs::SHUTDOWN_HOLD_US);
+            }
+            assert!(output.shutdown_requests.is_empty());
+        }
+        assert_eq!(saw_warning, reset_start > 6_100_000);
+        let mut next_warning = false;
+        let mut requests = Vec::new();
+        for at in (12_550_000..=23_500_000).step_by(50_000) {
+            let output = acquired(&mut rig, at, (13_000_000..23_200_000).contains(&at), false);
+            let primary = output
+                .state
+                .sources
+                .iter()
+                .find(|state| state.source == TouchSource::Primary)
+                .unwrap();
+            next_warning |= primary
+                .held_us
+                .is_some_and(|held| held >= lamp_msgs::SHUTDOWN_HOLD_US);
+            requests.extend(output.shutdown_requests);
+        }
+        assert!(next_warning, "an independent new press can warn again");
+        assert_eq!(requests.len(), 1);
+    }
+}
+
+#[test]
+fn reset_overlap_preserves_primary_hold_state_when_shutdown_is_off() {
+    let mut rig = Rig::new(buttons());
+    rig.engine.set_shutdown(false);
+    acquired(&mut rig, 0, false, false);
+    for at in (50_000..=7_000_000).step_by(50_000) {
+        let output = acquired(&mut rig, at, true, (2_000_000..2_100_000).contains(&at));
+        let primary = output
+            .state
+            .sources
+            .iter()
+            .find(|state| state.source == TouchSource::Primary)
+            .unwrap();
+        assert_eq!(primary.held_us, Some(at - 50_000));
+        assert!(output.shutdown_requests.is_empty());
+    }
+    let output = acquired(&mut rig, 7_000_001, false, false);
+    assert!(
+        output
+            .events
+            .iter()
+            .any(|event| event.source == TouchSource::Primary
+                && event.when_quiet == TouchIntent::SoftwareMute)
+    );
+}
+
+#[test]
+fn a_boot_stuck_refused_reset_line_does_not_disable_primary_shutdown() {
+    let mut rig = Rig::new(buttons());
+    rig.engine.set_shutdown(true);
+    let mut requests = Vec::new();
+    for at in (0..=11_500_000).step_by(50_000) {
+        requests.extend(acquired(&mut rig, at, at >= 1_100_000, true).shutdown_requests);
+    }
+    assert!(rig.engine.reset_refused());
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].stamp.at_us, 11_100_000);
+}
+
+#[test]
+fn pending_primary_shutdown_is_cancelled_by_reset_or_gpio_loss_but_not_strip_loss() {
+    for cause in ["reset", "gpio", "strip", "off"] {
+        let mut rig = before_primary_shutdown_threshold();
+        let sample = rig.sample(10_050_000, true, false, 0);
+        rig.engine.ingest_gpio(10_050_000, sample).unwrap();
+        // No tick has drained/published this threshold request yet.
+        match cause {
+            "reset" => {
+                let sample = rig.sample(10_050_001, true, true, 0);
+                rig.engine.ingest_gpio(10_050_001, sample).unwrap();
+            }
+            "gpio" => rig.engine.gpio_fault(10_050_001, ControlFault::Missing),
+            "strip" => rig.engine.strip_fault(10_050_001, ControlFault::Missing),
+            "off" => rig.engine.set_shutdown(false),
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            rig.engine.tick(10_050_001).shutdown_requests.len(),
+            usize::from(cause == "strip"),
+            "{cause}"
+        );
+    }
+}
+
+#[test]
+fn undrained_primary_shutdown_requests_are_bounded_and_overflow_fails_closed() {
+    let mut rig = Rig::new(buttons());
+    rig.engine.set_shutdown(true);
+    for cycle in 0..=MAX_PENDING_EVENTS as u64 {
+        let base = cycle * 20_100_000;
+        for offset in (0..=20_050_000).step_by(50_000) {
+            let at = base + offset;
+            let sample = rig.sample(at, (50_000..=20_000_000).contains(&offset), false, 0);
+            if let Err(error) = rig.engine.ingest_gpio(at, sample) {
+                assert_eq!(error.fault, ControlFault::Overflow);
+                assert_eq!(cycle, MAX_PENDING_EVENTS as u64);
+                assert!(
+                    rig.engine.tick(at).shutdown_requests.is_empty(),
+                    "overflow cannot deliver old asks"
+                );
+                return;
+            }
+        }
+    }
+    panic!("undrained shutdown requests exceeded the bound");
 }

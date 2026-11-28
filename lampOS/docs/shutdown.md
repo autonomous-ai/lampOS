@@ -1,15 +1,17 @@
 # Turning the lamp off safely (#3697)
 
-Until now the only way to turn a lamp off was to pull the plug, which can
-corrupt the SD card. V1 had a shutdown from the app, from a held button and by
-voice; `v1-verdicts.md` says how to rebuild it: the buttons are needed
-(GO-2.20), a destructive action happens on release by hold time (HAL-5.7), the
-servos are parked before the power goes (HAL-5.18), and the park is V1's order,
-"move to rest over 2 s, wait 0.4 s, then torque off, reporting each joint"
-(HAL-4.12).
+[Tiếng Việt](vi/shutdown_vi.md)
 
-This page is the lamp's side of it. The first change builds the runner and the
-body's let-go; the ways a person asks come after it (below).
+The app, the primary button and the confirmed prepare-unplug skill reach the
+same Setup-owned shutdown runner. With the product's existing shutdown switch
+on, a fresh primary-button contact asks once when it reaches 10 seconds while
+still held (#7943); releasing after 5 s but before 10 s also asks. The button
+never factory resets the lamp.
+
+V1's historical baseline used release time (HAL-5.7) and parked the servos
+before power-off (HAL-5.18, HAL-4.12). The runner below retains lampOS's ordered
+stop, measured let-go and update lock. The held-button change does not replace
+that runner or change deployment defaults.
 
 ## The runner
 
@@ -64,11 +66,11 @@ For the button it is set on three units: Controls
 (`lamp-controls.service`), the voice (`lamp-voice.service`, which hands it to
 its ring worker, and to its provider worker so a model with no
 `prepare_to_unplug` says to turn it off from the app first, #4595, unplug.md) and setup's watcher (`lamp-setup-reset.service`).
-The product leaves it off in all four, those three and `lamp-cloud.service`,
-until the button's 5 to 15 s hold, beside the 2 to 5 s mute on the same
-button, is checked on a product lamp (#3697). The app's Turn off was shown
-on lamp-0c89 (#3698) and was on with it in #4633; it comes back with the
-switch. Setup's
+The product already sets it on in all four readers, including
+`lamp-cloud.service` (#4867, shipped in stable 9528). Earlier releases kept it
+off while the release-triggered button and app paths were qualified; that is
+history, not the current product default. #7943 changes recognition, not units,
+pin mappings or switch defaults. Setup's
 `the_product_sets_the_shutdown_switch_in_every_unit_whose_part_reads_it_or_in_none`
 fails if the product sets it in some of those units and not the others, or
 if a part that reads it has no unit listed.
@@ -98,38 +100,87 @@ root) is the only privileged part that runs, so it is the one that listens.
   loaded (`systemctl show -p LoadState`), when it is logged `already turning
   off`. The watcher keeps no flag of its own: a runner that refused (an update
   installing) or ended without powering off is collected (`--collect`), so
-  the next request, a second hold, starts it again (#3729). A start that
+  the next independent press can start it again (#3729). Controls does not
+  send a second request when the same contact is held longer or released, even
+  after refusal or a failed publication. A start that
   fails is logged, and the reset is still watched.
 
 ## The button held
 
-The primary button (the one whose short press is Stop and whose 2 s hold is
-the mute), released by hold time (HAL-5.7):
+The product primary button is active-low GPIO99 (header pin 35 / PD3). Reset
+is the separate GPIO100 (header pin 37). Controls must first observe a released
+primary button to arm it; a button already held at startup is not a fresh
+press. The following timings are measured from the accepted contact's first
+acquisition, with Controls enabled and its GPIO input valid:
 
-| Held, then released | `LAMP_SHUTDOWN` off | `LAMP_SHUTDOWN=on` |
+| Primary contact | `LAMP_SHUTDOWN` off | `LAMP_SHUTDOWN=on` |
 |---|---|---|
-| under 2 s | Stop | Stop |
-| 2 s to under 5 s | software mute | software mute |
-| 5 s to 15 s | software mute | **turn off**: no mute; one `lamp/shutdown_request` from `button` |
-| over 15 s | software mute | nothing (cancelled, V1's 5 to 10 s window, widened) |
+| Released under 2 s | Stop | Stop |
+| Released from 2 s to under 5 s | software mute | software mute |
+| Released from 5 s to under 10 s | software mute | one shutdown request, no mute |
+| Still held at 10 s | no held action; software mute on release | one shutdown request on the first fresh accepted active GPIO sample at or after 10 s |
+| Held longer or released after that request | software mute on release | no second request; continuing to hold does not cancel a request already sent |
 
-Nothing happens before the release. Controls' touch path publishes the hold
-on `controls/touch` as `TouchIntent::Shutdown` (not retained in
-`controls/touch_state`'s `latest`) and, from an enabled Controls, the request.
-Its legacy engine, which gives the voice its mute in touch mode, asks no mute
-for a hold of 5 s or more with the switch on.
+There is no primary-button cancellation gesture once a fresh contact reaches
+5 s: releasing before 10 s asks for shutdown, and holding to 10 s asks while
+held. Holding past 15 s no longer cancels it. An object that presses the button
+after startup, once the button has armed, can therefore turn the lamp off at
+10 s, once for that contact. If it is still pressed at the next boot, the
+startup-held refusal prevents another request until a release re-arms it.
 
-While the button is held from 5 s to 15 s, the ring shows the warning: the
-whole ring in the setup light's amber (`SetupLook::Failed`, no channel over
-24), steady, in place of its face. The voice's ring worker reads the button's
-held time from `controls/touch_state` (`held_us`, as for the head's
-countdown) and draws through its usual authority: a resting frame only while
-the lamp may listen, so a lamp that is muted shows no warning. Past 15 s the
-warning goes, as the hold no longer asks anything.
+The timer alone cannot extend an old sample into a shutdown. Controls checks
+clock, session, sequence, freshness and the complete GPIO acquisition before
+acting. The pending shutdown queue is bounded to 64 entries
+(`MAX_PENDING_EVENTS`); GPIO faults, invalid input or stale GPIO clear it and
+require the button to re-arm. A fault confined to the optional strip leaves
+healthy primary GPIO independent. Disabled/shadow Controls sends no request.
+The per-contact latch survives draining the queue: a failed publish or a
+runner refusal is not retried by the same hand. Release and a new accepted
+press are needed for another request.
 
-`lamp-setup-reset.service` needs its reset plan to start
-(`ConditionPathExists=/etc/lampOS/setup/reset-plan.json`); without it the
-button's request is not heard.
+A valid, armed reset contact takes precedence over an overlapping primary
+contact. It inhibits that entire primary contact and removes any still-queued
+shutdown request for it, including one queued at the threshold but not yet
+published. Releasing reset first does not re-enable the overlapping primary
+hold. Controls logs the cancellation once per contact and omits that contact's
+`held_us`, so amber stops and stays off after reset is released. A reset input stuck active at boot and refused as unarmed does not
+disable an otherwise healthy primary button. An already published request
+cannot be recalled by a later reset overlap.
+
+### Existing message compatibility
+
+The held action publishes the existing version-1 `lamp/shutdown_request`,
+source `button`, which Setup already accepts. It emits no held `TouchEvent` and
+invents no release timestamp. A genuine release may still publish the old
+`TouchIntent::Shutdown` event within its existing 5–15 s release window; that
+wire schema is unchanged, and the runtime does not turn it into a duplicate
+shutdown request. The legacy primary engine suppresses software mute for
+holds of at least 5 s while the shutdown switch is on.
+
+`TouchOutput`, used by the engine and replay output, gains optional
+`shutdown_requests`: it defaults to an empty list and is omitted when empty.
+The runtime publishes those requests directly. This is an internal/replay
+output field, not a new field on `controls/touch` or a new bus message type.
+
+### Warning and availability
+
+From 5 s, the ring shows steady amber (`SetupLook::Failed`, no channel over
+24) while the primary remains held, including after 10 s and beyond 15 s.
+It reads fresh `held_us` from `controls/touch_state` under the ring's existing
+authority; reset red has priority. A reset-cancelled primary contact has no
+held-duration warning. With the physical privacy slide closed, there is no
+amber: the ring's resting frame requires the microphone to be permitted.
+Release, stale/missing state or revoked output authority removes the
+corresponding warning. Amber is a hold warning,
+not confirmation that Setup accepted shutdown. Green is never a button
+acknowledgement: only the runner's successful measured let-go permits the
+safe-to-unplug green frame.
+
+The normal product Controls and setup watcher require completed setup.
+`lamp-setup-reset.service` also needs
+`/etc/lampOS/setup/reset-plan.json`; without its watcher, a button request has
+no privileged listener. Initial-setup reachability is a separate case. Kept or
+migrated pin files and units are not rewritten by this change.
 
 ## The ways a person asks
 
@@ -149,8 +200,8 @@ button's request is not heard.
    still on is asked again (cloud.md, "The lamp turned off from the app").
    No keeper is needed: a product lamp has none.
 
-2. **The button held**, acting on release by hold time (HAL-5.7), with
-   warning lights while it is held: [The button held](#the-button-held),
+2. **The button held**, asking once at 10 s while held, or on release from
+   5 s to under 10 s, with amber warning from 5 s: [The button held](#the-button-held),
    through [The request](#the-request).
 
 3. **"I'm unplugging you"** (#5763): with `LAMP_UNPLUG=on` and
@@ -169,20 +220,41 @@ Still to come:
 
 The button (and later the voice) asks through [the request](#the-request); every way is behind `LAMP_SHUTDOWN`.
 
-## Not yet seen on a lamp
+## Validation and remaining lamp checks
 
-Host tests only (`lamp-setup`'s `shutdown`, its watcher on a real bus and its
-change helper's answer under a held update lock, `lamp-body`'s let-go against
-simulated servos, `lamp-cloud`'s `system.shutdown` against a stand-in helper
-answering with the helper's own code, Controls' holds of 1, 3, 6 and 20 s with
-the switch on and off, the ring's warning window). Not seen on a lamp: the
-button held 6 s turning a lamp off, the amber while held, and how soon after
-the release the runner starts. On a lamp still to see: the app's `success`
-before the lamp goes down, and the helper's `systemd-run` from its sandboxed
-unit; the rest proof on a standing lamp;
-the let-go's per-joint read-back; whether the ring keeps its frame after the
-poweroff (it does only while the LEDs keep power); whether the servos keep
-power after the board's poweroff; and a clean boot with no filesystem repair.
+**Historical evidence:** #3697 recorded a released 8,668 ms press refused
+under an update, then successful button/app shutdowns and clean boots on
+lamp-52e6, stable 9424, on 2 November. #4867 enabled the product switches in
+stable 9528 using that earlier release-path check. Amber was not captured.
+Those results do not qualify the new 10-second while-held path or current
+factory lamps.
+
+The host regressions cover the fresh held threshold, once-per-contact
+publication, stale/fault rejection and reset overlap. The opt-in
+`primary_held_shutdown_threshold_to_bus_host_latency` test measures a queued
+fresh threshold sample through the real service step, bus receipt and JSON
+parsing, with first use plus 200 repeats. Its targets are p95 ≤50 ms and
+maximum ≤100 ms. This excludes physical acquisition and service-loop
+scheduling; current run results belong in the change's review evidence.
+
+The device target is warning-threshold acquisition → visible amber ≤200 ms;
+it has not been measured. Neither target includes the intentional 10-second
+hold or proves request → runner/speech onset. The existing update-lock wait,
+speech bound, rest and service-stop work remain separate parts of shutdown.
+
+An authorized lamp row must show the actual GPIO99 transition, amber while
+held, one request at about 10 s before release, and no second attempt from
+that contact after release or refusal. Verify the ordinary shorter gestures,
+reset overlap and a fresh subsequent press, including cancelled amber staying
+off after reset release. Include the privacy slide closed (no amber). Under an
+update, amber can remain while the primary stays held, but the shared runner
+must refuse while its lock remains held, with no shutdown effects. Measure
+10 s threshold → first sound or movement; the ring does not change at 10 s,
+so this is the person's first sign that shutdown began. Verify the
+rest/stop/torque-off order, green only after confirmed let-go, and a clean next
+boot with no filesystem repair. Whether LEDs or servos retain power after the
+board powers off must be observed, not inferred. No current lamp, acoustic,
+physical feedback or shipping result is claimed here.
 
 Related: preparing to unplug without turning off (unplug.md), the reset
 (setup.md, "The reset"), the pause (keeper.md).

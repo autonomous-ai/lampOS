@@ -1774,3 +1774,211 @@ fn the_touch_runtimes_state_says_its_monotonic_clock_only_when_its_clock_is_this
         }
     }
 }
+
+/// The real service publishes the old ShutdownRequest wire while the accepted
+/// GPIO contact is still down. The switch lives in a separate test process;
+/// this does not change another parallel test's environment or touch a pin.
+#[test]
+fn primary_button_requests_shutdown_while_still_held() {
+    const CHILD: &str = "LAMP_TEST_PRIMARY_HELD_SHUTDOWN_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "primary_button_requests_shutdown_while_still_held",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD, "1")
+            .env(lamp_msgs::SHUTDOWN_SWITCH, "on")
+            .spawn()
+            .unwrap();
+        let until = std::time::Instant::now() + Duration::from_secs(20);
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(
+                    status.success(),
+                    "held-button service child failed: {status}"
+                );
+                return;
+            }
+            if std::time::Instant::now() >= until {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("held-button service child exceeded 20 seconds");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    let mut rig = Rig::new(true);
+    let mut requests = rig
+        .bus
+        .subscribe(lamp_msgs::ShutdownRequest::TOPIC, "held_test")
+        .unwrap();
+    rig.gpio(0, false, false, false);
+    rig.step(0);
+    for at in (5_000..50_000).step_by(5_000) {
+        rig.gpio(at, false, false, false);
+        rig.step(at);
+    }
+    for at in (50_000..10_050_000).step_by(5_000) {
+        rig.gpio(at, true, false, false);
+        assert!(
+            rig.step(at).events.is_empty(),
+            "a held contact is not a released touch event"
+        );
+        assert!(
+            requests.recv(Duration::ZERO).unwrap().is_none(),
+            "no early shutdown request"
+        );
+    }
+    rig.gpio(10_049_999, true, false, false);
+    rig.step(10_049_999);
+    assert!(requests.recv(Duration::ZERO).unwrap().is_none());
+    rig.gpio(10_050_000, true, false, false);
+    assert!(
+        rig.step(10_050_000).events.is_empty(),
+        "do not invent a release or change TouchEvent wire"
+    );
+    let message = requests
+        .recv(Duration::from_millis(100))
+        .unwrap()
+        .expect("shutdown must be requested at ten seconds before release");
+    let request: lamp_msgs::ShutdownRequest = message.parse().unwrap();
+    assert_eq!(request.source, lamp_msgs::ShutdownSource::Button);
+    request.accept("controls", CLOCK, 10_050_000).unwrap();
+    for at in (10_055_000..11_050_000).step_by(5_000) {
+        rig.gpio(at, true, false, false);
+        rig.step(at);
+    }
+    rig.gpio(11_050_000, false, false, false);
+    let output = rig.step(11_050_000);
+    for event in output.events {
+        event.check().unwrap();
+    }
+    assert!(
+        requests.recv(Duration::ZERO).unwrap().is_none(),
+        "same contact must not retry shutdown on release"
+    );
+}
+
+/// Host timing only: a fresh threshold GPIO sample is already queued before
+/// timing the real service step through bus receipt and JSON parsing. The
+/// simulated 5 ms acquisitions preserve freshness without sleeping ten seconds;
+/// this excludes physical GPIO, the service loop's scheduling, Setup and LEDs.
+#[test]
+#[ignore = "host latency measurement: first contact plus 200 repeats in an isolated child"]
+fn primary_held_shutdown_threshold_to_bus_host_latency() {
+    const CHILD: &str = "LAMP_TEST_PRIMARY_HELD_SHUTDOWN_LATENCY_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "primary_held_shutdown_threshold_to_bus_host_latency",
+                "--ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD, "1")
+            .env(lamp_msgs::SHUTDOWN_SWITCH, "on")
+            .spawn()
+            .unwrap();
+        let until = std::time::Instant::now() + Duration::from_secs(180);
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(
+                    status.success(),
+                    "held-button latency child failed: {status}"
+                );
+                return;
+            }
+            if std::time::Instant::now() >= until {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("held-button latency child exceeded 180 seconds");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    let mut rig = Rig::with(
+        true,
+        TouchPinsConfig {
+            every_ms: 5,
+            ..wiring()
+        },
+    );
+    let mut requests = rig
+        .bus
+        .subscribe(lamp_msgs::ShutdownRequest::TOPIC, "held_latency")
+        .unwrap();
+    rig.gpio(0, false, false, false);
+    rig.step(0);
+    let mut elapsed_us = Vec::with_capacity(201);
+    let mut pressed_at = 5_000;
+    for contact in 0..201 {
+        let threshold_at = pressed_at + 10_000_000;
+        for at in (pressed_at..threshold_at).step_by(5_000) {
+            rig.gpio(at, true, false, false);
+            assert!(rig.step(at).events.is_empty(), "contact {contact}");
+        }
+        assert!(
+            requests.recv(Duration::ZERO).unwrap().is_none(),
+            "contact {contact}: no request before the threshold"
+        );
+        rig.gpio(threshold_at, true, false, false);
+        let started = std::time::Instant::now();
+        let output = rig.service.step(|| threshold_at);
+        let message = requests
+            .recv(Duration::from_millis(100))
+            .unwrap()
+            .expect("held threshold must publish through the real service bus");
+        let request: lamp_msgs::ShutdownRequest = message.parse().unwrap();
+        elapsed_us.push(started.elapsed().as_micros());
+
+        assert!(output.events.is_empty(), "no invented release: {contact}");
+        output.state.check().unwrap();
+        assert_eq!(request.source, lamp_msgs::ShutdownSource::Button);
+        assert_eq!(request.stamp.at_us, threshold_at);
+        request.accept("controls", CLOCK, threshold_at).unwrap();
+        let released_at = threshold_at + 5_000;
+        rig.gpio(released_at, false, false, false);
+        rig.step(released_at);
+        assert!(
+            requests.recv(Duration::ZERO).unwrap().is_none(),
+            "contact {contact}: release must not retry"
+        );
+        pressed_at = released_at + 5_000;
+    }
+
+    let first = elapsed_us[0];
+    let mut repeated = elapsed_us[1..].to_vec();
+    repeated.sort_unstable();
+    let p50 = repeated[99];
+    let p95 = repeated[189];
+    let max = *elapsed_us.iter().max().unwrap();
+    println!(
+        "{}",
+        serde_json::json!({
+            "boundary": "fresh threshold GPIO sample already queued -> real Service::step -> bus recv and JSON parse",
+            "excludes": "GPIO acquisition, service-loop scheduling, intentional 10 s hold, Setup runner, acoustic and physical LED feedback",
+            "synthetic_gpio_step_us": 5_000,
+            "count": elapsed_us.len(),
+            "first_us": first,
+            "repeated_count": repeated.len(),
+            "repeated_p50_us": p50,
+            "repeated_p95_us": p95,
+            "repeated_max_us": repeated[199],
+            "max_us": max,
+            "p95_target_us": 50_000,
+            "max_target_us": 100_000,
+            "hardware_measured": false
+        })
+    );
+    assert!(
+        p95 <= 50_000,
+        "held-button host p95 exceeded 50 ms: {p95} us"
+    );
+    assert!(
+        max <= 100_000,
+        "held-button host maximum exceeded 100 ms: {max} us"
+    );
+}
