@@ -9,7 +9,7 @@ use zune_jpeg::{
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 256;
 /// The largest frame decoded at all, either way.
-const MAX_SIDE: usize = 4_096;
+pub(crate) const MAX_SIDE: usize = 4_096;
 
 /// Blue, green and red planes of `WIDTH` by `HEIGHT`, each value 0 to 255,
 /// with the frame in the top left corner and the rest black.
@@ -90,7 +90,7 @@ pub struct Frame {
 }
 
 /// How much a frame this size is shrunk to fit, never enlarged.
-fn fit_scale(width: usize, height: usize) -> f32 {
+pub(crate) fn fit_scale(width: usize, height: usize) -> f32 {
     (WIDTH as f32 / width as f32)
         .min(HEIGHT as f32 / height as f32)
         .min(1.0)
