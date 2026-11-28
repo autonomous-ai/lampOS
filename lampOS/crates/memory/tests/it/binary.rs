@@ -121,6 +121,21 @@ impl Process {
         }
     }
 
+    /// Its log once it says `said`, or as it is after [`LOG_WAIT`]. A line
+    /// reaches the file through the process's log relay
+    /// (`lamp_ipc::log_relay`), a moment after it is written, so an answer
+    /// on the socket can come before it.
+    fn log_saying(&self, said: &str) -> String {
+        let started = Instant::now();
+        loop {
+            let log = fs::read_to_string(&self.log).unwrap();
+            if log.contains(said) || started.elapsed() >= LOG_WAIT {
+                return log;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     /// A reply follows the request log's submission to the relay, not its
     /// delivery. Observe the final complete record before killing the relay
     /// with the process. The caller still reads the whole file after the kill.
@@ -632,7 +647,7 @@ fn a_forget_socket_that_cant_be_made_leaves_memory_serving() {
     );
     assert_eq!(status["ok"], true, "{status}");
     assert!(!Path::new(&narrow).exists());
-    let log = fs::read_to_string(&process.log).unwrap();
+    let log = process.log_saying("lamp-memory: the forget socket is not open:");
     assert!(
         log.contains("lamp-memory: the forget socket is not open:"),
         "{log}"
