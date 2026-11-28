@@ -51,6 +51,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub(crate) mod caller_match;
+
 /// Where the same-voice check's journal lines go: stderr on a lamp. A test
 /// may take them instead, to see each one said (#1444).
 pub type Journal = Arc<dyn Fn(&str) + Send + Sync>;
@@ -678,6 +680,10 @@ struct Clip {
 /// follows them.
 pub struct Voices<P: Printer> {
     printer: P,
+    caller_match: Option<caller_match::CallerMatch>,
+    // A sensor look may read a ready result before the existing judges
+    // look. Deliver it to them in order, only at their original poll.
+    observed: VecDeque<(u64, Result<Vec<f32>, String>)>,
     /// The line being heard while its first samples are gathered, until
     /// they are asked for or it ends.
     clip: Option<Clip>,
@@ -930,6 +936,8 @@ impl<P: Printer> Voices<P> {
     pub fn new(printer: P) -> Self {
         Self {
             printer,
+            caller_match: None,
+            observed: VecDeque::new(),
             clip: None,
             asked: VecDeque::new(),
             prints: VecDeque::new(),
@@ -947,6 +955,28 @@ impl<P: Printer> Voices<P> {
             asks_while: None,
             confirm_only: false,
         }
+    }
+
+    /// The existing turn-taking printer also measures the opening caller.
+    pub(crate) fn matching_the_caller(&mut self) -> bool {
+        if !self.confirm_only {
+            self.caller_match = caller_match::CallerMatch::journaled();
+        }
+        self.caller_match.is_some()
+    }
+
+    /// Drain only already-available answers. A disabled trial does no extra work.
+    pub(crate) fn caller_match(&mut self) -> Option<&mut caller_match::CallerMatch> {
+        self.caller_match
+            .as_mut()?
+            .maintain(caller_match::monotonic_us());
+        while self.observed.len() < KEPT {
+            let Some(answer) = self.next_print() else {
+                break;
+            };
+            self.observed.push_back(answer);
+        }
+        self.caller_match.as_mut()
     }
 
     /// A line is asked for its print only while `open` says yes, as its
@@ -1047,6 +1077,9 @@ impl<P: Printer> Voices<P> {
     /// The line `request` began; it is judged only if it was said with the
     /// lamp quiet (`judged`).
     pub fn began(&mut self, request: u64, judged: bool) {
+        if let Some(sensor) = &mut self.caller_match {
+            sensor.began(request, judged, caller_match::monotonic_us());
+        }
         self.clip = judged.then(|| Clip {
             request,
             samples: Vec::with_capacity(ASKED_AT),
@@ -1069,6 +1102,10 @@ impl<P: Printer> Voices<P> {
     /// The line `request` ended: what was heard of it is asked for if it is
     /// long enough to know.
     pub fn ended(&mut self, request: u64) {
+        if let Some(sensor) = &mut self.caller_match {
+            sensor.ended(request, caller_match::monotonic_us());
+            let _ = self.caller_match();
+        }
         match &self.clip {
             Some(clip) if clip.request == request && clip.samples.len() >= LEAST_SAMPLES => {
                 self.ask()
@@ -1090,6 +1127,9 @@ impl<P: Printer> Voices<P> {
             return;
         }
         if self.printer.ask(clip.request, &clip.samples) {
+            if let Some(sensor) = &mut self.caller_match {
+                sensor.submitted(clip.request, caller_match::monotonic_us());
+            }
             if self.asked.len() == KEPT {
                 self.asked.pop_front();
             }
@@ -1121,8 +1161,22 @@ impl<P: Printer> Voices<P> {
         }
     }
 
+    fn next_print(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+        let (request, answer) = self.printer.answer()?;
+        if self.caller_match.is_some()
+            && let Ok(print) = &answer
+            && self
+                .usable_speech(request)
+                .is_some_and(|n| n >= LEAST_SAMPLES)
+            && let Some(sensor) = &mut self.caller_match
+        {
+            sensor.received(request, print, caller_match::monotonic_us());
+        }
+        Some((request, answer))
+    }
+
     fn poll(&mut self) {
-        while let Some((request, print)) = self.printer.answer() {
+        while let Some((request, print)) = self.observed.pop_front().or_else(|| self.next_print()) {
             self.asked.retain(|asked| *asked != request);
             match print {
                 Ok(print) => {
@@ -1494,6 +1548,29 @@ mod tests {
             voices.heard(request, &[voice; 320]);
         }
         voices.ended(request);
+    }
+
+    #[test]
+    fn caller_match_observation_preserves_the_existing_print_consumers_order_and_timing() {
+        let mut voices = Voices::new(StandIn::default());
+        assert!(voices.matching_the_caller());
+        said(&mut voices, 1, 1, ASKED_AT);
+        said(&mut voices, 2, -1, ASKED_AT);
+        let _ = voices.caller_match();
+        assert!(
+            voices.prints.is_empty(),
+            "the ordinary judge has not polled yet"
+        );
+        assert_eq!(voices.observed.len(), 2);
+        assert_eq!(voices.asked, [1, 2]);
+        assert_eq!(voices.print_of(2), Some(vec![0., 1., 0.]));
+        assert_eq!(voices.print_of(1), Some(vec![1., 0., 0.]));
+        assert!(voices.asked.is_empty());
+        assert!(voices.observed.is_empty());
+        assert_eq!(
+            voices.prints.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
+            [1, 2]
+        );
     }
 
     /// #829, lamp-4ace on 18 October: a line's print is on its way while

@@ -3563,6 +3563,7 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
         // With no face seen, the caller's follow-up only in their own voice.
         crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT,
+        crate::same_voice::caller_match::SWITCH,
         // Held desk talk makes a busy room (#7332).
         crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
         crate::speaking_faces::ENVIRONMENT,
@@ -3980,6 +3981,7 @@ mod tests {
             crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT,
             crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT,
             crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT,
+            crate::same_voice::caller_match::SWITCH,
             crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT,
             crate::speaking_faces::ENVIRONMENT,
             crate::speaking_faces::EYES_ENVIRONMENT,
@@ -5305,6 +5307,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_FOLLOW_UP_RENEWS_ENVIRONMENT
                     || name == crate::second_provider::BUSY_NO_FACE_RENEWS_ENVIRONMENT
                     || name == crate::second_provider::NO_FACE_FOLLOW_UP_BY_VOICE_ENVIRONMENT
+                    || name == crate::same_voice::caller_match::SWITCH
                     || name == crate::second_provider::ROOM_HELD_TALK_ENVIRONMENT
                     || name == crate::speaking_faces::ENVIRONMENT
                     || name == crate::speaking_faces::EYES_ENVIRONMENT
@@ -5469,6 +5472,7 @@ mod tests {
                     "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FOLLOW_UPS=on",
                     "LAMP_FOLLOW_UPS_AFTER_THE_ANSWER=on",
+                    "LAMP_FOLLOW_UP_CALLER_MATCH=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_HARD_ASKS_TO_AGENT=on",

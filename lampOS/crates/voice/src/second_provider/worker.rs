@@ -2387,7 +2387,9 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
 /// batch retire before any summary or confirmation lock can delay cleanup.
 fn forget_pending(forgot: &mut crate::bus_out::ForgotIn, now_us: u64) -> Vec<Option<String>> {
     let forgotten = forgot.forgotten(now_us);
-    crate::conversation_summary::memory_forgotten_waiting(&forgotten);
+    if crate::conversation_summary::memory_forgotten_waiting(&forgotten) > 0 {
+        crate::same_voice::caller_match::forgotten();
+    }
     forgotten
 }
 
@@ -2429,11 +2431,15 @@ fn forget_received(
 /// the reactor, the thread and notes with the summary on, the waiting write
 /// alone with it off (Jarvis's finding on #6397 at `00a3aebe7e`).
 fn forget_inline(forgot: &mut crate::bus_out::ForgotIn, now_us: u64, summary: bool) -> usize {
-    if summary {
+    let count = if summary {
         crate::conversation_summary::memory_forgot(forgot, now_us)
     } else {
         crate::conversation_summary::memory_forgot_waiting(forgot, now_us)
+    };
+    if count > 0 {
+        crate::same_voice::caller_match::forgotten();
     }
+    count
 }
 
 /// Only with the owner voice: keep one subscriber and await at most one
@@ -6166,6 +6172,9 @@ pub fn serve(
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.hearing_only_said_to_me();
                 heeding.opening_the_eyes(files.bus_root.as_deref());
+                if std::env::var(crate::same_voice::caller_match::SWITCH).is_ok_and(|v| v == "on") {
+                    heeding.match_the_caller();
+                }
             }
             // Only the first line soon after the lamp's question skips its
             // look (`LAMP_ASKED_LOOKS=on`, #8395).
@@ -6622,6 +6631,24 @@ pub fn serve(
         // check runs (`LAMP_CONVERSATION_CARRIED_MEMORY`, Jarvis's P2 on
         // #5842): without it no other voice could ever show.
         engine = engine.reading_carried_where_heard(shows_another);
+        if heeding.lock().is_ok_and(|h| h.matching_caller) {
+            // Observe available prints between line end and admission and
+            // expire RAM even when the room falls silent. Reuse the room tick.
+            let matching = heeding.clone();
+            let mut prior = engine.room_tick.take();
+            let mut next = 0;
+            engine = engine.keeping_room(Box::new(move |now| {
+                if let Some(tick) = &mut prior {
+                    tick(now);
+                }
+                if now >= next {
+                    next = now.saturating_add(20_000);
+                    if let Ok(mut h) = matching.try_lock() {
+                        let _ = h.caller_match();
+                    }
+                }
+            }));
+        }
         remarked_by = Some(heeding.clone());
         // A line begun in a computer's turn is a call, as on the Live route.
         let opening = heeding.clone();
@@ -8934,6 +8961,7 @@ pub(crate) struct Heeding {
     /// `LAMP_JOIN_SAME_VOICE=on` (#8003, [`Self::joining_by_the_services_prints`]):
     /// the join reads [`Self::for_services`] too.
     join_reads_services_prints: bool,
+    matching_caller: bool,
     /// [`Self::for_services`] holds the join's prints alone
     /// ([`Self::checking_the_voice_for_the_join`]).
     join_prints_only: bool,
@@ -10282,6 +10310,7 @@ impl Heeding {
             for_services: None,
             services_linked: None,
             join_reads_services_prints: false,
+            matching_caller: false,
             join_prints_only: false,
             voice_ends_going_on: false,
             named_always: false,
@@ -11653,6 +11682,19 @@ impl Heeding {
         }
     }
 
+    fn match_the_caller(&mut self) {
+        self.matching_caller = self
+            .join_voices()
+            .is_some_and(|voices| voices.matching_the_caller());
+    }
+
+    fn caller_match(&mut self) -> Option<&mut crate::same_voice::caller_match::CallerMatch> {
+        if !self.matching_caller {
+            return None;
+        }
+        self.join_voices()?.caller_match()
+    }
+
     /// The prints the join reads ([`Self::same_speaker`]): those for every
     /// rule, else, with `LAMP_JOIN_SAME_VOICE`, the services' or its own.
     fn join_voices(
@@ -12008,6 +12050,9 @@ impl Heeding {
     /// unmuted ([`Gate::install`]): the caller's face ids and the eyes'
     /// looks go, so no passing id outlives a privacy change.
     pub(crate) fn privacy_changed(&mut self) {
+        if let Some(sensor) = self.caller_match() {
+            sensor.reset();
+        }
         self.caller_faces.clear();
         self.caller_faces_from_call = false;
         // No line's words are kept past it for a repeat
@@ -12313,6 +12358,21 @@ impl Heeding {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
             crate::second_provider::Did::Said(request, until_us) => {
+                if self.matching_caller {
+                    // A late caller match can only tie this admitted line's actual
+                    // answer to the conversation. Each other reason in chain stands.
+                    let renews = !self.chain.contains(&request);
+                    let untied_only = !renews
+                        && self.chain_untied.contains(&request)
+                        && self.someone_elses_line != Some(request)
+                        && self.no_look_answer != Some(request);
+                    if let Some(sensor) = self.caller_match()
+                        && sensor.answered(request, until_us, monotonic_us(), renews, untied_only)
+                    {
+                        self.chain.retain(|id| *id != request);
+                        self.chain_untied.retain(|id| *id != request);
+                    }
+                }
                 // `LAMP_ONE_REPLY_WINDOW`: its news's reply window from its end.
                 self.attention.lamp_words_until(until_us);
                 if self.carries && self.carrying && !self.chain.contains(&request) {
@@ -12345,6 +12405,9 @@ impl Heeding {
             // conversation with the lamp (#3945). An older one, with a newer
             // let out since, is left as it stands.
             crate::second_provider::Did::Declined(request) => {
+                if let Some(sensor) = self.caller_match() {
+                    sensor.declined(request);
+                }
                 if let Some(before) = self
                     .before_let_out
                     .take_if(|before| self.decline_silent && before.request == request)
@@ -12368,6 +12431,9 @@ impl Heeding {
             // `LAMP_SAME_SPEAKER_CARRIES`: a stop ends the conversation
             // carried.
             crate::second_provider::Did::Stopped => {
+                if let Some(sensor) = self.caller_match() {
+                    sensor.reset();
+                }
                 self.carrying = false;
                 self.carry_window.clear();
                 self.held_colleagues.clear();
@@ -12591,6 +12657,23 @@ impl Heeding {
         self.keep_the_name_in_its_line(request, said, &mut signs);
         self.silence_turned(request, said, heard, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
+        if self.matching_caller {
+            // A spoken call admitted in its own right supplies the reference.
+            // Continued words from a cut line cannot replace the opening caller.
+            let opens = verdict.is_none()
+                && self.by_name == Some(request)
+                && signs.continues_from.is_none()
+                && !self.attention.tapped()
+                && !self.attention.ruled_not_the_name()
+                && !crate::said_to_me::yes_awaited();
+            if let Some(sensor) = self.caller_match() {
+                if opens {
+                    sensor.opened(request);
+                } else {
+                    sensor.admitted(request, verdict.is_none());
+                }
+            }
+        }
         self.held_since_start_by(verdict, heard);
         if self.said_lately.len() == SAID_KEPT {
             self.said_lately.pop_front();
@@ -12872,7 +12955,31 @@ impl Heeding {
             self.second_voice_at = Some(said.1);
         }
         let going_on = signs.going_on;
-        let decision = crate::said_to_me::judge(line);
+        use crate::said_to_me::{Held, Said};
+        let mut decision = crate::said_to_me::judge(line);
+        let mut helped = false;
+        if going_on
+            && decision != Said::Stands
+            && let Some(sensor) = self.caller_match()
+            && !crate::said_to_me::yes_awaited()
+            && !crate::services::plain_yes(heard)
+            && !crate::services::plain_no(heard)
+            && !line.question_waits
+            && !crate::spoken_stop::is_stop_request(heard)
+            && sensor.admission(request, said)
+            && matches!(
+                decision,
+                Said::Held(
+                    Held::NoLook
+                        | Held::NotSeenSpeaking
+                        | Held::NotFacingInConversation
+                        | Held::AwayInConversation
+                )
+            )
+        {
+            decision = Said::FollowUp;
+            helped = true;
+        }
         if going_on && over_held {
             let tie = if cut_in_tied {
                 "its words tie it to the conversation, so with no look it may still be let out"
@@ -12924,7 +13031,7 @@ impl Heeding {
         // Every decision journaled with the pose, for a row to count
         // (#7721); the held line as before, the pose after it.
         let crate::said_to_me::Said::Held(held) = decision else {
-            if decision != crate::said_to_me::Said::Stands {
+            if decision != crate::said_to_me::Said::Stands && !helped {
                 self.called(request);
             }
             eprintln!(
@@ -13032,6 +13139,15 @@ impl Heeding {
         } else {
             self.said_until_us
         };
+        if self.matching_caller {
+            let session_changed = self
+                .session_for
+                .as_ref()
+                .is_some_and(|before| before != &person);
+            if let Some(sensor) = self.caller_match() {
+                sensor.check_scope(session_changed, closed_at, said_ago.is_some());
+            }
+        }
         // A new person at the lamp begins a new session, as on Live.
         if self.session_for.as_ref() != Some(&person) {
             if self.session_for.is_some() {
@@ -32112,6 +32228,220 @@ mod tests {
             eyes.look(
                 now + Duration::from_millis(from_ms + index as u64 * 400),
                 Some((("b", *seq), &faces)),
+            );
+        }
+    }
+
+    struct CallerMatchPrints {
+        pending: Option<(u64, Vec<f32>)>,
+        release: Arc<std::sync::atomic::AtomicBool>,
+    }
+
+    impl crate::same_voice::Printer for CallerMatchPrints {
+        fn ask(&mut self, id: u64, samples: &[i16]) -> bool {
+            let score = f32::from(samples[0]) / 100.0;
+            self.pending = Some((id, vec![score, (1.0 - score * score).sqrt()]));
+            true
+        }
+        fn answer(&mut self) -> Option<(u64, Result<Vec<f32>, String>)> {
+            if self.release.load(std::sync::atomic::Ordering::Acquire) {
+                self.pending.take().map(|(id, v)| (id, Ok(v)))
+            } else {
+                None
+            }
+        }
+    }
+
+    fn caller_match_line(h: &mut super::Heeding, id: u64, value: i16, size: usize) {
+        use crate::second_provider::Heard;
+        h.hear(
+            id,
+            Heard::Began {
+                over_the_lamps_voice: false,
+            },
+        );
+        h.hear(id, Heard::Samples(&vec![value; size]));
+        h.hear(id, Heard::Ended);
+    }
+
+    fn caller_match_worker(
+        sensor_on: bool,
+    ) -> (super::Heeding, Arc<std::sync::atomic::AtomicBool>) {
+        let release = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let mut h = product_heeding(Arc::default());
+        h.attention.tie_the_second_sign(true);
+        h.checking_the_voice_for_the_join(Box::new(CallerMatchPrints {
+            pending: None,
+            release: release.clone(),
+        }));
+        if sensor_on {
+            h.match_the_caller();
+        }
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        let now = monotonic_us();
+        caller_match_line(&mut h, 1, 100, crate::same_voice::ASKED_AT);
+        let call = "Hey Lamp, what is nine times eight?";
+        assert!(h.heed(1, (now - 1_800_000, now), call, None).is_none());
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person(call, true, Instant::now());
+            thread.lamp(1, "Seventy-two.", Instant::now());
+        }
+        h.lamp_did(crate::second_provider::Did::Said(1, now));
+        crate::scenario_clock::elapse_in_pass(Duration::from_secs(15)).unwrap();
+        (h, release)
+    }
+
+    #[test]
+    fn caller_match_worker_helps_only_an_ordinary_line_with_a_timely_print() {
+        use crate::same_voice::ASKED_AT;
+        let _one = crate::provider_worker::tests::one_thread();
+        let run = |sensor_on: bool, score: i16, samples: usize, waiting: bool, words: &str| {
+            let _clock = clock_with_history();
+            let (mut h, _) = caller_match_worker(sensor_on);
+            caller_match_line(&mut h, 2, score, samples);
+            let end = monotonic_us();
+            let held = crate::said_to_me::awaiting_yes(waiting, || {
+                h.heed(2, (end - 1_800_000, end), words, None)
+            });
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            held
+        };
+        let words = "And times two?";
+        let baseline = run(false, 100, ASKED_AT, false, words);
+        assert!(baseline.is_some(), "no look, ordinary window pass disabled");
+        assert_eq!(
+            run(true, 100, ASKED_AT, false, words),
+            None,
+            "positive help"
+        );
+        assert_eq!(run(true, 26, ASKED_AT, false, words), baseline);
+        assert_eq!(
+            run(true, 100, crate::same_voice::LEAST_SAMPLES, false, words),
+            baseline
+        );
+        for words in ["Yes.", "No.", "Yes, please go ahead."] {
+            assert_eq!(
+                run(true, 100, ASKED_AT, true, words),
+                run(false, 100, ASKED_AT, true, words)
+            );
+            assert_eq!(
+                run(true, 100, ASKED_AT, false, words),
+                run(false, 100, ASKED_AT, false, words)
+            );
+        }
+    }
+
+    #[test]
+    fn caller_match_worker_late_print_can_only_renew_a_spoken_untied_line() {
+        use std::sync::atomic::Ordering;
+        let _one = crate::provider_worker::tests::one_thread();
+        for (enabled, score, renewed) in [(true, 100, true), (true, 26, false), (false, 100, false)]
+        {
+            let _clock = clock_with_history();
+            let (mut h, ready) = caller_match_worker(enabled);
+            h.taking_follow_ups();
+            h.not_renewing_untied();
+            ready.store(false, Ordering::Release);
+            caller_match_line(&mut h, 2, score, crate::same_voice::ASKED_AT);
+            let end = monotonic_us();
+            let words = "The pencils are in the drawer.";
+            assert!(h.heed(2, (end - 1_800_000, end), words, None).is_none());
+            assert!(
+                h.chain_untied.contains(&2),
+                "ordinary line admitted without a print"
+            );
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(200)).unwrap();
+            ready.store(true, Ordering::Release);
+            let played = monotonic_us();
+            h.lamp_did(crate::second_provider::Did::Said(2, played));
+            assert_eq!(h.said_until_free_us == Some(played), renewed);
+            assert_eq!(h.chain.contains(&2), !renewed);
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        }
+    }
+
+    #[test]
+    fn caller_match_worker_window_crossing_keeps_the_line_that_started_in_time() {
+        use crate::second_provider::Heard;
+        let _one = crate::provider_worker::tests::one_thread();
+        for (start_after_answer_ms, helps) in [(19_000, true), (20_001, false)] {
+            let _clock = clock_with_history();
+            let (mut h, _) = caller_match_worker(true);
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(
+                start_after_answer_ms - 15_000,
+            ))
+            .unwrap();
+            let start = monotonic_us();
+            h.hear(
+                2,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(1_001)).unwrap();
+            let _ = h.caller_match(); // Regular room tick while the person is still speaking.
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(999)).unwrap();
+            h.hear(2, Heard::Samples(&vec![100; crate::same_voice::ASKED_AT]));
+            h.hear(2, Heard::Ended);
+            let verdict = h.heed(2, (start, monotonic_us()), "And times two?", None);
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            assert_eq!(
+                verdict.is_none(),
+                helps,
+                "start {start_after_answer_ms} ms after the answer"
+            );
+        }
+    }
+
+    #[test]
+    fn caller_match_worker_window_crossing_keeps_first_playback_of_an_admitted_line() {
+        use crate::second_provider::{Did, Heard};
+        use std::sync::atomic::Ordering;
+        let _one = crate::provider_worker::tests::one_thread();
+        for (playback_delay_ms, renews) in [(900, true), (1100, true), (20_001, false)] {
+            let _clock = clock_with_history();
+            let (mut h, ready) = caller_match_worker(true);
+            h.taking_follow_ups();
+            h.not_renewing_untied();
+            ready.store(false, Ordering::Release);
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(2200)).unwrap();
+            let start = monotonic_us();
+            h.hear(
+                2,
+                Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(1800)).unwrap();
+            h.hear(2, Heard::Samples(&vec![100; crate::same_voice::ASKED_AT]));
+            h.hear(2, Heard::Ended);
+            assert!(
+                h.heed(
+                    2,
+                    (start, monotonic_us()),
+                    "The pencils are in the drawer.",
+                    None
+                )
+                .is_none()
+            );
+            assert!(h.chain_untied.contains(&2));
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(200)).unwrap();
+            ready.store(true, Ordering::Release);
+            let _ = h.caller_match();
+            crate::scenario_clock::elapse_in_pass(Duration::from_millis(playback_delay_ms - 200))
+                .unwrap();
+            let played = monotonic_us();
+            h.lamp_did(Did::Said(2, played));
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            assert_eq!(
+                h.said_until_free_us == Some(played),
+                renews,
+                "first playback after {playback_delay_ms} ms"
             );
         }
     }
