@@ -14,6 +14,11 @@ qualify the reset voice policy. The current rubric is **v2**,
 `sensor-team-2026-11-27-v2`. Use the [v2 adapter guide](adapter-v2.md) and
 [EVAL template](eval-template.md). V1 examples below are historical only.
 
+The [28 November lamp-channel register](../../docs/sensor-collection-20261128.md)
+defines the paired recording intake and separate call/self-wake/interruption
+views. Preserve each source clip's lineage; overlap alone is not an interrupt
+label, and a recorded replay cannot establish a physical audible stop.
+
 ## Build and check
 
 ```sh

@@ -48,6 +48,11 @@ also contain README and SHA256SUMS; all outputs refuse overwrite.
 
 ## One shared collection
 
+The [28 November lamp-channel register](sensor-collection-20261128.md)
+adds paired over-lamp-speech and clean development recordings, with explicit
+call, self-wake and interruption labels and limits. It does not replace the
+real-person collection below or change the qualification bars.
+
 Freeze the scorer source/binary, model, thresholds, scripts, eligibility and
 split before holdout capture. Freeze adjudicated labels before viewing
 predictions. Development people and sessions are disjoint from holdout.
