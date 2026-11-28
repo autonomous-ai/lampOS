@@ -48,16 +48,22 @@ pub const UNREACHED: &str = "making a skill can't be reached on the lamp now";
 /// request (`lamp_voice::made_skill::MOST_REQUEST_CHARS`, held equal by a
 /// test). 480 bytes from 6 Nov (180 before); 2,000 bytes since 18 Nov,
 /// when a Vietnamese request, 2 or 3 bytes a letter, was still cut at 160
-/// to 240 letters; 2,000 characters since 19 Nov (#7245), so Vietnamese is
-/// as long as English. `system.info` tells the app this bound
-/// ([`MOST_CHARS_FIELD`]). Past it the app is told [`past_most_words`].
-pub const MOST_WORDS_CHARS: usize = 2_000;
+/// to 240 letters; 2,000 characters from 19 Nov (#7245), so Vietnamese is
+/// as long as English; 7,500 since 25 Nov (#8630): the lamp's one large
+/// safety bound, sized to the agent's 48 KiB make rules with the request
+/// at four bytes a letter (the arithmetic is at the voice's constant),
+/// not a number a person meets in normal use. `system.info` tells the app
+/// this bound ([`MOST_CHARS_FIELD`]), and the app follows it with no
+/// counter and no cap of its own. Past it the app is told
+/// [`past_most_words`].
+pub const MOST_WORDS_CHARS: usize = 7_500;
 
 /// [`MOST_WORDS_CHARS`] in bytes at most, four a letter
 /// (`lamp_voice::made_skill::MOST_REQUEST_BYTES`): no check of its own,
 /// the characters bound it. Said as [`MOST_WORDS_FIELD`] for an app that
-/// still counts bytes; the app holds its box to at most 2,000 of them
-/// whatever a lamp says, so that app is never refused for its length.
+/// still counts bytes (one from before #7245 holds its box to at most
+/// 2,000 of them whatever a lamp says, so it is never refused for its
+/// length).
 pub const MOST_WORDS_BYTES: usize = 4 * MOST_WORDS_CHARS;
 
 /// `system.info`'s field for [`MOST_WORDS_BYTES`], there only while
@@ -71,10 +77,14 @@ pub const MOST_WORDS_FIELD: &str = "make_skill_most_bytes";
 /// letters.
 pub const MOST_CHARS_FIELD: &str = "make_skill_most_chars";
 
-/// What the app is told of words past [`MOST_WORDS_CHARS`]: the bound in
-/// plain digits.
+/// What the app is told of words past [`MOST_WORDS_CHARS`]: plainly, with
+/// no number (#8630: the person meets no visible limit), never in silence.
+/// A fallback the app normally never shows: it reads the bound from
+/// `system.info` and tells the person in their own language before it
+/// sends anything (Mobile, 17:00 on #8630), so this English line reaches
+/// only an app that sends past the bound anyway.
 pub fn past_most_words() -> String {
-    format!("what the skill should do is at most {MOST_WORDS_CHARS} characters")
+    "what the skill should do is too long for the lamp to make as one skill: shorten it".to_owned()
 }
 
 /// How often lamp-cloud asks lamp-voice whether making a skill is ready
@@ -602,37 +612,46 @@ mod tests {
     }
 
     /// 19 Nov (#7245): the app's words are counted in characters,
-    /// lamp-voice's own bound for a skill's request, 2,000 of them, so a
-    /// Vietnamese ask is as long as an English one; in bytes, four a letter
-    /// at most, for an app that still counts bytes.
+    /// lamp-voice's own bound for a skill's request, so a Vietnamese ask
+    /// is as long as an English one; in bytes, four a letter at most, for
+    /// an app that still counts bytes. #8630: one large safety bound,
+    /// 7,500, held equal on both paths here, told to the app by
+    /// `system.info`; past it the app is told plainly, with no number, so
+    /// the person meets no visible limit.
     #[test]
-    fn the_words_bound_is_lamp_voices_two_thousand_characters() {
-        assert_eq!(MOST_WORDS_CHARS, 2_000);
+    fn the_words_bound_is_lamp_voices_one_safety_bound() {
+        assert_eq!(MOST_WORDS_CHARS, 7_500);
         assert_eq!(MOST_WORDS_CHARS, lamp_voice::made_skill::MOST_REQUEST_CHARS);
-        assert_eq!(MOST_WORDS_BYTES, 8_000);
+        assert_eq!(MOST_WORDS_BYTES, 30_000);
         assert_eq!(MOST_WORDS_BYTES, lamp_voice::made_skill::MOST_REQUEST_BYTES);
         assert_eq!(
             past_most_words(),
-            "what the skill should do is at most 2000 characters"
+            "what the skill should do is too long for the lamp to make as one skill: shorten it"
         );
+        assert!(!past_most_words().chars().any(|c| c.is_ascii_digit()));
     }
 
     /// A Vietnamese ask past the old 2,000-byte bound goes to lamp-voice
     /// whole (#7245): 1,500 letters as written, about 2,100 bytes, and
-    /// 1,000 of its widest letters, 3,000 bytes; so do 2,000 letters, and
-    /// one letter more is refused here with the bound named, and
-    /// lamp-voice is never asked.
+    /// 1,000 of its widest letters, 3,000 bytes; so do 5,000 letters,
+    /// about 6,900 bytes (#8630), and [`MOST_WORDS_CHARS`] of them; one
+    /// letter more is refused here, plainly, and lamp-voice is never asked.
     #[test]
-    fn two_thousand_letters_of_vietnamese_are_handed_whole_and_one_more_refused() {
+    fn five_thousand_letters_of_vietnamese_are_handed_whole_and_the_bound_holds() {
         let (socket, seen) = voice(
-            "vi2k",
+            "vi5k",
             vec![
+                json!({"making": true}),
                 json!({"making": true}),
                 json!({"making": true}),
                 json!({"making": true}),
             ],
         );
-        for (id, words) in [("r1", vietnamese(1_500)), ("r3", "ộ".repeat(1_000))] {
+        for (id, words) in [
+            ("r1", vietnamese(1_500)),
+            ("r3", "ộ".repeat(1_000)),
+            ("r4", vietnamese(5_000)),
+        ] {
             assert!(words.len() > 2_000, "{}", words.len());
             assert_eq!(
                 make(&socket, &json!({"words": words, "request_id": id})),
@@ -643,15 +662,15 @@ mod tests {
                 json!({"make": {"words": words, "request_id": id}})
             );
         }
-        let words = vietnamese(2_000);
-        assert_eq!(words.chars().count(), 2_000);
-        assert!(words.len() > 2_700, "{}", words.len());
+        let words = vietnamese(MOST_WORDS_CHARS);
+        assert_eq!(words.chars().count(), MOST_WORDS_CHARS);
+        assert!(words.len() > 10_000, "{}", words.len());
         assert_eq!(
             make(
                 &socket,
                 &json!({"words": format!("{words}a"), "request_id": "r0"})
             ),
-            Err("what the skill should do is at most 2000 characters".to_owned())
+            Err(past_most_words())
         );
         assert_eq!(
             make(&socket, &json!({"words": words, "request_id": "r2"})),
@@ -665,13 +684,14 @@ mod tests {
     }
 
     /// From `skills.make` through lamp-voice's own app-make socket
-    /// (`lamp_voice::app_make::serve`, not a stand-in): 2,000 letters of
-    /// Vietnamese, about 2,750 bytes, pass lamp-cloud's bound and lamp-voice's, are taken and
-    /// reach its maker, here with no model to ask, so not kept, and why
-    /// (lamp-voice's own tests make one into a kept skill through the same
-    /// socket with a scripted model). 2,001 is refused here.
+    /// (`lamp_voice::app_make::serve`, not a stand-in): 5,000 letters of
+    /// Vietnamese, about 6,900 bytes (#8630), pass lamp-cloud's bound and
+    /// lamp-voice's, are taken and reach its maker, here with no model to
+    /// ask, so not kept, and why (lamp-voice's own tests make one into a
+    /// kept skill through the same socket with a scripted model). One
+    /// letter past the bound is refused here.
     #[test]
-    fn two_thousand_letters_reach_lamp_voices_own_maker() {
+    fn five_thousand_letters_reach_lamp_voices_own_maker() {
         let dir = PathBuf::from(format!("/tmp/mkv-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         // Its own directory: lamp-voice makes it, the voice's alone.
@@ -701,14 +721,14 @@ mod tests {
             |_| true,
         )
         .unwrap();
-        let words = vietnamese(2_000);
         assert_eq!(
             make(
                 &socket,
-                &json!({"words": format!("{words}a"), "request_id": "r0"})
+                &json!({"words": format!("{}a", vietnamese(MOST_WORDS_CHARS)), "request_id": "r0"})
             ),
             Err(past_most_words())
         );
+        let words = vietnamese(5_000);
         assert_eq!(
             make(&socket, &json!({"words": words, "request_id": "r1"})),
             Ok(Some(json!({"making": true, "request_id": "r1"})))

@@ -701,10 +701,11 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 info["character"] = json!({"energy_alone": true});
             }
             // `make_skill_most_chars` (#7245, 19 Nov): the most characters
-            // of words `skills.make` takes, 2,000, and
-            // `make_skill_most_bytes` (18 Nov), those in bytes at most,
-            // 8,000, only while `can` names it, so the app holds a lamp
-            // that says neither, an older one, to 480 bytes.
+            // of words `skills.make` takes, the lamp's one safety bound
+            // (7,500, #8630), which the app follows with no cap of its
+            // own, and `make_skill_most_bytes` (18 Nov), those in bytes at
+            // most, four a letter, only while `can` names it, so the app
+            // holds a lamp that says neither, an older one, to 480 bytes.
             if on(lamp, "skills.make") {
                 info[crate::make_skill::MOST_CHARS_FIELD] =
                     json!(crate::make_skill::MOST_WORDS_CHARS);
@@ -2426,9 +2427,10 @@ pub mod tests {
         assert!(can.contains(&"skills.make".to_owned()) && can.contains(&"skills.made".to_owned()));
     }
 
-    /// 18 Nov: `system.info` says how many bytes of words `skills.make`
-    /// takes, 2,000, only while `can` names it; so the app holds a lamp
-    /// that says nothing, an older one, to its old 480.
+    /// 18 Nov: `system.info` says how many characters (and bytes) of words
+    /// `skills.make` takes, the lamp's one safety bound (#8630), only while
+    /// `can` names it; so the app holds a lamp that says nothing, an older
+    /// one, to its old 480.
     #[test]
     fn system_info_says_the_words_bound_only_while_make_skill_is_named() {
         let bound = |lamp: &mut Fake| {
@@ -2447,7 +2449,9 @@ pub mod tests {
             "not ready: not named, not said"
         );
         lamp.make_skill_ready = true;
-        assert_eq!(bound(&mut lamp), (Some(json!(2_000)), Some(json!(8_000))));
+        // #8630: the one large safety bound both paths hold, which the app
+        // follows in place of a cap of its own.
+        assert_eq!(bound(&mut lamp), (Some(json!(7_500)), Some(json!(30_000))));
         assert_eq!(crate::make_skill::MOST_WORDS_FIELD, "make_skill_most_bytes");
         assert_eq!(crate::make_skill::MOST_CHARS_FIELD, "make_skill_most_chars");
     }

@@ -3565,28 +3565,55 @@ gone ([switches.md](switches.md)). What happens:
    - It says `skill.toml` has no `name` key: the name is SKILL.md's, and
      `name =` in `skill.toml` fails the check as an unknown field. That was
      what failed #2813's rerun on lamp-0c89.
-   - The request is at most 2,000 characters (`MOST_REQUEST_CHARS`,
-     #7245, 19 Nov: counted in letters, so a Vietnamese request is as long
-     as an English one; before, bytes: 180 at first, sized to fit the tasks
-     part's 1,000-byte task with the brief, 480 from 6 Nov when the owner
-     found 180 too short in the app, 2,000 from 18 Nov when a Vietnamese
-     request, 2 or 3 bytes a letter, was still cut at 160 to 240 letters),
-     refused if longer with the bound named ("That is too long to ask for
-     as one skill, past 2,000 characters: say it more shortly."), never
-     cut, and the model is asked nothing then. Why a bound at all: the
-     whole request goes to the making model with its system prompt, so a
-     far longer one only makes the person wait longer for a skill that does
-     one thing. No wire needs fewer bytes than its 8,000 at most (four a
-     letter, `MOST_REQUEST_BYTES`): the app-make socket's line is 64 KiB,
-     lamp-cloud's MQTT packet over 1 MiB, the agent's make rules 48 KiB.
-     The app's MAKE IT and the voice's own make share it.
+   - The request is at most 7,500 characters (`MOST_REQUEST_CHARS`; #8630,
+     25 Nov: the lamp's one large safety bound, not a number a person meets
+     in normal use, so the app shows no counter and no cap of its own and
+     follows `system.info`'s `make_skill_most_chars`; #7245, 19 Nov:
+     counted in letters, so a Vietnamese request is as long as an English
+     one; before, bytes: 180 at first, sized to fit the tasks part's
+     1,000-byte task with the brief, 480 from 6 Nov when the owner found
+     180 too short in the app, 2,000 from 18 Nov when a Vietnamese request,
+     2 or 3 bytes a letter, was still cut at 160 to 240 letters, and 2,000
+     characters from 19 Nov to 25 Nov), refused if longer with a plain line
+     that names no number ("That is too long for me to make as one skill:
+     please say it more shortly.", `REQUEST_TOO_LONG`, told to the model
+     to say in the conversation's language as the make's other refusals
+     are, except a queued make, whose line is said as it is
+     (`make_queue::failed_line`, as every failed line of a queued make);
+     from the app, lamp-cloud's own "what the skill should do is too long
+     for the lamp to make as one skill: shorten it", a fallback the app
+     normally never shows, since it tells the person in their own language
+     before it sends anything past the bound it read), never cut, never
+     refused in silence, and the model is asked nothing then. Why 7,500:
+     the one wire the request must fit is the agent's make rules
+     (`lamp_tasks::skill_make::MOST_RULES_BYTES`, 48 KiB, 49,152 bytes),
+     which carry the longest system prompt (15,708 bytes with every switch
+     that adds to it on, five linked accounts with long addresses and
+     today's date, as a product lamp adds them; 15,270 with none; measured
+     by `the_longest_repair_and_system_prompt_fit_the_agents_make_rules`,
+     which pins 500 bytes to spare), a repair's own words (1,488 bytes: the
+     brief's 960, the repair mark, 735 bytes of the check's lines and the
+     ask), three newlines, and the request at four bytes a letter at most
+     (`MOST_REQUEST_BYTES`, 30,000; a Vietnamese letter is at most 3):
+     15,708 + 1,488 + 3 + 30,000 = 47,199, leaving 1,953 bytes for the
+     system prompt to grow. The 20,000
+     to 30,000 the issue proposed does not fit that wire (its room is
+     31,953 bytes, 7,988 letters of four bytes). Every other bound is far
+     larger: the app-make socket's line is 64 KiB, lamp-cloud's MQTT packet
+     over 1 MiB, and the make model's context 128k tokens
+     (`lamp_tasks::one_session::CONTEXT_TOKENS`), a make's session rotated
+     fresh at 60 % of it (76,800), where 48 KiB of rules is under 25k
+     tokens even at two bytes a token. The app's MAKE IT and the voice's
+     own make share it, held equal by lamp-cloud's test
+     (`the_words_bound_is_lamp_voices_one_safety_bound`).
    - Nothing else of the conversation goes with it.
    - It names the triggers and gestures only as "one [trigger] as listed
      (coming to the desk is room/presence)" and `body = { gesture }`: the
      system prompt lists each (`TRIGGER_MEANINGS`,
      `made_skill::gesture_names`). So the brief's own words are at most
-     960 bytes, the longest brief 8,960 with a request of 2,000
-     characters of four bytes (`MOST_BRIEF_BYTES`; 2,960 with a 2,000-byte
+     960 bytes, the longest brief 30,960 with a request of 7,500
+     characters of four bytes (`MOST_BRIEF_BYTES`; 8,960 with 2,000
+     characters until #8630, 2,960 with a 2,000-byte
      request, 1,160 with 480, 1,440 once the brief told the
      remind step and its `every` in #7245, 1,340 before that) and a
      repair's check lines 735 (`MOST_REPAIR_BYTES`, 560 before), the six
@@ -6691,8 +6718,8 @@ Tests:
   `own_echo::yes_tests::the_say_backs_own_words_in_its_tail_are_held`;
   `skill_writes_told::tests` (each send told once after the mark, said
   with its time).
-- `made_skill::tests`: the brief within 2,960 bytes with a 2,000-byte
-  request (`MOST_BRIEF_BYTES`, its repair within `MOST_REPAIR_BRIEF_BYTES`), `every_request_is_briefed_and_the_model_judges_it`
+- `made_skill::tests`: the brief within 30,960 bytes with a 30,000-byte
+  request, 7,500 characters of four bytes (`MOST_BRIEF_BYTES`, #8630; its repair within `MOST_REPAIR_BRIEF_BYTES`), `every_request_is_briefed_and_the_model_judges_it`
   (a service, a write or two services are briefed, never refused by a
   word list), `the_read_steps_are_the_catalogues_readable_services`,
   exactly two files, the
@@ -8380,7 +8407,7 @@ lamp's agent when DeepSeek fails", "The app's MAKE IT too").
    Tests: `coordinator::service::tests::the_app_make_socket_answers_through_a_closed_and_an_unreadable_switch`,
    `say::tests::bound_at_start_the_say_socket_answers_through_the_privacy_wait`.
 2. `{"make": {"words", "request_id"}}`: the words become the same brief
-   (`made_skill::brief`, at most 2,000 characters) and are made at once on a
+   (`made_skill::brief`, at most 7,500 characters, #8630) and are made at once on a
    thread of their own by the lamp's own model, the same example, check
    and up to three repairs (`make_skill_local::make_kept`,
    `app_make::make_here`). Not made (or a written one not kept), the app

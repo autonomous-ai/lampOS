@@ -196,7 +196,7 @@ fn a_queued_make_that_failed_with_no_line_says_one_through_the_real_path() {
             7_679_201,
             on,
             make(&too_long),
-            "I couldn't make gold price: that is too long to ask for as one skill, past 2,000 characters: say it more shortly.",
+            "I couldn't make gold price: that is too long for me to make as one skill: please say it more shortly.",
         ),
         (
             7_679_203,
