@@ -2398,3 +2398,47 @@ tests with a fake NPU, a fake Store and the service's own clock; the
 VIPLite struct's size; the ARM64 build; MoveNet converted and measured on
 the lamp by its own reference. Not yet proven: a run on the lamp's NPU
 through this service.
+
+## Sensor 5's consented local pilot recorder (#8848)
+
+Source review, 28 November 2026, based on `1e42209fce`: V1's camera
+snapshot route checks physical/manual privacy both before capture and after
+the potentially slow operation; its temporary capture does not hold the
+privacy lock. Keep that final-boundary rule, without depending on HAL or
+opening another camera/microphone owner. The maintained Rust alternatives
+are Eyes' private `FrameClient`/`CameraGrant` path and Ears' `LeaseGate` plus
+its existing `mic1/audio` export. Reuse them and the private boots parser.
+Controls state alone is electrical evidence, not a permit. The JPEG stream
+and SDK preview do not carry the native metadata needed for this study.
+
+The first local review demonstrated that Ears' ordinary Audio wire loses
+the original block permit even though its publication checks that permit.
+Keep the existing wire as the default. An explicit Ears diagnostic switch,
+`LAMP_BUS_AUDIO_CAPTURE_PERMIT=on`, adds the immutable original clock/epoch/
+deadline as optional JSON metadata. Old readers ignore it; the new recorder
+refuses missing evidence and checks the original deadline after encoding.
+It never substitutes a newer subscriber ticket for source authority. The
+camera receives the same final-boundary treatment: queued close/EOF after
+encoding wins, with a bounded pending frame preserved. Observer failures and
+privacy closure also win over a duration-complete result.
+
+Change only an explicitly selected Eyes reader identity: `seen` remains
+the default; `sensor5-capture` accepts the same-UID
+`lamp-sensor5-capture.service` instead, never both. No unit enables this
+policy. The standalone Rust tool grants no permissions, reopens no revoked
+session and starts no service. It retains original camera metadata and PCM
+block sequences; receipt-time previews are unverified estimates, not ADC
+timestamps or measured lip sync. Existing FFmpeg tools are reused only for
+offline preparation and synthetic fixtures; direct live FFmpeg is refused.
+
+Bounded source queues and a separate archive process keep slow filesystem
+writes out of final privacy admission. The target poll is 2 ms, source age
+is strictly below 50 ms at admission, missing sources stop within 1 s, and
+archive teardown has a 500 ms total budget. Already admitted bytes may
+finish writing after closure; permission loss admits no further bytes.
+Synthetic tests cover authority, age, lineage, ordering, bounded backlog,
+stalled writers and orphan cleanup. Those checks establish no physical
+closure, capture cadence, disk durability, A/V alignment or board latency.
+The [pilot protocol](sensor5-pilot.md) records these remaining measurements
+and the immutable local retention contract. No model, media, Python runtime,
+hardware access or default-on behavior is added to the product.

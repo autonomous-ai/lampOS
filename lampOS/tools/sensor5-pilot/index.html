@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src blob: data:; media-src blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Sensor 5 · Local frame labels</title>
+  <style>
+    :root { color-scheme: dark; font: 15px/1.5 system-ui, sans-serif; background: #10212c; color: #e8f0f3; }
+    * { box-sizing: border-box; } body { max-width: 1360px; margin: auto; padding: 24px; }
+    h1 { font-size: 27px; margin: 0 0 6px; } h2 { font-size: 18px; margin: 0 0 12px; } p { margin: 6px 0 14px; }
+    .muted, small { color: #b7c9d2; } .top, .panel { background: #1b303c; border: 1px solid #405660; border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+    .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; } button, input, select { font: inherit; }
+    button { background: #245364; border: 1px solid #6b94a4; border-radius: 6px; color: #fff; padding: 8px 13px; cursor: pointer; }
+    button.primary { background: #8be1ce; border-color: #8be1ce; color: #102d29; font-weight: 650; }
+    button:disabled { opacity: .45; cursor: default; } button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #efbb6a; outline-offset: 2px; }
+    input, select { background: #122631; border: 1px solid #78939e; border-radius: 5px; padding: 6px 8px; color: inherit; } input[type=number] { width: 90px; }
+    input[type=checkbox] { accent-color: #8be1ce; } input[type=range] { width: 100%; padding: 0; margin: 14px 0; }
+    .message { min-height: 32px; color: #a7eadb; padding: 8px 0; } .message.error { color: #ffbdaf; font-weight: 600; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr); gap: 18px; align-items: start; }
+    canvas { display: block; width: 100%; height: auto; background: #0a151c; border: 1px solid #78939e; border-radius: 6px; touch-action: none; }
+    fieldset { border: 0; padding: 0; margin: 0; min-width: 0; } fieldset:disabled { opacity: .65; } label { display: inline-flex; align-items: center; gap: 7px; }
+    .field { display: flex; flex-direction: column; align-items: stretch; gap: 6px; margin-bottom: 15px; }
+    .sources { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0 18px; } .face-row { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; border: 1px solid #57717c; border-radius: 6px; padding: 10px; margin: 10px 0; }
+    .box-desc { width: 100%; font-size: 12px; color: #bdd1da; } .facts { overflow-wrap: anywhere; font-size: 12px; margin: 8px 0 14px; color: #b7c9d2; }
+    .notice { border-left: 3px solid #efbb6a; padding-left: 12px; } details { margin-top: 16px; } summary { cursor: pointer; font-weight: 650; }
+    #saveState { color: #efcf99; } #counts { font-weight: 650; } [hidden] { display: none !important; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } body { padding: 12px; } }
+  </style>
+  <script src="label.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <h1>Sensor 5 · Local frame labels</h1>
+    <p class="muted">Review native frames and microphone audio. Files stay in this browser; there is no upload, server, analytics or model-score display.</p>
+    <div class="bar">
+      <label>Rater pseudonym <input id="rater" value="R01" maxlength="64" size="10" autocomplete="off" spellcheck="false"></label>
+      <button id="openFolder" class="primary">Choose prepared clip folder</button>
+      <button id="practice">Open synthetic practice</button>
+      <button id="import" disabled>Import my labels</button>
+    </div>
+    <input id="folder" type="file" webkitdirectory multiple hidden>
+    <input id="labelsFile" type="file" accept=".json,application/json" hidden>
+    <div id="message" class="message" role="status" aria-live="polite">Choose a folder made by prepare-labels.sh. Keep a separate export for each rater.</div>
+  </header>
+  <main id="workspace" hidden>
+    <h2 id="clipTitle"></h2>
+    <p id="hashInfo" class="facts"></p>
+    <p id="alignmentInfo" class="notice" role="note"></p>
+    <div class="layout">
+      <section class="panel" aria-label="Frame viewer">
+        <canvas id="frame" width="640" height="360" aria-label="Current native frame; drag to draw the selected face box"></canvas>
+        <input id="position" type="range" min="0" max="0" step="1" value="0" aria-label="Native frame index">
+        <p id="frameInfo"></p>
+        <div class="bar">
+          <button id="previous">Previous</button><button id="next">Next</button><button id="play">Play from frame</button>
+          <label>Frame <input id="jump" type="number" min="0" step="1" value="0"></label><button id="jumpButton">Go</button>
+        </div>
+        <audio id="audio" preload="metadata" hidden></audio>
+        <p class="muted">← / → step native frames · Space plays/pauses · S applies the current frame. Audio follows its original offset; a negative audio time is before the microphone stream starts.</p>
+        <p class="notice">Labels are never propagated automatically. Boxes use normalized image coordinates. Playback is a review aid, not a physical synchronization measurement.</p>
+      </section>
+      <section class="panel" aria-label="Frame annotation">
+        <fieldset id="editor" disabled>
+          <h2>Current frame</h2>
+          <label class="field">Visible scene
+            <select id="scene"><option value="unlabelled">Unlabelled</option><option value="faces">Face(s) in view</option><option value="no_face">No face in view</option><option value="uncertain">Visibility uncertain</option></select>
+          </label>
+          <div>Audible source <small>(select all known sources)</small></div>
+          <div class="sources">
+            <label><input type="checkbox" name="source" value="visible">Visible face</label>
+            <label><input type="checkbox" name="source" value="offscreen">Off-screen person</label>
+            <label><input type="checkbox" name="source" value="playback">Video/playback</label>
+            <label><input type="checkbox" name="source" value="none">No speech</label>
+            <label><input type="checkbox" name="source" value="uncertain">Uncertain</label>
+          </div>
+          <div class="bar"><label>Track ID <input id="trackId" value="T01" maxlength="4" size="5" list="knownTracks" autocomplete="off"></label><button id="addFace">Add face/track</button></div>
+          <datalist id="knownTracks"></datalist>
+          <small>Reuse T01, T02… for the same people across frames. Out-of-view tracks have no box.</small>
+          <div id="faces"></div>
+          <div class="bar"><button id="apply" class="primary">Apply this frame</button><button id="copyPrevious">Copy previous to editor</button><button id="clear">Clear frame</button></div>
+          <details>
+            <summary>Explicit range assignment</summary>
+            <p>Copies these exact labels and boxes to an inclusive frame range. It does not track motion or interpolate. Review every copied frame.</p>
+            <div class="bar"><label>From <input id="rangeFirst" type="number" min="0" value="0"></label><label>Through <input id="rangeLast" type="number" min="0" value="0"></label></div>
+            <p><label><input id="overwrite" type="checkbox">Allow replacing existing labels in this range</label></p>
+            <button id="applyRange">Apply explicit range</button>
+          </details>
+        </fieldset>
+      </section>
+    </div>
+    <section class="panel" aria-label="Export labels">
+      <p id="counts"></p><p id="saveState"></p>
+      <div class="bar"><button id="export" class="primary">Export labels JSON</button><button id="confirmExport" disabled>Confirm downloaded file kept</button></div>
+      <p class="muted">Nothing is saved automatically. Export each independent rater's file to the private archive, then confirm you kept it. Import checks the capture hash, prepared manifest hash, image hashes, audio origin and every frame index/timestamp. Do not inspect another rater's labels before finishing your independent pass.</p>
+    </section>
+  </main>
+</body>
+</html>
