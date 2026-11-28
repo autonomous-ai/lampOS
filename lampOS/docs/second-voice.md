@@ -6310,9 +6310,15 @@ after a take-over, but now for every turn:
       which one is bigger?" after "Okay, I'll stop there." was held): the
       lamp's words end where the stop cut them, by the time it is told at the
       latest, so words sent ahead and never played count for nothing, and
-      anything it says after moves the end on. A stop ends only the call's
-      carry (`called_at`), which covers a line said right after "Hey Lamp"
-      before the lamp spoke. A line with no
+      anything it says after moves the end on. A stop said aloud ("never
+      mind", "stop", "enough") is told to the rule at the stop, before its
+      own line (`Shared::stop_said`), as a hand's Stop is told when the next
+      line begins (`after_stop`); at either, the route's own end of the
+      lamp's words (`Shared::said_until_us`) is brought back to the stop, so
+      what the lamp says next, the stop's own line first, counts from there,
+      never from after the words sent ahead (the Reviewer-lead's P2 on
+      #8892). A stop ends only the call's carry (`called_at`), which covers
+      a line said right after "Hey Lamp" before the lamp spoke. A line with no
       words in it (a sound, a cough, room noise) is never answered, but as a
       call: `no words heard in it (LAMP_SIMPLE_CALL)`. A
       checked short sound with a word in it, not a filler, is the rule's to
