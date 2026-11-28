@@ -332,12 +332,6 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     } else if leading == m {
         Some((&words[m..], "start"))
     } else if trailing == m {
-        if line.cut_it && cut_end_on() {
-            return Echo::Answered(Some(format!(
-                "lamp-voice second: request {request}: of its {n} words, {m} at its end in the lamp's answer to request {}, but it cut that answer as it began: its end is the person's, sent as heard ({CUT_END_ENVIRONMENT})",
-                said.request
-            )));
-        }
         Some((&words[..n - m], "end"))
     } else {
         None
@@ -378,6 +372,15 @@ pub(super) fn judge(line: &Line<'_>, said: Option<&Said<'_>>) -> Echo {
     if let Some(why) = guard {
         return Echo::Answered(Some(format!(
             "lamp-voice second: request {request}: of its {n} words, {m} in the lamp's answer to request {of}, but {why}: answered as the person's (LAMP_SECOND_OWN_ECHO)"
+        )));
+    }
+    // A run at the end of a line that cut this answer as it began: its end
+    // is the person's, sent as heard. Judged after the guards, so a line a
+    // guard answers is journalled by its guard's reason (Jarvis's P3 on
+    // #8680), and its outcome is the same either way.
+    if matches!(cut, Some((_, "end"))) && line.cut_it && cut_end_on() {
+        return Echo::Answered(Some(format!(
+            "lamp-voice second: request {request}: of its {n} words, {m} at its end in the lamp's answer to request {of}, but it cut that answer as it began: its end is the person's, sent as heard ({CUT_END_ENVIRONMENT})"
         )));
     }
     let when = if line.over_the_lamps_voice {
@@ -864,6 +867,48 @@ mod tests {
             matches!(judge(&first, Some(&read)), Echo::Stripped(_, ref journal) if journal.contains("at its start")),
             "{:?}",
             judge(&first, Some(&read))
+        );
+        set_cut_end_for_test(false);
+    }
+
+    /// Jarvis's P3 on #8680: a cut line's end run is judged after the
+    /// guards, so a cut line a guard answers keeps its guard's reason in the
+    /// journal, not `LAMP_SECOND_OWN_ECHO_CUT_END`'s. Answered either way.
+    #[test]
+    fn a_cut_line_a_guard_answers_is_journalled_by_its_guard() {
+        let read = Said {
+            words: "Three things are set: a timer, ringing at 14:36. Call the plumber at 20:00 tonight. Water the plants at nine tonight.",
+            ..said()
+        };
+        set_cut_end_for_test(true);
+        // Its question of its own.
+        let asked = Line {
+            cut_it: true,
+            ..line(
+                "Can you cancel the one to water the plants?",
+                UNTIL_US - 70_000,
+                false,
+            )
+        };
+        assert!(
+            matches!(judge(&asked, Some(&read)), Echo::Answered(Some(ref journal)) if journal.contains("it is a question of its own") && !journal.contains(CUT_END_ENVIRONMENT)),
+            "{:?}",
+            judge(&asked, Some(&read))
+        );
+        // The lamp's name.
+        let named = Line {
+            cut_it: true,
+            called: true,
+            ..line(
+                "Cancel the reminder to water the plants.",
+                UNTIL_US - 70_000,
+                true,
+            )
+        };
+        assert!(
+            matches!(judge(&named, Some(&read)), Echo::Answered(Some(ref journal)) if journal.contains("it has the lamp's name")),
+            "{:?}",
+            judge(&named, Some(&read))
         );
         set_cut_end_for_test(false);
     }

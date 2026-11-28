@@ -234,12 +234,30 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
     json!({"tool": name, "outcome": outcome})
 }
 
+/// The status a done forget told on a yes adds to the turn's calls
+/// (`LAMP_MEMORY_DONE_YES_AGAIN`, #8570): it backs the turn's "Forgotten."
+/// in the claim check (`action_claim::forgot_in`), and `already` marks it as
+/// no call of this turn, so [`context`] leaves it out.
+pub(super) fn done_already() -> Value {
+    json!({
+        "tool": crate::remember::FORGET,
+        "outcome": {"forgotten": true, "already": true},
+    })
+}
+
+/// Whether `status` is [`done_already`]'s: no [`status`] keeps `already`.
+fn is_done_already(status: &Value) -> bool {
+    status["outcome"]["already"] == true
+}
+
 pub(super) fn context(
     instruction: &str,
     question: &Message,
     calls: &[Value],
     left: usize,
 ) -> Vec<Message> {
+    // Only the calls run in this turn: a done forget's backing ran none.
+    let calls: Vec<&Value> = calls.iter().filter(|call| !is_done_already(call)).collect();
     let kind = if calls
         .last()
         .is_some_and(|call| call["tool"] == crate::known_faces::FORGET)
@@ -252,7 +270,7 @@ pub(super) fn context(
         Message::system(instruction),
         Message::system(format!(
             "A {kind} forget call has run in this turn. The earlier conversation, recalled memory, pictures and tool payloads have been discarded. Answer only the person's current words and these content-free call outcomes: {}. Do not repeat any of these calls or reconstruct what was forgotten. Only confirm deletion when the outcome confirms it; an error or missing confirmation means the result is uncertain, not success. forgotten reports memory items only; false means none were removed. face_forgotten is independent and true confirms the face was forgotten, not that memory or every related record was removed. primary_memory_result=forgotten confirms primary memory only; uncertain means it could not be confirmed. old_face_records_kept_apart means old face records remain, and face_cleanup_uncertain means another face cleanup warning could not be interpreted. Neither is complete deletion. setup_name_result, place_result and reminders_result report those steps: forgotten/cancelled confirms that step, kept means it could not be cleared, uncertain means it was not confirmed. room_memory_result, sound_consent_result and face_expression_consent_result report cleanup of the room lines and the two household consents: cleared confirms that step, kept means it was refused, uncertain means completion was not confirmed. A missing step is unreported, never a confirmation. everything=false, all=false, some_subjects_not_found or some_items_left means do not claim complete deletion; distinguish a known kept part from an uncertain outcome. scope=room means only what this room remembers, never a person's private memory. asked_which=true means nothing was removed because it was not clear which thing: ask them which in a few words, and do not call forget again in this turn. Say briefly if a face, old face records, setup name, place, reminders, room lines or household consents could not be cleared. {left} later calls from the old round were not run; if the current words still ask for other work, plan it afresh without the discarded context. Never invent a fact or a reason that the status does not give.",
-            serde_json::to_string(calls).expect("JSON values serialize"),
+            serde_json::to_string(&calls).expect("JSON values serialize"),
         )),
         question.clone(),
     ]
@@ -283,6 +301,46 @@ mod tests {
             kept,
             json!({"tool": crate::known_faces::FORGET, "outcome": {"error": true}})
         );
+    }
+
+    /// The Reviewer-lead's and Jarvis's P3s on #8680: a done forget's
+    /// backing keeps `already` and backs the claim check, and a forget run
+    /// later in the turn starts its chat without it, since no forget ran on
+    /// the yes; `status` never keeps `already` from a call's own answer.
+    #[test]
+    fn a_done_forgets_backing_is_no_call_of_the_turn() {
+        let backing = done_already();
+        assert_eq!(
+            backing,
+            json!({"tool": crate::remember::FORGET,
+                "outcome": {"forgotten": true, "already": true}})
+        );
+        assert!(crate::action_claim::forgot_in(std::slice::from_ref(
+            &backing
+        )));
+        let ran = status(
+            crate::remember::FORGET,
+            &json!({"forgotten": false, "already": true}),
+        );
+        assert!(ran["outcome"].get("already").is_none(), "{ran}");
+        let question = Message::user("Yes. Forget the red bike too.");
+        let chat = context(
+            "instructions",
+            &question,
+            &[backing.clone(), ran.clone()],
+            0,
+        );
+        let said = chat[1].content.as_ref().and_then(Value::as_str).unwrap();
+        assert!(!said.contains("already"), "{said}");
+        assert!(
+            said.contains(&serde_json::to_string(&[&ran]).unwrap()),
+            "{said}"
+        );
+        // A face forget after the backing is still told as the face's.
+        let face = status(crate::known_faces::FORGET, &json!({"ok": true}));
+        let chat = context("instructions", &question, &[face, backing], 0);
+        let said = chat[1].content.as_ref().and_then(Value::as_str).unwrap();
+        assert!(said.starts_with("A face forget call"), "{said}");
     }
 
     /// C134: a refusal that asked which keeps that flag, never its note,

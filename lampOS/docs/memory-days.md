@@ -496,7 +496,8 @@ lamp-06c1 shape: the colour gone, both exchanges and the observation kept;
 one that answered from it goes with it, one before it stays; a recall of it
 and the two "it" follow-ups after go with it, and so does what was observed
 of them).
-With `LAMP_MEMORY_HITS_ROOM_NOT_ASKER=on` (off unless set, #8570) the room's
+With `LAMP_MEMORY_HITS_ROOM_NOT_ASKER=on` (off unless set, on in the product's
+`lamp-voice`, #8570) the room's
 hits end with the room-not-asker rule's own words, never told as the asker's
 own (memory.md, "Told on each turn").
 
