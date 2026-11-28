@@ -1,0 +1,3073 @@
+{
+  "CONVERSION": "NOT_RUN",
+  "SET_BAR": "FAIL",
+  "STREAM": "NOT_RUN",
+  "candidate": {
+    "model_id": "yunet_five-nose-ray-hfov70-minbox4-v2",
+    "model_sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+    "preprocess_sha256": "20eadce905d4f0ab72a616831dec1b95acb5ed2b6c366898eb5ec91342555c47",
+    "producer_sha256": "ede2289c21443b581b188aed43f567c1c66f52d6927fb41479455c0965afc1bc"
+  },
+  "data_scope": "Synthetic/public diagnostic aggregates only. No lamp/customer data, images, models, raw runtime paths or credentials.",
+  "diagnostic_only_if_tune_failed": true,
+  "pointing_diagnostic": {
+    "CONVERSION": "NOT_RUN",
+    "SET_BAR": "NOT_APPLICABLE_DIAGNOSTIC",
+    "STREAM": "NOT_RUN",
+    "by_person": {
+      "1": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 17,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 182,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 33.89595444335526,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 41.26356125820274
+          },
+          "yaw": {
+            "mae_deg": 25.290312079603723,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 30.650137036653145
+          }
+        },
+        "outside": {
+          "correct": 88,
+          "planned": 132,
+          "unknown": 4
+        },
+        "planned": 186,
+        "states": {
+          "clipped_face": 2,
+          "measured": 182,
+          "no_face": 1,
+          "pnp_back_facing": 1
+        }
+      },
+      "10": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 26,
+          "planned": 54,
+          "unknown": 1
+        },
+        "measured": 180,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 36.74578638855356,
+            "n": 180,
+            "planned": 186,
+            "rmse_deg": 44.559926865897815
+          },
+          "yaw": {
+            "mae_deg": 21.110816347339114,
+            "n": 180,
+            "planned": 186,
+            "rmse_deg": 27.156168713572118
+          }
+        },
+        "outside": {
+          "correct": 97,
+          "planned": 132,
+          "unknown": 5
+        },
+        "planned": 186,
+        "states": {
+          "measured": 180,
+          "no_face": 2,
+          "pnp_back_facing": 4
+        }
+      },
+      "11": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 7,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 185,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 35.109351766743714,
+            "n": 185,
+            "planned": 186,
+            "rmse_deg": 42.681552285633245
+          },
+          "yaw": {
+            "mae_deg": 22.886224694129368,
+            "n": 185,
+            "planned": 186,
+            "rmse_deg": 28.085402060389505
+          }
+        },
+        "outside": {
+          "correct": 110,
+          "planned": 132,
+          "unknown": 1
+        },
+        "planned": 186,
+        "states": {
+          "measured": 185,
+          "pnp_back_facing": 1
+        }
+      },
+      "12": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 24,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 183,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 34.09780318023569,
+            "n": 183,
+            "planned": 186,
+            "rmse_deg": 41.65274484727439
+          },
+          "yaw": {
+            "mae_deg": 21.588572477582627,
+            "n": 183,
+            "planned": 186,
+            "rmse_deg": 27.877431431631976
+          }
+        },
+        "outside": {
+          "correct": 94,
+          "planned": 132,
+          "unknown": 3
+        },
+        "planned": 186,
+        "states": {
+          "measured": 183,
+          "no_face": 1,
+          "pnp_back_facing": 2
+        }
+      },
+      "13": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 25,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 184,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 33.61036691207079,
+            "n": 184,
+            "planned": 186,
+            "rmse_deg": 40.3238284973189
+          },
+          "yaw": {
+            "mae_deg": 24.815680075129244,
+            "n": 184,
+            "planned": 186,
+            "rmse_deg": 29.449759797283615
+          }
+        },
+        "outside": {
+          "correct": 92,
+          "planned": 132,
+          "unknown": 2
+        },
+        "planned": 186,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 184
+        }
+      },
+      "14": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 18,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 177,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 34.703902233697306,
+            "n": 177,
+            "planned": 186,
+            "rmse_deg": 43.09112845119594
+          },
+          "yaw": {
+            "mae_deg": 22.338707723251268,
+            "n": 177,
+            "planned": 186,
+            "rmse_deg": 26.960928374317277
+          }
+        },
+        "outside": {
+          "correct": 85,
+          "planned": 132,
+          "unknown": 9
+        },
+        "planned": 186,
+        "states": {
+          "clipped_face": 5,
+          "measured": 177,
+          "no_face": 1,
+          "pnp_back_facing": 3
+        }
+      },
+      "15": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 4,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 185,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 32.89978985951407,
+            "n": 185,
+            "planned": 186,
+            "rmse_deg": 40.376233021694254
+          },
+          "yaw": {
+            "mae_deg": 23.133855753250575,
+            "n": 185,
+            "planned": 186,
+            "rmse_deg": 28.728791647397742
+          }
+        },
+        "outside": {
+          "correct": 109,
+          "planned": 132,
+          "unknown": 1
+        },
+        "planned": 186,
+        "states": {
+          "measured": 185,
+          "no_face": 1
+        }
+      },
+      "2": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 20,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 173,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 33.51139988507871,
+            "n": 173,
+            "planned": 186,
+            "rmse_deg": 40.45250897374208
+          },
+          "yaw": {
+            "mae_deg": 23.625555566920532,
+            "n": 173,
+            "planned": 186,
+            "rmse_deg": 29.149067154433173
+          }
+        },
+        "outside": {
+          "correct": 75,
+          "planned": 132,
+          "unknown": 13
+        },
+        "planned": 186,
+        "states": {
+          "clipped_face": 12,
+          "measured": 173,
+          "no_face": 1
+        }
+      },
+      "3": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 18,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 179,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 32.0187161601303,
+            "n": 179,
+            "planned": 186,
+            "rmse_deg": 39.85166005014637
+          },
+          "yaw": {
+            "mae_deg": 24.33343178412214,
+            "n": 179,
+            "planned": 186,
+            "rmse_deg": 28.968296643995355
+          }
+        },
+        "outside": {
+          "correct": 95,
+          "planned": 132,
+          "unknown": 7
+        },
+        "planned": 186,
+        "states": {
+          "clipped_face": 4,
+          "measured": 179,
+          "no_face": 1,
+          "pnp_back_facing": 2
+        }
+      },
+      "4": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 14,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 182,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 34.22413770964788,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 41.70104396282635
+          },
+          "yaw": {
+            "mae_deg": 21.164819095754567,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 27.255451573324912
+          }
+        },
+        "outside": {
+          "correct": 97,
+          "planned": 132,
+          "unknown": 4
+        },
+        "planned": 186,
+        "states": {
+          "measured": 182,
+          "pnp_back_facing": 4
+        }
+      },
+      "5": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 15,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 182,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 33.920745167333635,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 41.28588039799675
+          },
+          "yaw": {
+            "mae_deg": 21.966387372110827,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 27.0481823500608
+          }
+        },
+        "outside": {
+          "correct": 99,
+          "planned": 132,
+          "unknown": 4
+        },
+        "planned": 186,
+        "states": {
+          "ambiguous_face": 1,
+          "measured": 182,
+          "no_face": 2,
+          "pnp_back_facing": 1
+        }
+      },
+      "6": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 34,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 157,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 31.985684053959382,
+            "n": 157,
+            "planned": 186,
+            "rmse_deg": 38.709124997922814
+          },
+          "yaw": {
+            "mae_deg": 24.052412138480364,
+            "n": 157,
+            "planned": 186,
+            "rmse_deg": 29.05728591773126
+          }
+        },
+        "outside": {
+          "correct": 82,
+          "planned": 132,
+          "unknown": 29
+        },
+        "planned": 186,
+        "states": {
+          "clipped_face": 24,
+          "measured": 157,
+          "no_face": 3,
+          "pnp_back_facing": 2
+        }
+      },
+      "7": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 23,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 185,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 33.856890123943124,
+            "n": 185,
+            "planned": 186,
+            "rmse_deg": 41.23641152542369
+          },
+          "yaw": {
+            "mae_deg": 27.02096798926451,
+            "n": 185,
+            "planned": 186,
+            "rmse_deg": 31.53252480982684
+          }
+        },
+        "outside": {
+          "correct": 93,
+          "planned": 132,
+          "unknown": 1
+        },
+        "planned": 186,
+        "states": {
+          "clipped_face": 1,
+          "measured": 185
+        }
+      },
+      "8": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 21,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 186,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 34.16352488392965,
+            "n": 186,
+            "planned": 186,
+            "rmse_deg": 42.36608184795358
+          },
+          "yaw": {
+            "mae_deg": 22.64341759153052,
+            "n": 186,
+            "planned": 186,
+            "rmse_deg": 27.230605157262104
+          }
+        },
+        "outside": {
+          "correct": 102,
+          "planned": 132,
+          "unknown": 0
+        },
+        "planned": 186,
+        "states": {
+          "measured": 186
+        }
+      },
+      "9": {
+        "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+        "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+        "inside": {
+          "correct": 6,
+          "planned": 54,
+          "unknown": 0
+        },
+        "measured": 182,
+        "nominal_camera_euler_error": {
+          "pitch": {
+            "mae_deg": 33.439393150488065,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 41.27495191472907
+          },
+          "yaw": {
+            "mae_deg": 22.000602933070976,
+            "n": 182,
+            "planned": 186,
+            "rmse_deg": 26.219785231020314
+          }
+        },
+        "outside": {
+          "correct": 105,
+          "planned": 132,
+          "unknown": 4
+        },
+        "planned": 186,
+        "states": {
+          "clipped_face": 2,
+          "measured": 182,
+          "pnp_back_facing": 2
+        }
+      }
+    },
+    "candidate": {
+      "model_id": "yunet_five-nose-ray-hfov70-minbox4-v2",
+      "model_sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+      "preprocess_sha256": "20eadce905d4f0ab72a616831dec1b95acb5ed2b6c366898eb5ec91342555c47",
+      "producer_sha256": "ede2289c21443b581b188aed43f567c1c66f52d6927fb41479455c0965afc1bc"
+    },
+    "cone": {
+      "HI": 10,
+      "LO": -3,
+      "Y": 63
+    },
+    "limits": [
+      "All15people previously exposed; no unseen-person qualification.",
+      "No fitting, calibration, source/threshold replacement or image exclusions.",
+      "Angular error uses raw camera Euler and legacy nominal labels; ray-cone label agreement is proxy-only.",
+      "HFOV70/D0 is unmeasured on these photos.",
+      "Static file replay is not live-lamp performance; no hardware timing claim."
+    ],
+    "overall": {
+      "angular_error_basis": "Raw camera Euler yaw-right/pitch-down versus existing nominal minus-pan/minus-tilt labels.",
+      "classification_basis": "Ray-cone versus legacy camera-label proxy; exact reference ray is unavailable.",
+      "inside": {
+        "correct": 272,
+        "planned": 810,
+        "unknown": 1
+      },
+      "measured": 2702,
+      "nominal_camera_euler_error": {
+        "pitch": {
+          "mae_deg": 33.89661212296447,
+          "n": 2702,
+          "planned": 2790,
+          "rmse_deg": 41.4355725913674
+        },
+        "yaw": {
+          "mae_deg": 23.194271634787803,
+          "n": 2702,
+          "planned": 2790,
+          "rmse_deg": 28.390671142132426
+        }
+      },
+      "outside": {
+        "correct": 1423,
+        "planned": 1980,
+        "unknown": 87
+      },
+      "planned": 2790,
+      "states": {
+        "ambiguous_face": 3,
+        "clipped_face": 50,
+        "measured": 2702,
+        "no_face": 13,
+        "pnp_back_facing": 22
+      }
+    },
+    "schema": "sensor4-pointing-diagnostic-report/1",
+    "status": "complete_diagnostic_only"
+  },
+  "provenance": {
+    "cone_lock_sha256": "45def6cebf1c3de932c386268839a284c0fc0752d6ffda7412227b9c61c70098",
+    "independent_pointing_audit_sha256": "96ed53466d891e07b6745a703e48c5cd775b79e19da3a5b8d4b173a580b6710d",
+    "independent_result_audit_sha256": "90fd452a3ba5a977c5802ea2a2f44f8d9f449d7b0744633d706d2e66c3324261",
+    "local_runtime_sha256": "ce2826683affd054e25ca4bbbdff2721f20def55a777676b51c5479cf313fea0",
+    "manifest_sha256": "df188c89ab663a1473f479d4be7716fd69ae6554fbed685a986d8e3f8609cd20",
+    "materialization_audit_sha256": "ef2eae68db6794ad0c383c156e502158b0650d6fc7b4ef3d73c0ecee57295c1d",
+    "materialized_input_seal_sha256": "445a987c7e861ef2048071ef170e2beebdcf9fdc76171e6cb3e1f4f403f17abd",
+    "plan_sha256": "321a78927cd87c585d1cc7a53bc7fcbc7f8dc22bfcdbe08a03fb5b3b4eb31e8f",
+    "pointing_report_sha256": "17da40f3d94ccc2d8fa4fa746c0ef393b7801145017d84adf9a7df08f14af147",
+    "recipe_sha256": "f8b57acf50c5cac4f472326fbe5a73bf0df3b3aa348235ce453e42c0c8e4423a",
+    "runtime_launcher_sha256": "02f1de0df244735684c16d97010ea988fad7e803b6ddbf63660babbc5e0d215f",
+    "scorer_sha256": "fd767b0e84b02034ac58e0fa9256ddef80cbe7a3ce778f4a3c2d2e7c786f2d9f",
+    "test_report_sha256": "929d17cbf31fbb88fd87a99d43d871a66ac98b9bb94bd0512c0be6eab6e1864e",
+    "tune_report_sha256": "b9ea9078db5931f528112100a0d4d5a3af64d2e7bdd15ccfc7db69b13663841e"
+  },
+  "reference_cone_diagnostic": {
+    "SET_BAR": "FAIL",
+    "boundary_diagnostic": {
+      "angle_errors": {
+        "pitch": {
+          "mae_deg": 10.56840032818853,
+          "p50_deg": 8.336792786211983,
+          "p90_deg": 21.134202100270482,
+          "planned_n": 72,
+          "rmse_deg": 12.827681762726575,
+          "valid_n": 72
+        },
+        "yaw": {
+          "mae_deg": 4.79615074992241,
+          "p50_deg": 3.1526182716810007,
+          "p90_deg": 8.623099007811922,
+          "planned_n": 72,
+          "rmse_deg": 6.230080507266387,
+          "valid_n": 72
+        }
+      },
+      "inside": {
+        "caught": 32,
+        "planned": 48,
+        "rate": 0.6666666666666666,
+        "unknown": 0,
+        "wrong": 16
+      },
+      "measured": 72,
+      "outside": {
+        "false_facing": 15,
+        "planned": 24,
+        "rate": 0.375,
+        "rejected": 9,
+        "unknown": 0
+      },
+      "planned": 72,
+      "states": {
+        "measured": 72
+      },
+      "unknown": 0
+    },
+    "cells": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.633554718729705,
+            "p50_deg": 7.6478028794031285,
+            "p90_deg": 22.123660395895595,
+            "planned_n": 216,
+            "rmse_deg": 13.238120504841245,
+            "valid_n": 214
+          },
+          "yaw": {
+            "mae_deg": 6.035422807186907,
+            "p50_deg": 3.9656721076805526,
+            "p90_deg": 14.199622715432904,
+            "planned_n": 216,
+            "rmse_deg": 8.183868322554336,
+            "valid_n": 214
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 0,
+        "inside": {
+          "caught": 104,
+          "planned": 108,
+          "rate": 0.9629629629629629,
+          "unknown": 0,
+          "wrong": 4
+        },
+        "light_index": 0,
+        "measured": 214,
+        "outside": {
+          "false_facing": 36,
+          "planned": 108,
+          "rate": 0.6481481481481481,
+          "rejected": 70,
+          "unknown": 2
+        },
+        "planned": 216,
+        "states": {
+          "measured": 214,
+          "pnp_back_facing": 2
+        },
+        "unknown": 2
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 9.827310870466096,
+            "p50_deg": 6.42032708300816,
+            "p90_deg": 22.626904512763467,
+            "planned_n": 216,
+            "rmse_deg": 12.89815167057266,
+            "valid_n": 207
+          },
+          "yaw": {
+            "mae_deg": 6.454270605064194,
+            "p50_deg": 5.007980200314506,
+            "p90_deg": 14.588886350900275,
+            "planned_n": 216,
+            "rmse_deg": 8.452409806698231,
+            "valid_n": 207
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 0,
+        "inside": {
+          "caught": 105,
+          "planned": 108,
+          "rate": 0.9722222222222222,
+          "unknown": 0,
+          "wrong": 3
+        },
+        "light_index": 1,
+        "measured": 207,
+        "outside": {
+          "false_facing": 37,
+          "planned": 108,
+          "rate": 0.5740740740740741,
+          "rejected": 62,
+          "unknown": 9
+        },
+        "planned": 216,
+        "states": {
+          "measured": 207,
+          "no_face": 8,
+          "pnp_back_facing": 1
+        },
+        "unknown": 9
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.566690309326443,
+            "p50_deg": 6.957231515771305,
+            "p90_deg": 23.892378902304724,
+            "planned_n": 216,
+            "rmse_deg": 13.998447104883692,
+            "valid_n": 210
+          },
+          "yaw": {
+            "mae_deg": 7.8106414096588805,
+            "p50_deg": 5.094026046747462,
+            "p90_deg": 15.05909105085957,
+            "planned_n": 216,
+            "rmse_deg": 14.755612156145924,
+            "valid_n": 210
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 1,
+        "inside": {
+          "caught": 99,
+          "planned": 108,
+          "rate": 0.9166666666666666,
+          "unknown": 0,
+          "wrong": 9
+        },
+        "light_index": 0,
+        "measured": 210,
+        "outside": {
+          "false_facing": 42,
+          "planned": 108,
+          "rate": 0.5555555555555556,
+          "rejected": 60,
+          "unknown": 6
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 210,
+          "no_face": 4
+        },
+        "unknown": 6
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.377130359245005,
+            "p50_deg": 6.47786153882799,
+            "p90_deg": 24.124645846577366,
+            "planned_n": 216,
+            "rmse_deg": 14.378904408168651,
+            "valid_n": 211
+          },
+          "yaw": {
+            "mae_deg": 12.43741901537637,
+            "p50_deg": 6.168013029959529,
+            "p90_deg": 24.353544684213407,
+            "planned_n": 216,
+            "rmse_deg": 23.292661558175386,
+            "valid_n": 211
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 1,
+        "inside": {
+          "caught": 99,
+          "planned": 108,
+          "rate": 0.9166666666666666,
+          "unknown": 0,
+          "wrong": 9
+        },
+        "light_index": 1,
+        "measured": 211,
+        "outside": {
+          "false_facing": 62,
+          "planned": 108,
+          "rate": 0.37962962962962965,
+          "rejected": 41,
+          "unknown": 5
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 211,
+          "no_face": 3
+        },
+        "unknown": 5
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.629992702486915,
+            "p50_deg": 8.539857229078736,
+            "p90_deg": 25.734068666706758,
+            "planned_n": 216,
+            "rmse_deg": 15.150415165115977,
+            "valid_n": 208
+          },
+          "yaw": {
+            "mae_deg": 19.307757870531393,
+            "p50_deg": 11.235580699660616,
+            "p90_deg": 45.957184594358765,
+            "planned_n": 216,
+            "rmse_deg": 29.51029892691949,
+            "valid_n": 208
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 2,
+        "inside": {
+          "caught": 106,
+          "planned": 108,
+          "rate": 0.9814814814814815,
+          "unknown": 0,
+          "wrong": 2
+        },
+        "light_index": 0,
+        "measured": 208,
+        "outside": {
+          "false_facing": 83,
+          "planned": 108,
+          "rate": 0.1574074074074074,
+          "rejected": 17,
+          "unknown": 8
+        },
+        "planned": 216,
+        "states": {
+          "measured": 208,
+          "no_face": 8
+        },
+        "unknown": 8
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.516786528534645,
+            "p50_deg": 7.244937481634357,
+            "p90_deg": 25.816285905418273,
+            "planned_n": 216,
+            "rmse_deg": 15.876117943223138,
+            "valid_n": 203
+          },
+          "yaw": {
+            "mae_deg": 23.612003144587014,
+            "p50_deg": 13.270609707621539,
+            "p90_deg": 60.25531341769187,
+            "planned_n": 216,
+            "rmse_deg": 34.154792937926736,
+            "valid_n": 203
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 2,
+        "inside": {
+          "caught": 107,
+          "planned": 108,
+          "rate": 0.9907407407407407,
+          "unknown": 0,
+          "wrong": 1
+        },
+        "light_index": 1,
+        "measured": 203,
+        "outside": {
+          "false_facing": 85,
+          "planned": 108,
+          "rate": 0.09259259259259259,
+          "rejected": 10,
+          "unknown": 13
+        },
+        "planned": 216,
+        "states": {
+          "measured": 203,
+          "no_face": 13
+        },
+        "unknown": 13
+      }
+    ],
+    "class_bar": {
+      "denominator_each_class": 648,
+      "pass": false,
+      "required_correct_each_class": 616
+    },
+    "cone": {
+      "HI": 25,
+      "LO": -20,
+      "Y": 60
+    },
+    "head_shoulder_disagreement": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.016195136791866,
+            "p50_deg": 7.2278392140874494,
+            "p90_deg": 24.367849097396963,
+            "planned_n": 648,
+            "rmse_deg": 14.533743390736626,
+            "valid_n": 626
+          },
+          "yaw": {
+            "mae_deg": 12.714971159434915,
+            "p50_deg": 6.2066481297474105,
+            "p90_deg": 28.93437316990367,
+            "planned_n": 648,
+            "rmse_deg": 23.383710222491768,
+            "valid_n": 626
+          }
+        },
+        "disagree": false,
+        "inside": {
+          "caught": 312,
+          "planned": 324,
+          "rate": 0.9629629629629629,
+          "unknown": 0,
+          "wrong": 12
+        },
+        "measured": 626,
+        "outside": {
+          "false_facing": 176,
+          "planned": 324,
+          "rate": 0.3888888888888889,
+          "rejected": 126,
+          "unknown": 22
+        },
+        "planned": 648,
+        "states": {
+          "ambiguous_face": 4,
+          "measured": 626,
+          "no_face": 17,
+          "pnp_back_facing": 1
+        },
+        "unknown": 22
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.493176271980847,
+            "p50_deg": 6.795913422616578,
+            "p90_deg": 23.858445076052668,
+            "planned_n": 648,
+            "rmse_deg": 14.028658843409595,
+            "valid_n": 627
+          },
+          "yaw": {
+            "mae_deg": 12.347404998204945,
+            "p50_deg": 6.738736047012381,
+            "p90_deg": 30.319284217351555,
+            "planned_n": 648,
+            "rmse_deg": 20.55740946864329,
+            "valid_n": 627
+          }
+        },
+        "disagree": true,
+        "inside": {
+          "caught": 308,
+          "planned": 324,
+          "rate": 0.9506172839506173,
+          "unknown": 0,
+          "wrong": 16
+        },
+        "measured": 627,
+        "outside": {
+          "false_facing": 169,
+          "planned": 324,
+          "rate": 0.41358024691358025,
+          "rejected": 134,
+          "unknown": 21
+        },
+        "planned": 648,
+        "states": {
+          "measured": 627,
+          "no_face": 19,
+          "pnp_back_facing": 2
+        },
+        "unknown": 21
+      }
+    ],
+    "identities": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.699787815362255,
+            "p50_deg": 7.2820940817883795,
+            "p90_deg": 24.184097520732994,
+            "planned_n": 216,
+            "rmse_deg": 14.150703923200805,
+            "valid_n": 211
+          },
+          "yaw": {
+            "mae_deg": 12.890563696247249,
+            "p50_deg": 6.322599259026994,
+            "p90_deg": 34.496975763259165,
+            "planned_n": 216,
+            "rmse_deg": 21.502349283226184,
+            "valid_n": 211
+          }
+        },
+        "identity_id": "A18",
+        "inside": {
+          "caught": 106,
+          "planned": 108,
+          "rate": 0.9814814814814815,
+          "unknown": 0,
+          "wrong": 2
+        },
+        "measured": 211,
+        "outside": {
+          "false_facing": 57,
+          "planned": 108,
+          "rate": 0.42592592592592593,
+          "rejected": 46,
+          "unknown": 5
+        },
+        "planned": 216,
+        "states": {
+          "measured": 211,
+          "no_face": 4,
+          "pnp_back_facing": 1
+        },
+        "unknown": 5
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 9.627237359301445,
+            "p50_deg": 5.583879030543322,
+            "p90_deg": 22.50511083663702,
+            "planned_n": 216,
+            "rmse_deg": 13.717512233424578,
+            "valid_n": 210
+          },
+          "yaw": {
+            "mae_deg": 11.432085584867707,
+            "p50_deg": 6.017548019756788,
+            "p90_deg": 32.96255931788396,
+            "planned_n": 216,
+            "rmse_deg": 18.03754832361168,
+            "valid_n": 210
+          }
+        },
+        "identity_id": "A19",
+        "inside": {
+          "caught": 99,
+          "planned": 108,
+          "rate": 0.9166666666666666,
+          "unknown": 0,
+          "wrong": 9
+        },
+        "measured": 210,
+        "outside": {
+          "false_facing": 55,
+          "planned": 108,
+          "rate": 0.4351851851851852,
+          "rejected": 47,
+          "unknown": 6
+        },
+        "planned": 216,
+        "states": {
+          "measured": 210,
+          "no_face": 6
+        },
+        "unknown": 6
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 12.240553710738288,
+            "p50_deg": 7.4446306673172655,
+            "p90_deg": 25.032571265257197,
+            "planned_n": 216,
+            "rmse_deg": 16.355370470308436,
+            "valid_n": 207
+          },
+          "yaw": {
+            "mae_deg": 9.73178309126461,
+            "p50_deg": 6.298611885567368,
+            "p90_deg": 18.418488881821553,
+            "planned_n": 216,
+            "rmse_deg": 16.852963463796982,
+            "valid_n": 207
+          }
+        },
+        "identity_id": "A20",
+        "inside": {
+          "caught": 108,
+          "planned": 108,
+          "rate": 1.0,
+          "unknown": 0,
+          "wrong": 0
+        },
+        "measured": 207,
+        "outside": {
+          "false_facing": 58,
+          "planned": 108,
+          "rate": 0.37962962962962965,
+          "rejected": 41,
+          "unknown": 9
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 207,
+          "no_face": 7
+        },
+        "unknown": 9
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 9.126262610729807,
+            "p50_deg": 5.617464502787334,
+            "p90_deg": 22.828082476419397,
+            "planned_n": 216,
+            "rmse_deg": 12.031026594749468,
+            "valid_n": 202
+          },
+          "yaw": {
+            "mae_deg": 21.315214710595495,
+            "p50_deg": 9.759174140508204,
+            "p90_deg": 67.40694225609647,
+            "planned_n": 216,
+            "rmse_deg": 34.49137707693874,
+            "valid_n": 202
+          }
+        },
+        "identity_id": "A21",
+        "inside": {
+          "caught": 102,
+          "planned": 108,
+          "rate": 0.9444444444444444,
+          "unknown": 0,
+          "wrong": 6
+        },
+        "measured": 202,
+        "outside": {
+          "false_facing": 65,
+          "planned": 108,
+          "rate": 0.26851851851851855,
+          "rejected": 29,
+          "unknown": 14
+        },
+        "planned": 216,
+        "states": {
+          "measured": 202,
+          "no_face": 13,
+          "pnp_back_facing": 1
+        },
+        "unknown": 14
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.992724599414252,
+            "p50_deg": 8.553144529642676,
+            "p90_deg": 24.979433018067496,
+            "planned_n": 216,
+            "rmse_deg": 15.05920397371146,
+            "valid_n": 216
+          },
+          "yaw": {
+            "mae_deg": 9.189660657428242,
+            "p50_deg": 7.420012599656943,
+            "p90_deg": 19.67497322788848,
+            "planned_n": 216,
+            "rmse_deg": 12.29660862118317,
+            "valid_n": 216
+          }
+        },
+        "identity_id": "A22",
+        "inside": {
+          "caught": 101,
+          "planned": 108,
+          "rate": 0.9351851851851852,
+          "unknown": 0,
+          "wrong": 7
+        },
+        "measured": 216,
+        "outside": {
+          "false_facing": 54,
+          "planned": 108,
+          "rate": 0.5,
+          "rejected": 54,
+          "unknown": 0
+        },
+        "planned": 216,
+        "states": {
+          "measured": 216
+        },
+        "unknown": 0
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.764523790846537,
+            "p50_deg": 7.325672571668142,
+            "p90_deg": 23.917669550743337,
+            "planned_n": 216,
+            "rmse_deg": 13.9466605176567,
+            "valid_n": 207
+          },
+          "yaw": {
+            "mae_deg": 10.993375814076353,
+            "p50_deg": 5.186108452479168,
+            "p90_deg": 18.658955596165924,
+            "planned_n": 216,
+            "rmse_deg": 23.0129473049297,
+            "valid_n": 207
+          }
+        },
+        "identity_id": "A23",
+        "inside": {
+          "caught": 104,
+          "planned": 108,
+          "rate": 0.9629629629629629,
+          "unknown": 0,
+          "wrong": 4
+        },
+        "measured": 207,
+        "outside": {
+          "false_facing": 56,
+          "planned": 108,
+          "rate": 0.39814814814814814,
+          "rejected": 43,
+          "unknown": 9
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 207,
+          "no_face": 6,
+          "pnp_back_facing": 1
+        },
+        "unknown": 9
+      }
+    ],
+    "limits": [
+      "Synthetic dataset only, no human or live-lamp qualification.",
+      "Six cell passes imply at least618/648 correct per class; published overall bar remains616/648.",
+      "Unknown/missing/unavailable outputs fail; structurally incomplete files are refused.",
+      "MAE uses measured rows only and always reports coverage; no wrapping or clamping."
+    ],
+    "primary": {
+      "angle_errors": {
+        "pitch": {
+          "mae_deg": 10.754476997736392,
+          "p50_deg": 7.030544228376922,
+          "p90_deg": 24.0668117200175,
+          "planned_n": 1296,
+          "rmse_deg": 14.283232343951006,
+          "valid_n": 1253
+        },
+        "yaw": {
+          "mae_deg": 12.53104140437411,
+          "p50_deg": 6.460291871507351,
+          "p90_deg": 29.92490294528176,
+          "planned_n": 1296,
+          "rmse_deg": 22.01483446509009,
+          "valid_n": 1253
+        }
+      },
+      "inside": {
+        "caught": 620,
+        "planned": 648,
+        "rate": 0.9567901234567902,
+        "unknown": 0,
+        "wrong": 28
+      },
+      "measured": 1253,
+      "outside": {
+        "false_facing": 345,
+        "planned": 648,
+        "rate": 0.4012345679012346,
+        "rejected": 260,
+        "unknown": 43
+      },
+      "planned": 1296,
+      "states": {
+        "ambiguous_face": 4,
+        "measured": 1253,
+        "no_face": 36,
+        "pnp_back_facing": 3
+      },
+      "unknown": 43
+    },
+    "shoulders": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.658751191963084,
+            "p50_deg": 7.204168459874136,
+            "p90_deg": 23.7051329628771,
+            "planned_n": 648,
+            "rmse_deg": 14.07192799521536,
+            "valid_n": 627
+          },
+          "yaw": {
+            "mae_deg": 11.55977543067136,
+            "p50_deg": 6.3633791286523405,
+            "p90_deg": 28.037851423216715,
+            "planned_n": 648,
+            "rmse_deg": 19.694049484572353,
+            "valid_n": 627
+          }
+        },
+        "inside": {
+          "caught": 312,
+          "planned": 324,
+          "rate": 0.9629629629629629,
+          "unknown": 0,
+          "wrong": 12
+        },
+        "measured": 627,
+        "outside": {
+          "false_facing": 169,
+          "planned": 324,
+          "rate": 0.41358024691358025,
+          "rejected": 134,
+          "unknown": 21
+        },
+        "planned": 648,
+        "shoulder_yaw_deg": 0,
+        "states": {
+          "measured": 627,
+          "no_face": 19,
+          "pnp_back_facing": 2
+        },
+        "unknown": 21
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.850355720132338,
+            "p50_deg": 6.804310588737849,
+            "p90_deg": 24.554700863954892,
+            "planned_n": 648,
+            "rmse_deg": 14.491786158925994,
+            "valid_n": 626
+          },
+          "yaw": {
+            "mae_deg": 13.50385892116584,
+            "p50_deg": 6.753107586780871,
+            "p90_deg": 32.27180575888357,
+            "planned_n": 648,
+            "rmse_deg": 24.116486400526107,
+            "valid_n": 626
+          }
+        },
+        "inside": {
+          "caught": 308,
+          "planned": 324,
+          "rate": 0.9506172839506173,
+          "unknown": 0,
+          "wrong": 16
+        },
+        "measured": 626,
+        "outside": {
+          "false_facing": 176,
+          "planned": 324,
+          "rate": 0.3888888888888889,
+          "rejected": 126,
+          "unknown": 22
+        },
+        "planned": 648,
+        "shoulder_yaw_deg": 75,
+        "states": {
+          "ambiguous_face": 4,
+          "measured": 626,
+          "no_face": 17,
+          "pnp_back_facing": 1
+        },
+        "unknown": 22
+      }
+    ]
+  },
+  "schema": "sensor4-public-evaluation-summary/1",
+  "test": {
+    "SET_BAR": "FAIL",
+    "boundary_diagnostic": {
+      "angle_errors": {
+        "pitch": {
+          "mae_deg": 10.56840032818853,
+          "p50_deg": 8.336792786211983,
+          "p90_deg": 21.134202100270482,
+          "planned_n": 72,
+          "rmse_deg": 12.827681762726575,
+          "valid_n": 72
+        },
+        "yaw": {
+          "mae_deg": 4.79615074992241,
+          "p50_deg": 3.1526182716810007,
+          "p90_deg": 8.623099007811922,
+          "planned_n": 72,
+          "rmse_deg": 6.230080507266387,
+          "valid_n": 72
+        }
+      },
+      "inside": {
+        "caught": 17,
+        "planned": 48,
+        "rate": 0.3541666666666667,
+        "unknown": 0,
+        "wrong": 31
+      },
+      "measured": 72,
+      "outside": {
+        "false_facing": 8,
+        "planned": 24,
+        "rate": 0.6666666666666666,
+        "rejected": 16,
+        "unknown": 0
+      },
+      "planned": 72,
+      "states": {
+        "measured": 72
+      },
+      "unknown": 0
+    },
+    "cells": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.633554718729705,
+            "p50_deg": 7.6478028794031285,
+            "p90_deg": 22.123660395895595,
+            "planned_n": 216,
+            "rmse_deg": 13.238120504841245,
+            "valid_n": 214
+          },
+          "yaw": {
+            "mae_deg": 6.035422807186907,
+            "p50_deg": 3.9656721076805526,
+            "p90_deg": 14.199622715432904,
+            "planned_n": 216,
+            "rmse_deg": 8.183868322554336,
+            "valid_n": 214
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 0,
+        "inside": {
+          "caught": 49,
+          "planned": 108,
+          "rate": 0.4537037037037037,
+          "unknown": 0,
+          "wrong": 59
+        },
+        "light_index": 0,
+        "measured": 214,
+        "outside": {
+          "false_facing": 15,
+          "planned": 108,
+          "rate": 0.8425925925925926,
+          "rejected": 91,
+          "unknown": 2
+        },
+        "planned": 216,
+        "states": {
+          "measured": 214,
+          "pnp_back_facing": 2
+        },
+        "unknown": 2
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 9.827310870466096,
+            "p50_deg": 6.42032708300816,
+            "p90_deg": 22.626904512763467,
+            "planned_n": 216,
+            "rmse_deg": 12.89815167057266,
+            "valid_n": 207
+          },
+          "yaw": {
+            "mae_deg": 6.454270605064194,
+            "p50_deg": 5.007980200314506,
+            "p90_deg": 14.588886350900275,
+            "planned_n": 216,
+            "rmse_deg": 8.452409806698231,
+            "valid_n": 207
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 0,
+        "inside": {
+          "caught": 57,
+          "planned": 108,
+          "rate": 0.5277777777777778,
+          "unknown": 0,
+          "wrong": 51
+        },
+        "light_index": 1,
+        "measured": 207,
+        "outside": {
+          "false_facing": 16,
+          "planned": 108,
+          "rate": 0.7685185185185185,
+          "rejected": 83,
+          "unknown": 9
+        },
+        "planned": 216,
+        "states": {
+          "measured": 207,
+          "no_face": 8,
+          "pnp_back_facing": 1
+        },
+        "unknown": 9
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.566690309326443,
+            "p50_deg": 6.957231515771305,
+            "p90_deg": 23.892378902304724,
+            "planned_n": 216,
+            "rmse_deg": 13.998447104883692,
+            "valid_n": 210
+          },
+          "yaw": {
+            "mae_deg": 7.8106414096588805,
+            "p50_deg": 5.094026046747462,
+            "p90_deg": 15.05909105085957,
+            "planned_n": 216,
+            "rmse_deg": 14.755612156145924,
+            "valid_n": 210
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 1,
+        "inside": {
+          "caught": 49,
+          "planned": 108,
+          "rate": 0.4537037037037037,
+          "unknown": 0,
+          "wrong": 59
+        },
+        "light_index": 0,
+        "measured": 210,
+        "outside": {
+          "false_facing": 18,
+          "planned": 108,
+          "rate": 0.7777777777777778,
+          "rejected": 84,
+          "unknown": 6
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 210,
+          "no_face": 4
+        },
+        "unknown": 6
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.377130359245005,
+            "p50_deg": 6.47786153882799,
+            "p90_deg": 24.124645846577366,
+            "planned_n": 216,
+            "rmse_deg": 14.378904408168651,
+            "valid_n": 211
+          },
+          "yaw": {
+            "mae_deg": 12.43741901537637,
+            "p50_deg": 6.168013029959529,
+            "p90_deg": 24.353544684213407,
+            "planned_n": 216,
+            "rmse_deg": 23.292661558175386,
+            "valid_n": 211
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 1,
+        "inside": {
+          "caught": 46,
+          "planned": 108,
+          "rate": 0.42592592592592593,
+          "unknown": 0,
+          "wrong": 62
+        },
+        "light_index": 1,
+        "measured": 211,
+        "outside": {
+          "false_facing": 35,
+          "planned": 108,
+          "rate": 0.6296296296296297,
+          "rejected": 68,
+          "unknown": 5
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 211,
+          "no_face": 3
+        },
+        "unknown": 5
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.629992702486915,
+            "p50_deg": 8.539857229078736,
+            "p90_deg": 25.734068666706758,
+            "planned_n": 216,
+            "rmse_deg": 15.150415165115977,
+            "valid_n": 208
+          },
+          "yaw": {
+            "mae_deg": 19.307757870531393,
+            "p50_deg": 11.235580699660616,
+            "p90_deg": 45.957184594358765,
+            "planned_n": 216,
+            "rmse_deg": 29.51029892691949,
+            "valid_n": 208
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 2,
+        "inside": {
+          "caught": 45,
+          "planned": 108,
+          "rate": 0.4166666666666667,
+          "unknown": 0,
+          "wrong": 63
+        },
+        "light_index": 0,
+        "measured": 208,
+        "outside": {
+          "false_facing": 37,
+          "planned": 108,
+          "rate": 0.5833333333333334,
+          "rejected": 63,
+          "unknown": 8
+        },
+        "planned": 216,
+        "states": {
+          "measured": 208,
+          "no_face": 8
+        },
+        "unknown": 8
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.516786528534645,
+            "p50_deg": 7.244937481634357,
+            "p90_deg": 25.816285905418273,
+            "planned_n": 216,
+            "rmse_deg": 15.876117943223138,
+            "valid_n": 203
+          },
+          "yaw": {
+            "mae_deg": 23.612003144587014,
+            "p50_deg": 13.270609707621539,
+            "p90_deg": 60.25531341769187,
+            "planned_n": 216,
+            "rmse_deg": 34.154792937926736,
+            "valid_n": 203
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 2,
+        "inside": {
+          "caught": 56,
+          "planned": 108,
+          "rate": 0.5185185185185185,
+          "unknown": 0,
+          "wrong": 52
+        },
+        "light_index": 1,
+        "measured": 203,
+        "outside": {
+          "false_facing": 39,
+          "planned": 108,
+          "rate": 0.5185185185185185,
+          "rejected": 56,
+          "unknown": 13
+        },
+        "planned": 216,
+        "states": {
+          "measured": 203,
+          "no_face": 13
+        },
+        "unknown": 13
+      }
+    ],
+    "class_bar": {
+      "denominator_each_class": 648,
+      "pass": false,
+      "required_correct_each_class": 616
+    },
+    "cone": {
+      "HI": 10,
+      "LO": -3,
+      "Y": 63
+    },
+    "head_shoulder_disagreement": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.016195136791866,
+            "p50_deg": 7.2278392140874494,
+            "p90_deg": 24.367849097396963,
+            "planned_n": 648,
+            "rmse_deg": 14.533743390736626,
+            "valid_n": 626
+          },
+          "yaw": {
+            "mae_deg": 12.714971159434915,
+            "p50_deg": 6.2066481297474105,
+            "p90_deg": 28.93437316990367,
+            "planned_n": 648,
+            "rmse_deg": 23.383710222491768,
+            "valid_n": 626
+          }
+        },
+        "disagree": false,
+        "inside": {
+          "caught": 151,
+          "planned": 324,
+          "rate": 0.4660493827160494,
+          "unknown": 0,
+          "wrong": 173
+        },
+        "measured": 626,
+        "outside": {
+          "false_facing": 73,
+          "planned": 324,
+          "rate": 0.7067901234567902,
+          "rejected": 229,
+          "unknown": 22
+        },
+        "planned": 648,
+        "states": {
+          "ambiguous_face": 4,
+          "measured": 626,
+          "no_face": 17,
+          "pnp_back_facing": 1
+        },
+        "unknown": 22
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.493176271980847,
+            "p50_deg": 6.795913422616578,
+            "p90_deg": 23.858445076052668,
+            "planned_n": 648,
+            "rmse_deg": 14.028658843409595,
+            "valid_n": 627
+          },
+          "yaw": {
+            "mae_deg": 12.347404998204945,
+            "p50_deg": 6.738736047012381,
+            "p90_deg": 30.319284217351555,
+            "planned_n": 648,
+            "rmse_deg": 20.55740946864329,
+            "valid_n": 627
+          }
+        },
+        "disagree": true,
+        "inside": {
+          "caught": 151,
+          "planned": 324,
+          "rate": 0.4660493827160494,
+          "unknown": 0,
+          "wrong": 173
+        },
+        "measured": 627,
+        "outside": {
+          "false_facing": 87,
+          "planned": 324,
+          "rate": 0.6666666666666666,
+          "rejected": 216,
+          "unknown": 21
+        },
+        "planned": 648,
+        "states": {
+          "measured": 627,
+          "no_face": 19,
+          "pnp_back_facing": 2
+        },
+        "unknown": 21
+      }
+    ],
+    "identities": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.699787815362255,
+            "p50_deg": 7.2820940817883795,
+            "p90_deg": 24.184097520732994,
+            "planned_n": 216,
+            "rmse_deg": 14.150703923200805,
+            "valid_n": 211
+          },
+          "yaw": {
+            "mae_deg": 12.890563696247249,
+            "p50_deg": 6.322599259026994,
+            "p90_deg": 34.496975763259165,
+            "planned_n": 216,
+            "rmse_deg": 21.502349283226184,
+            "valid_n": 211
+          }
+        },
+        "identity_id": "A18",
+        "inside": {
+          "caught": 38,
+          "planned": 108,
+          "rate": 0.35185185185185186,
+          "unknown": 0,
+          "wrong": 70
+        },
+        "measured": 211,
+        "outside": {
+          "false_facing": 33,
+          "planned": 108,
+          "rate": 0.6481481481481481,
+          "rejected": 70,
+          "unknown": 5
+        },
+        "planned": 216,
+        "states": {
+          "measured": 211,
+          "no_face": 4,
+          "pnp_back_facing": 1
+        },
+        "unknown": 5
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 9.627237359301445,
+            "p50_deg": 5.583879030543322,
+            "p90_deg": 22.50511083663702,
+            "planned_n": 216,
+            "rmse_deg": 13.717512233424578,
+            "valid_n": 210
+          },
+          "yaw": {
+            "mae_deg": 11.432085584867707,
+            "p50_deg": 6.017548019756788,
+            "p90_deg": 32.96255931788396,
+            "planned_n": 216,
+            "rmse_deg": 18.03754832361168,
+            "valid_n": 210
+          }
+        },
+        "identity_id": "A19",
+        "inside": {
+          "caught": 49,
+          "planned": 108,
+          "rate": 0.4537037037037037,
+          "unknown": 0,
+          "wrong": 59
+        },
+        "measured": 210,
+        "outside": {
+          "false_facing": 32,
+          "planned": 108,
+          "rate": 0.6481481481481481,
+          "rejected": 70,
+          "unknown": 6
+        },
+        "planned": 216,
+        "states": {
+          "measured": 210,
+          "no_face": 6
+        },
+        "unknown": 6
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 12.240553710738288,
+            "p50_deg": 7.4446306673172655,
+            "p90_deg": 25.032571265257197,
+            "planned_n": 216,
+            "rmse_deg": 16.355370470308436,
+            "valid_n": 207
+          },
+          "yaw": {
+            "mae_deg": 9.73178309126461,
+            "p50_deg": 6.298611885567368,
+            "p90_deg": 18.418488881821553,
+            "planned_n": 216,
+            "rmse_deg": 16.852963463796982,
+            "valid_n": 207
+          }
+        },
+        "identity_id": "A20",
+        "inside": {
+          "caught": 67,
+          "planned": 108,
+          "rate": 0.6203703703703703,
+          "unknown": 0,
+          "wrong": 41
+        },
+        "measured": 207,
+        "outside": {
+          "false_facing": 27,
+          "planned": 108,
+          "rate": 0.6666666666666666,
+          "rejected": 72,
+          "unknown": 9
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 207,
+          "no_face": 7
+        },
+        "unknown": 9
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 9.126262610729807,
+            "p50_deg": 5.617464502787334,
+            "p90_deg": 22.828082476419397,
+            "planned_n": 216,
+            "rmse_deg": 12.031026594749468,
+            "valid_n": 202
+          },
+          "yaw": {
+            "mae_deg": 21.315214710595495,
+            "p50_deg": 9.759174140508204,
+            "p90_deg": 67.40694225609647,
+            "planned_n": 216,
+            "rmse_deg": 34.49137707693874,
+            "valid_n": 202
+          }
+        },
+        "identity_id": "A21",
+        "inside": {
+          "caught": 41,
+          "planned": 108,
+          "rate": 0.37962962962962965,
+          "unknown": 0,
+          "wrong": 67
+        },
+        "measured": 202,
+        "outside": {
+          "false_facing": 29,
+          "planned": 108,
+          "rate": 0.6018518518518519,
+          "rejected": 65,
+          "unknown": 14
+        },
+        "planned": 216,
+        "states": {
+          "measured": 202,
+          "no_face": 13,
+          "pnp_back_facing": 1
+        },
+        "unknown": 14
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.992724599414252,
+            "p50_deg": 8.553144529642676,
+            "p90_deg": 24.979433018067496,
+            "planned_n": 216,
+            "rmse_deg": 15.05920397371146,
+            "valid_n": 216
+          },
+          "yaw": {
+            "mae_deg": 9.189660657428242,
+            "p50_deg": 7.420012599656943,
+            "p90_deg": 19.67497322788848,
+            "planned_n": 216,
+            "rmse_deg": 12.29660862118317,
+            "valid_n": 216
+          }
+        },
+        "identity_id": "A22",
+        "inside": {
+          "caught": 48,
+          "planned": 108,
+          "rate": 0.4444444444444444,
+          "unknown": 0,
+          "wrong": 60
+        },
+        "measured": 216,
+        "outside": {
+          "false_facing": 16,
+          "planned": 108,
+          "rate": 0.8518518518518519,
+          "rejected": 92,
+          "unknown": 0
+        },
+        "planned": 216,
+        "states": {
+          "measured": 216
+        },
+        "unknown": 0
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.764523790846537,
+            "p50_deg": 7.325672571668142,
+            "p90_deg": 23.917669550743337,
+            "planned_n": 216,
+            "rmse_deg": 13.9466605176567,
+            "valid_n": 207
+          },
+          "yaw": {
+            "mae_deg": 10.993375814076353,
+            "p50_deg": 5.186108452479168,
+            "p90_deg": 18.658955596165924,
+            "planned_n": 216,
+            "rmse_deg": 23.0129473049297,
+            "valid_n": 207
+          }
+        },
+        "identity_id": "A23",
+        "inside": {
+          "caught": 59,
+          "planned": 108,
+          "rate": 0.5462962962962963,
+          "unknown": 0,
+          "wrong": 49
+        },
+        "measured": 207,
+        "outside": {
+          "false_facing": 23,
+          "planned": 108,
+          "rate": 0.7037037037037037,
+          "rejected": 76,
+          "unknown": 9
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 207,
+          "no_face": 6,
+          "pnp_back_facing": 1
+        },
+        "unknown": 9
+      }
+    ],
+    "limits": [
+      "Synthetic dataset only, no human or live-lamp qualification.",
+      "Six cell passes imply at least618/648 correct per class; published overall bar remains616/648.",
+      "Unknown/missing/unavailable outputs fail; structurally incomplete files are refused.",
+      "MAE uses measured rows only and always reports coverage; no wrapping or clamping."
+    ],
+    "primary": {
+      "angle_errors": {
+        "pitch": {
+          "mae_deg": 10.754476997736392,
+          "p50_deg": 7.030544228376922,
+          "p90_deg": 24.0668117200175,
+          "planned_n": 1296,
+          "rmse_deg": 14.283232343951006,
+          "valid_n": 1253
+        },
+        "yaw": {
+          "mae_deg": 12.53104140437411,
+          "p50_deg": 6.460291871507351,
+          "p90_deg": 29.92490294528176,
+          "planned_n": 1296,
+          "rmse_deg": 22.01483446509009,
+          "valid_n": 1253
+        }
+      },
+      "inside": {
+        "caught": 302,
+        "planned": 648,
+        "rate": 0.4660493827160494,
+        "unknown": 0,
+        "wrong": 346
+      },
+      "measured": 1253,
+      "outside": {
+        "false_facing": 160,
+        "planned": 648,
+        "rate": 0.6867283950617284,
+        "rejected": 445,
+        "unknown": 43
+      },
+      "planned": 1296,
+      "states": {
+        "ambiguous_face": 4,
+        "measured": 1253,
+        "no_face": 36,
+        "pnp_back_facing": 3
+      },
+      "unknown": 43
+    },
+    "shoulders": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.658751191963084,
+            "p50_deg": 7.204168459874136,
+            "p90_deg": 23.7051329628771,
+            "planned_n": 648,
+            "rmse_deg": 14.07192799521536,
+            "valid_n": 627
+          },
+          "yaw": {
+            "mae_deg": 11.55977543067136,
+            "p50_deg": 6.3633791286523405,
+            "p90_deg": 28.037851423216715,
+            "planned_n": 648,
+            "rmse_deg": 19.694049484572353,
+            "valid_n": 627
+          }
+        },
+        "inside": {
+          "caught": 151,
+          "planned": 324,
+          "rate": 0.4660493827160494,
+          "unknown": 0,
+          "wrong": 173
+        },
+        "measured": 627,
+        "outside": {
+          "false_facing": 87,
+          "planned": 324,
+          "rate": 0.6666666666666666,
+          "rejected": 216,
+          "unknown": 21
+        },
+        "planned": 648,
+        "shoulder_yaw_deg": 0,
+        "states": {
+          "measured": 627,
+          "no_face": 19,
+          "pnp_back_facing": 2
+        },
+        "unknown": 21
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.850355720132338,
+            "p50_deg": 6.804310588737849,
+            "p90_deg": 24.554700863954892,
+            "planned_n": 648,
+            "rmse_deg": 14.491786158925994,
+            "valid_n": 626
+          },
+          "yaw": {
+            "mae_deg": 13.50385892116584,
+            "p50_deg": 6.753107586780871,
+            "p90_deg": 32.27180575888357,
+            "planned_n": 648,
+            "rmse_deg": 24.116486400526107,
+            "valid_n": 626
+          }
+        },
+        "inside": {
+          "caught": 151,
+          "planned": 324,
+          "rate": 0.4660493827160494,
+          "unknown": 0,
+          "wrong": 173
+        },
+        "measured": 626,
+        "outside": {
+          "false_facing": 73,
+          "planned": 324,
+          "rate": 0.7067901234567902,
+          "rejected": 229,
+          "unknown": 22
+        },
+        "planned": 648,
+        "shoulder_yaw_deg": 75,
+        "states": {
+          "ambiguous_face": 4,
+          "measured": 626,
+          "no_face": 17,
+          "pnp_back_facing": 1
+        },
+        "unknown": 22
+      }
+    ]
+  },
+  "tune": {
+    "SET_BAR": "FAIL",
+    "boundary_diagnostic": {
+      "excluded_from_fit_and_primary": true,
+      "status": "NOT_RUN"
+    },
+    "cells": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.393314475972529,
+            "p50_deg": 7.662718189565281,
+            "p90_deg": 22.66522778108909,
+            "planned_n": 216,
+            "rmse_deg": 13.209989445869736,
+            "valid_n": 212
+          },
+          "yaw": {
+            "mae_deg": 5.1926170442449076,
+            "p50_deg": 3.464491167563253,
+            "p90_deg": 11.893462114884894,
+            "planned_n": 216,
+            "rmse_deg": 7.1372497468609595,
+            "valid_n": 212
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 0,
+        "inside": {
+          "caught": 52,
+          "planned": 108,
+          "rate": 0.48148148148148145,
+          "unknown": 0,
+          "wrong": 56
+        },
+        "light_index": 0,
+        "measured": 212,
+        "outside": {
+          "false_facing": 17,
+          "planned": 108,
+          "rate": 0.8055555555555556,
+          "rejected": 87,
+          "unknown": 4
+        },
+        "planned": 216,
+        "states": {
+          "measured": 212,
+          "no_face": 2,
+          "pnp_back_facing": 2
+        },
+        "unknown": 4
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.139450316807402,
+            "p50_deg": 6.6167632649220165,
+            "p90_deg": 23.164763552628273,
+            "planned_n": 216,
+            "rmse_deg": 13.240460684603962,
+            "valid_n": 210
+          },
+          "yaw": {
+            "mae_deg": 5.868299280828612,
+            "p50_deg": 4.407790220481116,
+            "p90_deg": 13.891106200215523,
+            "planned_n": 216,
+            "rmse_deg": 7.707390867786792,
+            "valid_n": 210
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 0,
+        "inside": {
+          "caught": 52,
+          "planned": 108,
+          "rate": 0.48148148148148145,
+          "unknown": 0,
+          "wrong": 56
+        },
+        "light_index": 1,
+        "measured": 210,
+        "outside": {
+          "false_facing": 13,
+          "planned": 108,
+          "rate": 0.8240740740740741,
+          "rejected": 89,
+          "unknown": 6
+        },
+        "planned": 216,
+        "states": {
+          "measured": 210,
+          "no_face": 6
+        },
+        "unknown": 6
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.595118023239666,
+            "p50_deg": 7.043477470744378,
+            "p90_deg": 24.382674880646082,
+            "planned_n": 216,
+            "rmse_deg": 13.950010504024442,
+            "valid_n": 212
+          },
+          "yaw": {
+            "mae_deg": 6.137114843517714,
+            "p50_deg": 4.391177452866675,
+            "p90_deg": 14.292972279996746,
+            "planned_n": 216,
+            "rmse_deg": 8.306112964147143,
+            "valid_n": 212
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 1,
+        "inside": {
+          "caught": 49,
+          "planned": 108,
+          "rate": 0.4537037037037037,
+          "unknown": 0,
+          "wrong": 59
+        },
+        "light_index": 0,
+        "measured": 212,
+        "outside": {
+          "false_facing": 18,
+          "planned": 108,
+          "rate": 0.7962962962962963,
+          "rejected": 86,
+          "unknown": 4
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 212,
+          "no_face": 2
+        },
+        "unknown": 4
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.610977181005175,
+            "p50_deg": 6.152915868485561,
+            "p90_deg": 24.713084910819823,
+            "planned_n": 216,
+            "rmse_deg": 14.5924122932695,
+            "valid_n": 212
+          },
+          "yaw": {
+            "mae_deg": 12.09695090050187,
+            "p50_deg": 6.3566526346854,
+            "p90_deg": 24.00162433200247,
+            "planned_n": 216,
+            "rmse_deg": 22.487673391203476,
+            "valid_n": 212
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 1,
+        "inside": {
+          "caught": 54,
+          "planned": 108,
+          "rate": 0.5,
+          "unknown": 0,
+          "wrong": 54
+        },
+        "light_index": 1,
+        "measured": 212,
+        "outside": {
+          "false_facing": 30,
+          "planned": 108,
+          "rate": 0.6851851851851852,
+          "rejected": 74,
+          "unknown": 4
+        },
+        "planned": 216,
+        "states": {
+          "measured": 212,
+          "no_face": 4
+        },
+        "unknown": 4
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.831131104934963,
+            "p50_deg": 8.289338183486267,
+            "p90_deg": 26.156036105033472,
+            "planned_n": 216,
+            "rmse_deg": 15.649210450842107,
+            "valid_n": 209
+          },
+          "yaw": {
+            "mae_deg": 19.05806307907173,
+            "p50_deg": 11.25529839974941,
+            "p90_deg": 41.75205603816485,
+            "planned_n": 216,
+            "rmse_deg": 28.770191384601016,
+            "valid_n": 209
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 2,
+        "inside": {
+          "caught": 50,
+          "planned": 108,
+          "rate": 0.46296296296296297,
+          "unknown": 0,
+          "wrong": 58
+        },
+        "light_index": 0,
+        "measured": 209,
+        "outside": {
+          "false_facing": 42,
+          "planned": 108,
+          "rate": 0.5462962962962963,
+          "rejected": 59,
+          "unknown": 7
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 1,
+          "measured": 209,
+          "no_face": 6
+        },
+        "unknown": 7
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.369716278974524,
+            "p50_deg": 6.757757404472754,
+            "p90_deg": 27.153869899708116,
+            "planned_n": 216,
+            "rmse_deg": 15.867728554366606,
+            "valid_n": 203
+          },
+          "yaw": {
+            "mae_deg": 24.720361334805308,
+            "p50_deg": 15.424584448353855,
+            "p90_deg": 62.313084800171076,
+            "planned_n": 216,
+            "rmse_deg": 34.87237468861041,
+            "valid_n": 203
+          }
+        },
+        "cell_bar": {
+          "denominator_each_class": 108,
+          "pass": false,
+          "required_correct_each_class": 103
+        },
+        "distance_index": 2,
+        "inside": {
+          "caught": 49,
+          "planned": 108,
+          "rate": 0.4537037037037037,
+          "unknown": 1,
+          "wrong": 58
+        },
+        "light_index": 1,
+        "measured": 203,
+        "outside": {
+          "false_facing": 48,
+          "planned": 108,
+          "rate": 0.4444444444444444,
+          "rejected": 48,
+          "unknown": 12
+        },
+        "planned": 216,
+        "states": {
+          "measured": 203,
+          "no_face": 13
+        },
+        "unknown": 13
+      }
+    ],
+    "class_bar": {
+      "denominator_each_class": 648,
+      "pass": false,
+      "required_correct_each_class": 616
+    },
+    "cone": {
+      "HI": 10,
+      "LO": -3,
+      "Y": 63
+    },
+    "head_shoulder_disagreement": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.97292308313446,
+            "p50_deg": 7.144223370490855,
+            "p90_deg": 24.975011825094867,
+            "planned_n": 648,
+            "rmse_deg": 14.576464766470952,
+            "valid_n": 628
+          },
+          "yaw": {
+            "mae_deg": 12.552166465274501,
+            "p50_deg": 6.129368126064243,
+            "p90_deg": 30.483103333488682,
+            "planned_n": 648,
+            "rmse_deg": 22.967193255079852,
+            "valid_n": 628
+          }
+        },
+        "disagree": false,
+        "inside": {
+          "caught": 148,
+          "planned": 324,
+          "rate": 0.4567901234567901,
+          "unknown": 1,
+          "wrong": 175
+        },
+        "measured": 628,
+        "outside": {
+          "false_facing": 83,
+          "planned": 324,
+          "rate": 0.6851851851851852,
+          "rejected": 222,
+          "unknown": 19
+        },
+        "planned": 648,
+        "states": {
+          "ambiguous_face": 3,
+          "measured": 628,
+          "no_face": 16,
+          "pnp_back_facing": 1
+        },
+        "unknown": 20
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.663686552524494,
+            "p50_deg": 6.973478465135395,
+            "p90_deg": 24.445168806129395,
+            "planned_n": 648,
+            "rmse_deg": 14.313459483612581,
+            "valid_n": 630
+          },
+          "yaw": {
+            "mae_deg": 11.614932689500256,
+            "p50_deg": 6.025574940113151,
+            "p90_deg": 26.987920780399776,
+            "planned_n": 648,
+            "rmse_deg": 19.260202211460452,
+            "valid_n": 630
+          }
+        },
+        "disagree": true,
+        "inside": {
+          "caught": 158,
+          "planned": 324,
+          "rate": 0.4876543209876543,
+          "unknown": 0,
+          "wrong": 166
+        },
+        "measured": 630,
+        "outside": {
+          "false_facing": 85,
+          "planned": 324,
+          "rate": 0.6820987654320988,
+          "rejected": 221,
+          "unknown": 18
+        },
+        "planned": 648,
+        "states": {
+          "measured": 630,
+          "no_face": 17,
+          "pnp_back_facing": 1
+        },
+        "unknown": 18
+      }
+    ],
+    "identities": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.018505080858313,
+            "p50_deg": 7.611027830624869,
+            "p90_deg": 23.723950307865557,
+            "planned_n": 216,
+            "rmse_deg": 14.346519019173819,
+            "valid_n": 213
+          },
+          "yaw": {
+            "mae_deg": 12.200444742402551,
+            "p50_deg": 5.760142453017707,
+            "p90_deg": 33.51908289725994,
+            "planned_n": 216,
+            "rmse_deg": 20.318016152966752,
+            "valid_n": 213
+          }
+        },
+        "identity_id": "A12",
+        "inside": {
+          "caught": 41,
+          "planned": 108,
+          "rate": 0.37962962962962965,
+          "unknown": 0,
+          "wrong": 67
+        },
+        "measured": 213,
+        "outside": {
+          "false_facing": 34,
+          "planned": 108,
+          "rate": 0.6574074074074074,
+          "rejected": 71,
+          "unknown": 3
+        },
+        "planned": 216,
+        "states": {
+          "measured": 213,
+          "no_face": 3
+        },
+        "unknown": 3
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 9.253878198840393,
+            "p50_deg": 4.906501952984865,
+            "p90_deg": 22.198675301167583,
+            "planned_n": 216,
+            "rmse_deg": 13.46199582096421,
+            "valid_n": 207
+          },
+          "yaw": {
+            "mae_deg": 13.193094606686135,
+            "p50_deg": 7.884262616906948,
+            "p90_deg": 39.73028206239408,
+            "planned_n": 216,
+            "rmse_deg": 20.47702814077183,
+            "valid_n": 207
+          }
+        },
+        "identity_id": "A13",
+        "inside": {
+          "caught": 55,
+          "planned": 108,
+          "rate": 0.5092592592592593,
+          "unknown": 1,
+          "wrong": 52
+        },
+        "measured": 207,
+        "outside": {
+          "false_facing": 27,
+          "planned": 108,
+          "rate": 0.6759259259259259,
+          "rejected": 73,
+          "unknown": 8
+        },
+        "planned": 216,
+        "states": {
+          "measured": 207,
+          "no_face": 7,
+          "pnp_back_facing": 2
+        },
+        "unknown": 9
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 12.436322142425,
+            "p50_deg": 7.8730805345126615,
+            "p90_deg": 25.788958380023853,
+            "planned_n": 216,
+            "rmse_deg": 16.875890842649216,
+            "valid_n": 208
+          },
+          "yaw": {
+            "mae_deg": 9.704824821467744,
+            "p50_deg": 5.513530251667628,
+            "p90_deg": 19.360024230631424,
+            "planned_n": 216,
+            "rmse_deg": 17.154664489379382,
+            "valid_n": 208
+          }
+        },
+        "identity_id": "A14",
+        "inside": {
+          "caught": 70,
+          "planned": 108,
+          "rate": 0.6481481481481481,
+          "unknown": 0,
+          "wrong": 38
+        },
+        "measured": 208,
+        "outside": {
+          "false_facing": 30,
+          "planned": 108,
+          "rate": 0.6481481481481481,
+          "rejected": 70,
+          "unknown": 8
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 1,
+          "measured": 208,
+          "no_face": 7
+        },
+        "unknown": 8
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 8.969573881291648,
+            "p50_deg": 5.120022547190937,
+            "p90_deg": 23.275833738190396,
+            "planned_n": 216,
+            "rmse_deg": 12.125838724456042,
+            "valid_n": 204
+          },
+          "yaw": {
+            "mae_deg": 17.554081467199666,
+            "p50_deg": 7.098735245101565,
+            "p90_deg": 54.139755128871556,
+            "planned_n": 216,
+            "rmse_deg": 29.02135195943686,
+            "valid_n": 204
+          }
+        },
+        "identity_id": "A15",
+        "inside": {
+          "caught": 40,
+          "planned": 108,
+          "rate": 0.37037037037037035,
+          "unknown": 0,
+          "wrong": 68
+        },
+        "measured": 204,
+        "outside": {
+          "false_facing": 35,
+          "planned": 108,
+          "rate": 0.5648148148148148,
+          "rejected": 61,
+          "unknown": 12
+        },
+        "planned": 216,
+        "states": {
+          "measured": 204,
+          "no_face": 12
+        },
+        "unknown": 12
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.970958832434993,
+            "p50_deg": 8.713101880289145,
+            "p90_deg": 25.46839809509302,
+            "planned_n": 216,
+            "rmse_deg": 15.044543856760919,
+            "valid_n": 216
+          },
+          "yaw": {
+            "mae_deg": 9.041470867649373,
+            "p50_deg": 7.737359849843392,
+            "p90_deg": 18.201180578069042,
+            "planned_n": 216,
+            "rmse_deg": 11.946428843598285,
+            "valid_n": 216
+          }
+        },
+        "identity_id": "A16",
+        "inside": {
+          "caught": 38,
+          "planned": 108,
+          "rate": 0.35185185185185186,
+          "unknown": 0,
+          "wrong": 70
+        },
+        "measured": 216,
+        "outside": {
+          "false_facing": 16,
+          "planned": 108,
+          "rate": 0.8518518518518519,
+          "rejected": 92,
+          "unknown": 0
+        },
+        "planned": 216,
+        "states": {
+          "measured": 216
+        },
+        "unknown": 0
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 11.163565093820173,
+            "p50_deg": 8.045844114936699,
+            "p90_deg": 23.895572714141682,
+            "planned_n": 216,
+            "rmse_deg": 14.314295665367835,
+            "valid_n": 210
+          },
+          "yaw": {
+            "mae_deg": 11.037661577502323,
+            "p50_deg": 4.774787821143011,
+            "p90_deg": 18.980186244374956,
+            "planned_n": 216,
+            "rmse_deg": 24.532244507111916,
+            "valid_n": 210
+          }
+        },
+        "identity_id": "A17",
+        "inside": {
+          "caught": 62,
+          "planned": 108,
+          "rate": 0.5740740740740741,
+          "unknown": 0,
+          "wrong": 46
+        },
+        "measured": 210,
+        "outside": {
+          "false_facing": 26,
+          "planned": 108,
+          "rate": 0.7037037037037037,
+          "rejected": 76,
+          "unknown": 6
+        },
+        "planned": 216,
+        "states": {
+          "ambiguous_face": 2,
+          "measured": 210,
+          "no_face": 4
+        },
+        "unknown": 6
+      }
+    ],
+    "limits": [
+      "Synthetic dataset only, no human or live-lamp qualification.",
+      "Six cell passes imply at least618/648 correct per class; published overall bar remains616/648.",
+      "Unknown/missing/unavailable outputs fail; structurally incomplete files are refused.",
+      "MAE uses measured rows only and always reports coverage; no wrapping or clamping."
+    ],
+    "primary": {
+      "angle_errors": {
+        "pitch": {
+          "mae_deg": 10.818059001827402,
+          "p50_deg": 7.066878644982941,
+          "p90_deg": 24.6973335041938,
+          "planned_n": 1296,
+          "rmse_deg": 14.445351634066855,
+          "valid_n": 1258
+        },
+        "yaw": {
+          "mae_deg": 12.082804558487718,
+          "p50_deg": 6.068059148183135,
+          "p90_deg": 28.128418459029252,
+          "planned_n": 1296,
+          "rmse_deg": 21.19196179522641,
+          "valid_n": 1258
+        }
+      },
+      "inside": {
+        "caught": 306,
+        "planned": 648,
+        "rate": 0.4722222222222222,
+        "unknown": 1,
+        "wrong": 341
+      },
+      "measured": 1258,
+      "outside": {
+        "false_facing": 168,
+        "planned": 648,
+        "rate": 0.683641975308642,
+        "rejected": 443,
+        "unknown": 37
+      },
+      "planned": 1296,
+      "states": {
+        "ambiguous_face": 3,
+        "measured": 1258,
+        "no_face": 33,
+        "pnp_back_facing": 2
+      },
+      "unknown": 38
+    },
+    "shoulders": [
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.67244101289844,
+            "p50_deg": 6.978373504070923,
+            "p90_deg": 24.341092928845377,
+            "planned_n": 648,
+            "rmse_deg": 14.21693684371399,
+            "valid_n": 629
+          },
+          "yaw": {
+            "mae_deg": 10.949541338398992,
+            "p50_deg": 5.823454126925133,
+            "p90_deg": 25.951858440366703,
+            "planned_n": 648,
+            "rmse_deg": 18.53832633718008,
+            "valid_n": 629
+          }
+        },
+        "inside": {
+          "caught": 148,
+          "planned": 324,
+          "rate": 0.4567901234567901,
+          "unknown": 1,
+          "wrong": 175
+        },
+        "measured": 629,
+        "outside": {
+          "false_facing": 85,
+          "planned": 324,
+          "rate": 0.6820987654320988,
+          "rejected": 221,
+          "unknown": 18
+        },
+        "planned": 648,
+        "shoulder_yaw_deg": 0,
+        "states": {
+          "measured": 629,
+          "no_face": 18,
+          "pnp_back_facing": 1
+        },
+        "unknown": 19
+      },
+      {
+        "angle_errors": {
+          "pitch": {
+            "mae_deg": 10.963676990756364,
+            "p50_deg": 7.186408066000679,
+            "p90_deg": 25.2540342858412,
+            "planned_n": 648,
+            "rmse_deg": 14.670210443123286,
+            "valid_n": 629
+          },
+          "yaw": {
+            "mae_deg": 13.216067778576441,
+            "p50_deg": 6.323453106905903,
+            "p90_deg": 31.72099745876403,
+            "planned_n": 648,
+            "rmse_deg": 23.548438293799585,
+            "valid_n": 629
+          }
+        },
+        "inside": {
+          "caught": 158,
+          "planned": 324,
+          "rate": 0.4876543209876543,
+          "unknown": 0,
+          "wrong": 166
+        },
+        "measured": 629,
+        "outside": {
+          "false_facing": 83,
+          "planned": 324,
+          "rate": 0.6851851851851852,
+          "rejected": 222,
+          "unknown": 19
+        },
+        "planned": 648,
+        "shoulder_yaw_deg": 75,
+        "states": {
+          "ambiguous_face": 3,
+          "measured": 629,
+          "no_face": 15,
+          "pnp_back_facing": 1
+        },
+        "unknown": 19
+      }
+    ]
+  },
+  "tune_status": "FAIL"
+}
