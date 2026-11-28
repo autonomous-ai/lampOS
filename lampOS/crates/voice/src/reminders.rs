@@ -114,7 +114,9 @@ pub(crate) fn cannot_ring(
     name: &str,
     var: impl Fn(&str) -> Option<std::ffi::OsString>,
 ) -> Option<serde_json::Value> {
-    let sets = matches!(name, "set_timer" | "set_reminder" | "repeat_reminder");
+    // A move sets the one moved again (#8840).
+    let sets = matches!(name, "set_timer" | "set_reminder" | "repeat_reminder")
+        || name == lamp_actions::schedule::MOVE;
     let on = refence_on(var(REFENCE_VARIABLE).as_deref().and_then(|v| v.to_str()));
     let dir = var(LEDGER_VARIABLE).map(PathBuf::from)?;
     let fresh = || {

@@ -387,12 +387,13 @@ mod tests {
             Policed::Run
         );
         assert_eq!(desk.clone().wait(1, "light_on".into()).await, Policed::Held);
-        assert_eq!(desk.wait(1, "cancel_reminder".into()).await, Policed::Held);
+        // A cancel said back to the lamp runs (#8840).
+        assert_eq!(desk.wait(1, "cancel_reminder".into()).await, Policed::Run);
         for (name, policed) in [
             ("light_on", Policed::Run),
             ("volume_up", Policed::Run),
             ("volume_mute", Policed::Held),
-            ("cancel_reminder", Policed::Held),
+            ("cancel_reminder", Policed::Run),
             ("set_timer", Policed::Run),
         ] {
             assert_eq!(

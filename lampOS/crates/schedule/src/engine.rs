@@ -1167,6 +1167,9 @@ impl<P: Persistence> Engine<P> {
         view["set_unix_ms"] = json!(item.created_unix_ms);
         view["set_local"] = json!(set.as_ref().map(|(local, _)| local));
         view["set_day"] = json!(set.as_ref().map(|(_, day)| day));
+        // Set by no one, the room's: a move sets it again as the room's,
+        // never as its mover's (#8840). Never who set it.
+        view["set_by_room"] = json!(item.person.is_none());
         view
     }
 

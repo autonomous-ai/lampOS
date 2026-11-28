@@ -770,9 +770,11 @@ impl Adapter {
     }
 
     /// `move_reminder` (#8840): the one reminder `by` names, set again at
-    /// `time` with its words and its repeat, then the old one cancelled, so
-    /// never both left and never neither. Several or none matching, a timer,
-    /// or an interval series: told, and nothing changes.
+    /// `time` with its words, its repeat, its zone and (for a one-time one
+    /// moved with no `day`) its date, as its setter's, then the old one
+    /// cancelled. Never neither: a failed set changes nothing. If the cancel
+    /// fails, both stay and the person is told (`old_kept`). Several or none
+    /// matching, a timer, or an interval series: told, and nothing changes.
     fn move_one(
         &self,
         by: By,
@@ -823,13 +825,23 @@ impl Adapter {
         if one["kind"] != "reminder" {
             return not_by_clock();
         }
+        // A one-time item's zone and date are in its `local`,
+        // `YYYY-MM-DDTHH:MM:SS+HH:MM[Zone]`: moved with no `day`, it stays on
+        // its own date (the Reviewer-lead's P2 on #8945: "move it to 10"
+        // for tomorrow's must not become today's).
+        let local = one["local"].as_str().unwrap_or_default();
+        let local_zone = local
+            .rsplit_once('[')
+            .and_then(|(_, zone)| zone.strip_suffix(']'))
+            .map(str::to_owned);
+        let local_day = local.get(..10).filter(|d| self::day(d)).map(str::to_owned);
         let zone = one["repeat"]["zone"].as_str().map(str::to_owned);
         let (when, repeat) = match one["repeat"]["kind"].as_str() {
             None if one["repeat"].is_null() => (
                 When::At {
                     time: time.clone(),
-                    day,
-                    zone: None,
+                    day: day.or(local_day),
+                    zone: local_zone,
                     fold: None,
                 },
                 "once",
@@ -858,13 +870,21 @@ impl Adapter {
         };
         let old = one["id"].as_u64().ok_or(Failure::Unavailable)?;
         let text = one["text"].as_str().ok_or(Failure::Unavailable)?.to_owned();
+        // The room's stays the room's: set again by no one (the
+        // Reviewer-lead's P3 1 on #8945), so the room still hears of it.
+        let room = caller
+            .filter(|_| one["set_by_room"] == true)
+            .map(|caller| Caller {
+                setter: None,
+                ..caller.clone()
+            });
         let set = self.perform(
             Call::Set {
                 text: text.clone(),
                 when,
             },
             set_times,
-            caller,
+            room.as_ref().or(caller),
             deadline,
         )?;
         let new = set["id"].as_u64().ok_or(Failure::Uncertain)?;
@@ -1496,6 +1516,9 @@ struct Item {
     set_local: Option<String>,
     #[serde(default)]
     set_day: Option<String>,
+    /// Set by no one (`list_set`, #8840); absent from an older Schedule.
+    #[serde(default)]
+    set_by_room: Option<bool>,
 }
 /// When an item was set, as the model is told it: its day (`today`,
 /// `yesterday` or `YYYY-MM-DD`) and its local `HH:MM`, both or neither. An
@@ -1596,6 +1619,10 @@ fn page(
             let (set_day, set_clock) = set_at(&i);
             one["set_day"] = json!(set_day);
             one["set_clock"] = json!(set_clock);
+            // Set by no one: a move keeps it the room's (#8840).
+            if i.set_by_room == Some(true) {
+                one["set_by_room"] = json!(true);
+            }
         }
         checked.push(one);
     }
