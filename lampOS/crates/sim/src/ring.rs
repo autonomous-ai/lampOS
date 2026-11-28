@@ -20,6 +20,8 @@ fn rest() -> Light {
         on: false,
         colour: "warm".to_owned(),
         level: 1,
+        tint: None,
+        step: None,
     }
 }
 
@@ -225,10 +227,12 @@ fn kind_name(kind: PatternKind) -> &'static str {
 /// The light's colour at `share` of the full level (level 5 is 1.0), under
 /// the real ring's cap (level/5 of 120 a channel).
 fn drawn(light: &Light, share: f32) -> [u8; 3] {
-    let tint = Light::TINTS
-        .iter()
-        .find(|(name, _)| *name == light.colour)
-        .map(|(_, t)| *t)
+    // The light's own colour when it has one, else its name's: the ten and
+    // the soft ones.
+    let tint = light
+        .tint
+        .map(|own| own.map(|channel| f32::from(channel) / 255.0))
+        .or_else(|| Light::tint_of(&light.colour))
         .unwrap_or([1.0, 1.0, 1.0]);
     // The cap first, then the tint: the order the steady light has always had.
     let scale = share * 120.0;
@@ -297,6 +301,8 @@ mod tests {
             on: true,
             colour: colour.to_owned(),
             level,
+            tint: None,
+            step: None,
         }
     }
 

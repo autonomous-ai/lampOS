@@ -855,6 +855,8 @@ mod tests {
                 on: true,
                 colour: "warm".into(),
                 level,
+                tint: None,
+                step: None,
             })
         };
         let mut own = OwnLight::default();
@@ -874,6 +876,8 @@ mod tests {
             on: true,
             colour: "warm".into(),
             level: 3,
+            tint: None,
+            step: None,
         });
         let mut own = OwnLight::default();
         let mut change = Change::default();

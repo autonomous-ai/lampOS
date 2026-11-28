@@ -368,6 +368,8 @@ nhận HAL nhận yêu cầu phát, không đảm bảo audio đã phát xong.
 | `led.resting.get` | Đọc lựa chọn đèn nghỉ của chủ máy, mặc định của device và màu đang áp qua HAL `GET /led/resting` (đồng bộ) | _(không có)_ |
 | `led.resting.set` | Lưu đèn nghỉ (`default`, `off` hoặc màu `custom`) qua HAL `PUT /led/resting`; giữ qua reboot (đồng bộ) | `mode`, `color` khi `custom` |
 | `led.resting.preview` | Hiện thử một màu mà không lưu qua HAL `POST /led/resting/preview`; tự quay về sau 10 giây kể từ lần preview cuối; chỉ ack khi lỗi | `color` |
+| `led.faces.get` | Chỉ Lamp 2: đọc màu và độ sáng chủ máy đặt cho mặt nghỉ, nghe, nghĩ và nói, và những gì đèn nhận (đồng bộ) | _(không có)_ |
+| `led.faces.set` | Chỉ Lamp 2: đặt hoặc trả về mặc định một hay nhiều mặt đó (đồng bộ) | một hay nhiều trong `resting`, `listening`, `thinking`, `speaking`, mỗi cái `{color, level}` hoặc `"default"` |
 | `volume.get` | Đọc âm lượng loa theo 0-100% của dải cho phép (đồng bộ) | _(không có)_ |
 | `volume.set` | Đặt âm lượng loa, 0-100% của dải cho phép, qua HAL `POST /audio/volume` (đồng bộ) | `volume` |
 | `mic.get` | Đọc trạng thái tắt mic và công tắc mic phần cứng (đồng bộ) | _(không có)_ |
@@ -1209,6 +1211,69 @@ thêm vài trăm mili giây.
 
 Device không có capability `light` trả `failure` với `this device has no light`.
 Input sai bị từ chối trước khi gọi HAL.
+
+**Những gì đèn nhận (Lamp 2).** Đèn giữ nguyên màu được gửi, và có nhiều bậc
+sáng hơn, sẽ nói điều đó trong reply của `led.resting.get`, `led.resting.set` và
+`led.faces.get`/`set`:
+
+```json
+{"colours": "any", "levels": 10}
+```
+
+`"colours": "any"` nghĩa là màu `custom` được giữ như khi gửi (giữ sắc màu, kênh
+sáng nhất được scale lên 255), không bị làm tròn về một trong mười màu có tên;
+`"levels": N` là số bậc độ sáng. `color` mà app đọc lại là sắc màu ở tỉ lệ của
+bậc đó trên 255, và gửi lại đúng màu đó thì vẫn là cùng một đèn. Reply không có
+hai field này là đèn của các đoạn trên: mười màu có tên, năm mức. Object `light`
+trong snapshot của Lamp 2 gọi tên đèn (`on`, `colour`, `level`) và, khi có,
+`tint` (màu riêng của chủ máy) và `step` (1 đến `levels`); `name` là tên màu khi
+đó là một màu có tên của đèn, và `null` khi đó là màu riêng của chủ máy. Các màu
+có tên của đèn là mười màu ở trên và bảy màu dịu: `candle`, `amber`, `peach`,
+`rose`, `lavender`, `mint` và `sky`.
+
+#### `led.faces.*` — Các mặt của một lượt qua MQTT (Lamp 2)
+
+Ngoài đèn nghỉ, Lamp 2 cho chủ máy đổi màu và làm dịu các mặt nó hiện trong một
+lượt. Chỉ màu và độ sáng là của chủ máy: mặt chuyển động thế nào luôn là của
+đèn, và nhịp thở khi offline, tín hiệu update và lỗi, và đèn privacy không đặt
+được ở đây. Độ sáng của một mặt là một phần độ sáng của chính đèn cho mặt đó, nên
+chỉ làm dịu hơn, không bao giờ sáng hơn, và giới hạn ban đêm cùng giới hạn ba
+lần nháy mỗi giây vẫn áp lên trên. Có trong `can` của `system.info` là
+`led.faces.get` và `led.faces.set`; đèn không có chúng là đèn không có mặt nào
+để đặt.
+
+```json
+{"cmd": "data", "kind": "led.faces.get", "data": {}}
+{"cmd": "data", "kind": "led.faces.set", "data": {
+  "listening": {"color": [60, 120, 255], "level": 6},
+  "thinking": "default",
+  "resting": {"color": [255, 140, 0], "level": 3}
+}}
+```
+
+`set` nhận một object có ít nhất một trong `resting`, `listening`, `thinking`
+và `speaking`. Mỗi giá trị là `"default"`, trả mặt đó về cho đèn (với
+`resting`, là đèn lúc đèn khởi động), hoặc `{"color": [r, g, b], "level": N}`:
+kênh của `color` từ 0-255, không phải màu đen, chỉ lấy sắc màu (được scale để
+kênh sáng nhất là 255), và `level` là số nguyên từ 1 đến `levels` (10). Với mặt
+của một lượt, `level` 10 là độ sáng của chính đèn và mỗi bậc thấp hơn thì dịu
+hơn; với `resting`, là đèn của chủ máy (giống `led.resting.set` với `custom`),
+`level` là bậc của chính đèn. Mặt không được nêu giữ nguyên. Mọi thứ khác bị từ
+chối trước khi hỏi đèn: mặt không biết, màu đen, `level` ngoài 1 đến `levels`,
+object rỗng. `set` và `get` trả `success` với:
+
+```json
+{"colours": "any", "levels": 10,
+ "faces": {
+   "resting":   {"color": [255, 140, 0],   "level": 2,  "on": true, "default": true},
+   "listening": {"color": [128, 217, 255], "level": 10, "default": true},
+   "thinking":  {"color": [255, 133, 10],  "level": 10, "default": true},
+   "speaking":  {"color": [255, 184, 77],  "level": 10, "default": true}}}
+```
+
+`default` là true khi một mặt là của chính đèn, khi đó `color` và `level` là
+những gì nó đang hiện. Lựa chọn được giữ qua restart, và đèn đã giữ đèn của nó
+từ trước khi có các mặt thì vẫn giữ như cũ.
 
 #### `volume.*` / `mic.*` — Âm lượng loa và mic qua MQTT
 

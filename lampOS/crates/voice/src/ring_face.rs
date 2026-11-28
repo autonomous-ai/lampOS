@@ -9,7 +9,7 @@
 //! they counted clockwise as a person facing the lamp sees them (pixels 8,
 //! 16 and 24 at three, six and nine o'clock), and every angle here is
 //! counted that way.
-use lamp_msgs::{LightPattern, PatternKind};
+use lamp_msgs::{FaceLook, Light, LightFaces, LightPattern, PatternKind};
 use lamp_ring::{PIXEL_COUNT, Rgb};
 use std::f32::consts::{PI, TAU};
 
@@ -40,7 +40,7 @@ pub struct Lit {
     pub on: bool,
     /// The colour, each channel as a share of the brightest.
     tint: [f32; 3],
-    /// How bright, from 1 to [`LEVELS`].
+    /// How bright, as a step from 1 to [`LEVELS`].
     level: u8,
 }
 
@@ -100,19 +100,36 @@ struct Shown {
     red: bool,
 }
 
-/// How many levels a light has.
-pub const LEVELS: u8 = 5;
-/// The glow of each level as a share of the ceiling, and how much a slow
+/// How many steps of brightness a light has: [`Light::STEPS`], ten. The
+/// five levels a light was asked for at are five of them
+/// ([`Light::LEGACY_STEPS`]) and look exactly as they always did; the other
+/// five are new, the lowest softer than level 1 ever was.
+pub const LEVELS: u8 = Light::STEPS;
+/// The glow of each step as a share of the ceiling, and how much a slow
 /// breath adds to it, so that a light that is on is never a still disc.
-/// The first is the low breath the lamp rested in before it had a light
-/// to set; the last reaches the ceiling at the top of a breath.
+/// Steps 2, 5, 7, 9 and 10 are the old levels 1 to 5 to the digit: the
+/// first is the low breath the lamp rested in before it had a light to set,
+/// the last reaches the ceiling at the top of a breath, so nothing is
+/// brighter than before. Step 1 is the softest the ring shows without
+/// breaking into a patchwork of single steps (the ember's note below): at
+/// the night's ceiling of 24 its brightest channel is one step.
 const LEVEL_GLOW: [(f32, f32); LEVELS as usize] = [
+    (0.04, 0.05),
     (0.07, 0.06),
+    (0.12, 0.06),
+    (0.17, 0.06),
     (0.24, 0.06),
+    (0.33, 0.065),
     (0.44, 0.07),
+    (0.55, 0.075),
     (0.68, 0.08),
     (0.90, 0.10),
 ];
+/// The glow of one of the five levels a skill or an older part names.
+fn legacy_glow(level: u8) -> f32 {
+    let at = usize::from(level.clamp(1, Light::BRIGHTEST)) - 1;
+    LEVEL_GLOW[usize::from(Light::LEGACY_STEPS[at]) - 1].0
+}
 /// The offline breath's warm amber (#830), also the restart guard's pulse
 /// on the asleep face (#7224, [`crate::ring_asleep::guard_pixels`]).
 pub const OFFLINE_TINT: [f32; 3] = [1.0, 0.55, 0.12];
@@ -138,58 +155,141 @@ const WHOLE_STEP: f32 = 0.015;
 const AMBER: [f32; 3] = [1.0, 0.55, 0.0];
 
 impl Lit {
-    /// The ten colours by name, as [`lamp_msgs::Light::TINTS`] has them.
-    const TINTS: [(&'static str, [f32; 3]); 10] = lamp_msgs::Light::TINTS;
-
-    /// A light of this colour and level, or `None` for a colour there is
-    /// not or a level outside 1 to [`LEVELS`].
+    /// A light of this colour and level (one of the five of
+    /// [`Light::BRIGHTEST`]), or `None` for a colour there is not or a
+    /// level outside them. Any of the seventeen named colours.
     pub fn of(on: bool, colour: &str, level: u8) -> Option<Self> {
-        let tint = Self::TINTS
-            .iter()
-            .find_map(|(name, tint)| (*name == colour).then_some(*tint))?;
-        (1..=LEVELS)
-            .contains(&level)
-            .then_some(Self { on, tint, level })
+        let tint = Light::tint_of(colour)?;
+        (1..=Light::BRIGHTEST).contains(&level).then(|| Self {
+            on,
+            tint,
+            level: Light::LEGACY_STEPS[usize::from(level) - 1],
+        })
+    }
+
+    /// A light of this colour at a step from 1 to [`LEVELS`].
+    pub fn at_step(on: bool, colour: &str, step: u8) -> Option<Self> {
+        let tint = Light::tint_of(colour)?;
+        (1..=LEVELS).contains(&step).then_some(Self {
+            on,
+            tint,
+            level: step,
+        })
+    }
+
+    /// The light a message says, if it is one there is: its own `tint`
+    /// when it has one, else its named colour's, at its `step` when it has
+    /// one, else at the step of its level.
+    pub fn from_light(light: &Light) -> Option<Self> {
+        light.check().ok()?;
+        let tint = match light.tint {
+            Some(own) => own.map(|channel| f32::from(channel) / 255.0),
+            None => Light::tint_of(&light.colour)?,
+        };
+        Some(Self {
+            on: light.on,
+            tint,
+            level: light.step_now(),
+        })
     }
 
     /// The light a lamp has before anyone has asked for one: on, warm, at
-    /// its lowest. Exactly the face it rested in before lights could be set.
+    /// its lowest of the five levels. Exactly the face it rested in before
+    /// lights could be set.
     pub const fn first() -> Self {
         Self {
             on: true,
             tint: AMBER,
-            level: 1,
+            level: Light::LEGACY_STEPS[0],
         }
     }
 
-    /// The colours there are, in the order of [`Self::TINTS`].
+    /// The ten colours of [`Light::COLOURS`], in their order.
     pub fn colours() -> [&'static str; 10] {
-        Self::TINTS.map(|(name, _)| name)
+        Light::COLOURS
     }
 
-    /// One level dimmer, as a share of this light's glow: the next level
-    /// down's over this one's, or half of the lowest (#1362's one dip).
+    /// One level dimmer, as a share of this light's glow: the glow of the
+    /// highest of the five levels that is under it over its own, or half
+    /// of it when none is (#1362's one dip). A light at one of the five
+    /// levels dips exactly as it always did.
     pub fn step_down_share(&self) -> f32 {
-        let index = usize::from(self.level.clamp(1, LEVELS)) - 1;
-        match index {
-            0 => 0.5,
-            _ => LEVEL_GLOW[index - 1].0 / LEVEL_GLOW[index].0,
-        }
+        let own = LEVEL_GLOW[usize::from(self.level.clamp(1, LEVELS)) - 1].0;
+        Light::LEGACY_STEPS
+            .iter()
+            .rev()
+            .map(|step| LEVEL_GLOW[usize::from(*step) - 1].0)
+            .find(|glow| *glow < own - 1e-6)
+            .map_or(0.5, |under| under / own)
     }
 
-    /// How bright, from 1 to [`LEVELS`].
+    /// How bright, as a step from 1 to [`LEVELS`].
     pub fn level(&self) -> u8 {
         self.level
     }
 
-    /// One level brighter, as a share of this light's glow: the next level
-    /// up's over this one's, or at the top only the breath's own rise
-    /// (#7516's swell).
+    /// One level brighter, as a share of this light's glow: the glow of
+    /// the lowest of the five levels that is over it over its own, or at
+    /// the top only the breath's own rise (#7516's swell).
     pub fn step_up_share(&self) -> f32 {
-        let index = usize::from(self.level.clamp(1, LEVELS)) - 1;
-        match LEVEL_GLOW.get(index + 1) {
-            Some(up) => up.0 / LEVEL_GLOW[index].0,
-            None => (LEVEL_GLOW[index].0 + LEVEL_GLOW[index].1) / LEVEL_GLOW[index].0,
+        let (own, breathes) = LEVEL_GLOW[usize::from(self.level.clamp(1, LEVELS)) - 1];
+        Light::LEGACY_STEPS
+            .iter()
+            .map(|step| LEVEL_GLOW[usize::from(*step) - 1].0)
+            .find(|glow| *glow > own + 1e-6)
+            .map_or((own + breathes) / own, |over| over / own)
+    }
+}
+
+/// How much of today's face the person has left: a colour and a share.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Look {
+    tint: [f32; 3],
+    /// The face's glow times this, from [`LEVEL_GLOW`]'s first step over
+    /// its last up to 1, never over.
+    gain: f32,
+}
+
+/// The person's looks for the faces of a turn ([`LightFaces`]): none is
+/// the lamp's own face exactly as it was, and a look changes colour and
+/// brightness only, never how a face moves.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Looks {
+    listening: Option<Look>,
+    thinking: Option<Look>,
+    speaking: Option<Look>,
+}
+
+impl Looks {
+    /// The looks a message says. A level outside 1 to [`LEVELS`] or a
+    /// colour with no channel at 255 is no look there is: that face is the
+    /// lamp's own.
+    pub fn from_faces(faces: &LightFaces) -> Self {
+        let look = |look: Option<FaceLook>| {
+            let look = look.filter(|look| {
+                (1..=LEVELS).contains(&look.level) && look.tint.into_iter().max() == Some(255)
+            })?;
+            Some(Look {
+                tint: look.tint.map(|channel| f32::from(channel) / 255.0),
+                gain: LEVEL_GLOW[usize::from(look.level) - 1].0 / LEVEL_GLOW[LEVELS as usize - 1].0,
+            })
+        };
+        Self {
+            listening: look(faces.listening),
+            thinking: look(faces.thinking),
+            speaking: look(faces.speaking),
+        }
+    }
+
+    /// The person's look for `mood`'s face, if they set one. Offline and
+    /// resting have none: resting is the lamp's own light, and offline is
+    /// a signal.
+    fn of(&self, mood: Mood) -> Option<Look> {
+        match mood {
+            Mood::Listening => self.listening,
+            Mood::Thinking => self.thinking,
+            Mood::Speaking => self.speaking,
+            Mood::Resting | Mood::Offline => None,
         }
     }
 }
@@ -315,6 +415,8 @@ pub struct Face {
     let_go_us: Option<u64>,
     /// The lamp's own light, which is its face at rest.
     lit: Lit,
+    /// The person's colour and brightness for the faces of a turn.
+    looks: Looks,
     /// The eye (task 34, #712), off unless set: listening, the face looks
     /// toward the person, and at rest it blinks now and then.
     eye: bool,
@@ -387,6 +489,11 @@ impl Face {
             mood: None,
             let_go_us: None,
             lit: Lit::first(),
+            looks: Looks {
+                listening: None,
+                thinking: None,
+                speaking: None,
+            },
             eye: false,
             strong: false,
             seen_us: None,
@@ -626,6 +733,13 @@ impl Face {
         self.lit
     }
 
+    /// Set the person's colour and brightness for the faces of listening,
+    /// thinking and speaking. The ring eases into them like any other
+    /// change of face; none is the lamp's own face as it always was.
+    pub fn faces(&mut self, looks: Looks) {
+        self.looks = looks;
+    }
+
     /// How the lamp's own light moves at rest, from when, or not at all
     /// ([`crate::ring_light::RingLight::pattern`]): between the pattern's
     /// low and the light's level, eased like any other change. A turn's
@@ -662,10 +776,19 @@ impl Face {
     ) -> [Rgb; PIXEL_COUNT] {
         self.drew_own = false;
         let frame = self.render_face(mood, level, now_us, ceiling);
+        // Every resting frame goes through the flash bound. A turn's face
+        // the person gave a colour of their own goes through it only while
+        // it is a saturated red, or comes out of one: the flash the bound
+        // limits at any brightness. Any other own colour moves with the
+        // voice as the lamp's own faces do, never held (the Reviewer-lead's
+        // P2 on #8870: speech swings a face ten times a second, and a held
+        // speaking face froze).
         if mood != Mood::Resting {
-            return frame;
+            let was_red = self.rest_shown.is_some_and(|shown| shown.red);
+            if self.looks.of(mood).is_none() || !(was_red || saturated_red(&frame, ceiling)) {
+                return frame;
+            }
         }
-        // Every resting frame goes through the flash bound.
         self.flash_safe(frame, now_us, ceiling)
     }
 
@@ -830,6 +953,7 @@ impl Face {
                 Some(motion) => moving(self.lit, motion, pixel),
                 None => look(
                     mood, self.level, seconds, breath, angle, self.lit, held, ceiling, look_to,
+                    self.looks,
                 ),
             };
             let scale = accent_t.map_or([1.0; 3], |t| accent_scale(self.accent, t, angle));
@@ -965,12 +1089,11 @@ pub fn toward(xmin: f32, ymin: f32, xmax: f32, ymax: f32) -> [f32; 2] {
 ///   third brighter, goes once around over the period; then the light as
 ///   it rests ([`look`]), drawn by [`Face::render`].
 fn moving(lit: Lit, (kind, cycles, low): (PatternKind, f32, u8), pixel: usize) -> [f32; 3] {
-    let glow = |level: u8| LEVEL_GLOW[usize::from(level.clamp(1, LEVELS)) - 1].0;
-    let top = glow(lit.level);
+    let top = LEVEL_GLOW[usize::from(lit.level.clamp(1, LEVELS)) - 1].0;
     let angle = TAU * pixel as f32 / PIXEL_COUNT as f32;
     let shown = match kind {
         PatternKind::Breathe => {
-            let bottom = glow(low);
+            let bottom = legacy_glow(low).min(top);
             bottom + (top - bottom) * (0.5 - 0.5 * (TAU * cycles).cos())
         }
         PatternKind::Candle => {
@@ -1001,7 +1124,7 @@ const CANDLE_DIP: f32 = 0.2;
 const PULSE_RISE: f32 = 1.35;
 
 /// The Speaking face's own warm, and its least glow, with the voice quiet.
-const SPEAKING_TINT: [f32; 3] = [1.0, 0.72, 0.30];
+const SPEAKING_TINT: [f32; 3] = LightFaces::DEFAULT_TINTS[2];
 const SPEAKING_LEAST: f32 = 0.26;
 /// A skill's light held over the Speaking face (`LAMP_SKILL_LIGHT_SPEAKING`):
 /// this share of the face's colour is the light's, the rest Speaking's own
@@ -1035,7 +1158,9 @@ fn look(
     held: Option<Lit>,
     ceiling: u8,
     look_to: Option<(f32, f32)>,
+    looks: Looks,
 ) -> [f32; 3] {
+    let own = looks.of(mood);
     let (tint, glow) = match mood {
         Mood::Resting => {
             // The lamp's own light, in a slow breath, with a soft brighter
@@ -1048,7 +1173,11 @@ fn look(
                 let (glow, breathes) = LEVEL_GLOW[usize::from(lit.level.clamp(1, LEVELS)) - 1];
                 // The patch is for the dim levels: a bright ring needs
                 // nothing to show that it is alive.
-                let patches = if lit.level == 1 { 0.03 } else { 0.0 };
+                let patches = if lit.level <= Light::LEGACY_STEPS[0] {
+                    0.03
+                } else {
+                    0.0
+                };
                 (lit.tint, glow + breathes * breath + patches * patch)
             } else {
                 let pixel = (angle * PIXEL_COUNT as f32 / TAU).round() as usize;
@@ -1071,7 +1200,10 @@ fn look(
                 let near = (0.5 + 0.5 * (angle - toward).cos()).powi(2);
                 1.0 - dim * (1.0 - near)
             });
-            ([0.50, 0.85, 1.0], glow * looking)
+            (
+                own.map_or(LightFaces::DEFAULT_TINTS[0], |own| own.tint),
+                glow * looking,
+            )
         }
         Mood::Offline => {
             // One slow, dim breath in warm amber, about 2.5 s a breath and
@@ -1084,12 +1216,17 @@ fn look(
             // An amber point circling the ring with a fading tail behind it.
             let head = TAU * (seconds / 1.15).fract();
             let behind = (head - angle).rem_euclid(TAU);
-            ([1.0, 0.52, 0.04], 0.14 + 0.80 * (-behind / 0.75).exp())
+            (
+                own.map_or(LightFaces::DEFAULT_TINTS[1], |own| own.tint),
+                0.14 + 0.80 * (-behind / 0.75).exp(),
+            )
         }
         Mood::Speaking => {
             // Warm, and as bright as the lamp's own voice is loud, with a
             // slow two-lobed turn so that it is never a flat disc.
             let turn = wave(seconds, 3.1, 2.0, angle);
+            // The person's colour, if they set one, is the face's own warm.
+            let warm = own.map_or(SPEAKING_TINT, |own| own.tint);
             match held.filter(|held| held.on) {
                 // A skill's light held with the words: its colour mixed into
                 // the face, and the face's least glow that of the middle
@@ -1097,12 +1234,9 @@ fn look(
                 // Speaking's own least and the voice still moves it over
                 // most of plain Speaking's span (Seventh on #2253).
                 Some(held) => {
-                    let least = LEVEL_GLOW[usize::from(SKILL_SPEAKING_LEVEL) - 1]
-                        .0
-                        .max(SPEAKING_LEAST);
+                    let least = legacy_glow(SKILL_SPEAKING_LEVEL).max(SPEAKING_LEAST);
                     let tint: [f32; 3] = std::array::from_fn(|channel| {
-                        SPEAKING_TINT[channel]
-                            + (held.tint[channel] - SPEAKING_TINT[channel]) * SKILL_TINT_SHARE
+                        warm[channel] + (held.tint[channel] - warm[channel]) * SKILL_TINT_SHARE
                     });
                     (
                         tint,
@@ -1110,12 +1244,14 @@ fn look(
                     )
                 }
                 None => (
-                    SPEAKING_TINT,
+                    warm,
                     (SPEAKING_LEAST + 0.74 * level.powf(0.8)) * (0.90 + 0.10 * turn),
                 ),
             }
         }
     };
+    // The person's share of the face's own brightness: never over it.
+    let glow = glow * own.map_or(1.0, |own| own.gain);
     tint.map(|channel| channel * glow)
 }
 
@@ -1560,12 +1696,12 @@ mod tests {
     /// pixels' colour about five times a second).
     #[test]
     fn a_candle_flickers_shallow_with_close_neighbours_and_keeps_its_colour() {
-        for level in 3..=LEVELS {
+        for level in 3..=Light::BRIGHTEST {
             let mut face = moving_face("orange", level, PatternKind::Candle, 1_000, 1);
             let frames: Vec<[Rgb; PIXEL_COUNT]> = (0..120)
                 .map(|frame| face.render(Mood::Resting, 0, frame * 25_000, 24))
                 .collect();
-            let top = LEVEL_GLOW[usize::from(level) - 1].0 * 24.0;
+            let top = legacy_glow(level) * 24.0;
             let (floor, ceil) = ((top * 0.8).floor() - 1.0, top.ceil() + 1.0);
             let mut apart = 0.0;
             let mut pairs = 0.0;
@@ -1604,7 +1740,7 @@ mod tests {
         let mut plain = Face::new();
         plain.light(Lit::of(true, "blue", 3).unwrap());
         let resting = play(&mut plain, Mood::Resting, 0, 0, 260);
-        let steady = (LEVEL_GLOW[2].0 * 48.0) as u8;
+        let steady = (legacy_glow(3) * 48.0) as u8;
         let brightest = |frame: &[Rgb; PIXEL_COUNT]| {
             (0..PIXEL_COUNT)
                 .max_by_key(|&pixel| frame[pixel].blue)
@@ -1672,7 +1808,7 @@ mod tests {
         assert!(was[0] > was[1] && was[1] > 0 && was[2] == 0, "{was:?}");
         // Blue is blue, and each level is brighter than the one below.
         let mut before = 0;
-        for level in 1..=LEVELS {
+        for level in 1..=Light::BRIGHTEST {
             let mut face = Face::new();
             face.light(Lit::of(true, "blue", level).unwrap());
             assert_eq!(face.lit(), Lit::of(true, "blue", level).unwrap());
@@ -1686,7 +1822,7 @@ mod tests {
         }
         // The brightest reaches the ceiling and never passes it.
         let mut bright = Face::new();
-        bright.light(Lit::of(true, "white", LEVELS).unwrap());
+        bright.light(Lit::of(true, "white", Light::BRIGHTEST).unwrap());
         let frames = play(&mut bright, Mood::Resting, 0, 1_000, 600);
         let peak = frames
             .iter()
@@ -1713,7 +1849,7 @@ mod tests {
         // A colour or a level there is not is no light.
         assert_eq!(Lit::of(true, "mauve", 3), None);
         assert_eq!(Lit::of(true, "blue", 0), None);
-        assert_eq!(Lit::of(true, "blue", LEVELS + 1), None);
+        assert_eq!(Lit::of(true, "blue", Light::BRIGHTEST + 1), None);
     }
 
     /// #1677: a light asked to fade in is rested into over its fade, as
@@ -2468,7 +2604,7 @@ mod tests {
             f64::from(loud - quiet) / f64::from(loud)
         };
         let plain = span(None);
-        for level in 1..=LEVELS {
+        for level in 1..=Light::BRIGHTEST {
             let tinted = span(Some(Lit::of(true, "blue", level).unwrap()));
             assert!(
                 tinted >= plain * 2.0 / 3.0,
@@ -2591,15 +2727,33 @@ mod tests {
     }
 
     /// #1362's one dip: a level lower, as a share of the light's own glow.
+    /// A light at one of the five levels dips and swells exactly as it did
+    /// before there were ten steps; the new steps use the same levels.
     #[test]
     fn one_step_down_is_the_next_level_or_half_the_lowest() {
+        let old = [0.07_f32, 0.24, 0.44, 0.68, 0.90];
         let share = |level| Lit::of(true, "white", level).unwrap().step_down_share();
         assert_eq!(share(1), 0.5);
-        for level in 2..=LEVELS {
-            let index = usize::from(level) - 1;
-            assert_eq!(share(level), LEVEL_GLOW[index - 1].0 / LEVEL_GLOW[index].0);
+        for level in 2..=Light::BRIGHTEST {
+            let at = usize::from(level) - 1;
+            assert_eq!(share(level), old[at - 1] / old[at], "{level}");
             assert!((0.2..1.0).contains(&share(level)), "{level}");
         }
+        let up = |level| Lit::of(true, "white", level).unwrap().step_up_share();
+        for level in 1..Light::BRIGHTEST {
+            let at = usize::from(level) - 1;
+            assert_eq!(up(level), old[at + 1] / old[at], "{level}");
+        }
+        assert_eq!(up(Light::BRIGHTEST), 1.0 / 0.90);
+        // The steps between: the dip is to the level under, the swell to
+        // the level over, and the softest step dips by half.
+        let step = |step| Lit::at_step(true, "white", step).unwrap();
+        assert_eq!(step(1).step_down_share(), 0.5);
+        assert_eq!(step(1).step_up_share(), 0.07 / 0.04);
+        assert_eq!(step(3).step_down_share(), 0.07 / 0.12);
+        assert_eq!(step(3).step_up_share(), 0.24 / 0.12);
+        assert_eq!(step(8).step_down_share(), 0.44 / 0.55);
+        assert_eq!(step(8).step_up_share(), 0.68 / 0.55);
     }
 
     /// A paired computer's own pixels (docs/control.md, `light` with `rgb`
@@ -2781,5 +2935,394 @@ mod tests {
 
     fn wrap(given: &[[u8; 3]; PIXEL_COUNT]) -> [Rgb; PIXEL_COUNT] {
         given.map(|[r, g, b]| Rgb::new(r, g, b))
+    }
+
+    /// Ten steps, five of them the old levels to the digit, the lowest
+    /// softer than level 1 ever was, and the top the top it always was:
+    /// nothing is brighter than before.
+    #[test]
+    fn ten_steps_five_of_them_the_old_levels_and_the_top_the_same() {
+        assert_eq!(LEVELS, 10);
+        let old = [
+            (0.07, 0.06),
+            (0.24, 0.06),
+            (0.44, 0.07),
+            (0.68, 0.08),
+            (0.90, 0.10),
+        ];
+        for (at, glow) in old.iter().enumerate() {
+            let step = usize::from(Light::LEGACY_STEPS[at]);
+            assert_eq!(LEVEL_GLOW[step - 1], *glow, "level {}", at + 1);
+            let level = at as u8 + 1;
+            assert_eq!(
+                Lit::of(true, "blue", level),
+                Lit::at_step(true, "blue", Light::LEGACY_STEPS[at])
+            );
+        }
+        assert!(LEVEL_GLOW.windows(2).all(|pair| pair[1].0 > pair[0].0));
+        assert!(LEVEL_GLOW[0].0 < old[0].0, "step 1 is under level 1");
+        assert!(LEVEL_GLOW[0].0 * 2.0 > 0.0);
+        assert_eq!(LEVEL_GLOW[usize::from(LEVELS) - 1], old[4]);
+        // Every step is a light, none outside them is.
+        for step in 1..=LEVELS {
+            assert!(Lit::at_step(true, "mint", step).is_some(), "{step}");
+        }
+        assert_eq!(Lit::at_step(true, "mint", 0), None);
+        assert_eq!(Lit::at_step(true, "mint", LEVELS + 1), None);
+        // A light kept in the old words and the same light said by its
+        // step draw the same face frame for frame.
+        for level in 1..=Light::BRIGHTEST {
+            let by_level = Light::new(true, "blue", level).unwrap();
+            let by_step = by_level
+                .clone()
+                .at_step(Light::LEGACY_STEPS[usize::from(level) - 1]);
+            assert_eq!(
+                Lit::from_light(&by_level),
+                Lit::from_light(&by_step),
+                "{level}"
+            );
+        }
+    }
+
+    /// The light's own colour and its finer steps are drawn: its own tint
+    /// in place of the named one, and each step brighter than the one
+    /// below, down to a glow softer than level 1's.
+    #[test]
+    fn a_lights_own_colour_and_each_of_its_steps_are_drawn() {
+        let own = Light {
+            tint: Some([255, 0, 128]),
+            ..Light::new(true, "pink", 1).unwrap().at_step(6)
+        };
+        let mut face = Face::new();
+        face.light(Lit::from_light(&own).unwrap());
+        let [red, green, blue] = rested(&mut face);
+        assert!(red > 0 && green == 0 && blue > 0, "{red} {green} {blue}");
+        // Half as much blue as red, within the steps each rounds by.
+        assert!((blue * 2).abs_diff(red) * 10 <= red, "{red} {blue}");
+        let mut before = 0;
+        for step in 1..=LEVELS {
+            let mut face = Face::new();
+            face.light(Lit::at_step(true, "blue", step).unwrap());
+            let [_, _, blue] = rested(&mut face);
+            assert!(blue > before, "step {step}: {blue} after {before}");
+            before = blue;
+        }
+        // Step 1 is softer than the lowest of the old levels.
+        let (mut softest, mut lowest) = (Face::new(), Face::new());
+        softest.light(Lit::at_step(true, "white", 1).unwrap());
+        lowest.light(Lit::of(true, "white", 1).unwrap());
+        assert!(rested(&mut softest).iter().sum::<u32>() < rested(&mut lowest).iter().sum());
+        // Soft colours have a look of their own beside the ten.
+        let mut seen = Vec::new();
+        for colour in Light::SOFT_COLOURS {
+            let mut face = Face::new();
+            face.light(Lit::of(true, colour, 5).unwrap());
+            let look = rested(&mut face);
+            assert!(!seen.contains(&look), "{colour}");
+            seen.push(look);
+        }
+    }
+
+    fn faces_of(look: Option<(u8, [u8; 3])>) -> Looks {
+        let look = look.map(|(level, tint)| FaceLook { tint, level });
+        Looks::from_faces(&LightFaces {
+            listening: look,
+            thinking: look,
+            speaking: look,
+        })
+    }
+
+    /// The most any channel of any pixel reaches over a run of `mood`.
+    fn peak_of(face: &mut Face, mood: Mood, ceiling: u8) -> u8 {
+        (0..150)
+            .flat_map(|frame| face.render(mood, 150, frame * 20_000, ceiling))
+            .flat_map(|pixel| [pixel.red, pixel.green, pixel.blue])
+            .max()
+            .unwrap()
+    }
+
+    /// With no look set, every face is the lamp's own, byte for byte as
+    /// before; a look set and then given back is the lamp's own again.
+    #[test]
+    fn a_face_with_no_look_is_the_lamps_own_and_a_look_given_back_is_too() {
+        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+            let mut plain = Face::new();
+            let mut none = Face::new();
+            none.faces(faces_of(None));
+            assert_eq!(
+                play(&mut plain, mood, 120, 0, 60),
+                play(&mut none, mood, 120, 0, 60),
+                "{mood:?}"
+            );
+            let mut changed = Face::new();
+            changed.faces(faces_of(Some((3, [255, 0, 0]))));
+            play(&mut changed, mood, 120, 0, 30);
+            changed.faces(faces_of(None));
+            let frames = play(&mut changed, mood, 120, 600_000, 200);
+            let mut fresh = Face::new();
+            play(&mut fresh, mood, 120, 0, 30);
+            let again = play(&mut fresh, mood, 120, 600_000, 200);
+            assert_eq!(frames[150..], again[150..], "{mood:?}");
+        }
+    }
+
+    /// A look changes the colour: a face given green shows no red, and
+    /// listening, thinking and speaking each take their own.
+    #[test]
+    fn a_look_gives_the_face_the_persons_colour() {
+        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+            let mut face = Face::new();
+            face.faces(faces_of(Some((10, [0, 255, 0]))));
+            for pixel in play(&mut face, mood, 150, 0, 100).iter().flatten() {
+                assert_eq!((pixel.red, pixel.blue), (0, 0), "{mood:?}");
+            }
+        }
+        let mut face = Face::new();
+        face.faces(Looks::from_faces(&LightFaces {
+            speaking: Some(FaceLook {
+                tint: [0, 255, 0],
+                level: 10,
+            }),
+            ..Default::default()
+        }));
+        // Only speaking changed: listening is still the lamp's own cool.
+        let mut plain = Face::new();
+        assert_eq!(
+            play(&mut face, Mood::Listening, 150, 0, 40),
+            play(&mut plain, Mood::Listening, 150, 0, 40)
+        );
+        assert_ne!(
+            play(&mut face, Mood::Speaking, 150, 0, 40),
+            play(&mut plain, Mood::Speaking, 150, 0, 40)
+        );
+    }
+
+    /// A face's brightness is a share of the lamp's own, so it can be made
+    /// softer and never brighter: at no level or colour does any channel
+    /// pass the lamp's own face's brightest, and the lowest step is a
+    /// twentieth of it.
+    #[test]
+    fn a_looks_brightness_is_a_share_of_the_faces_own_never_over_it() {
+        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+            let own = peak_of(&mut Face::new(), mood, 48);
+            let mut last = 0;
+            for level in 1..=Light::STEPS {
+                for tint in [[255, 255, 255], [255, 0, 0], [0, 255, 0], [10, 20, 255]] {
+                    let mut face = Face::new();
+                    face.faces(faces_of(Some((level, tint))));
+                    let peak = peak_of(&mut face, mood, 48);
+                    assert!(peak <= own, "{mood:?} {level} {tint:?}: {peak} over {own}");
+                    if tint == [255, 255, 255] {
+                        assert!(peak >= last, "{mood:?} {level}");
+                        last = peak;
+                    }
+                }
+            }
+            let mut softest = Face::new();
+            softest.faces(faces_of(Some((1, [255, 255, 255]))));
+            assert!(peak_of(&mut softest, mood, 48) * 10 <= own, "{mood:?}");
+        }
+    }
+
+    /// Movement stays the lamp's own: the thinking point circles as it did,
+    /// and the voice still moves listening and speaking, under a look.
+    #[test]
+    fn a_look_leaves_the_movement_to_the_lamp() {
+        let head = |frame: &[Rgb; PIXEL_COUNT]| {
+            (0..PIXEL_COUNT)
+                .max_by_key(|&pixel| u32::from(frame[pixel].red) + u32::from(frame[pixel].green))
+                .unwrap()
+        };
+        let mut plain = Face::new();
+        let mut own = Face::new();
+        own.faces(faces_of(Some((10, [255, 255, 255]))));
+        let (a, b) = (
+            play(&mut plain, Mood::Thinking, 0, 0, 120),
+            play(&mut own, Mood::Thinking, 0, 0, 120),
+        );
+        for at in [60, 80, 100, 119] {
+            assert_eq!(head(&a[at]), head(&b[at]), "frame {at}");
+        }
+        for mood in [Mood::Listening, Mood::Speaking] {
+            let mut face = Face::new();
+            face.faces(faces_of(Some((10, [255, 255, 255]))));
+            let quiet = brightness(play(&mut face, mood, 0, 0, 80).last().unwrap());
+            let loud = brightness(play(&mut face, mood, 255, 2_000_000, 80).last().unwrap());
+            assert!(loud > quiet, "{mood:?}: {loud} over {quiet}");
+        }
+    }
+
+    /// The night's cap stays over a look: under every ceiling no channel
+    /// passes it, at the brightest level of the brightest colour.
+    #[test]
+    fn a_look_stays_under_the_night_cap() {
+        for ceiling in [24, 48, 120] {
+            for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+                let mut face = Face::new();
+                face.faces(faces_of(Some((10, [255, 255, 255]))));
+                assert!(
+                    peak_of(&mut face, mood, ceiling) <= ceiling,
+                    "{mood:?} {ceiling}"
+                );
+            }
+        }
+    }
+
+    /// Offline, the resting light and the signals have no look: the face is
+    /// the same whatever the person set, and so is a hand's glow.
+    #[test]
+    fn offline_and_resting_ignore_the_looks() {
+        for mood in [Mood::Offline, Mood::Resting] {
+            let mut plain = Face::new();
+            let mut set = Face::new();
+            set.faces(faces_of(Some((2, [255, 0, 0]))));
+            assert_eq!(
+                play(&mut plain, mood, 120, 0, 60),
+                play(&mut set, mood, 120, 0, 60),
+                "{mood:?}"
+            );
+        }
+        let mut plain = Face::new();
+        let mut set = Face::new();
+        set.faces(faces_of(Some((2, [255, 0, 0]))));
+        for face in [&mut plain, &mut set] {
+            face.hand(Some(500_000));
+        }
+        assert_eq!(
+            play(&mut plain, Mood::Resting, 0, 0, 40),
+            play(&mut set, Mood::Resting, 0, 0, 40)
+        );
+    }
+
+    /// The Reviewer-lead's P2 on #8870: a speaking face in the owner's own
+    /// colour moves with speech as the lamp's own one does, never held by
+    /// the flash bound, which is there for a saturated red. The voice is
+    /// speech-like: five syllables a second, each loud for 80 ms and quiet
+    /// for the rest, which moves the face as speech does, up in about 20 ms
+    /// and down over about 170 ms ([`LEVEL_RISE_US`], [`LEVEL_FALL_US`]),
+    /// between about 0.26 and the whole of its glow. A bright own colour
+    /// (white, a pale green) swings by a swing's share ten times a second
+    /// that way, past the bound's six; every frame of it is still drawn as
+    /// the face makes it, as the lamp's own face's always are.
+    #[test]
+    fn an_own_colour_speaking_face_moves_with_speech_like_the_lamps_own() {
+        const FRAME_US: u64 = 10_000;
+        let voice = |at_us: u64| {
+            if (at_us / 1_000) % 200 < 80 { 255 } else { 0 }
+        };
+        for ceiling in [30, 60, 120] {
+            for tint in [[255, 255, 255], [160, 255, 160], [140, 204, 255]] {
+                let mut bounded = Face::new();
+                let mut free = Face::new();
+                for face in [&mut bounded, &mut free] {
+                    face.faces(Looks::from_faces(&LightFaces {
+                        listening: None,
+                        thinking: None,
+                        speaking: Some(FaceLook { tint, level: 10 }),
+                    }));
+                }
+                let mut drawn = Vec::new();
+                for frame in 0..400 {
+                    let at_us = 1_000_000 + frame * FRAME_US;
+                    let made = free.render_face(Mood::Speaking, voice(at_us), at_us, ceiling);
+                    let shown = bounded.render(Mood::Speaking, voice(at_us), at_us, ceiling);
+                    assert_eq!(shown, made, "{ceiling} {tint:?}: frame {frame} held");
+                    drawn.push(shown);
+                }
+                // It moves with the voice as much as the lamp's own face.
+                let mut plain = Face::new();
+                let plain: Vec<_> = (0..400)
+                    .map(|frame| {
+                        let at_us = 1_000_000 + frame * FRAME_US;
+                        plain.render(Mood::Speaking, voice(at_us), at_us, ceiling)
+                    })
+                    .collect();
+                let span = |frames: &[[Rgb; PIXEL_COUNT]]| {
+                    let shares: Vec<f32> = frames[100..]
+                        .iter()
+                        .map(|frame| brightness_share(frame, ceiling))
+                        .collect();
+                    shares.iter().copied().fold(f32::MIN, f32::max)
+                        - shares.iter().copied().fold(f32::MAX, f32::min)
+                };
+                assert!(
+                    span(&drawn) >= span(&plain) * 0.8,
+                    "{ceiling} {tint:?}: moved {} against the lamp's own {}",
+                    span(&drawn),
+                    span(&plain)
+                );
+            }
+        }
+        // And the bound's account would have held the brightest of them:
+        // a white face swings past six times a second.
+        let mut white = Face::new();
+        white.faces(faces_of(Some((10, [255, 255, 255]))));
+        let frames: Vec<_> = (0..400)
+            .map(|frame| {
+                let at_us = 1_000_000 + frame * FRAME_US;
+                white.render_face(Mood::Speaking, voice(at_us), at_us, 60)
+            })
+            .skip(100)
+            .collect();
+        assert!(
+            turns(&frames, 60) > 2 * usize::from(FLASHES_A_SECOND) * 3,
+            "{} turns in 3 s",
+            turns(&frames, 60)
+        );
+    }
+
+    /// A face the person coloured a saturated red goes through the flash
+    /// bound like the resting light, whatever it is made of; the lamp's own
+    /// faces and an own colour that is no saturated red do not, as the
+    /// lamp's own never did (the Reviewer-lead's P2 on #8870). The voice
+    /// that moves it is only so fast, so the bound shows as a count:
+    /// however the voice goes, the swings of a red face never pass three
+    /// flashes a second, and it keeps the bound's own account of a red
+    /// going in and out.
+    #[test]
+    fn a_red_face_goes_through_the_flash_bound_and_the_lamps_own_does_not() {
+        for mood in [Mood::Listening, Mood::Speaking] {
+            let mut own = Face::new();
+            let mut red = Face::new();
+            let mut sky = Face::new();
+            red.faces(faces_of(Some((10, [255, 0, 0]))));
+            sky.faces(faces_of(Some((10, [140, 204, 255]))));
+            let mut was_red = false;
+            for frame in 0..50 {
+                let at_us = 1_000_000 + frame * 20_000;
+                own.render(mood, 200, at_us, 120);
+                sky.render(mood, 200, at_us, 120);
+                was_red |= saturated_red(&red.render(mood, 200, at_us, 120), 120);
+            }
+            assert!(was_red, "{mood:?}: the red face is a saturated red");
+            assert!(
+                own.rest_shown.is_none(),
+                "{mood:?}: the lamp's own face is not held"
+            );
+            assert!(sky.rest_shown.is_none(), "{mood:?}: nor is a sky face");
+            assert!(red.rest_shown.is_some(), "{mood:?}: a red face is");
+        }
+        // However the voice goes, five times a second, a coloured face
+        // swings no more than the bound allows.
+        for (period, toggles) in [(2u64, 100u64), (3, 100), (4, 100)] {
+            let mut face = Face::new();
+            face.faces(faces_of(Some((10, [255, 0, 0]))));
+            let frames: Vec<_> = (0..toggles * period)
+                .map(|step| {
+                    let level = if (step / period) % 2 == 0 { 255 } else { 0 };
+                    face.render(Mood::Listening, level, 1_000_000 + step * 25_000, 120)
+                })
+                .collect();
+            let seconds = (toggles * period) as f32 * 0.025;
+            let red_flips = frames
+                .windows(2)
+                .filter(|pair| saturated_red(&pair[0], 120) != saturated_red(&pair[1], 120))
+                .count();
+            let swings = turns(&frames, 120) + red_flips;
+            assert!(
+                swings as f32 <= 2.0 * f32::from(FLASHES_A_SECOND) * seconds + 2.0,
+                "{period}: {swings} swings in {seconds} s"
+            );
+        }
     }
 }

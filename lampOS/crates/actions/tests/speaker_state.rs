@@ -914,6 +914,8 @@ fn heartbeat_publication_failure_keeps_mute_and_ordinary_actions_serving() {
         on: false,
         colour: "white".into(),
         level: 2,
+        tint: None,
+        step: None,
     }));
     let (mut running, _) = Running::prepared_outputs(
         true,

@@ -418,6 +418,8 @@ mod tests {
             on,
             colour: colour.into(),
             level: 3,
+            tint: None,
+            step: None,
         }
     }
 

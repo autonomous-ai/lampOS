@@ -6,7 +6,7 @@
 //! needs root.
 use crate::answer::{Lamp, Mic, PREVIEW_HOLDS, Volume};
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{ChatIn, ChatOut, Claim, Light, LightRequest, MessageOut, Priority};
+use lamp_msgs::{ChatIn, ChatOut, Claim, Light, LightFaces, LightRequest, MessageOut, Priority};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, UdpSocket};
@@ -256,6 +256,7 @@ pub struct Ring {
     command: Option<Publisher>,
     request: Option<Publisher>,
     previewing: Option<Light>,
+    faces: Option<Publisher>,
 }
 
 /// How long `iw` has to say the Wi-Fi's name: the runtime that asks also
@@ -662,6 +663,39 @@ impl Lamp for Real {
             .ok_or(NO_RING)?
             .parse::<Light>()
             .map_err(|_| "the lamp's light said something unreadable".to_owned())
+    }
+
+    fn light_faces(&mut self) -> Result<LightFaces, String> {
+        self.latest(LightFaces::TOPICS[1])
+            .filter(|message| !message.expired)
+            .ok_or("the lamp's faces are not running")?
+            .parse::<LightFaces>()
+            .map_err(|_| "the lamp's faces said something unreadable".to_owned())
+    }
+
+    /// Asks for the faces on `light/faces/command` and reads back what the
+    /// ring says on `light/faces/state`.
+    fn set_light_faces(&mut self, faces: &LightFaces) -> Result<LightFaces, String> {
+        let bus = self.bus.as_ref().ok_or(NO_RING)?;
+        let out = match &mut self.ring.faces {
+            Some(out) => out,
+            empty => empty.insert(
+                bus.publisher_declared(LightFaces::TOPICS[0], &LightFaces::declaration(), SOURCE)
+                    .map_err(|_| "the faces cannot be asked for here".to_owned())?,
+            ),
+        };
+        out.publish_json(lamp_ipc::monotonic_us(), faces)
+            .map_err(|_| "the faces could not be asked for".to_owned())?;
+        let asked = Instant::now();
+        loop {
+            if self.light_faces().as_ref() == Ok(faces) {
+                return Ok(*faces);
+            }
+            if asked.elapsed() >= SHOWN_WITHIN {
+                return Err("the faces were asked for, but the ring did not show them".into());
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 
     /// A preview still shown is given back first, so the light saved is the
@@ -1450,7 +1484,14 @@ mod tests {
         let mut state = bus
             .publisher_declared(Light::TOPICS[1], &Light::declaration(), "ring")
             .unwrap();
+        let mut faces_asked = bus
+            .subscribe_typed(LightFaces::TOPICS[0], "ring", LightFaces::TYPE)
+            .unwrap();
+        let mut faces_state = bus
+            .publisher_declared(LightFaces::TOPICS[1], &LightFaces::declaration(), "ring")
+            .unwrap();
         std::thread::spawn(move || {
+            let mut faces = LightFaces::default();
             let mut shown = crate::light::first();
             let mut kept = Vec::new();
             let mut said = Instant::now() - Duration::from_secs(1);
@@ -1462,9 +1503,16 @@ mod tests {
                     shown = message.parse::<Light>().unwrap();
                     said = Instant::now() - Duration::from_secs(1);
                 }
+                if let Ok(Some(message)) = faces_asked.recv(Duration::ZERO) {
+                    faces = message.parse::<LightFaces>().unwrap();
+                    said = Instant::now() - Duration::from_secs(1);
+                }
                 if said.elapsed() >= Duration::from_millis(100) {
                     state
                         .publish_json(lamp_ipc::monotonic_us(), &shown)
+                        .unwrap();
+                    faces_state
+                        .publish_json(lamp_ipc::monotonic_us(), &faces)
                         .unwrap();
                     said = Instant::now();
                 }

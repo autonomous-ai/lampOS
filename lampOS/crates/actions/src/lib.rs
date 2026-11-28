@@ -202,7 +202,10 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
         ]);
     }
     if light {
-        let names = lamp_msgs::Light::COLOURS;
+        let names: Vec<&str> = lamp_msgs::Light::COLOURS
+            .into_iter()
+            .chain(lamp_msgs::Light::SOFT_COLOURS)
+            .collect();
         functions.extend([
             plain(
                 "light_on",
@@ -211,7 +214,7 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
             plain("light_off", "Switch your own light off."),
             Function {
                 name: "light_colour",
-                description: "Your light can change colour: set your own light to one of its colours by name: white, warm (a warm white), orange, yellow, red, pink, purple (violet), blue, cyan or green. White and warm are colours here, not brightness: \"make your light white\" is white, and a bare \"make it warm\" or \"warm light\" is warm. For a step from where it is, \"warmer\", \"cooler\", or a little, a bit, a touch or slightly warm(er) or cool(er), use light_warmer or light_cooler.",
+                description: "Your light can change colour: set your own light to one of its colours by name: white, warm (a warm white), orange, yellow, red, pink, purple (violet), blue, cyan or green, or one of its soft colours: candle, amber, peach, rose, lavender, mint or sky. White and warm are colours here, not brightness: \"make your light white\" is white, and a bare \"make it warm\" or \"warm light\" is warm. For a step from where it is, \"warmer\", \"cooler\", or a little, a bit, a touch or slightly warm(er) or cool(er), use light_warmer or light_cooler.",
                 parameters: Some(json!({
                     "type": "object",
                     "properties": {"colour": {"type": "string", "enum": names}},
@@ -417,7 +420,7 @@ mod tests {
             );
         }
         // The file is the shape the voice reads, and only one function
-        // takes anything: a colour out of the ten.
+        // takes anything: a colour out of the ten and the seven soft ones.
         let file: Value = serde_json::from_str(&catalog_file(&all)).unwrap();
         let listed = file["tools"].as_array().unwrap();
         assert_eq!(listed.len(), 11);
@@ -431,7 +434,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .len(),
-            10
+            17
         );
         assert!(catalog_file(&all).len() < 65_536);
     }
@@ -516,7 +519,10 @@ mod tests {
         // light white" and "make it whiter" each went to light_brighter.
         let all = catalog(true, true);
         let said = |name: &str| all.iter().find(|f| f.name == name).unwrap().description;
-        for colour in lamp_msgs::Light::COLOURS {
+        for colour in lamp_msgs::Light::COLOURS
+            .into_iter()
+            .chain(lamp_msgs::Light::SOFT_COLOURS)
+        {
             assert!(said("light_colour").contains(colour), "{colour}");
         }
         assert!(said("light_colour").contains("not brightness"));

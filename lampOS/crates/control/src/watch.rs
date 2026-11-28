@@ -1755,6 +1755,8 @@ mod tests {
             on: true,
             colour: "red".to_owned(),
             level: 3,
+            tint: None,
+            step: None,
         };
         let mut pixels = [[0u8, 0, 0]; 32];
         pixels[0] = [255, 0, 0];
@@ -1788,6 +1790,8 @@ mod tests {
             on: true,
             colour: "blue".to_owned(),
             level: 2,
+            tint: None,
+            step: None,
         };
         watch.hold_pixels("c_2", &blue, &[[0, 0, 255]; 32], later);
         assert_eq!(

@@ -75,6 +75,27 @@ const READ: &[(&str, &str, Type)] = &[
     ("led.resting.set", "color", Type::RgbOrNull),
     ("led.resting.set", "default.color", Type::Rgb),
     ("led.resting.set", "effective.color", Type::Rgb),
+    // What the lamp takes: any colour kept as sent (`"any"`), and how many
+    // levels of brightness. A lamp that says neither takes ten tints at
+    // five levels, as the app has always read it.
+    ("led.resting.get", "colours", Type::Text),
+    ("led.resting.get", "levels", Type::Whole),
+    ("led.resting.set", "colours", Type::Text),
+    ("led.resting.set", "levels", Type::Whole),
+    // The faces row: each face as a colour and a level, and the same.
+    ("led.faces.get", "colours", Type::Text),
+    ("led.faces.get", "levels", Type::Whole),
+    ("led.faces.get", "faces.resting.color", Type::Rgb),
+    ("led.faces.get", "faces.resting.level", Type::Whole),
+    ("led.faces.get", "faces.resting.on", Type::Flag),
+    ("led.faces.get", "faces.listening.color", Type::Rgb),
+    ("led.faces.get", "faces.listening.level", Type::Whole),
+    ("led.faces.get", "faces.listening.default", Type::Flag),
+    ("led.faces.get", "faces.thinking.color", Type::Rgb),
+    ("led.faces.get", "faces.speaking.color", Type::Rgb),
+    ("led.faces.set", "colours", Type::Text),
+    ("led.faces.set", "levels", Type::Whole),
+    ("led.faces.set", "faces.speaking.level", Type::Whole),
 ];
 
 fn field<'a>(data: &'a Value, path: &str) -> Option<&'a Value> {
@@ -166,6 +187,16 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
     let _previews = ring
         .subscribe_typed(LightRequest::TOPIC, "ring", LightRequest::TYPE)
         .unwrap();
+    let mut says_faces = ring
+        .publisher_declared(
+            lamp_msgs::LightFaces::TOPICS[1],
+            &lamp_msgs::LightFaces::declaration(),
+            "ring",
+        )
+        .unwrap();
+    says_faces
+        .publish_json(1, &lamp_msgs::LightFaces::default())
+        .unwrap();
     let mut shows = ring
         .publisher_declared(Light::TOPICS[1], &Light::declaration(), "ring")
         .unwrap();
@@ -243,6 +274,10 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         ("led.resting.get", Value::Null),
         ("led.resting.preview", json!({"color": [20, 0, 10]})),
         ("led.resting.set", json!({"mode": "default"})),
+        ("led.faces.get", Value::Null),
+        // Nothing to change on a ring that says its faces are the lamp's
+        // own: answered from what it says, with nothing asked of it.
+        ("led.faces.set", json!({"speaking": "default"})),
     ] {
         let result = answer(&mut real, kind, &data);
         let sent = me.data("2026-10-18T10:00:00Z", kind, &result).to_string();
