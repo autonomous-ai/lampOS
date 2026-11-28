@@ -12384,11 +12384,13 @@ impl Heeding {
                 // owner, 27 Nov 2026: "any conversation has a 20s window so
                 // reminder, proactive, chatting, etc."). The lamp's words end
                 // where the stop cut them, by now at the latest, as it is told
-                // at the next line's start: what was sent ahead and never
-                // played counts for nothing, and anything the lamp says after
-                // moves the end on, as any words do. Only the call's carry
-                // ends: it covers a line said right after "Hey Lamp", before
-                // the lamp spoke.
+                // (a stop said aloud at the stop, a hand's as the next line
+                // begins): what was sent ahead and never played counts for
+                // nothing, and anything the lamp says after moves the end on,
+                // as any words do, counted from the stop (the route brings its
+                // own end back too, `Shared::words_end_at_stop`). Only the
+                // call's carry ends: it covers a line said right after "Hey
+                // Lamp", before the lamp spoke.
                 if self.simple_call {
                     let now_us = monotonic_us();
                     self.said_until_us = self.said_until_us.map(|until_us| until_us.min(now_us));
