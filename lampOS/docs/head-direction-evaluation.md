@@ -4,8 +4,9 @@
 changes below are implemented on the isolated simple-call base
 `0dbbfc95bbea6ddf397308e1a8ef1933c5d19dcb`. The Reviewer's v2 scoring contract
 is frozen at `31c290d5bb9dc845679098a837a4d0ffd5059cb4`. Native Mac and
-Linux tests, strict Clippy and formatting pass; native ARM64 and board
-measurements are still required. This candidate is a **head-only
+Linux tests, strict Clippy and formatting pass, as do the separate native
+ARM64 gates. A holder-reported file replay is reviewed below; live capture
+measurements and joint qualification are still required. This candidate is a **head-only
 proxy**, with shoulders unknown, and cannot qualify the joint head-and-
 shoulders job alone. Product defaults remain unchanged.
 
@@ -522,7 +523,7 @@ remain unmeasured; file timing must not be added to an invented capture clock.
 | Working/full crop comparison and small-face stress | Both crop modes completed above on the same public inputs. Native small-face two-class support remains insufficient; no physical-distance or synthetic-small-face claim. |
 | First and repeated host classification cost | Standalone optimized host measurement: first 1.045 µs, repeated median 0.087 µs, p95 0.125 µs over 1,000 samples, below the 1 ms added-classification target. Boundary is legacy yaw plus three classifiers; excludes model/geometry/guard/report work and is elapsed duration, not measured CPU time or board capture latency. |
 | Source freshness and permission regressions | Focused 48 passed / 1 ignored; full Mac 567 passed / 6 ignored and Linux 569 passed / 6 ignored. Strict all-target Clippy and formatting passed on both; the capture-generation, sequence, clock, age and revocation tests remain. The new ignored classifier measurement was run explicitly in the separate optimized host harness. |
-| Board offline processing replay | Requested from the lead for after 22:55 local, initially the historical `cee2e324` example in working mode; no result recorded. It cannot establish new classification behavior, capture age or real-person recall. |
+| Board offline processing replay | The holder supplied 18 completed public-file rows on 28 November; see the separate review below. Executable-to-source provenance remains pending. File processing does not establish capture age or real-person recall. |
 | Real desk distance, speaking and shoulder cases | Unmeasured; no substitute labels or inferred physical distance. |
 | Live board capture-to-usable-result p95 <=100 ms | Unmeasured; require original capture clock/point, missed and stale outcomes, and final permission check. |
 
@@ -622,6 +623,89 @@ file-processing timings retain their original boundaries and limitations.
 Live source-capture-to-result timing, associated shoulders, independent joint
 labels, physical desk distance and small-face coverage remain unmeasured or
 unsupported. No threshold from this round is adopted into voice admission.
+
+## Reviewed person split and angle diagnostics (2026-11-28)
+
+The lead's [retained stand-in run](https://github.com/autonomous-ai/lampOS/issues/8847#issuecomment-7229616938)
+uses the same 2,790 public-image outputs, with persons 1–7 for fitting and
+8–15 for testing; both series stay with their person. It searches both crops
+and integer yaw/pitch bounds, maximizing tuning outside rejection subject
+to at least 95% tuning inside recall, then the frozen tie order. It locks
+full crop, no edge allowance, absolute mesh yaw <=55 degrees and mesh pitch
+[-24,+15]. This is separate from the earlier 3,564-variant round. No model
+was rerun, and neither fitted rule changes the runtime observer.
+
+| Partition | Inside correct / wrong / unknown | Inside recall | Outside correct / false-facing / unknown | Outside recall |
+| --- | --- | --- | --- | --- |
+| Tune: persons 1–7 | 361 / 17 / 0, of 378 | 95.50% | 644 / 229 / 51, of 924 | 69.70% |
+| Test: persons 8–15 | 389 / 43 / 0, of 432 | 90.05% | 788 / 245 / 23, of 1,056 | 74.62% |
+
+Unknowns remain failures on the original denominators. Both test bars fail.
+All 15 people already informed earlier development: this is a revisited
+development test, not an unseen holdout. The earlier v2 procedure's test-person
+figures also use other test people during fitting, so their comparison cannot
+establish an unbiased improvement on new people.
+
+Independent review reproduced the locked counts, all eight test-person rows,
+the tilt breakdowns and 364 saved compression-summary fields. All 18 retained
+artifact checksums, seven source-input hashes, the earlier 50-artifact manifest
+and 71 original input/source hashes match. Fitting computes its objective on
+persons 1–7 only, although the loader parses the complete source files. The
+retained hashes and local timestamps support protocol-before-lock-before-score;
+the analysis entry points themselves can overwrite outputs and do not enforce
+one execution. Two comparison inputs lack pinned expected hashes in that script;
+their present bytes were separately checked against the frozen v2 manifest.
+
+The split protocol is `8c900976e28f1cf83c9c9bfa5e386b31eefef5a6bac0d126ba6ac7cb24742320`;
+the lock is `5460bde839aa95ef5ca73c6561fb719212ebf849a68fb614aa308d9781a2ebfd`.
+The current and at-lock scripts match, SHA-256
+`6766e941b2e6f4683367b13e2a0d13374fc71bc1961ff02918c4ad62ca7ec576`.
+
+Descriptive pan/tilt plots were added during review from those same fixed
+outputs, without fitting another rule. They show all 15 people together and
+separately, with matching point, bin and coverage tables. Estimated pan is
+minus mesh yaw; estimated tilt is minus mesh pitch. Each axis plots 2,716 of
+2,790 observations and reports the 74 exclusions rather than replacing them
+with zeros. The full-crop estimate-on-label slopes are 0.764 for pan and 0.430
+for tilt. Large labelled angles have smaller mean estimated magnitudes; 197
+of the 245 test false-facing cases carry tilt labels of -30 or +30 degrees.
+These are descriptive associations, not proof that a physical head-pose defect
+caused every error. The [dataset acquisition](https://crowley-coutaz.fr/Pointing04/data-face.html)
+uses room markers as angle references; it supplies no independent shoulder,
+intended-recipient or live desk-interaction labels. A new model is a candidate
+for a future controlled comparison, not a demonstrated remedy from this run.
+
+## Reviewed holder file-processing replay (2026-11-28)
+
+The holder's [board replay report](https://github.com/autonomous-ai/lampOS/issues/8847#issuecomment-7226621408)
+supplies 18 ordered samples, zero processing errors, one face in every row,
+exit zero and empty stderr. All eight retained file checksums match. The 18
+recorded JPEG hashes match the frozen image inventory; this review did not
+read image bytes on the device. The reported executable is
+`65e6e5c7cc9f9d84acb17c4b594f046d25674dbcb5d2bc3fed671f2dc41f368f`.
+Its source revision/build handoff remains unresolved, so this is a limited
+artifact review, not acceptance of complete executable provenance.
+
+| Reported file-processing stage | First sample | Following 17: median | Following 17: nearest-rank p95 / maximum |
+| --- | --- | --- | --- |
+| Total | 221.892 ms | 153.408 ms | 169.200 ms |
+| Detector | 125.118 ms | 58.523 ms | 65.010 ms |
+| Crop and mesh | 95.207 ms | 93.098 ms | 107.607 ms |
+| Decode | 1.449 ms | 1.556 ms | 1.750 ms |
+
+Model loading is a separate 777.513 ms. Every stage has 17 observed values
+and no missing value after the first sample. At n=17, nearest-rank p95 is
+the maximum. The original published p95 values instead match the 16th sorted
+value, index floor((n-1)*0.95); their percentile method was not recorded in
+the supplied artifacts. Keep the definitions explicit rather than pooling
+these summaries. The reported run used nice 15 alongside the product services;
+this is not a controlled performance comparison or a proven steady state.
+
+The wrapper and reviewed producer define file-read start to computed result,
+before JSON serialization/flush, excluding capture and model loading. That
+boundary remains attributed until source-to-executable provenance is supplied.
+Clock trust and capture age remain unknown. This timing does not qualify the
+live capture-to-usable-result target, and the review made no device connection.
 
 ## Qualification and fleet integration remain separate
 

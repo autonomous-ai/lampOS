@@ -2699,6 +2699,10 @@ The draft is implemented and passes the local Mac/Linux code gates. Live
 capture timing, real-person evidence and joint qualification remain pending. A
 [separate development calibration](head-direction-evaluation.md#one-bounded-development-calibration-round-2026-11-28)
 failed its per-class targets; its fitted thresholds are not runtime rules.
+The later [reviewed person split and holder file replay](head-direction-evaluation.md#reviewed-person-split-and-angle-diagnostics-2026-11-28)
+preserve that conclusion: neither proxy recall passes, the person split is
+previously used development data, and file processing is not capture latency.
+No fitted cone, new model or product behavior is enabled by these reviews.
 
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 

@@ -112,9 +112,12 @@ checks the adapter contract only; readiness stays null. Qualification still
 needs the real-person holdout, verified clocks and producing binary/source/
 model/config provenance. Keep all original and derived evidence privately;
 v2 `retention: "keep_all"` supersedes old deletion dates. The lead holds
-real captures and board runs. New host first/repeated classification cost,
-board replay, live source-to-result latency and real-person recall remain
-pending; the old geometry results remain historical. See [the frozen
+real captures and board runs. Host classification cost and the holder's
+public-file replay are now recorded with separate boundaries; the latter's
+executable-to-source provenance is pending. The reviewed person split still
+fails both proxy recall targets and does not justify adopting its thresholds
+or declaring a replacement model a proven fix. Live source-to-result latency
+and real-person recall remain pending. See the [reviewed measurements](head-direction-evaluation.md#reviewed-person-split-and-angle-diagnostics-2026-11-28), [the frozen
 contract](head-direction-evaluation.md#frozen-v2-head-and-shoulders-contract-2026-11-27)
 and [dated evidence boundaries](head-direction-evaluation.md#sensor-4-fixed-rule-development-comparison-2026-11-27).
 
