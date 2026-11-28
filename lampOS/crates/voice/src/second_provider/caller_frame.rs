@@ -135,6 +135,7 @@ impl Trial {
                         "lamp-voice caller-frame: {}",
                         serde_json::json!({
                             "clock_id": clock_id, "worker_epoch": worker_epoch,
+                            "model": "speechbrain-ecapa-voxceleb", "score_kind": "rescaled_frame_median_cosine",
                             "caller_request_id": o.caller.map(|id| id.to_string()), "request_id": o.request.to_string(),
                             "capture_end_us": o.capture_end_us, "queued_us": o.queued_us,
                             "ready_us": row.ready_us, "simple_verdict_us": row.verdict_us,
@@ -480,7 +481,7 @@ impl Trial {
 }
 
 fn enabled(switch: Option<&str>, model: &Path) -> bool {
-    switch == Some("on") && model.is_absolute() && model.join("caller-frame.f32").is_file()
+    switch == Some("on") && model.is_absolute() && model.join("ecapa-voxceleb.onnx").is_file()
 }
 
 fn wake_audio(pcm: &[i16], words: &str, range: Option<Range<usize>>) -> Option<Range<usize>> {

@@ -2,7 +2,21 @@
 
 This is sensor 6 on the simple-call base at `0dbbfc95bb`. The base answers an ordinary follow-up that starts in its renewing 20-second window. The sensor runs on its own for measurement. Its output cannot change admission, renewal or confirmation. All product units leave the sensor off. [Sensor issue](https://github.com/autonomous-ai/lampOS/issues/8849) · [Simple call](https://github.com/autonomous-ai/lampOS/pull/8892) · [Tiếng Việt](../../vi/caller-frame_vi.md)
 
-## What the two checks measure
+## The current trial uses SpeechBrain ECAPA-TDNN
+
+The shadow child compares the isolated spoken “Hey Lamp” with individual regions of a follow-up at 16 kHz. SpeechBrain's ECAPA-TDNN embedding checkpoint is the only learned asset. The publisher labels that specific model Apache-2.0. The package includes its attribution, license and the changes made for the local runtime. The reference implementation and the Rust encoder agreed within 0.000002 per component on seven independent synthetic inputs of 0.04–3 seconds. [Publisher's model and license](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb/blob/0f99f2d0ebe89ac095bcc5903c4dd8f72b367286/README.md) · [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+Every 10 ms the child measures the AC power of a 25 ms frame. An adaptive energy floor selects speech-like frames. At least eight must qualify. The wake supplies one 192-component speaker vector. On the follow-up, the child compares overlapping regions of at most 1.28 seconds with that vector every 0.64 seconds, anchoring the last region to the end. A frame receives the mean cosine of the regions covering its centre. A short line that fits in one region has a single similarity for its active frames. The child processes completed audio and can use later samples within a region. The median active-frame cosine must exceed **0.25** to identify the caller. Insufficient audio gives an unknown and earns zero credit in its class. The journal's bounded score is `(cosine + 1) / 2`. [Frozen rule on #8849](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7235630577) · [SpeechBrain verification cutoff](https://speechbrain.readthedocs.io/en/latest/_modules/speechbrain/inference/speaker.html)
+
+To prepare the model, download `embedding_model.ckpt` from the pinned release and run the following from `lampOS/` with a fresh destination. Point `LAMP_CALLER_FRAME_MODEL` to its absolute containing directory. The separate `LAMP_CALLER_FRAME_VAD=on` switch enables measurement on the simple-call route. The shipped default is off. The preparer verifies the checkpoint SHA-256 `0575cb64845e6b9a10db9bcb74d5ac32b326b8dc90352671d345e2ee3d0126a2`. The native child checks the exported graph SHA-256 `d8c32b0dbc17e31c7b13c9d7910f0adaca2ea0b0b3351da05041c9168e741994` before loading it. Both the checked-in graph description and its Ruby packer contain only topology, dimensions, fixed constants and source offsets. [Original checkpoint](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb/tree/0f99f2d0ebe89ac095bcc5903c4dd8f72b367286)
+
+```sh
+ruby tools/caller-frame-bench/prepare-ecapa.rb embedding_model.ckpt ecapa-voxceleb.onnx
+```
+
+Each ECAPA journal row identifies the model and its score scale. The paired replay saves raw cosines, the frame trace and timing for each complete line in the collector's private archive. [Commands for both original sets](../../../tools/caller-frame-bench/strong-replay.md)
+
+## Earlier whole-line and Personal VAD ST comparisons
 
 The whole-line comparator uses the product’s CAM++ model. Both captured inputs must reach 24,000 samples (1.5 seconds). It embeds the first 28,800 samples at most (1.8 seconds, including capture pre-roll). Cosines of at least 0.70 indicate the caller, and values below 0.30 indicate another speaker. Intermediate, unavailable and too-short inputs abstain. The replay also emits a separate diagnostic that runs the same model and bands even when the length guard would abstain. [CAM++ provenance](../../same-voice.md)
 
@@ -12,7 +26,7 @@ We fixed the following line rule before viewing the evaluation results. Count fr
 
 The development measurements include the per-cell numerators, guarded and unguarded CAM++ results, timings and the reference parity check. [Bench tables and retained data](bench.md)
 
-## Replaying a labelled set
+## Replaying the earlier ST comparison
 
 For a prepared corpus, `bash tools/caller-frame-bench/replay.sh lamp-replay "$ARCHIVE" "$NEW_BUNDLE"` retrieves the fixed public model files, runs both methods locally and writes the reports and SHA-256 in a new directory. Use `synthetic-heldout` for the held-out #8907 provider voices. Two optional final arguments accept existing CAM++ and frame-model paths for a fully offline replay with cached build dependencies.
 
@@ -36,4 +50,4 @@ The voice supervisor passes the frame switch and model path only to the second-r
 
 The held-out provider run kept 82.5% of same callers and rejected 15.9% of other voices. In +5 dB noise the frame sensor rejected none of the 277 other-voice trials. On the physical microphone it kept 16/16 same-caller follow-ups and rejected 1/28 constructed impostors. Both background cells fell in the recorder gap. It stays off. [Primary and physical EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496)
 
-The quality bar is 95% of same callers kept and 95% of other voices rejected on the agreed physical holdout. For 120 examples in each class that is 114 correct in each. Report the short (1–3 words) and longer lines separately in quiet and noisy conditions, with the whole denominator in each cell. The lead tests the sensor by itself, then compares the played voice set and a real-person session against stable before any addition to the judge. [Evaluation record](https://github.com/autonomous-ai/lampOS/issues/8849) · [Shared reviewer scoring](https://github.com/autonomous-ai/lampOS/pull/8885)
+For the ECAPA trial, the lead requires at least 95% of same callers kept and 90% of other voices rejected on each set. On the 1,108 provider pairs this means at least 527/554 and 499/554 respectively. On the 44 physical pairs it means 16/16 and at least 26/28. Report short (1–3 words) and longer lines separately in quiet and noisy conditions, with the whole denominator in each cell. [Lead's scope and quality bar](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7235605349) · [Shared reviewer scoring](https://github.com/autonomous-ai/lampOS/pull/8885)

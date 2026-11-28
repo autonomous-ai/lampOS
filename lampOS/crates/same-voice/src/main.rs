@@ -50,17 +50,25 @@ fn serve(model: &Path) -> Result<(), String> {
 }
 
 fn serve_frames(directory: &Path) -> Result<(), String> {
-    use lamp_same_voice::personal_vad::{self, Model, decide};
+    use lamp_same_voice::{
+        personal_vad::{self, Decision},
+        strong_caller::StrongCaller,
+    };
     lamp_same_voice::ordinary_priority().map_err(|e| e.to_string())?;
-    let model = Model::load(directory)?;
+    let model = StrongCaller::load(directory)?;
     personal_vad::serve(
         &mut std::io::stdin().lock(),
         &mut std::io::stdout().lock(),
-        |wake, line| {
-            let frames = model
-                .enroll(wake)
-                .map_or_else(Vec::new, |caller| model.posteriors(&caller, line));
-            decide(&frames)
+        |wake, line| match model.pair(wake, line) {
+            Ok(result) => Decision {
+                class: result.class,
+                // The existing worker protocol accepts a value in [0, 1].
+                target_fraction: result.cosine.map(|score| (score + 1.0) * 0.5),
+            },
+            Err(_) => Decision {
+                class: "unknown",
+                target_fraction: None,
+            },
         },
     )
     .map_err(|e| e.to_string())

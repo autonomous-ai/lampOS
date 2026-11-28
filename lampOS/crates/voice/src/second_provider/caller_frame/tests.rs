@@ -238,6 +238,10 @@ fn configuration_requires_the_explicit_switch_and_local_model_directory() {
     assert!(!enabled(Some("on"), &dir));
     let asset = dir.join("caller-frame.f32");
     std::fs::File::create_new(&asset).unwrap();
+    assert!(!enabled(Some("on"), &dir));
+    std::fs::remove_file(asset).unwrap();
+    let asset = dir.join("ecapa-voxceleb.onnx");
+    std::fs::File::create_new(&asset).unwrap();
     assert!(enabled(Some("on"), &dir));
     std::fs::remove_file(asset).unwrap();
     std::fs::remove_dir(dir).unwrap();

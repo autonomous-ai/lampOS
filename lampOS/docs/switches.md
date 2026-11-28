@@ -59,6 +59,8 @@ RPC or product capability. Its constructor takes an explicit boolean for host
 controls. Neither product nor lamp units set it. It is outside the behavior
 counts until the separately reviewed runtime integration implements the switch.
 
+On the simple-call research branch, `LAMP_CALLER_FRAME_VAD=on` enables shadow measurement on the second route when `LAMP_CALLER_FRAME_MODEL` names an absolute directory containing the pinned `ecapa-voxceleb.onnx`. Both settings are unset in product units. Admission, renewal and confirmation remain with the simple call. [Sensor 6 measurement and model](verification/caller-frame-8849/README.md)
+
 ## The count
 
 The counts aren't kept on this page: a test works them out from the rows, so
