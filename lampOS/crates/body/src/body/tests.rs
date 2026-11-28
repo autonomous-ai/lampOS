@@ -23544,3 +23544,163 @@ fn the_reach_map_on_never_holds_a_pause_fold_a_stop_or_a_hand() {
         );
     }
 }
+
+/// #8939's honest limit, a guard's sit-down with `LAMP_BODY_REACH_MAP=on`: a held look down past the map's edge is held at the
+/// edge; the strain guard (a long strain of the elbow) or the heat guard (the elbow at 70) then sits the lamp down. A sit-down is a
+/// safety move, so the map lets go of the head at once. It lets go eased: the head's pitch never steps farther in one step than
+/// the same run takes without the map. Before, the held goal went the whole way past the edge in one step (114 counts, at full
+/// height) as the sit-down began.
+#[test]
+fn a_guards_sit_down_during_a_reach_map_hold_lets_the_head_go_no_faster_than_without_the_map() {
+    // Each step's time, stand, pitch goal and retreats, for a held look from 12 s and the guard's case: 0 a long strain of the
+    // elbow from 13 s (sits down at about 23 s), 1 the elbow warming to 70 from 14 s.
+    let run = |reach_map: Option<&'static crate::reach_map::ReachMap>, case: u8| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(30));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 3;
+        if case == 0 {
+            lamp.strains = vec![(Duration::from_secs(13), Duration::from_secs(40), 2, 500)];
+        } else {
+            lamp.heats = warms(Duration::from_secs(14)).collect();
+        }
+        let time = clock.time.clone();
+        let seen_at = clock.time.clone();
+        let mut seen: Vec<(Duration, f32, u16, u16)> = Vec::new();
+        run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                reach_map,
+                reach_refuse: true,
+                strain_guard: Some(StrainGuard {
+                    load: 450,
+                    seconds: 10,
+                    cools: false,
+                    rest_cools: false,
+                }),
+                ..gesture_limits()
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Listening, 100)),
+            move || {
+                let looking = time.get() >= Duration::from_secs(12);
+                let steps = ((time.get().as_millis() as f32 - 12_000.0) / 200.0).floor() + 1.0;
+                Asked {
+                    held: looking,
+                    // 40 counts down from home, a held look: past the map's edge below.
+                    aim: looking.then(|| [0.0, (steps * 11.4).min(40.0)]),
+                    aim_from_home: looking,
+                    ..Asked::default()
+                }
+            },
+            |glimpse| {
+                seen.push((
+                    seen_at.get(),
+                    glimpse.stand,
+                    glimpse.goals[0],
+                    glimpse.retreats,
+                ))
+            },
+        );
+        seen
+    };
+    // The largest step of the pitch's goal from the look on, and the most down goal at full height before the sit-down.
+    let steps = |seen: &[(Duration, f32, u16, u16)]| {
+        let from = seen
+            .iter()
+            .position(|s| s.0 >= Duration::from_secs(12))
+            .expect("the look began");
+        let largest = seen[from..]
+            .windows(2)
+            .map(|pair| pair[1].2.abs_diff(pair[0].2))
+            .max()
+            .unwrap();
+        let held = seen
+            .iter()
+            .filter(|s| s.1 >= 1.0 && s.3 == 0)
+            .map(|s| s.2)
+            .max()
+            .unwrap();
+        (largest, held)
+    };
+    for case in 0..2u8 {
+        let without = run(None, case);
+        assert!(
+            without.iter().any(|s| s.3 > 0),
+            "case {case}: the guard never sat the lamp down"
+        );
+        let rest = without
+            .iter()
+            .rfind(|s| s.0 < Duration::from_secs(11) && s.1 >= 1.0)
+            .map(|s| s.2)
+            .expect("the lamp stands before the look");
+        // The map's run ends 68 counts below the rest, so its edge less the 48 count margin is 20 below the rest.
+        let high = f64::from(rest) + 68.0;
+        let map = flat_map((1_500.0, high));
+        let edge = (high - 48.0) as u16;
+        let with = run(Some(map), case);
+        let (largest_without, went_without) = steps(&without);
+        let (largest_with, held_with) = steps(&with);
+        assert!(
+            went_without > edge + 20 && held_with <= edge + 1,
+            "case {case}: the map did not hold the look at its edge ({held_with}, edge {edge}, without {went_without})"
+        );
+        assert!(
+            with.iter().any(|s| s.3 > 0),
+            "case {case}: the guard never sat the lamp down with the map"
+        );
+        assert!(
+            largest_with <= largest_without.max(u16::from(GESTURE_STEP[0] as u8)),
+            "case {case}: the head's pitch stepped {largest_with} counts in one step with the map, {largest_without} without"
+        );
+    }
+}
+
+/// The one place the reach map's hold lets go (`reach_release`): each of the pitch, shoulder and elbow goes from where it was last
+/// written by at most a clip's own step toward its goal, a joint a hand or a stall holds takes its goal as asked, and it says
+/// whether some joint is still short.
+#[test]
+fn the_reach_maps_hold_lets_go_a_clips_step_at_a_time_and_never_holds_a_joint_in_a_hand() {
+    // The pitch 114 counts down (a sit-down after a hold at the edge), the shoulder 30 up, the elbow 5 down.
+    let (mut pitch, mut arm) = (1_974u16, [2_680u16, 2_595]);
+    assert!(reach_release(
+        &mut pitch,
+        &mut arm,
+        1_860,
+        [2_650, 2_600],
+        [true; 3]
+    ));
+    assert_eq!((pitch, arm), (1_884, [2_671, 2_595]));
+    // Within a step of every goal: as asked, and nothing short.
+    let (mut pitch, mut arm) = (1_880u16, [2_660u16, 2_590]);
+    assert!(!reach_release(
+        &mut pitch,
+        &mut arm,
+        1_860,
+        [2_650, 2_600],
+        [true; 3]
+    ));
+    assert_eq!((pitch, arm), (1_880, [2_660, 2_590]));
+    // A pitch in a hand goes where it is asked at once; the arm still eases.
+    let (mut pitch, mut arm) = (1_974u16, [2_680u16, 2_600]);
+    assert!(reach_release(
+        &mut pitch,
+        &mut arm,
+        1_860,
+        [2_650, 2_600],
+        [false, true, true]
+    ));
+    assert_eq!((pitch, arm), (1_974, [2_671, 2_600]));
+    // Up as well as down.
+    let (mut pitch, mut arm) = (1_700u16, [2_600u16, 2_600]);
+    assert!(reach_release(
+        &mut pitch,
+        &mut arm,
+        1_860,
+        [2_650, 2_600],
+        [true; 3]
+    ));
+    assert_eq!((pitch, arm), (1_836, [2_629, 2_600]));
+}

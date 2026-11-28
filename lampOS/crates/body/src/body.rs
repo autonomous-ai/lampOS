@@ -375,6 +375,34 @@ const GESTURE_WAIT: Duration = Duration::from_secs(3);
 /// base yaw, shoulder, elbow. A little over the fastest a clip asks, so that
 /// a clip is followed exactly and one that is dropped goes back no faster.
 const GESTURE_STEP: [f32; 5] = [24.0, 34.0, 26.0, 21.0, 21.0];
+
+/// One step of letting go of the reach map's hold (`LAMP_BODY_REACH_MAP=on`): the head's pitch and the arm's shoulder and elbow
+/// goals go from where each was last written toward this step's goal by at most a clip's own step (`GESTURE_STEP`), each joint
+/// `free` to ease (one a hand or a stall holds takes its goal as asked). True while some joint is still short of its goal.
+fn reach_release(
+    pitch: &mut u16,
+    arm: &mut [u16; 2],
+    pitch_written: u16,
+    arm_written: [u16; 2],
+    free: [bool; 3],
+) -> bool {
+    let toward = |goal: &mut u16, from: u16, step: f32, free: bool| -> bool {
+        let step = step as u16;
+        if !free || goal.abs_diff(from) <= step {
+            return false;
+        }
+        *goal = if *goal > from {
+            from + step
+        } else {
+            from - step
+        };
+        true
+    };
+    let pitch_short = toward(pitch, pitch_written, GESTURE_STEP[0], free[0]);
+    let shoulder_short = toward(&mut arm[0], arm_written[0], GESTURE_STEP[3], free[1]);
+    let elbow_short = toward(&mut arm[1], arm_written[1], GESTURE_STEP[4], free[2]);
+    pitch_short || shoulder_short || elbow_short
+}
 /// The farthest a gesture takes each of those from where the lamp has it.
 /// At least what a move may ask (`moves::FARTHEST`: 200, 200, the lamp's own
 /// yaw reach up to 250, 350, 350), so that a move the check takes is played
@@ -7406,6 +7434,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut glance_from: Option<[f32; 3]> = None;
     // The reach-map shadow's memory (`LAMP_BODY_REACH_MAP=shadow`): it speaks on a change.
     let mut reach_shadow = crate::reach_map::Shadow::default();
+    // `LAMP_BODY_REACH_MAP=on`: the map held the pose on the last step, or its hold is still being let go (`reach_release`).
+    let mut reach_releasing = false;
     // Whether Expression asked a glance on the last step.
     let mut glanced = false;
     // Steps the head has been led up while below its way without coming
@@ -9552,6 +9582,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             || stand_velocity != 0.0
             || stalls.iter().any(|stall| stall.hold.is_some())
             || test_held;
+        // Whether the map holds the pose on this step (a goal it put back).
+        let mut reach_holds = false;
         if let Some(map) = limits.reach_map
             && slump_again.is_none()
             && standing.is_some()
@@ -9592,10 +9624,34 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             if let Some(refused) = held {
                 // Only the joints the pure rule put back: `refused` never moves a joint to a goal it was not asked or last written.
-                goals[0] = refused.pitch as u16;
-                arm_goals = [refused.shoulder as u16, refused.elbow as u16];
+                let put_back = [
+                    refused.pitch as u16,
+                    refused.shoulder as u16,
+                    refused.elbow as u16,
+                ];
+                reach_holds = put_back != [goals[0], arm_goals[0], arm_goals[1]];
+                goals[0] = put_back[0];
+                arm_goals = [put_back[1], put_back[2]];
             }
         }
+        // The map's hold lets go eased, however it ends (the pose back inside, a safety move or a hand, the lamp no longer at
+        // full height): the pitch, shoulder and elbow go from where they were last written toward their goals no faster than a
+        // clip's own step (`GESTURE_STEP`), never the whole way at once (a sit-down during a hold snapped the head 114 counts in
+        // one step, #8939's limit). A joint a hand or a stall holds, or a relaxed head, takes its goal as asked.
+        if reach_releasing && !reach_holds {
+            reach_releasing = reach_release(
+                &mut goals[0],
+                &mut arm_goals,
+                written[0],
+                arm_written,
+                [
+                    !(held[0] || test_held || relaxed || stalls[0].hold.is_some()),
+                    stalls[3].hold.is_none(),
+                    stalls[4].hold.is_none(),
+                ],
+            );
+        }
+        reach_releasing |= reach_holds;
         still_steps = if goals != written || arm_goals != arm_written {
             0
         } else {
