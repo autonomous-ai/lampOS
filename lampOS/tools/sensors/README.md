@@ -19,6 +19,12 @@ defines the paired recording intake and separate call/self-wake/interruption
 views. Preserve each source clip's lineage; overlap alone is not an interrupt
 label, and a recorded replay cannot establish a physical audible stop.
 
+The separate [public/synthetic vision recipe](vision-freeze-20261128-v1.json)
+and [vision protocol](../../docs/vision-evaluation-20261128.md) freeze the
+28 November NPU/OpenCV comparisons. Use its [EVAL template](vision-eval-template.md).
+The recipe is not a v2 CLI manifest or a claim of already sealed media;
+dataset, conversion and streamed timing results have separate statuses.
+
 ## Build and check
 
 ```sh

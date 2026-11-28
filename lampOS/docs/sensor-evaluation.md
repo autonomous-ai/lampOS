@@ -48,6 +48,13 @@ also contain README and SHA256SUMS; all outputs refuse overwrite.
 
 ## One shared collection
 
+The owner's 28 November afternoon direction adds a separate
+[public/synthetic vision freeze](vision-evaluation-20261128.md) for work now,
+including NPU and OpenCV comparisons. Monday's footage is a later external
+test, not a prerequisite for that work. Its dataset-specific bars and recipe
+have their own identifier; the historical morning v2 contract below is not
+silently rewritten.
+
 The [28 November lamp-channel register](sensor-collection-20261128.md)
 adds paired over-lamp-speech and clean development recordings, with explicit
 call, self-wake and interruption labels and limits. It does not replace the
