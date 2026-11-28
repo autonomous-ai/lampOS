@@ -16741,6 +16741,63 @@ async fn a_stop_said_over_the_lamp_is_answered_in_the_owners_language() {
     assert!(script.asked.lock().unwrap().is_empty());
 }
 
+/// `LAMP_SIMPLE_CALL` (Fifth's gate on lamp-52e6: "Okay, okay, never mind."
+/// over an answer, the lamp's "Okay, I'll stop there.", and then "So which
+/// one is bigger?" held): every time the lamp speaks the window opens,
+/// so a stop's own line is told to the rule as the lamp's words, as an
+/// answer's are ([`Did::Said`], by its request), and the window runs on from
+/// its end. Without the switch a fixed line tells the rule nothing, as before.
+#[tokio::test]
+async fn with_simple_call_a_stops_own_line_is_told_as_the_lamps_words() {
+    // It may close the voice's conversation: hold the thread and leave it new.
+    let _thread = thread_held();
+    for simple in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Okay, okay, never mind.".to_owned())].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let built = if simple {
+            built.taking_simple_calls()
+        } else {
+            built
+        };
+        let said: Arc<Mutex<Vec<(u64, u64)>>> = Arc::default();
+        let seen = said.clone();
+        let mut engine = built
+            .ending_spoken_stops(true)
+            .telling_what_it_did(Arc::new(move |did| {
+                if let Did::Said(request, until_us) = did {
+                    seen.lock().unwrap().push((request, until_us));
+                }
+            }));
+        let before = lamp_ipc::monotonic_us();
+        engine.submit(start_marked(1, true, false, false));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        assert!(
+            out.contains(&format!("said:{}", crate::spoken_stop::LINE)),
+            "{simple}: {out:?}"
+        );
+        assert!(
+            script.asked.lock().unwrap().is_empty(),
+            "{simple}: the model is not asked"
+        );
+        let said = said.lock().unwrap().clone();
+        if simple {
+            assert!(!said.is_empty(), "the stop's line is the lamp's words");
+            assert!(
+                said.iter()
+                    .all(|(request, until_us)| *request == 1 && *until_us > before),
+                "{said:?}"
+            );
+        } else {
+            assert!(said.is_empty(), "off: as before: {said:?}");
+        }
+    }
+}
+
 /// lamp-06c1, 30 Oct 15:53:43 (#4710): "Okay, I'll stop there." was
 /// written but never heard. It was rendered only after the cut, whole,
 /// before any of it played, and the voice was slow; 5 s later a wordless
