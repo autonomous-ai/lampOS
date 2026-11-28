@@ -39,6 +39,7 @@ pub mod kept;
 pub mod latest;
 pub mod mesh;
 pub mod permit;
+pub mod person;
 pub mod photo;
 pub mod picture;
 pub mod remember_speaker;

@@ -48,7 +48,8 @@ Counts and times only: no picture, no face, nobody's identity.
 They own the larger part of the evidence, the faces; the voice's lines come
 to them on `voice/heard`, as they already do for the mouth
 (`--mouth-on-heard`). A face is any face the eyes publish on
-`humans/faces/tracked`, after their own still-face filter, near or far, as
+`humans/faces/tracked`, after their own still-face filter (and, with
+`LAMP_EYES_CONFIRMED_PERSON=on`, only a confirmed person's: [eyes.md](eyes.md), #8971), near or far, as
 Expression counts nobody for its sleep (`alive.rs`). `room/state` says how
 the room sounds and `attention/addressed` one request at a time, so neither
 carries this.
