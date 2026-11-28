@@ -369,6 +369,11 @@ mod tests {
             "LAMP_VOICE_ROUTE",
         ];
         let attention = include_str!("../../../docs/attention.md");
+        // The one simple rule (`LAMP_SIMPLE_CALL`) is the second route's, which a moved lamp's
+        // voice does not run (`LAMP_VOICE_ROUTE` is left out: no second.json there). On its route
+        // the switch would only lift the coordinator's floor hold, short-sound drop and talk over
+        // the lamp's own line, with no rule to judge the lines they let through (#8892).
+        const SECOND_ROUTE_ONLY: [&str; 1] = ["LAMP_SIMPLE_CALL"];
         for line in product.lines() {
             let Some(name) = line
                 .strip_prefix("Environment=")
@@ -385,7 +390,8 @@ mod tests {
                 assert!(
                     WHO_IT_ANSWERS.contains(&name)
                         || CLOCK_AND_SESSION.contains(&name)
-                        || NOT_THE_GROUP.contains(&name),
+                        || NOT_THE_GROUP.contains(&name)
+                        || SECOND_ROUTE_ONLY.contains(&name),
                     "{name} is named in attention.md and set in the product voice: add it to the group or leave it out on purpose"
                 );
             }
