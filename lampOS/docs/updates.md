@@ -1663,6 +1663,10 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the first update after setup: setup is done; its phone grace period is not restarted` | the first update after setup, before the walk: setup is done and its new unit still skips once done, so it isn't restarted though its unit differs from this build's (#6284) |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
+| `build N, which the lamp runs, adds X: the updater that switched to it did not carry them (#7018)` | an up-to-date round's pass begins: build N is the lamp's, and X are the product units it carries that the lamp lacks ("A part added over the air", "On an up-to-date round too") |
+| `X, added to build N, was taken away: …; build N is kept, and its units are tried again with the next build` | that pass failed (a watch, a write) or was cut short: X are stopped and removed, build N is not refused, and its units are not tried again at build N (#7018) |
+| `the units build N adds are not added this round: …; the next round tries again` | that pass could not be had this round (the units unread, a fetch, the disk): the round is up to date, and the next one looks again (#7018) |
+| `the units build N adds are not added: …; they are tried again with the next build` | the build's own units plan no pass (a link there that no unit starts through, say): the round is up to date, and they are tried at build N no more (#7018) |
 | `started <unit>, added by build N` | the watch passed and the build is kept; a long-running part of `lampos.target` the switch added, enabled and inactive, was started with `--no-block` ("A part added over the air") |
 | `started <unit>, ended before build N, which changed it` | the watch passed and the build is kept; a long-running part of `lampos.target` the lamp had, that the switch changed and that had ended cleanly (inactive, last run a success), was started with `--no-block` (#6699, "A part added over the air") |
 | `started lamp-control.service, ended cleanly with SWITCH on` | a kept switch or an up-to-date round: lamp-control was enabled, had ended cleanly, and `LAMP_CONTROL` or `LAMP_SKILL_TASKS` (SWITCH) reads `on`; started with `--no-block`, changed by the build or not (#6699) |
@@ -2582,6 +2586,62 @@ managed updater lacks some (the waking face, the Wi-Fi restore and
 recovery among them), and gets them enabled for its next start. A stop of
 an added unit systemd never loaded (the switch cut before its reload) is
 taken as done. The tests use the round's fake systemd.
+
+**On an up-to-date round too (#7018).** The round that switches a lamp to a
+build is run by the updater the lamp had. An older one adds only the units
+of its own `install::PRODUCT`, then `own` switches lamp-update to the
+build's, and that one's first round finds the lamp up to date. Before this,
+an up-to-date round only started lamp-control (above), so a unit the build
+carried and the older updater did not know waited for the next build. Now,
+when the channel's build is the one the lamp runs (`look`, equal
+sequences), the round makes one pass that only adds (`installed_adds`):
+
+- **When:** the build is not refused here, its units were not tried at this
+  build yet (`adds_tried` in `state.json`), and the adding rules above find
+  a unit to add (`adding_units`: a build of level 8, every part linked, a
+  managed updater, in this binary's `install::PRODUCT`, nothing there, the
+  users there). The channel's manifest is the installed build's here,
+  already checked; none is stored.
+- **What:** `plan` with `adds_only` skips the installed parts and their
+  companions, so a unit the lamp has, edited by the owner or not, is never
+  written. Only the added units, a part new to the lamp, its `current`
+  link and the enabling links are, as above.
+- **How:** as a switch (`acting`, then `switch`): the quiet wait, the
+  journal (`Journal::adds_only`), the reload, the watch, and
+  `start_added`. `installed`, `previous` and the units kept in `previous/`
+  stay as they are, and the round ends `up to date: build N`.
+- **A pass that fails** removes what it added (`remove_added`), as a build
+  put back does, and refuses nothing: the build is the lamp's. The same
+  holds for a pass cut short and recovered at the next start.
+- **Once per installed build:** `adds_tried` records the build after the
+  pass, well or not. A unit the owner deleted, or one that fails its watch,
+  is not added again every round; the next build tries again, as a switch
+  does. A round of this updater that takes a build records it too, so an
+  owner's deleted unit is not added back by its next up-to-date round.
+- **Whose look:** `adds_tried_by` keeps the folder the updater that looked
+  runs from (`Config::running`). The updater that switched to a build
+  added only the units its own `install::PRODUCT` names; the build's own
+  updater, which `own` then runs from another folder, may carry more, so
+  its first up-to-date round makes the one pass too, and records its own
+  folder (the first builder's P2 on #8400). A state written before, with
+  no folder, counts as another updater's look. A pass the channel, the
+  disk or the fetch stop is not counted: the next round looks again.
+- **A dry round** (`--apply` off) lists the additions as a switch's: it
+  ends `would update`.
+
+The limit, for review:
+
+| limit | value | why |
+|---|---|---|
+| tries of an up-to-date round's additions | once per installed build, success or failure | a unit the owner deleted, or one that fails its watch, is not re-added every round; the next build tries again, as a switch does today |
+
+So an up-to-date round can now fetch a new part and switch at a quiet
+moment, and a stable lamp that lacks `lamp-region.service` or its `.path`
+gets them at its next up-to-date round, started at boot, as install leaves
+them. Not shown yet on a lamp: the row is an update PR's row (an older
+updater's switch to a build that adds a unit, then its self-switch, then
+the next up-to-date round; owner-deleted and owner-edited units left; the
+gate's two real rounds).
 
 ### sysstat's kept files at a round (#7254)
 

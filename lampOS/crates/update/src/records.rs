@@ -138,6 +138,20 @@ pub struct State {
     /// back is not retried for ever. Absent from a state written before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub held_retried: Vec<u64>,
+    /// The installed build whose product units the lamp lacks this updater
+    /// has looked at (#7018): by its own round that took the build, or by
+    /// an up-to-date round's pass for a build an older updater switched to.
+    /// Tried once per build, well or not, and never a reason to refuse it;
+    /// the next build tries again. Absent from a state written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adds_tried: Option<u64>,
+    /// The folder of the updater that looked for [`Self::adds_tried`]
+    /// (`Config::running`): a build's own updater, run from another folder
+    /// than the one that switched to it, looks once more, for the units it
+    /// carries that the switching one did not (the first builder's P2 on
+    /// #8400). Absent from a state written before, or with no folder known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adds_tried_by: Option<String>,
     /// Fields a later build wrote that this one does not know: kept as
     /// they were across a save, for that build to read again (#1505).
     #[serde(flatten)]
@@ -145,6 +159,19 @@ pub struct State {
 }
 
 impl State {
+    /// This updater, running from `by`, has looked at the units build
+    /// `sequence` adds (#7018).
+    pub fn adds_looked(&mut self, sequence: u64, by: Option<&str>) {
+        self.adds_tried = Some(sequence);
+        self.adds_tried_by = by.map(str::to_owned);
+    }
+
+    /// Whether the updater running from `by` has looked at the units build
+    /// `sequence` adds: another updater's look is not its own (#8400).
+    pub fn adds_seen(&self, sequence: u64, by: Option<&str>) -> bool {
+        self.adds_tried == Some(sequence) && self.adds_tried_by.as_deref() == by
+    }
+
     /// How long a `held` refusal stands before its one more try.
     pub const HELD_RETRY_AFTER_MS: u64 = 24 * 60 * 60 * 1000;
 
@@ -321,6 +348,12 @@ pub struct Journal {
     /// until the third in a row. Absent from a journal written before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refusing: Option<String>,
+    /// An up-to-date round's pass that only adds the product units the
+    /// lamp's running build carries and it lacks (#7018): put back, it
+    /// removes them and refuses nothing, the build being the lamp's
+    /// already. Absent from a journal written before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub adds_only: bool,
 }
 
 impl Journal {
@@ -908,6 +941,7 @@ mod tests {
             exit_notes: vec!["/etc/systemd/system/lamp-tasks.service.d/exit-note.conf".into()],
             aside: Vec::new(),
             refusing: None,
+            adds_only: false,
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));
@@ -1036,6 +1070,8 @@ mod tests {
             .into(),
             cut_short: None,
             held_retried: Vec::new(),
+            adds_tried: Some(4576),
+            adds_tried_by: Some("/opt/lampOS/update/".to_owned() + &"9".repeat(64) + "/"),
             later: Default::default(),
         };
         let journal = Journal {
@@ -1068,6 +1104,7 @@ mod tests {
             exit_notes: Vec::new(),
             aside: Vec::new(),
             refusing: None,
+            adds_only: false,
         };
         (state, journal)
     }

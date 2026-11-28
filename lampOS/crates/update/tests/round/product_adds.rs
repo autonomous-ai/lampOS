@@ -4,14 +4,14 @@
 //! once the watch passed, and taken away again with a build put back.
 use super::*;
 
-const MOOD: &str = "lamp-mood.service";
+pub(super) const MOOD: &str = "lamp-mood.service";
 const RECORDS: &str = "lamp-records.service";
-const RECORDS_TIMER: &str = "lamp-records.timer";
-const TEMPLATE: &str = "lamp-eyes-camera@.service";
-const SOCKET: &str = "lamp-eyes-camera.socket";
-const LEFT_OUT: &str = "lamp-keeper-restart.socket";
+pub(super) const RECORDS_TIMER: &str = "lamp-records.timer";
+pub(super) const TEMPLATE: &str = "lamp-eyes-camera@.service";
+pub(super) const SOCKET: &str = "lamp-eyes-camera.socket";
+pub(super) const LEFT_OUT: &str = "lamp-keeper-restart.socket";
 
-fn mood() -> String {
+pub(super) fn mood() -> String {
     "[Service]\nUser=lampos\nGroup=lampos\nExecStart=/opt/lampOS/mood/current/lamp-mood\n[Install]\nWantedBy=lampos.target\n".into()
 }
 
@@ -19,7 +19,7 @@ fn records() -> String {
     "[Service]\nExecStart=/opt/lampOS/records/current/lamp-records check\n".into()
 }
 
-fn records_timer() -> String {
+pub(super) fn records_timer() -> String {
     "[Timer]\nOnCalendar=hourly\n[Install]\nWantedBy=timers.target\n".into()
 }
 
@@ -34,7 +34,7 @@ fn socket() -> String {
 /// A lamp installed as the product: its eyes started through their link,
 /// no unit of its own, a managed updater, its users, and setup done (so
 /// `lampos.target` runs).
-fn product_lamp() -> Lamp {
+pub(super) fn product_lamp() -> Lamp {
     let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
     for unit in [
         "lamp-voice.service",
@@ -73,7 +73,12 @@ fn product_lamp() -> Lamp {
 }
 
 /// Build 2 at updater `level`: these binaries, and these product units.
-fn publish(lamp: &mut Lamp, level: u64, binaries: &[(&str, &str)], units: &[(&str, String)]) {
+pub(super) fn publish(
+    lamp: &mut Lamp,
+    level: u64,
+    binaries: &[(&str, &str)],
+    units: &[(&str, String)],
+) {
     let mut build = lamp.manifest(2, binaries, &[]);
     for (name, text) in units {
         let unit = Unit {
@@ -95,7 +100,7 @@ fn publish(lamp: &mut Lamp, level: u64, binaries: &[(&str, &str)], units: &[(&st
     );
 }
 
-fn all() -> Vec<(&'static str, String)> {
+pub(super) fn all() -> Vec<(&'static str, String)> {
     vec![
         (MOOD, mood()),
         (RECORDS, records()),
@@ -114,7 +119,7 @@ fn binaries(eyes: &str, mood: &str) -> Vec<(&'static str, String)> {
     ]
 }
 
-fn publish_all(lamp: &mut Lamp, level: u64, mood: &str) {
+pub(super) fn publish_all(lamp: &mut Lamp, level: u64, mood: &str) {
     publish_with_eyes(lamp, level, "eyes 1", mood);
 }
 
@@ -127,7 +132,7 @@ fn publish_with_eyes(lamp: &mut Lamp, level: u64, eyes: &str, mood: &str) {
     publish(lamp, level, &binaries, &all());
 }
 
-fn link(lamp: &Lamp, path: &str) -> Option<String> {
+pub(super) fn link(lamp: &Lamp, path: &str) -> Option<String> {
     fs::read_link(lamp.root.join(path.trim_start_matches('/')))
         .ok()
         .map(|to| to.display().to_string())
