@@ -23634,13 +23634,6 @@ async fn answer(
                     continue;
                 }
                 if policed == Policed::Held {
-                    // Journalled: a held call reaches no part, so nothing
-                    // else says it was asked (#8840: on lamp-52e6 a cancel
-                    // held this way left no line anywhere).
-                    eprintln!(
-                        "lamp-voice second: request {request} asked for {}: held by the Policy's decision for the turn",
-                        call.name
-                    );
                     messages.push(Message::tool(
                         call.id.clone(),
                         crate::policy_holds::held().to_string(),
