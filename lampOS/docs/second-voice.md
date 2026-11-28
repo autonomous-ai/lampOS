@@ -3463,7 +3463,8 @@ lamp-memory has no network, so the tiered store's nightly sleep
 ([memory.md](memory.md), "The tiered store beside Days") is asked of a
 model by the voice (`tiers_night.rs`; the memory owner's option A, 3 Nov;
 the first builder's bounds on #4710). Off unless `LAMP_MEMORY_TIERS` is
-`shadow` or `on` in the voice's own unit, with `LAMP_MEMORY_SOCKET`, the
+`shadow` or `on` in the voice's own unit (the product's sets `shadow`, the
+owner's call of 27 Nov), with `LAMP_MEMORY_SOCKET`, the
 second route's file (`LAMP_VOICE_SECOND_CONFIG`) and its relay
 (`deepseek_base_url`, or `LAMP_SECOND_DEEPSEEK_BASE_URL`). Then the
 coordinator starts one thread, `lamp-voice-tiers-night`, and says
@@ -3488,8 +3489,9 @@ set). It runs whether or not the second route is the lamp's voice.
   only). They are this pass's own: the memory's `nightly` pass
   (`LAMP_MEMORY_NIGHTLY`) keeps its own, so with both switches set a night
   may ask the relay up to twice the calls, bytes and tokens, both through
-  memory's one-at-a-time socket. Which pass runs is the memory owner's call
-  before `LAMP_MEMORY_TIERS` goes on. Each call's line logs them: `tiers night: <what
+  memory's one-at-a-time socket. The product sets both
+  (`LAMP_MEMORY_NIGHTLY=on` and `LAMP_MEMORY_TIERS=shadow`, the owner's call
+  of 27 Nov), so both passes run. Each call's line logs them: `tiers night: <what
   happened>; tonight N of 16 calls, B of 1048576 bytes, T of 200000
   tokens`. No words of the job are ever logged; the chat client's own
   lines are sizes and times only.

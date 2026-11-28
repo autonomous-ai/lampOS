@@ -509,7 +509,7 @@ before using an existing store.
     <dir>/<person>/journal-YYYY-MM-DD.jsonl   {"id":1,"at_unix_ms":1791892800000,"heard":"...","said":"..."}
     <dir>/<person>/kept.jsonl                 {"id":2,"at_unix_ms":1791892800000,"text":"..."}
 
-With `LAMP_MEMORY_TIERS` set (off unless set), `<dir>/memory-tiers.d/` holds
+With `LAMP_MEMORY_TIERS` set (off unless set; the product sets `shadow`), `<dir>/memory-tiers.d/` holds
 the tiered store beside Days ([below](#the-tiered-store-beside-days-lamp_memory_tiers)).
 Its dot keeps it from ever being read as a person's directory. A
 `--memory-days` start with the switch off removes one left there.
@@ -1611,7 +1611,10 @@ the person take it; it closes 90 days after its week. Rules and limits:
 
 ## The tiered store beside Days (`LAMP_MEMORY_TIERS`)
 
-Off unless set, and not set by the product's units. With `--memory-days`,
+Off unless set. The product's units set `shadow`, in lamp-memory's and
+lamp-voice's (the owner's call of 27 Nov, tracker rows C143 and C144; a row
+on lamp-06c1 follows); `on` is set in none until its 50 ms wait is measured
+on a lamp's eMMC. With `--memory-days`,
 lamp-memory reads `LAMP_MEMORY_TIERS` at start (#4746/#4747; the design is
 [memory-design.md](memory-design.md), "Wiring into lamp-memory"):
 
@@ -1749,7 +1752,8 @@ How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
     `jobs_invalid`, `jobs_stale`, `jobs_expired` and `jobs_put_back`.
 
 What is not done yet: no backfill of what Days held before the switch was
-set; a kept thing replaced (`replaces`) stays a fact in the tiers beside its
+set (a product lamp starts its tiered copy empty on its first start with
+the switch); a kept thing replaced (`replaces`) stays a fact in the tiers beside its
 replacement (the library has no retire without a fingerprint); the tiers'
 `Access.alone` is taken as given (Days already answers a scope to whoever
 the voice asks for); and the weekly reflection does not run. The played

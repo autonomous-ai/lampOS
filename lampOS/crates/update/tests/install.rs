@@ -1722,15 +1722,59 @@ fn the_product_voice_drops_frames_before_a_restarted_clock() {
     );
 }
 
-/// The tiered store beside Days stays off in the product (`LAMP_MEMORY_TIERS`,
-/// #4746): until its played test over days and two reads, no product file
-/// sets it, so lamp-memory serves Days alone.
+/// The tiered store beside Days is on in the product as `shadow`
+/// (`LAMP_MEMORY_TIERS`, #4746; the owner's call of 27 Nov, C143 and C144):
+/// set once in lamp-memory's unit, which mirrors and forgets, and once in
+/// lamp-voice's, which asks the night's model, and in no other unit.
+/// lamp-memory reads it only with `--memory-days`, and the voice's night needs
+/// the memory's socket and the second route's relay. `on` (the tiers' recall
+/// waited beside Days') stays unset until its wait is measured on a lamp.
 #[test]
-fn the_product_leaves_the_tiered_memory_off() {
-    for (file, text) in install::PRODUCT {
+fn the_product_mirrors_memory_into_the_tiers_as_shadow() {
+    const LINE: &str = "Environment=LAMP_MEMORY_TIERS=shadow";
+    let mut seen = Vec::new();
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let named: Vec<&&str> = service
+            .iter()
+            .filter(|line| line.contains("LAMP_MEMORY_TIERS"))
+            .collect();
+        if !matches!(*unit, "lamp-memory.service" | "lamp-voice.service") {
+            assert!(named.is_empty(), "{unit} sets the tiered memory");
+            assert!(
+                !text.contains("LAMP_MEMORY_TIERS="),
+                "{unit} names a tiered memory value"
+            );
+            continue;
+        }
+        assert_eq!(named, [&LINE], "{unit} sets {LINE} once, and only it");
+        seen.push(*unit);
+    }
+    seen.sort();
+    assert_eq!(seen, ["lamp-memory.service", "lamp-voice.service"]);
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let memory = section(unit("lamp-memory.service"), "Service");
+    assert!(
+        memory
+            .iter()
+            .any(|line| line.starts_with("ExecStart=") && line.contains(" --memory-days")),
+        "the memory's tiers need --memory-days"
+    );
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
+        "Environment=LAMP_VOICE_ROUTE=second",
+        "Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json",
+    ] {
         assert!(
-            !text.contains("LAMP_MEMORY_TIERS"),
-            "{file} sets the tiered memory"
+            voice.contains(&line),
+            "the voice's tiers night lacks {line}"
         );
     }
 }

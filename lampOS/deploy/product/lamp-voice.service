@@ -735,6 +735,13 @@ Environment=LAMP_MEMORY_PROFILE=on
 Environment=LAMP_MEMORY_NIGHTLY=on
 Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on
 Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
+# The tiered store's night (LAMP_MEMORY_TIERS, docs/second-voice.md "The memory's night"): 03:00 to 06:00, after 20 min
+# quiet with the privacy slide open, the voice takes lamp-memory's queued sleep jobs and asks the relay's DeepSeek, at
+# most 16 calls, 1 MiB and 200,000 tokens a night for this pass alone (the nightly pass above keeps its own); speech, a
+# line or the slide stops a call at once, and a held reply is dropped then (C143). Nothing is said or shown. The
+# owner's call of 27 Nov; a row on lamp-06c1 follows. `shadow`, as lamp-memory.service sets it: needs the memory socket
+# and the second route's relay, both above.
+Environment=LAMP_MEMORY_TIERS=shadow
 # Weekly chapters (B2, C109, docs/memory-days.md): the first night after a week ends, one short chapter of each known
 # person's week from the items the nightly pass kept, grounded in them; told only to that person's own recall of a
 # day or span, never in the session note. The owner's yes on 16 Nov; a row on lamp-06c1 comes before it trains. Needs

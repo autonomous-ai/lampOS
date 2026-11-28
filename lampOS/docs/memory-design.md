@@ -196,7 +196,9 @@ out the owner model, invent a fact, or turn recall into an unasked interview.
 The first builder's rule for any of this reaching a lamp (#4710, 2 November):
 wiring into lamp-memory behind a switch, a played test over days, and two
 reads. The wiring is `LAMP_MEMORY_TIERS` (off unless set; the product sets
-it nowhere), read by lamp-memory at start with `--memory-days`. Its contract
+`shadow` in lamp-memory's and lamp-voice's units, the owner's call of 27 Nov
+ahead of the played test, whose row on lamp-06c1 follows), read by
+lamp-memory at start with `--memory-days`. Its contract
 is in [memory.md](memory.md#the-tiered-store-beside-days-lamp_memory_tiers);
 the shape and what it leaves open:
 
@@ -242,8 +244,8 @@ the shape and what it leaves open:
   as the observation pass does) within 60 s a call and at most 16 calls,
   1 MiB and 200,000 tokens a night for this pass alone (the `nightly`
   pass keeps its own budget: with `LAMP_MEMORY_NIGHTLY` set too, a night
-  may ask the relay up to twice that; which pass runs is the memory
-  owner's call before the switch goes on), and gives the reply back
+  may ask the relay up to twice that; the product sets both, the owner's
+  call of 27 Nov, so both run), and gives the reply back
   (`tiers_sleep_give`). The tiered store's validator checks it; memory also
   checks that every source record is still held by the store and by Days.
   Speech, a line handed on or the slide closing stops a call at once, the
