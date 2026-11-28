@@ -2611,6 +2611,99 @@ the full seems read as before. With the switch off and no yes, no read
 runs, as before. Every other face, or no read, leaves it out: unknown,
 not away.
 
+### Head-direction and facing observer (`--head-direction-observer on`, #8847)
+
+This explicit CLI option accepts `on` or `off`, defaults to `off`, and is not
+enabled by any product unit. It observes existing processing looks without
+changing the detector, mesh scheduling, camera reader, thread count, bus
+payloads, legacy facing/speaking decisions or voice policy. It does not
+enable pitch/gaze or select which person was addressed. With no configured
+or currently wanted mesh, it counts that missing/deferred state rather than
+running another inference or falling back to five marks.
+
+The observer borrows the existing picture, detections and mesh landmarks,
+checks the shared candidate geometry, discards its angles, then retains
+fixed counters only. Two raw detections remain ambiguous even if the
+still-face filter removes one. No-face, ambiguous, filtered, skipped,
+decode/detector failure, size/visibility, absent/deferred/unavailable mesh,
+invalid geometry, freshness rejection and cancellation have distinct
+outcomes. The denominator is processing looks, not labelled head turns or
+independent conversation opportunities. These counts show availability,
+not accuracy or a successful lamp/screen/phone decision.
+
+At most once per 60 seconds, after the pending look ends, the main loop
+writes one bounded numeric/fixed-enum JSON record with schema
+`lamp-head-direction-observer/1` and prefix
+`lamp-eyes: head_direction_observer`. Its `window_us` is elapsed duration;
+the payload has no event timestamp, pose, angles, landmarks, image, identity
+or raw error text. Frame and look rejection counts are separate. Fresh,
+available geometry alone enters source-age histograms, split by
+start-of-exposure versus end-of-frame driver timestamps and working versus
+full crop. The exclusive source-age ceiling is **less than 250 ms**, not
+the approved **p95 100 ms or less** source-to-usable-output budget. Late
+looks remain in upper bins or stale rejections; a percentile of accepted
+samples cannot hide those missing outcomes and claim qualification.
+
+The capture/source, permission-generation, sequence and timestamp guard
+checks metadata again after geometry. It neither exports pose nor supplies
+the reviewed raw-pose revoke/publish fence needed by a future sensor.
+The added overhead target is p95 below 1 ms; on-lamp overhead, journal cost
+and the overall 100 ms budget remain unmeasured. Fleet recording/upload,
+the live per-case scorer adapter and qualification are not implemented.
+See [the runtime observation contract](head-direction-evaluation.md#default-off-runtime-observer)
+and [`head_direction`](../crates/eyes/src/head_direction/mod.rs).
+
+The schema/1 description above is the original #8865 prerequisite. The
+**sensor 4 extension, drafted 27 November 2026**, retains the same explicit
+default-off switch and proposes schema `lamp-head-direction-observer/2`.
+Its new `facing` object separates `legacy_yaw`, `mesh_yaw` and
+`mesh_yaw_pitch`. Each method has `facing`, `not_facing` and fixed-reason
+`unknown` counts. Each partitions the same processing looks; their counts
+must not be added as independent opportunities. Legacy and mesh yaw use
+the inherited 60-degree yaw rule, widened toward the image edge and capped
+at 90 degrees. The pitch variant additionally requires -20 through +25
+degrees, inclusively. No threshold is fitted and no legacy pitch/gaze or
+voice rule is enabled. These counts are predictions, not correct answers.
+
+Legacy may remain measurable when a mesh is missing or the candidate's
+stricter clipping check abstains; candidate methods never fall back to it.
+Final freshness rejection or cancellation makes every method unknown.
+The separate `facing.shoulders_unknown_no_association` count is always
+unknown: the NPU's 2D shoulder keypoints lack a verified fresh same-frame,
+same-person association and do not establish torso orientation. No NPU
+request, new model call, retained image or public face field is added.
+Head pose, shoulder orientation, gaze and intended recipient remain
+different questions. The simple-call base's call/window policy is unchanged.
+
+The frozen v2 scorer at `31c290d5bb9dc845679098a837a4d0ffd5059cb4`
+(#8885, rubric `sensor-team-2026-11-27-v2`) requires independently labelled
+head and shoulders: both known toward lamp means `facing`; with both known,
+an away component means `away`. The bar is >=114/120 in each class, with
+20 head-toward/shoulders-away and 20 reverse disagreement cases. Unknown
+components require independent gold or remain fault diagnostics. Our
+**head-only proxy cannot qualify this joint job alone**; its internal
+`not_facing` count is not a qualified v2 `away` result. Real-person holdout,
+verified source clocks and the producing binary are still required.
+Replay readiness remains null; invented adapter fixtures establish only
+contract compatibility. All original and derived evidence stays private
+and retained under v2 `keep_all`, superseding older deletion dates.
+
+The shared capture guard and candidate-availability source-age histograms
+remain as above; no new per-method latency field is proposed. Unknowns
+remain unsuccessful opportunities on labelled answerable episodes, never
+correctly-away results. No labelled real desk episodes, distance/speaking
+or shoulder results, live capture latency or sensor qualification are
+recorded for this extension. See the
+[dated sensor 4 comparison and evidence gaps](head-direction-evaluation.md#sensor-4-fixed-rule-development-comparison-2026-11-27).
+The draft is implemented and passes the local Mac/Linux code gates. Live
+capture timing, real-person evidence and joint qualification remain pending. A
+[separate development calibration](head-direction-evaluation.md#one-bounded-development-calibration-round-2026-11-28)
+failed its per-class targets; its fitted thresholds are not runtime rules.
+The later [reviewed person split and holder file replay](head-direction-evaluation.md#reviewed-person-split-and-angle-diagnostics-2026-11-28)
+preserve that conclusion: neither proxy recall passes, the person split is
+previously used development data, and file processing is not capture latency.
+No fitted cone, new model or product behavior is enabled by these reviews.
+
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 
 The eyes report every face the detector finds, however small or unsure.
@@ -3994,7 +4087,7 @@ Not yet shown on a lamp.
 lamp-eyes --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
 ```
 
-Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` (with `--glance-log ABSOLUTE_PATH`) and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above.
+Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` (with `--glance-log ABSOLUTE_PATH`) and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above. Separately, `--head-direction-observer on|off` counts existing head-geometry availability and source-age outcomes, with independent fixed-rule facing counts in the sensor 4 schema/2 draft; its default is `off` and no product unit enables it.
 `--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; or
 `VENDOR:PRODUCT` alone (#2190). `--device` is given only with a port, and
 may be left out. Without it, at each open the eyes take the one camera with
@@ -4041,6 +4134,21 @@ cargo run --release -p lamp-eyes --example look -- MODEL.onnx PHOTO.jpg
 ```
 
 ## Verification without a lamp
+
+For the new head-direction work, the
+[offline comparison](head-direction-evaluation.md#run-without-a-lamp) runs
+the existing detector/crop/mesh pipeline with the shared checked geometry
+in [`head_direction/geometry.rs`](../crates/eyes/src/head_direction/geometry.rs).
+The default-off runtime observer reuses that math with already computed
+meshes and counts metadata/availability; the schema/2 draft additionally
+counts the three independent fixed-rule facing predictions above. It leaves product sensing
+decisions and voice policy unchanged. Neither path replaces the Reviewer's
+labelled, on-body accuracy and latency gates; host geometry and freshness
+fixtures are not those measurements. The offline example's proposed
+`--crop working|full` suffix selects the existing working-picture or
+same-frame full crop, defaulting to working and identifying it in metadata.
+The historical 2,790-image run used working-picture crops and does not
+qualify every runtime mouth configuration.
 
 Host tests, `cargo test -p lamp-eyes` (14 passed, 0 failed, on macOS; the 12
 before the kept frame also passed under emulated ARM64). They cover: that the

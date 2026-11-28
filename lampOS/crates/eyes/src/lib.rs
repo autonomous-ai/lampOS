@@ -35,6 +35,7 @@ pub mod facing;
 pub mod frame_link;
 pub mod full_look;
 pub mod glance_log;
+pub mod head_direction;
 pub mod kept;
 pub mod latest;
 pub mod mesh;
