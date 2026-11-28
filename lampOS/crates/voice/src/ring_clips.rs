@@ -354,8 +354,25 @@ impl Renderer {
                 pass.full = true;
                 break;
             }
-            match self.cache.render_once(&words) {
-                Ok(samples) if !samples.is_empty() && samples.len() <= MOST_FRAMES as usize => {
+            match self.cache.render_once_to_keep(&words) {
+                Ok((_, false)) => {
+                    // Said in the lamp's own voice in place of the person's
+                    // Gemini voice (#8762's review): never kept under
+                    // theirs, so it would ring offline in the wrong voice
+                    // for its whole life; theirs is asked again after the
+                    // backoff.
+                    pass.failed = true;
+                    eprintln!(
+                        "lamp-voice schedule-consumer: reminder clips not rendered in the person's own voice, not kept: tried again in {} s (LAMP_OFFLINE_RINGS)",
+                        self.every.as_secs()
+                    );
+                    self.retry_at = Some(now + self.every);
+                    self.every = (self.every * 2).min(WARM_EVERY_MOST);
+                    return pass;
+                }
+                Ok((samples, true))
+                    if !samples.is_empty() && samples.len() <= MOST_FRAMES as usize =>
+                {
                     match self
                         .clips
                         .keep(&wanted.store_id, *id, &words, &voice, &samples)
@@ -371,7 +388,7 @@ impl Renderer {
                         }
                     }
                 }
-                Ok(_) => {
+                Ok((_, true)) => {
                     // Too long for a clip: it rings with the generic line.
                     eprintln!(
                         "lamp-voice schedule-consumer: reminder id {id}'s offline clip rendered past {} s: not kept, it rings with the generic line",
@@ -562,6 +579,54 @@ mod tests {
         );
         down.store(false, Ordering::SeqCst);
         assert_eq!(renderer.pass(&new, start + WARM_EVERY).rendered, 2);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #8762's review, P3 1: a reminder's clip the person's Gemini voice
+    /// failed (a 503, no sound in time) was rendered in the lamp's own
+    /// voice and kept under theirs, so it rang offline in the lamp's voice
+    /// for its whole life. A clip the lamp's voice said in theirs' place is
+    /// not kept: the pass waits its backoff, and the next one asks theirs
+    /// again and keeps that.
+    #[test]
+    fn a_clip_the_persons_gemini_voice_failed_is_not_kept_as_theirs() {
+        let dir = scratch("gemini-failed");
+        let clips = Clips::new(&dir);
+        let down = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let off = Arc::clone(&down);
+        let theirs: Render = Box::new(move |text: &str| {
+            if off.load(Ordering::SeqCst) {
+                return Err("HTTP 503".into());
+            }
+            Ok(vec![text.len() as i16; 2_400])
+        });
+        let (lamps, lamps_calls, _) = service("Rachel", 1_200);
+        let cache = TtsCache::new(
+            std::env::temp_dir().join("lamp-ring-clips-unused-cache"),
+            "own-gemini:Kore@https://google.example.invalid",
+            "gemini-tts",
+            "en",
+            theirs,
+        )
+        .giving_way_to(lamps, Box::new(|| false));
+        let voice = cache.identity().to_owned();
+        let mut renderer = Renderer::new(clips.clone(), cache);
+        let start = Instant::now();
+        let walk = wanted(STORE, &[(4, "Take your pills.")], &[]);
+        let said = words(None, "Take your pills.");
+        let pass = renderer.pass(&walk, start);
+        assert_eq!(lamps_calls.load(Ordering::SeqCst), 1, "said in the lamp's");
+        assert!(pass.failed && pass.rendered == 0, "{pass:?}");
+        assert_eq!(clips.own(STORE, 4, &said, &voice), None);
+        assert!(!clips.current(STORE, 4, &said, &voice));
+        assert_eq!(clips.kept(STORE), BTreeSet::new());
+        down.store(false, Ordering::SeqCst);
+        assert_eq!(renderer.pass(&walk, start + WARM_EVERY).rendered, 1);
+        assert_eq!(
+            clips.own(STORE, 4, &said, &voice),
+            Some(vec![said.len() as i16; 2_400]),
+            "theirs, once Google answers"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
