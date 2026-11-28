@@ -73,6 +73,14 @@ fn exit_note(unit: &str) -> ExitCode {
     let at_us = lamp_ipc::monotonic_us();
     let none = BTreeMap::new();
     if reports::exit_note(unit, &result, &code, &status, at_us, &boot, &none).is_none() {
+        if result == "success"
+            && let Err(error) = reports::repair_exit_notes(Path::new(reports::EXITS), unit, &boot)
+        {
+            say(&format!(
+                "earlier exit notes could not be made readable ({})",
+                error.kind()
+            ));
+        }
         return ExitCode::SUCCESS;
     }
     let shown = reports::bounded_output(
