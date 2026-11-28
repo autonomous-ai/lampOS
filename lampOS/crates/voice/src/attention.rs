@@ -2190,6 +2190,11 @@ pub struct Attention {
     /// The line in hand took the lamp's news's one reply when another rule
     /// than [`Self::first_output`]'s let it out ([`Self::let_out_after_news`]).
     news_let_out: bool,
+    /// How long after the lamp's news the line in hand began, when
+    /// [`Self::first_output`] took the news's slot for it, whatever it then
+    /// judged: a call (a tap, a computer's turn, a wake by the name) returns
+    /// before the news is weighed, and the slot is gone by then.
+    news_taken_ago: Option<u64>,
     /// The request in hand follows, within [`ANOTHER_REPLY_US`], one that
     /// called someone other than the lamp by name. With `spoken_to` only.
     after_another: bool,
@@ -2932,21 +2937,29 @@ impl Attention {
     /// the simple call on, the first line after the news never got the note.
     /// True when it took it; [`Self::played_after_news`] then says so.
     pub fn let_out_after_news(&mut self) -> bool {
-        if self.played_after_news() || self.judged_own || noise_after_news(&self.heard) {
-            return self.played_after_news();
+        if self.played_after_news() {
+            return true;
         }
-        let (Some(began), Some(news)) = (self.began_us, self.news_us) else {
+        if self.judged_own || noise_after_news(&self.heard) {
             return false;
+        }
+        // The slot `first_output` took for this line, else the news still
+        // waiting (no `first_output` ran for it).
+        let ago = match (self.news_taken_ago, self.began_us, self.news_us) {
+            (Some(ago), _, _) => Some(ago),
+            (None, Some(began), Some(news)) if news <= began => Some(began - news),
+            _ => None,
         };
         let window = if self.one_reply_window {
             ONE_REPLY_WINDOW_US
         } else {
             NEWS_REPLY_US
         };
-        if news > began || began - news > window {
+        if ago.is_none_or(|ago| ago > window) {
             return false;
         }
         self.news_us = None;
+        self.news_taken_ago = None;
         self.news_let_out = true;
         true
     }
@@ -3599,6 +3612,7 @@ impl Attention {
         self.heard.clear();
         self.verdict = None;
         self.news_let_out = false;
+        self.news_taken_ago = None;
         self.began_us = None;
         self.usual_began_us = None;
         self.ended_us = None;
@@ -3843,6 +3857,10 @@ impl Attention {
                 .map(|at| began - at),
             _ => None,
         };
+        // Kept for the line even if it is weighed again (the slot is gone).
+        if news_ago.is_some() {
+            self.news_taken_ago = news_ago;
+        }
         // In a conversation held in English, a turn heard mostly in another
         // script, or as a number alone after no question, was misheard
         // (#926): on lamp-4ace on 2026-10-16 at 05:39 a cut-in heard as
@@ -6391,12 +6409,13 @@ mod tests {
         assert!(!attention.played_after_news());
     }
 
-    /// First's hold on #8809: a line another rule lets out (#8892's
-    /// `LAMP_SIMPLE_CALL` lets a line begun within 20 s of the lamp's words
-    /// out as the conversation going on) still takes the news's one reply:
-    /// 5 s after the news, a new request said with no name is held here, let
-    /// out by that rule, and marked after the news; the next line is not,
-    /// nor a noise, nor a line begun before the news or past its window.
+    /// First's hold on #8809: the first line let out after the lamp's news
+    /// takes its one reply whatever rule let it out. A line a computer's turn
+    /// opened (as a tap, or a wake by the name, it returns as a call before
+    /// the news is weighed) is let out as [`OPENED`], not [`AFTER_NEWS`]; and
+    /// #8892's `LAMP_SIMPLE_CALL` lets out a line by its own rule. Either way
+    /// [`Attention::let_out_after_news`] marks it after the news: the next
+    /// line is not, nor a noise, nor a line begun past the news's window.
     #[test]
     fn a_line_another_rule_lets_out_right_after_the_news_is_marked() {
         const S: u64 = 1_000_000;
@@ -6405,20 +6424,33 @@ mod tests {
         attention.speak_when_spoken_to(true);
         attention.news_told(100 * S);
         attention.began_at(22, 4, 105 * S);
+        attention.turn_opened(22);
         attention.heard(ask);
-        assert_ne!(
+        assert_eq!(
             attention.first_output(22, Room::Quiet, false),
-            Some(Verdict::Play(AFTER_NEWS))
+            Some(Verdict::Play(OPENED))
         );
         assert!(!attention.played_after_news());
         assert!(attention.let_out_after_news());
         assert!(attention.played_after_news());
-        // One reply: the next line let out the same way is not marked.
+        // Weighed again, the line keeps it.
+        attention.first_output(22, Room::Quiet, false);
+        assert!(attention.let_out_after_news());
+        // One reply: the next line let out by another rule is not marked.
         attention.began_at(23, 4, 112 * S);
+        attention.turn_opened(23);
         attention.heard(ask);
         attention.first_output(23, Room::Quiet, true);
         assert!(!attention.let_out_after_news());
         assert!(!attention.played_after_news());
+        // No `first_output` for the line (a rule of its own): the news
+        // still waiting is taken.
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.news_told(100 * S);
+        attention.began_at(22, 4, 105 * S);
+        attention.heard(ask);
+        assert!(attention.let_out_after_news());
         // A noise takes nothing, so the line after it still does.
         let mut attention = Attention::default();
         attention.speak_when_spoken_to(true);
@@ -6428,6 +6460,7 @@ mod tests {
         attention.first_output(22, Room::Quiet, false);
         assert!(!attention.let_out_after_news());
         attention.began_at(23, 4, 106 * S);
+        attention.turn_opened(23);
         attention.heard(ask);
         attention.first_output(23, Room::Quiet, false);
         assert!(attention.let_out_after_news());
@@ -6437,6 +6470,7 @@ mod tests {
             attention.speak_when_spoken_to(true);
             attention.news_told(100 * S);
             attention.began_at(22, 4, began);
+            attention.turn_opened(22);
             attention.heard(ask);
             attention.first_output(22, Room::Quiet, false);
             assert!(!attention.let_out_after_news(), "{began}");
