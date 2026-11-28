@@ -24,6 +24,11 @@ path = "src/bin/seems_measure.rs"
 name = "glance_replay"
 test = true
 
+# Offline diagnosis of the existing mouth journal, not an accuracy scorer.
+[[example]]
+name = "speaking_replay"
+test = true
+
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true
