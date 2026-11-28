@@ -165,7 +165,7 @@ go() {
   grep -q '^LEG2B-DONE' $RES/oldclips.txt && grep -q '^STOCK_BACK=yes' $RES/oldclips.txt && grep -q '^STOCK_MUTED=no' $RES/oldclips.txt \
     || { echo "LEG 2B NOT DONE or the stock voice not back: no reset; putting back" | tee -a $RES/go.txt; on_exit; return 1; }
   # -- leg 2: the seed and the before
-  step seed "sh $KR/seed.sh"
+  step seed "SEED_HOMES=${SEED_HOMES:-0} sh $KR/seed.sh"
   grep -q '^SEED-OK' $RES/seed.txt || { echo "SEED NOT OK: no reset; putting back" | tee -a $RES/go.txt; on_exit; return 1; }
   # -- the journal window and the kit's files, before the reset's vacuum
   pull_window journal-window-before "$(since_spec ROW_START_WALL_US row-start.txt 600)"

@@ -3,7 +3,8 @@
 # Leg 2: harmless kit marker files (a fixed text, no person
 # data), one name ($MNAME), in each place the reset must empty, listed in $K/seeded.tsv (path, kind, folders the
 # kit made) for the judge and the put-back:
-#   home       each engine's home folder in /var/lib/lampos-agents (a link never followed)
+#   home       each engine's home folder in /var/lib/lampos-agents (a link never followed); with SEED_HOMES=1 on a
+#              lamp with no such folder, the kit makes it and two dummy homes, claude and codex (below)
 #   stray      /var/lib/lampos-agents/el8671-kit-stray: "anything else there is removed"
 #   marked     /var/lib/lampOS/voice/marked/ (made 0700 if missing)
 #   clips_new  the PR's ring clips folder, /var/lib/lampOS/voice/schedule-delivery/ring-clips (made 0700 if missing)
@@ -32,8 +33,28 @@ mkd() { # mkd DIR: made 0700 if missing; prints the folders it made
     mkdir -m 700 "$d" && made="$made${made:+,}$d" || return 1
   done; echo "${made:--}"
 }
-for h in $(homes); do put "$h/$MNAME" home -; done
-[ -d $HOMES ] && { echo "HOMES_DIR=present"; put $STRAY stray -; } || echo "HOMES_DIR=absent"
+[ -d $HOMES ] && echo "HOMES_DIR=present" || echo "HOMES_DIR=absent"
+# SEED_HOMES=1 (the first builder, #8671 21:07: the engines' homes wipe runs once on a lamp before it trains): with no
+# /var/lib/lampos-agents, the kit makes it as the product does, and two dummy homes in it, each recorded as kit-made
+# in seeded.tsv's third column (putback.sh removes them with rmdir only, deepest first, so the updater never takes a
+# kit-made home for an installed engine). As lamp-update's write_engine makes them (crates/update/src/agent_ns at
+# cf7dacac6d): HOMES root's, 0755 (wrapper.rs:80-82, write_engine :732, folder() :696-707 sets the mode); each
+# home lampos's uid and gid, 0700 (wrapper.rs:32, :81, :733-735; rounds.rs:247 reads the owner, :266 the call).
+hmade=''; kh=''
+if [ "${SEED_HOMES:-0}" = 1 ] && [ ! -e $HOMES ]; then
+  id -u lampos >/dev/null 2>&1 || { echo "SEED_FAIL no user lampos for the homes"; exit 1; }
+  mkdir -m 755 $HOMES && chown root:root $HOMES && chmod 755 $HOMES || { echo "SEED_FAIL $HOMES"; exit 1; }
+  hmade=$HOMES
+  for e in claude codex; do
+    mkdir -m 700 $HOMES/$e && chown lampos:lampos $HOMES/$e && chmod 700 $HOMES/$e || { echo "SEED_FAIL $HOMES/$e"; bad=1; continue; }
+    kh="$kh $HOMES/$e"
+  done
+  echo "HOMES_MADE=yes ($(kind_of $HOMES); homes:$kh)"
+fi
+for h in $(homes); do
+  case " $kh " in *" $h "*) put "$h/$MNAME" home "$h" ;; *) put "$h/$MNAME" home - ;; esac
+done
+[ -d $HOMES ] && put $STRAY stray "${hmade:--}"
 m=$(mkd $MARKED) && put "$MARKED/$MNAME" marked "$m" || { echo "SEED_FAIL marked"; bad=1; }
 m=$(mkd $CLIPS_NEW) && put "$CLIPS_NEW/$MNAME" clips_new "$m" || { echo "SEED_FAIL clips_new"; bad=1; }
 mv $K/seeded.tsv.new $K/seeded.tsv

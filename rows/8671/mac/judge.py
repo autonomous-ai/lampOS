@@ -121,8 +121,14 @@ trig = kv('trigger.txt')
 # folder (HOMES_DIR=absent, or for older runs: no home and no stray seeded) needs none.
 homes_dir = re.search(r'^HOMES_DIR=(\w+)', seed, re.M)
 homes_absent = (homes_dir.group(1) == 'absent') if homes_dir else (not kinds.get('home') and not kinds.get('stray'))
+# SEED_HOMES=1 on such a lamp: the kit made the folder and two dummy homes (claude, codex) in it, so the wipe runs.
+homes_made = bool(re.search(r'^HOMES_MADE=yes', seed, re.M))
+if homes_made:
+    homes_absent = False
 need = ['marked', 'clips_new'] + ([] if homes_absent else ['stray'])
 missing = [k for k in need if k not in kinds]
+if homes_made and len(kinds.get('home', [])) != 2:
+    missing.append('the 2 kit-made homes (%d seeded)' % len(kinds.get('home', [])))
 ok2 = 'SEED-OK' in seed and not missing
 if trig.get('SEEDED_N') and trig.get('PRESENT_N') != trig.get('SEEDED_N'):
     ok2 = False
@@ -203,6 +209,9 @@ else:
     if not seen or seen.group(1) != BIN: why.append('the wipe unit\'s exe was %s, not %s' % (seen.group(1) if seen else 'never seen', BIN))
     if not end: why.append('no WIPE_END (%s)' % (re.findall(r'^(WIPE_NEVER|WIPE_TIMEOUT)\S*', status, re.M) or ['?'])[0])
     elif not end.group(3).startswith('success'): why.append('wipe result %s' % end.group(3))
+    # N is forget_engine_homes's count (crates/setup/src/reset/engine_homes.rs at cf7dacac6d): +1 per home that
+    # held anything (:81, every seeded home holds the kit marker) and +1 per other entry removed (:87, the stray);
+    # reset.rs:2180 takes it, :2182 prints it. With SEED_HOMES=1: 2 homes + the stray, N >= 3.
     homes_need = len(kinds.get('home', [])) + len(kinds.get('stray', []))
     # reset.rs prints the engines' homes line only when it emptied something (homes > 0).
     if homes_need == 0:
@@ -240,6 +249,9 @@ if triggered and not unread:
         bo, ao = b.split(' ')[-1], a.split(' ')[-1]
         if not a.startswith('dir n=0 ') or ao != bo:
             why.append('home %s: %s (before %s)' % (h.rsplit('/', 1)[-1], a, b))
+    for kd, st, p in snap_marks(first):
+        if kd == 'stray' and st != 'absent': why.append('the stray entry %s not removed' % p)
+    if homes_made and len(before_home) != 2: why.append('%d home(s) read before, the kit made 2' % len(before_home))
     ak = dict(re.findall(r'^KIND (\S+) (.*)$', first, re.M))
     if not ak.get('/var/lib/lampOS/voice/marked', '').startswith('dir n=0'): why.append('marked: %s' % ak.get('/var/lib/lampOS/voice/marked'))
     if ak.get('/var/lib/lampOS/voice/history-marks.json', 'absent') != 'absent': why.append('history-marks.json still there')

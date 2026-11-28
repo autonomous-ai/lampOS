@@ -2,7 +2,9 @@
           python3 -I mac/fake.py --verify RESULTS_DIR  checks the judge's row.md in each against what it should say.
 fake-pass passes every leg; fake-pending has no re-pair yet
 (the voice's lines OWED); each fake-fail-* breaks one leg one way it could really fail on the lamp; fake-void-4c had
-nothing in /var/log.hdd to forget; fake-unreachable never came back; fake-noreset stopped before leg 3."""
+nothing in /var/log.hdd to forget; fake-unreachable never came back; fake-noreset stopped before leg 3.
+fake-homes-made is a SEED_HOMES=1 run on a lamp with no /var/lib/lampos-agents (the kit made it and the homes claude
+and codex: PASS, no limit line); fake-fail-4a-home-removed is that run with a home removed instead of emptied."""
 import shutil, sys
 from pathlib import Path
 
@@ -24,7 +26,11 @@ VARIANTS = {
     'void-4c': ('FAIL', {'4c': 'VOID'}),
     'unreachable': ('FAIL', {'3': 'FAIL'}),
     'noreset': ('FAIL', {'1': 'PASS', '2': 'PASS', '3': 'VOID'}),
+    'homes-made': ('PASS', {'1': 'PASS', '2': 'PASS', '2b': 'PASS', '3': 'PASS', '4a': 'PASS', '4b': 'PASS', '4c': 'PASS'}),
+    'fail-4a-home-removed': ('FAIL', {'2': 'PASS', '3': 'PASS', '4a': 'FAIL'}),
 }
+MADE = ('homes-made', 'fail-4a-home-removed')
+PASSLIKE = ('pass', 'homes-made')
 H = '/var/lib/lampos-agents'
 HOMES = [H + '/claudecode', H + '/codex']
 M = 'el8671-kit-marker'
@@ -46,8 +52,13 @@ def counts(text_before, j_before, hdd_t=0, hdd_j=0, ram=0):
             'LIVE voice_before=0 voice_after=0']
 
 
-def seeded():
-    s = [(h + '/' + M, 'home', '-') for h in HOMES] + [(H + '/el8671-kit-stray', 'stray', '-'),
+def homes_of(v):
+    return [H + '/claude', H + '/codex'] if v in MADE else HOMES
+
+
+def seeded(v):
+    made = v in MADE
+    s = [(h + '/' + M, 'home', h if made else '-') for h in homes_of(v)] + [(H + '/el8671-kit-stray', 'stray', H if made else '-'),
          ('/var/lib/lampOS/voice/marked/' + M, 'marked', '/var/lib/lampOS/voice/marked'),
          ('/var/lib/lampOS/voice/schedule-delivery/ring-clips/' + M, 'clips_new', '/var/lib/lampOS/voice/schedule-delivery/ring-clips'),
 ]
@@ -56,11 +67,14 @@ def seeded():
 
 def snap(v, name, since):
     o = ['SNAP=%s SNAP_WALL_US=1 SINCE_RESET_S=%d BOOT_ID=b1 BOOT_BEFORE=%s' % (name, since, 'b0' if v == 'fail-3reboot' else 'b1')]
-    for f, kd, made in seeded():
+    for f, kd, made in seeded(v):
         left = (v == 'fail-4a' and kd == 'home' and f.startswith(HOMES[1]))
         o.append('MARK %s %s %s' % (kd, 'present' if left else 'absent', f))
     o.append('HOMES=dir n=2 root:root:755')
-    for h in HOMES:
+    for h in homes_of(v):
+        if v == 'fail-4a-home-removed' and h.endswith('/codex'):
+            o.append('HOME %s absent' % h)
+            continue
         o.append('HOME %s dir n=%d lampos:lampos:700' % (h, 1 if v == 'fail-4a' and h == HOMES[1] else 0))
     for k in KEPT:
         p = k.split(' ')[0]
@@ -81,11 +95,11 @@ def snap(v, name, since):
             continue
         o.append('LOGFILE %s %s' % (f, '999' if v == 'fail-4a-inode' and f == '/var/log.hdd/syslog' else ino))
     o.append('SETUP_MARKER=absent RESET_JOURNAL=absent')
-    o += ['UNIT lampos.target=inactive', 'UNIT lamp-setup=active', 'UNIT lamp-voice=%s' % ('active' if v == 'pass' and name == 'repaired' else 'inactive')]
+    o += ['UNIT lampos.target=inactive', 'UNIT lamp-setup=active', 'UNIT lamp-voice=%s' % ('active' if v in PASSLIKE and name == 'repaired' else 'inactive')]
     o.append('TMPFS=gone')
     o.append('LIVE_HOMES_LINE=0 LIVE_LOGS_LINE=0 LIVE_STARTED_LINE=1 LIVE_LOG_FAIL=0 LIVE_WIPE_LINES=3')
     o.append('PROBE_JOURNAL=1 PROBE_SYSLOG=1')
-    o.append('VOICE_SINCE_END=%d WIPE_END_S=%d' % (57 if v == 'pass' and name == 'repaired' else 0, T + 60))
+    o.append('VOICE_SINCE_END=%d WIPE_END_S=%d' % (57 if v in PASSLIKE and name == 'repaired' else 0, T + 60))
     o += counts(0, 0, hdd_j=4 if v == 'fail-4c' and name == '1' else 0)
     o.append('HDD_NEWEST_MTIME=%d RESET_S=%d' % (T + 900, T))
     o.append('WLAN0=DOWN WPA_CONF=absent')
@@ -109,8 +123,10 @@ def make(root, v):
         'HOMES_BAD_LINES=0', 'LOGS_BAD_LINES=0', 'HOMES_LISTED=same', 'UNCHANGED_HOMES=yes', 'UNCHANGED_LOGS=yes', 'LEG1-DONE']) + '\n')
     if v == 'fail-1':
         return
-    s = ['SEEDED %s %s' % (kd, f) for f, kd, made in seeded()] + ['SEED_WALL_US=1']
-    s += ['KIND ' + k for k in KEPT] + ['HOME %s dir n=4 lampos:lampos:700' % h for h in HOMES] + ['CLIPS_OLD_OTHER=4']
+    s = ['HOMES_DIR=absent', 'HOMES_MADE=yes (dir n=2 root:root:755; homes: %s)' % ' '.join(homes_of(v))] if v in MADE else ['HOMES_DIR=present']
+    s += ['SEEDED %s %s' % (kd, f) for f, kd, made in seeded(v)] + ['SEED_WALL_US=1']
+    s += ['KIND ' + k for k in KEPT] + ['HOME %s dir n=%d lampos:lampos:700' % (h, 1 if v in MADE else 4) for h in homes_of(v)]
+    s += ['CLIPS_OLD_OTHER=4']
     s += ['LOGFILE ' + l for l in LOGS]
     s += counts(0 if v == 'void-4c' else 310, 0 if v == 'void-4c' else 1200)
     s += ['SEEDED_N=5', 'SEED-OK']
@@ -136,7 +152,7 @@ def make(root, v):
     exe = '/opt/lampOS/setup/releases/16600/lamp-setup' if v == 'fail-3exe' else '/run/el-8671/lamp-setup'
     w('after-files/after/status.txt', 'RECORDER_START boot=b1 1\nWIPE_SEEN exe=%s argv=x 2\nWIPE_END state=inactive '
       'load=not-found result=success/ 3\nFOLLOWER_STOPPED lines=9 4\nTMPFS_UNMOUNTED 5\nSNAP 0 6\nSNAP 1 7\n%s' % (
-          exe, 'VOICE_ACTIVE 8\nSNAP repaired 9\nDONE repaired 10\n' if v == 'pass' else ''))
+          exe, 'VOICE_ACTIVE 8\nSNAP repaired 9\nDONE repaired 10\n' if v in PASSLIKE else ''))
     rj = ['2026-11-28T10:05:01.000000+07:00 lamp-75c9 lamp-setup[1]: lamp-setup: reset: emptied 2 entries of Hermes and OpenClaw']
     if v != 'fail-3':
         rj.append("2026-11-28T10:05:01.100000+07:00 lamp-75c9 lamp-setup[1]: lamp-setup: reset: emptied 3 entries of the engines' homes")
@@ -145,7 +161,7 @@ def make(root, v):
     w('after-files/after/reset-journal.txt', '\n'.join(rj) + '\n')
     w('after-files/after/snap-0.txt', snap(v, '0', 70))
     w('after-files/after/snap-1.txt', snap(v, '1', 190))
-    if v == 'pass':
+    if v in PASSLIKE:
         w('after-files/after/snap-repaired.txt', snap(v, 'repaired', 5000))
     w('snap-live.txt', snap(v, 'live', 600))
     w('putback.log', 'recorder stopped\nremoved clips_old /var/lib/lampOS/voice/ring-clips/%s\nread-back 1: no kit marker left\nPUTBACK-OK\n' % M)
@@ -163,6 +179,8 @@ def verify(root):
                 got[p[1]] = p[4]
         for k, want_leg in legs.items():
             ok = ok and got.get(k) == want_leg
+        if v in MADE and any(l.startswith('Limit: this lamp has no') for l in row):
+            ok = False
         print('%s fake-%s: %s, legs %s' % ('ok  ' if ok else 'BAD ', v, row[0].rsplit(': ', 1)[1], got))
         bad |= not ok
     print('judge on made-up dirs: %s' % ('all as expected' if not bad else 'A VERDICT IS WRONG'))
