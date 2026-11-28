@@ -34,11 +34,22 @@ use serde_json::{Value, json};
 use std::{path::Path, time::Duration};
 
 /// Tools that set a reminder or timer, whose caller names its setter.
-const SETS: [&str; 3] = ["set_timer", "set_reminder", "repeat_reminder"];
+/// `move_reminder` sets the moved one again, as its mover's (#8840).
+const SETS: [&str; 4] = [
+    "set_timer",
+    "set_reminder",
+    "repeat_reminder",
+    lamp_actions::schedule::MOVE,
+];
 
 /// The reminder calls that read who set each item (the Schedule's
 /// `Asker::may_see`).
-const READS: [&str; 3] = ["list_reminders", "cancel_reminder", "snooze_reminder"];
+const READS: [&str; 4] = [
+    "list_reminders",
+    "cancel_reminder",
+    "snooze_reminder",
+    lamp_actions::schedule::MOVE,
+];
 
 /// `on` exactly; off unless set. The second route's worker reads it.
 pub const ONE_FACE_ENVIRONMENT: &str = "LAMP_ONE_FACE_REMINDERS";
@@ -220,6 +231,33 @@ mod tests {
         crate::remember::person_id(name)
     }
 
+    /// #8840: a move reads only the line's own reminders, as a cancel does,
+    /// and sets the moved one again as its mover's, as a set does.
+    #[test]
+    fn a_move_reads_as_a_cancel_and_sets_as_a_set() {
+        let owners = [id("Ann")];
+        let bo = scope(ScopeSnapshot::of("Bo"), 2);
+        assert_eq!(
+            caller_among(
+                Some(&bo.lease()),
+                lamp_actions::schedule::MOVE,
+                &owners,
+                false
+            ),
+            json!({"asker":{"person":id("Bo"),"owner":false},"setter":id("Bo")})
+        );
+        let room = scope(ScopeSnapshot::room(), 3);
+        assert_eq!(
+            caller_among(
+                Some(&room.lease()),
+                lamp_actions::schedule::MOVE,
+                &owners,
+                false
+            ),
+            json!({"asker":{"person":null,"owner":false},"setter":null})
+        );
+    }
+
     /// Two people each asking "my reminders" are each their own reader; the
     /// owner's line is the owner's; an unknown face, the room, a held gap,
     /// a one-face line and a revoked one read none of anyone's.
@@ -359,9 +397,11 @@ mod tests {
         assert!(one_face.lease().take_by_one_face());
         for name in READS {
             let told = caller_among(Some(&one_face.lease()), name, &owners, true);
+            // A move sets the one moved again, as its mover's (#8840).
+            let setter = (name == lamp_actions::schedule::MOVE).then(|| id("Ann"));
             assert_eq!(
                 told,
-                json!({"asker":{"person":id("Ann"),"owner":false},"setter":null}),
+                json!({"asker":{"person":id("Ann"),"owner":false},"setter":setter}),
                 "{name}"
             );
             assert!(may_see(&told, Some(&id("Ann"))), "{name}: Ann's own");

@@ -26,7 +26,7 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
             name,
             crate::remember::REMEMBER | crate::remember::RECALL | crate::tools::THE_TIME
         )
-        || crate::tools::SCHEDULE_NAMES.contains(&name)
+        || crate::tools::is_schedule_tool(name)
         || crate::agent_tasks::is_tool(name)
         || crate::known_faces::is_tool(name)
         || crate::rules::is_tool(name)

@@ -374,10 +374,12 @@ impl Claim {
         match self {
             Self::LightOrVolume => crate::tools::is_light_or_volume(name),
             Self::AnyCall => true,
-            Self::Schedule => matches!(
-                name,
-                "set_timer" | "set_reminder" | "repeat_reminder" | "snooze_reminder"
-            ),
+            Self::Schedule => {
+                matches!(
+                    name,
+                    "set_timer" | "set_reminder" | "repeat_reminder" | "snooze_reminder"
+                ) || name == lamp_actions::schedule::MOVE
+            }
             Self::ReminderTime => Self::Schedule.made_by(name) || name == "list_reminders",
             Self::LightKept => {
                 Self::LightOrVolume.made_by(name)

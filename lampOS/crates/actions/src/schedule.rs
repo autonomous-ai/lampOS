@@ -52,10 +52,25 @@ pub const MOVE: &str = "move_reminder";
 
 /// `catalog` with [`MOVE_SWITCH`] on (`moving`): `move_reminder` after the
 /// six. Off, `catalog` as it came.
-pub fn catalog_moving(catalog: Vec<Function>, moving: bool) -> Vec<Function> {
-    let _ = moving;
+pub fn catalog_moving(mut catalog: Vec<Function>, moving: bool) -> Vec<Function> {
+    if moving {
+        let time = json!({"type":"string","description":"The new local time in exact HH:MM, 00:00 through 23:59."});
+        catalog.push(Function {
+            name: MOVE,
+            description: MOVE_DESCRIBED,
+            parameters: Some(json!({"type":"object","properties":{
+                "id":{"type":"integer","minimum":1,"description":"An exact ID from list_reminders; never guess one."},
+                "text":{"type":"string","description":"What the reminder is for, in the person's words (\"go home\"), when no id is known."},
+                "time":time,
+                "day":{"type":"string","description":"For a one-time reminder only: today, tomorrow, next, or exact YYYY-MM-DD; omitted means the next strictly future occurrence."}
+            },"required":["time"]})),
+        });
+    }
     catalog
 }
+
+/// `move_reminder`'s description ([`MOVE_SWITCH`]).
+const MOVE_DESCRIBED: &str = "Change the time of a reminder the person set, only when asked: \"move my 4 PM reminder to 4:30\", \"make the go-home reminder 5 o'clock\". It keeps the reminder's words and how it repeats (daily stays daily, weekly keeps its weekday) and changes only its time; never cancel and set it again yourself. Give its id from the current list, or, with no id, its text: the words of what it reminds them of. If several match, or none, you are told which and nothing moves: ask which, naming each in a few words. A timer, or a reminder every so many minutes or hours, is not moved by clock: you are told so. Say the change once, with `clock` and how it repeats, only after moved is true.";
 pub const DEADLINE: Duration = Duration::from_millis(1250);
 /// Told beside a list that left out `hidden` reminders or timers as
 /// someone's own ([`HIDDEN_SWITCH`]): never told as the whole list, and
@@ -136,7 +151,7 @@ pub const NAMES: [&str; 6] = [
 ];
 
 pub fn is_tool(name: &str) -> bool {
-    NAMES.contains(&name)
+    NAMES.contains(&name) || name == MOVE
 }
 
 /// `on` only (#8182), in lamp-actions' unit and lamp-voice's: a timer or a
@@ -152,9 +167,12 @@ pub fn asks_how_long_from_environment() -> bool {
 /// The existing provider's small Schema vocabulary. Runtime validation below
 /// is stricter than a model schema; byte limits and unknown fields are checked.
 pub fn catalog() -> Vec<Function> {
-    asking_how_long(
-        catalog_with(every_from_environment()),
-        asks_how_long_from_environment(),
+    catalog_moving(
+        asking_how_long(
+            catalog_with(every_from_environment()),
+            asks_how_long_from_environment(),
+        ),
+        moving_from_environment(),
     )
 }
 
@@ -411,6 +429,9 @@ impl Adapter {
         caller: Option<&Caller>,
     ) -> Value {
         let deadline = Instant::now() + self.deadline;
+        if name == MOVE && !self.moving {
+            return failure(Failure::BadArguments);
+        }
         match parse(name, args, self.every)
             .and_then(|call| self.perform(call, set_times, caller, deadline))
         {
@@ -553,39 +574,17 @@ impl Adapter {
         // By text: the asker's own list, read as list_reminders reads it,
         // then the one match cancelled by id, as any cancel is.
         let call = match call {
+            Call::Move { by, time, day } => {
+                return self.move_one(by, time, day, set_times, caller, deadline);
+            }
             Call::CancelText { text } => {
-                let mut matches = Vec::new();
-                let mut after_id = 0;
-                for _ in 0..MOST_TEXT_PAGES {
-                    let listed = self.perform(
-                        Call::List {
-                            after_id,
-                            pending_only: false,
-                        },
-                        set_times,
-                        caller,
-                        deadline,
-                    )?;
-                    let items = listed["items"].as_array().cloned().unwrap_or_default();
-                    matches.extend(items.iter().filter(|item| by_text(item, &text)).cloned());
-                    // One just said, which may still be cancelled (C68).
-                    let said = listed["said_recently"]
-                        .as_array()
-                        .cloned()
-                        .unwrap_or_default();
-                    matches.extend(
-                        said.iter()
-                            .filter(|one| one["id"].is_u64() && by_text(one, &text))
-                            .cloned(),
-                    );
-                    match (
-                        listed["complete"].as_bool(),
-                        listed["next_after_id"].as_u64(),
-                    ) {
-                        (Some(false), Some(next)) if next > after_id => after_id = next,
-                        _ => break,
-                    }
-                }
+                let matches = self.matching(
+                    |item| by_text(item, &text),
+                    true,
+                    set_times,
+                    caller,
+                    deadline,
+                )?;
                 match matches.as_slice() {
                     [one] => Call::Cancel {
                         id: one["id"].as_u64().ok_or(Failure::Unavailable)?,
@@ -690,8 +689,8 @@ impl Adapter {
                     asker,
                 }
             }
-            Call::List { .. } | Call::CancelText { .. } => {
-                unreachable!("list and a cancel by text resolved before mutation")
+            Call::List { .. } | Call::CancelText { .. } | Call::Move { .. } => {
+                unreachable!("list, a cancel by text and a move resolved before mutation")
             }
         };
         let response = match (self.ask(&request, deadline), &request) {
@@ -723,6 +722,166 @@ impl Adapter {
 }
 
 impl Adapter {
+    /// The asker's own items, read as list_reminders reads them, that `wanted`
+    /// takes; with `said`, a one just said too, which may still be cancelled
+    /// (C68).
+    fn matching(
+        &self,
+        wanted: impl Fn(&Value) -> bool,
+        said: bool,
+        set_times: bool,
+        caller: Option<&Caller>,
+        deadline: Instant,
+    ) -> Result<Vec<Value>, Failure> {
+        let mut matches = Vec::new();
+        let mut after_id = 0;
+        for _ in 0..MOST_TEXT_PAGES {
+            let listed = self.perform(
+                Call::List {
+                    after_id,
+                    pending_only: false,
+                },
+                set_times,
+                caller,
+                deadline,
+            )?;
+            let items = listed["items"].as_array().cloned().unwrap_or_default();
+            matches.extend(items.iter().filter(|item| wanted(item)).cloned());
+            if said {
+                let said = listed["said_recently"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default();
+                matches.extend(
+                    said.iter()
+                        .filter(|one| one["id"].is_u64() && wanted(one))
+                        .cloned(),
+                );
+            }
+            match (
+                listed["complete"].as_bool(),
+                listed["next_after_id"].as_u64(),
+            ) {
+                (Some(false), Some(next)) if next > after_id => after_id = next,
+                _ => break,
+            }
+        }
+        Ok(matches)
+    }
+
+    /// `move_reminder` (#8840): the one reminder `by` names, set again at
+    /// `time` with its words and its repeat, then the old one cancelled, so
+    /// never both left and never neither. Several or none matching, a timer,
+    /// or an interval series: told, and nothing changes.
+    fn move_one(
+        &self,
+        by: By,
+        time: String,
+        day: Option<String>,
+        set_times: bool,
+        caller: Option<&Caller>,
+        deadline: Instant,
+    ) -> Result<Value, Failure> {
+        let matches = match &by {
+            By::Id(id) => {
+                self.matching(|item| item["id"] == *id, false, set_times, caller, deadline)?
+            }
+            By::Text(text) => self.matching(
+                |item| by_text(item, text),
+                false,
+                set_times,
+                caller,
+                deadline,
+            )?,
+        };
+        let one = match matches.as_slice() {
+            [one] => one.clone(),
+            _ => {
+                let found: Vec<Value> = matches
+                    .iter()
+                    .map(|item| json!({"id":item["id"],"kind":item["kind"],"text":item["text"],"repeat":item["repeat"],"clock":item["clock"]}))
+                    .collect();
+                let next = match (&by, found.is_empty()) {
+                    (By::Id(_), true) => {
+                        "No reminder they set has that id: list them again, and move nothing."
+                    }
+                    (By::Text(_), true) => {
+                        "Nothing they set matches those words: say so in a few words, and move nothing."
+                    }
+                    _ => {
+                        "More than one matches: ask which, naming each in a few words, and move it by its id once they say."
+                    }
+                };
+                return Ok(json!({"moved": false, "matches": found, "next": next}));
+            }
+        };
+        let not_by_clock = || {
+            Ok(
+                json!({"moved": false, "id": one["id"], "text": one["text"], "next": "This is a timer, or a reminder every so many minutes or hours: it is not moved by clock. Say so in a few words, and offer to cancel it and set a new one."}),
+            )
+        };
+        if one["kind"] != "reminder" {
+            return not_by_clock();
+        }
+        let zone = one["repeat"]["zone"].as_str().map(str::to_owned);
+        let (when, repeat) = match one["repeat"]["kind"].as_str() {
+            None if one["repeat"].is_null() => (
+                When::At {
+                    time: time.clone(),
+                    day,
+                    zone: None,
+                    fold: None,
+                },
+                "once",
+            ),
+            Some("daily") => (
+                When::Daily {
+                    time: time.clone(),
+                    zone,
+                },
+                "daily",
+            ),
+            Some("weekly") => {
+                let weekday: Weekday = serde_json::from_value(one["repeat"]["weekday"].clone())
+                    .map_err(|_| Failure::Unavailable)?;
+                (
+                    When::Weekly {
+                        weekday,
+                        time: time.clone(),
+                        zone,
+                    },
+                    "weekly",
+                )
+            }
+            Some("every") => return not_by_clock(),
+            _ => return Err(Failure::Unavailable),
+        };
+        let old = one["id"].as_u64().ok_or(Failure::Unavailable)?;
+        let text = one["text"].as_str().ok_or(Failure::Unavailable)?.to_owned();
+        let set = self.perform(
+            Call::Set {
+                text: text.clone(),
+                when,
+            },
+            set_times,
+            caller,
+            deadline,
+        )?;
+        let new = set["id"].as_u64().ok_or(Failure::Uncertain)?;
+        let mut moved = json!({"moved": true, "status": "committed", "id": new, "old_id": old, "text": text, "repeat": repeat, "weekday": one["repeat"]["weekday"], "local": set["local"], "clock": set["clock"], "message": "Moved. Say it once: its words, the new time as `clock`, and how it repeats."});
+        if let Err(why) = self.perform(Call::Cancel { id: old }, set_times, caller, deadline) {
+            // The new one is set and the old one may still be: never told
+            // as moved.
+            moved["moved"] = json!(false);
+            moved["old_kept"] = json!(true);
+            moved["message"] = json!(failure(why)["error"]);
+            moved["next"] = json!(
+                "The new time is set, but the old one may still be set too: say so plainly, and offer to cancel the old one by old_id."
+            );
+        }
+        Ok(moved)
+    }
+
     /// The one-time item `id` just said, from the said record as `asker`'s
     /// line hears it, to snooze (C68): that page, its store and revision,
     /// with `said_delivery`, the delivery said. One said longer ago than
@@ -932,10 +1091,29 @@ enum Call {
     CancelText {
         text: String,
     },
+    /// A reminder's time changed, its words and repeat kept (#8840).
+    Move {
+        by: By,
+        time: String,
+        day: Option<String>,
+    },
     Snooze {
         id: u64,
         seconds: u64,
     },
+}
+/// Which item a move names: an id from the list, or words of its text.
+enum By {
+    Id(u64),
+    Text(String),
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Move {
+    id: Option<u64>,
+    text: Option<String>,
+    time: String,
+    day: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1185,6 +1363,26 @@ fn parse(name: &str, value: &Value, every: bool) -> Result<Call, Failure> {
                 (Some(id), None) => Call::Cancel { id },
                 (None, Some(text)) if valid_text(&text) => Call::CancelText { text },
                 (None, Some(_)) => return Err(Failure::BadArguments),
+            }
+        }
+        MOVE => {
+            let a: Move = decode(value)?;
+            if a.day.as_deref().is_some_and(|d| !day(d)) {
+                return Err(Failure::BadArguments);
+            }
+            calendar(&a.time, None)?;
+            let by = match (a.id, a.text) {
+                (Some(0), _) | (Some(_), Some(_)) | (None, None) => {
+                    return Err(Failure::BadArguments);
+                }
+                (Some(id), None) => By::Id(id),
+                (None, Some(text)) if valid_text(&text) => By::Text(text),
+                (None, Some(_)) => return Err(Failure::BadArguments),
+            };
+            Call::Move {
+                by,
+                time: a.time,
+                day: a.day,
             }
         }
         "snooze_reminder" => {

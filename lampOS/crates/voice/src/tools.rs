@@ -388,8 +388,10 @@ pub(crate) fn schedule_arguments(tools: Option<&str>, speak: Option<&str>) -> Ve
     flags
 }
 
+/// The six [`SCHEDULE_NAMES`], and `move_reminder` (#8840), which the
+/// executive's catalog offers only with `LAMP_SCHEDULE_MOVE=on`.
 pub fn is_schedule_tool(name: &str) -> bool {
-    SCHEDULE_NAMES.contains(&name)
+    SCHEDULE_NAMES.contains(&name) || name == lamp_actions::schedule::MOVE
 }
 
 fn arguments(
