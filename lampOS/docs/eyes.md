@@ -746,6 +746,50 @@ at the desk.
 Not shown yet: the day's recording replayed through it, with the counts
 before and after, and whether raising the 0.6 score would do the same.
 
+### Only a confirmed person's face (`LAMP_EYES_CONFIRMED_PERSON`, #8971)
+
+With `LAMP_EYES_CONFIRMED_PERSON=on` (off unless set; `src/person.rs`), a
+face is kept only when it is a good face and a confirmed person. It is left
+out where the still faces are, before anything else uses the look: off
+`humans/faces/tracked`, `room/presence`, the presence file and
+`room/activity`, out of what the body is told, and out of recognition. So
+welcome-back and the other face-triggered skills, lamp-seen's frame gate and
+the policy's hello follow the confirmed person with no change of their own.
+Today any face the detector scores 0.6 or more counts, of any size, at any
+angle, clipped or not; on a day with nobody at the desk lamp-dbda's
+welcome-back started about 1,250 times (#8964).
+
+A good face (`person::poor` finds nothing; learning or comparing a face is
+to use the same, #8971 piece 2):
+
+- scored 0.8 or more (`LEAST_SCORE`; real faces at the desk score about
+  0.91, lamp-4ace's night false face 0.60 to 0.79);
+- 0.06 of the picture's height or taller (`LEAST_TALL`);
+- its box, before it is clamped to the picture, at least 0.01 of the
+  picture inside each edge (`EDGE`): a box at the edge is clipped;
+- both eyes and the nose inside the picture, and, when the face is wide
+  enough for its angle (`facing::LEAST_WIDTH`), turned 60 degrees or less
+  (`facing::MAX_YAW_DEG`) and tipped within the pitch window
+  (`facing::pitch_within`).
+
+A confirmed person: each face is followed look to look (a centre within
+0.1 of the picture across and down, lost after 5 s unseen, at most 8 at
+once), and is confirmed once its centre has moved 0.05 of the picture,
+across or down, within 10 s (`away::MOVED`, `MOVED_WITHIN_US`; a false
+face wanders 0.01 to 0.02). Once confirmed it stays confirmed while it is
+followed, so a person who then sits still stays seen; one that turns for a
+moment is left out only for those looks. The NPU's body pose as a second
+confirmation is the next piece; until it lands, a person already sitting
+quite still when the camera opens counts once they move.
+
+With `LAMP_EYES_CONFIRMED_PERSON=count` nothing is left out: the faces that
+would be are only counted. Either way the minute line ends with
+`left out:` (or `would leave out:`) `N faces, not a confirmed person: F
+faint, S small, C clipped, T turned, U unconfirmed`, so one journal holds
+today's gate and the new one on the same frames. The thresholds are a
+start, to be set from Builder #4's offline check (#8971 piece 5). Host
+tests: `cargo test -p lamp-eyes --lib person`.
+
 ## Who is there
 
 Since 2026-10-15 (#759; `docs/brain-build.md` step 4). "Lamp, remember my
