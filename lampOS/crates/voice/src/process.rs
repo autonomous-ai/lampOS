@@ -3349,6 +3349,8 @@ fn second_route_worker_environment(
         crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT,
         // A sure start past a word said to a person, the same rule.
         crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT,
+        // "Hey man, …" said by a face turned to the lamp (26 Nov 2026).
+        crate::second_provider::NAME_FACING_STAND_IN_ENVIRONMENT,
         crate::second_provider::NAME_STAYS_ENVIRONMENT,
         // A repeat of the line before's end is no call by its text (#3923).
         crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
@@ -3865,6 +3867,7 @@ mod tests {
             crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT,
             crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT,
             crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT,
+            crate::second_provider::NAME_FACING_STAND_IN_ENVIRONMENT,
             crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT,
             crate::attention::ONE_AS_LAMP_ENVIRONMENT,
@@ -5180,6 +5183,7 @@ mod tests {
                     || name == crate::second_provider::NAME_GREETED_STAND_IN_ENVIRONMENT
                     || name == crate::attention::MOM_NOT_THE_NAME_ENVIRONMENT
                     || name == crate::second_provider::NAME_SURE_OVER_A_PERSON_WORD_ENVIRONMENT
+                    || name == crate::second_provider::NAME_FACING_STAND_IN_ENVIRONMENT
                     || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::NAME_REPEAT_NOT_A_CALL_ENVIRONMENT
                     || name == crate::attention::ONE_AS_LAMP_ENVIRONMENT
@@ -5548,6 +5552,7 @@ mod tests {
                     "LAMP_NAMES_RENAME_YES=on",
                     "LAMP_NAME_AS_A_SENTENCE=on",
                     "LAMP_NAME_FACE_OR_WORDS=on",
+                    "LAMP_NAME_FACING_STAND_IN=on",
                     "LAMP_NAME_GREETED_STAND_IN=on",
                     "LAMP_NAME_HEY_ONLY=on",
                     "LAMP_NAME_LEARN_FIX=on",

@@ -6504,6 +6504,28 @@ pub fn serve(
                     );
                     engine = engine.taking_the_name_as_a_sentence(true);
                 }
+                // "Hey man, …" said by a face turned to the lamp and heard
+                // near is "Hey Lamp, …" (`LAMP_NAME_FACING_STAND_IN`).
+                if std::env::var(crate::second_provider::NAME_FACING_STAND_IN_ENVIRONMENT)
+                    .is_ok_and(|value| value == "on")
+                {
+                    eprintln!(
+                        "lamp-voice second: a line's first word right after a greeting that speech to text writes for the lamp's name though people say it to each other too (\"man\", \"ma'am\") is the name when lamp-name heard it near at 0.9 or more by the line's start and a face turned to the lamp said it (LAMP_NAME_FACING_STAND_IN)"
+                    );
+                    // Close or not: the owner's face at 15:01 was read
+                    // speaking it, facing the lamp, in 2 looks, but was no
+                    // close face, so `turned_to_the_lamp` alone said no.
+                    let facing = heeding.clone();
+                    engine = engine
+                        .taking_a_stand_in_said_facing(true)
+                        .seeing_the_line_said_facing(Arc::new(
+                            move |window: (u64, u64), turned| {
+                                facing
+                                    .lock()
+                                    .is_ok_and(|heeding| heeding.said_facing(window, turned))
+                            },
+                        ));
+                }
             } else {
                 eprintln!(
                     "lamp-voice second: a first word like the lamp's name is never taken as it: no bus to read lamp-name's near hearings from (LAMP_NAME_NEAR)"
@@ -9599,6 +9621,15 @@ fn speakers_between(
     }
 }
 
+/// `LAMP_NAME_FACING_STAND_IN`'s face: a close face turned to the lamp
+/// (`turned`, the near hearing's own sign) or one read speaking while facing
+/// the lamp in [`crate::said_to_me::FACING_LOOKS`] looks or more, and either
+/// only with no second voice in the room lately (`Heeding::said_facing`;
+/// Twelve's P2 on #8763: someone on a video call facing the lamp).
+pub(crate) fn stand_in_face(turned: bool, facing_looks: usize, second_voice: bool) -> bool {
+    !second_voice && (turned || facing_looks >= crate::said_to_me::FACING_LOOKS)
+}
+
 /// `began_us..ended_us`, by this process's monotonic clock, as instants.
 fn line_between(began_us: u64, ended_us: u64) -> Option<(Instant, Instant)> {
     let (now, now_us) = (Instant::now(), monotonic_us());
@@ -11415,6 +11446,33 @@ impl Heeding {
         facing && speaking && !self.turned_but_silent((began_us, ended_us))
     }
 
+    /// `LAMP_NAME_FACING_STAND_IN`: whether a face turned to the lamp was
+    /// read speaking the line while it faced the lamp in at least
+    /// [`crate::said_to_me::FACING_LOOKS`] looks from `began_us` to `ended_us`,
+    /// as `LAMP_SAID_TO_ME` reads a line said to the lamp on its face alone
+    /// (`speaking_faces::SpeakingFaces::turned_speaking_facing_looks`), close
+    /// or not, and never after a second voice in the room since the lamp last
+    /// spoke, as `LAMP_SAID_TO_ME` refuses it too (`said_to_me::Held::SecondVoice`,
+    /// #7891: someone facing the lamp while on a call or talking to another
+    /// person; the Reviewer-lead's second P2 on #8763). No eyes: no.
+    pub(crate) fn said_facing(&self, (began_us, ended_us): (u64, u64), turned: bool) -> bool {
+        let Some((eyes, _)) = self.eyes.as_ref() else {
+            return false;
+        };
+        let facing_looks = line_between(began_us, ended_us)
+            .map_or(0, |(from, to)| eyes.turned_speaking_facing_looks(from, to));
+        stand_in_face(turned, facing_looks, self.second_voice_lately())
+    }
+
+    /// An earlier line's second voice, since the lamp last spoke and within
+    /// the busy room's span, as the said-to-me line reads it (#7891).
+    fn second_voice_lately(&self) -> bool {
+        self.second_voice_at.is_some_and(|at| {
+            at > self.said_until_us.unwrap_or_default()
+                && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
+        })
+    }
+
     /// The best score of lamp-name's near hearings (`name/near`) that
     /// reached their bar from [`NEAR_BEFORE_US`] before `began_us`, a
     /// line's first sound, to [`crate::attention::NAME_AT_THE_START_US`]
@@ -12833,10 +12891,7 @@ impl Heeding {
             turned,
             // An earlier line's second voice, since the lamp last spoke and
             // within the busy room's span (#7891).
-            second_voice: self.second_voice_at.is_some_and(|at| {
-                at > self.said_until_us.unwrap_or_default()
-                    && monotonic_us().saturating_sub(at) <= crate::room_told::BUSY_ENDS_AFTER_US
-            }),
+            second_voice: self.second_voice_lately(),
             looks_needed,
             look_free_answered: self.look_free_used,
             // Begun over the lamp's own answer, which it cut (#8205). With

@@ -197,6 +197,264 @@ fn a_word_sounds_like_the_name_by_its_shape_or_as_heard_for_it() {
     }
 }
 
+/// How a face was seen saying a line: a close face `turned` to the lamp
+/// (the near hearing's own sign), or one read speaking it while it faced
+/// the lamp, close or not (`said_facing`).
+#[derive(Clone, Copy)]
+struct Face {
+    turned: bool,
+    said_facing: bool,
+    /// A second voice in the room lately, which holds either face for the
+    /// stand-in rule (`worker::stand_in_face`).
+    second_voice: bool,
+}
+
+const NO_FACE: Face = Face {
+    turned: false,
+    said_facing: false,
+    second_voice: false,
+};
+const CLOSE_FACE: Face = Face {
+    turned: true,
+    said_facing: false,
+    second_voice: false,
+};
+/// Twelve's P2 on #8763: a close face turned to the lamp and speaking, on a
+/// video call with the screen behind the lamp: a second voice lately.
+const CLOSE_FACE_ON_A_CALL: Face = Face {
+    turned: true,
+    said_facing: false,
+    second_voice: true,
+};
+/// The owner's at 15:01 on 26 Nov: read speaking the line facing the lamp in
+/// 2 looks, no close face.
+const FACING_FACE: Face = Face {
+    turned: false,
+    said_facing: true,
+    second_voice: false,
+};
+
+/// One line heard as `heard`, lamp-name's near hearing at its start `near`,
+/// a `face` saying it, and `LAMP_NAME_FACING_STAND_IN` `on`: what it was
+/// asked as, if it was. The rule holds a line whose words don't begin with
+/// the name.
+async fn asked_facing(heard: &str, near: Option<f32>, face: Face, on: bool) -> Option<String> {
+    asked_facing_in(heard, near, face, on, false).await
+}
+
+/// [`asked_facing`], with `LAMP_NAME_AS_A_SENTENCE` `as_a_sentence` too.
+async fn asked_facing_in(
+    heard: &str,
+    near: Option<f32>,
+    face: Face,
+    on: bool,
+    as_a_sentence: bool,
+) -> Option<String> {
+    let Face {
+        turned,
+        said_facing,
+        second_voice,
+    } = face;
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new([vec![text("Sure."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine
+        .heeding(Arc::new(|_, _, words, _, _| {
+            (!crate::attention::begins_with_the_name(words))
+                .then_some(crate::attention::NOT_SPOKEN_TO)
+        }))
+        .hearing_the_name_near(Arc::new(move |_: (u64, u64)| (near, turned)))
+        .taking_a_stand_in_said_facing(on)
+        .taking_the_name_as_a_sentence(as_a_sentence)
+        .seeing_the_line_said_facing(Arc::new(move |_: (u64, u64), turned| {
+            let looks = if said_facing {
+                crate::said_to_me::FACING_LOOKS
+            } else {
+                0
+            };
+            super::super::worker::stand_in_face(turned, looks, second_voice)
+        }));
+    engine.submit(start(1));
+    engine.submit(ProviderInput::Audio {
+        request: 1,
+        privacy_generation: 1,
+        sequence: 1,
+        read_completed_at_us: READ_US,
+        samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+    });
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    script
+        .asked
+        .lock()
+        .unwrap()
+        .first()
+        .and_then(|messages| messages.last().cloned())
+        .and_then(|message| message.content)
+        .and_then(|content| content.as_str().map(str::to_owned))
+}
+
+/// `LAMP_NAME_FACING_STAND_IN`: on lamp-74ff on 26 Nov at 15:01 the product
+/// owner faced the lamp and said "Hey Lamp, how's it going?". Speech to
+/// text wrote "Hey man, …", lamp-name heard the name near at 0.996 by the
+/// line's start, and the owner's face was seen speaking it turned to the
+/// lamp in 2 looks, though no close face. `LAMP_NAME_NEAR` ruled "man" not
+/// the name, and the line was held in a busy room. With the switch it is
+/// asked as "Hey Lamp, …", with that face or a close one turned to the
+/// lamp, and so is "Hey, ma'am. …" (25 Nov's "Hey Lamp, good morning!").
+/// Not with no face, a near hearing under 0.9 or none, no greeting before
+/// the word, a word not on the list or not set off, or the switch off.
+#[tokio::test]
+async fn a_greeted_word_said_to_a_person_is_the_name_said_by_a_face_turned_to_the_lamp() {
+    let line = "Hey man, how's it going?";
+    for face in [FACING_FACE, CLOSE_FACE] {
+        assert_eq!(
+            asked_facing(line, Some(0.996), face, true).await.as_deref(),
+            Some("Hey Lamp, how's it going?")
+        );
+    }
+    assert_eq!(
+        asked_facing("Hey, ma'am. Good morning.", Some(0.95), FACING_FACE, true)
+            .await
+            .as_deref(),
+        Some("Hey, Lamp. Good morning.")
+    );
+    assert_eq!(
+        asked_facing("Hi, Man, what time is it?", Some(0.9), CLOSE_FACE, true)
+            .await
+            .as_deref(),
+        Some("Hi, Lamp, what time is it?"),
+        "any case, at the bar"
+    );
+    for (heard, near, face, on, why) in [
+        (line, Some(0.996), NO_FACE, true, "no face"),
+        (
+            line,
+            Some(0.996),
+            CLOSE_FACE_ON_A_CALL,
+            true,
+            "a close face after a second voice",
+        ),
+        (
+            line,
+            Some(0.89),
+            FACING_FACE,
+            true,
+            "a near hearing under 0.9",
+        ),
+        (line, None, FACING_FACE, true, "no near hearing"),
+        (line, Some(0.996), FACING_FACE, false, "the switch off"),
+        (
+            line,
+            Some(0.996),
+            CLOSE_FACE,
+            false,
+            "the switch off, a close face",
+        ),
+        (
+            "Man, that was close.",
+            Some(0.996),
+            FACING_FACE,
+            true,
+            "no greeting",
+        ),
+        (
+            "Thanks, man.",
+            Some(0.996),
+            FACING_FACE,
+            true,
+            "past no greeting",
+        ),
+        (
+            "Hey dude, how's it going?",
+            Some(0.996),
+            FACING_FACE,
+            true,
+            "not on the list",
+        ),
+        (
+            "Hey man how's it going?",
+            Some(0.996),
+            FACING_FACE,
+            true,
+            "not set off",
+        ),
+    ] {
+        let asked = asked_facing(heard, near, face, on).await;
+        assert!(
+            !asked.as_deref().is_some_and(|asked| asked.contains("Lamp")),
+            "{heard} ({why}): asked as {asked:?}"
+        );
+    }
+}
+
+/// The Reviewer-lead's P2 on #8763: with no face, the rule takes nothing,
+/// so the arms after it judge the line as before the switch. "Hey man.
+/// How's it going?", heard near at 0.95 with nobody turned to the lamp, is
+/// a sentence of its own (`LAMP_NAME_AS_A_SENTENCE`) and still answered
+/// as the name, with the switch on or off. With a face it is answered by
+/// the switch's own arm.
+#[tokio::test]
+async fn with_no_face_a_greeted_stand_in_falls_through_to_the_sentence_rule() {
+    let line = "Hey man. How's it going?";
+    for on in [true, false] {
+        assert_eq!(
+            asked_facing_in(line, Some(0.95), NO_FACE, on, true)
+                .await
+                .as_deref(),
+            Some("Hey Lamp. How's it going?"),
+            "switch {on}: answered as a sentence of its own"
+        );
+    }
+    assert_eq!(
+        asked_facing_in(line, Some(0.95), FACING_FACE, true, false)
+            .await
+            .as_deref(),
+        Some("Hey Lamp. How's it going?"),
+        "the switch's own arm, with the face"
+    );
+}
+
+/// The Reviewer-lead's second P2 on #8763: the face read speaking toward the
+/// lamp is this rule's face only with no second voice in the room lately,
+/// as `LAMP_SAID_TO_ME` refuses it after one (`Held::SecondVoice`, #7891:
+/// someone on a call, or talking to another person, while facing the lamp).
+#[test]
+fn a_face_read_speaking_facing_is_not_the_rules_after_a_second_voice() {
+    use super::super::worker::stand_in_face;
+    let looks = crate::said_to_me::FACING_LOOKS;
+    assert!(stand_in_face(false, looks, false));
+    assert!(!stand_in_face(false, looks, true), "a second voice lately");
+    assert!(!stand_in_face(false, looks - 1, false), "too few looks");
+    // Twelve's P2 on #8763: a close face turned to the lamp is the rule's
+    // face too, and the second voice holds it as it holds the read one.
+    assert!(stand_in_face(true, 0, false));
+    assert!(
+        !stand_in_face(true, 0, true),
+        "a close face on a video call"
+    );
+}
+
+/// The greeted word, the list and the bar, by themselves.
+#[test]
+fn a_facing_stand_in_is_a_listed_word_right_after_a_greeting_heard_near() {
+    use super::super::{facing_stand_in, first_word_set_off};
+    let reads = |text: &str, near: Option<f32>| {
+        first_word_set_off(text).is_some_and(|word| facing_stand_in(text, word, near))
+    };
+    assert!(reads("Hey man, how's it going?", Some(0.9)));
+    assert!(reads("Hey, ma'am. Good morning.", Some(0.996)));
+    assert!(reads("Okay, man.", Some(0.95)));
+    assert!(!reads("Hey man, how's it going?", Some(0.899)));
+    assert!(!reads("Hey man, how's it going?", None));
+    assert!(!reads("Man, that was close.", Some(0.996)));
+    assert!(!reads("Hey, Mom.", Some(0.996)));
+    assert!(!reads("Hey, Lynn. What time is it?", Some(0.996)));
+}
+
 /// Set off as a name is: first, past a greeting at most, then a comma or
 /// a stop, or the whole line.
 #[test]
