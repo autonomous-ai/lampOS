@@ -86,3 +86,5 @@ Full per-class/cell/identity/shoulder and public diagnostic numbers are in [nume
 | `materialization_audit_sha256` | `ef2eae68db6794ad0c383c156e502158b0650d6fc7b4ef3d73c0ecee57295c1d` |
 | `independent_result_audit_sha256` | `90fd452a3ba5a977c5802ea2a2f44f8d9f449d7b0744633d706d2e66c3324261` |
 | `independent_pointing_audit_sha256` | `96ed53466d891e07b6745a703e48c5cd775b79e19da3a5b8d4b173a580b6710d` |
+
+[Follow-up: unchanged PnP versus original 6DRepNet on renders and real photos](method-comparison.md). Both remain unqualified.
