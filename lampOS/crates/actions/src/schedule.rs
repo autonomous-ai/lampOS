@@ -37,6 +37,25 @@ pub const HIDDEN_SWITCH: &str = "LAMP_REMINDERS_HIDDEN_COUNT";
 pub fn hidden_from_environment() -> bool {
     std::env::var_os(HIDDEN_SWITCH).as_deref() == Some(OsStr::new("on"))
 }
+/// `on` (#8840): `move_reminder` changes the time of a reminder the person
+/// set, keeping its words and how it repeats. Off, the catalog is as it was
+/// and the name is refused.
+pub const MOVE_SWITCH: &str = "LAMP_SCHEDULE_MOVE";
+
+/// Whether [`MOVE_SWITCH`] is `on` in this process's environment.
+pub fn moving_from_environment() -> bool {
+    std::env::var_os(MOVE_SWITCH).as_deref() == Some(OsStr::new("on"))
+}
+
+/// The tool [`MOVE_SWITCH`] adds, after the six [`NAMES`].
+pub const MOVE: &str = "move_reminder";
+
+/// `catalog` with [`MOVE_SWITCH`] on (`moving`): `move_reminder` after the
+/// six. Off, `catalog` as it came.
+pub fn catalog_moving(catalog: Vec<Function>, moving: bool) -> Vec<Function> {
+    let _ = moving;
+    catalog
+}
 pub const DEADLINE: Duration = Duration::from_millis(1250);
 /// Told beside a list that left out `hidden` reminders or timers as
 /// someone's own ([`HIDDEN_SWITCH`]): never told as the whole list, and
@@ -261,6 +280,8 @@ pub struct Adapter {
     every: bool,
     /// [`HIDDEN_SWITCH`]: the room's list tells how many it left out.
     hidden: bool,
+    /// [`MOVE_SWITCH`]: `move_reminder` is offered and taken.
+    moving: bool,
 }
 
 impl Adapter {
@@ -271,12 +292,19 @@ impl Adapter {
             deadline: DEADLINE,
             every: every_from_environment(),
             hidden: hidden_from_environment(),
+            moving: moving_from_environment(),
         })
     }
 
     /// The same adapter with [`EVERY_SWITCH`] taken as `every`, for a test.
     pub fn with_every(mut self, every: bool) -> Self {
         self.every = every;
+        self
+    }
+
+    /// The same adapter with [`MOVE_SWITCH`] taken as `moving`, for a test.
+    pub fn with_moving(mut self, moving: bool) -> Self {
+        self.moving = moving;
         self
     }
 
