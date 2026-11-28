@@ -356,14 +356,16 @@ impl Renderer {
             }
             match self.cache.render_once_to_keep(&words) {
                 Ok((_, false)) => {
-                    // Said in the lamp's own voice in place of the person's
-                    // Gemini voice (#8762's review): never kept under
-                    // theirs, so it would ring offline in the wrong voice
-                    // for its whole life; theirs is asked again after the
+                    // Said in the lamp's own voice in place of the voice in
+                    // front of it, the person's Gemini voice (#8762's review)
+                    // or Phonon on the lamp (the Reviewer-lead's P3 2 on
+                    // #8754's pull request): never kept under that voice, so
+                    // it would ring offline in the wrong voice for its whole
+                    // life; the voice in front is asked again after the
                     // backoff.
                     pass.failed = true;
                     eprintln!(
-                        "lamp-voice schedule-consumer: reminder clips not rendered in the person's own voice, not kept: tried again in {} s (LAMP_OFFLINE_RINGS)",
+                        "lamp-voice schedule-consumer: reminder clips not rendered in the voice the person chose, not kept: tried again in {} s (LAMP_OFFLINE_RINGS)",
                         self.every.as_secs()
                     );
                     self.retry_at = Some(now + self.every);
@@ -608,7 +610,7 @@ mod tests {
             "en",
             theirs,
         )
-        .giving_way_to(lamps, Box::new(|| false));
+        .giving_way_to(lamps, Box::new(|| false), "the person's own Gemini voice");
         let voice = cache.identity().to_owned();
         let mut renderer = Renderer::new(clips.clone(), cache);
         let start = Instant::now();
@@ -626,6 +628,55 @@ mod tests {
             clips.own(STORE, 4, &said, &voice),
             Some(vec![said.len() as i16; 2_400]),
             "theirs, once Google answers"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// As #8762's review, P3 1, for Phonon on the lamp (the Reviewer-lead's
+    /// P3 2 on #8754's pull request): a reminder's clip Phonon failed (not
+    /// serving yet, busy, stopped) was rendered in the lamp's own voice and
+    /// kept under Phonon's, so it rang offline in the lamp's voice for its
+    /// whole life. A clip the lamp's voice said in Phonon's place is not
+    /// kept: the pass waits its backoff, and the next one asks Phonon again
+    /// and keeps that.
+    #[test]
+    fn a_clip_phonon_failed_is_not_kept_as_phonons() {
+        let dir = scratch("phonon-failed");
+        let clips = Clips::new(&dir);
+        let down = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let off = Arc::clone(&down);
+        let phonon: Render = Box::new(move |text: &str| {
+            if off.load(Ordering::SeqCst) {
+                return Err("the lamp's voice's connection".into());
+            }
+            Ok(vec![text.len() as i16; 2_400])
+        });
+        let (lamps, lamps_calls, _) = service("Rachel", 1_200);
+        let cache = TtsCache::new(
+            std::env::temp_dir().join("lamp-ring-clips-unused-cache"),
+            "phonon:Freya",
+            "phonon-31m-en",
+            "en",
+            phonon,
+        )
+        .giving_way_to(lamps, Box::new(|| false), "Phonon on the lamp");
+        let voice = cache.identity().to_owned();
+        let mut renderer = Renderer::new(clips.clone(), cache);
+        let start = Instant::now();
+        let walk = wanted(STORE, &[(4, "Take your pills.")], &[]);
+        let said = words(None, "Take your pills.");
+        let pass = renderer.pass(&walk, start);
+        assert_eq!(lamps_calls.load(Ordering::SeqCst), 1, "said in the lamp's");
+        assert!(pass.failed && pass.rendered == 0, "{pass:?}");
+        assert_eq!(clips.own(STORE, 4, &said, &voice), None);
+        assert!(!clips.current(STORE, 4, &said, &voice));
+        assert_eq!(clips.kept(STORE), BTreeSet::new());
+        down.store(false, Ordering::SeqCst);
+        assert_eq!(renderer.pass(&walk, start + WARM_EVERY).rendered, 1);
+        assert_eq!(
+            clips.own(STORE, 4, &said, &voice),
+            Some(vec![said.len() as i16; 2_400]),
+            "Phonon's, once it answers"
         );
         let _ = fs::remove_dir_all(&dir);
     }

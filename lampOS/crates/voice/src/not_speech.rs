@@ -1079,6 +1079,14 @@ fn latin(c: char) -> bool {
     c.is_ascii_alphabetic() || matches!(c as u32, 0x00C0..=0x024F | 0x1E00..=0x1EFF)
 }
 
+/// Whether `text` has any letter of a script other than the Latin
+/// ([`latin`]): Japanese, Chinese, Korean, Cyrillic, Arabic and the rest. A
+/// voice that speaks English only can't say it (Phonon on the lamp,
+/// #8754). Languages written in the Latin script are not told apart here.
+pub(crate) fn in_another_script(text: &str) -> bool {
+    text.chars().any(|c| c.is_alphabetic() && !latin(c))
+}
+
 /// Whether what was heard in a conversation held in English makes no sense
 /// as a turn of it, and why: mostly another script's letters, or a number
 /// alone when the lamp's last line was not a question (`lamp_asked`), or, for

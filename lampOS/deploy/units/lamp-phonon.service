@@ -1,0 +1,55 @@
+# lampOS Phonon: the voice that runs on the lamp (lampOS/docs/phonon.md, #8754). Gradium's Phonon 31m
+# (English, Apache 2.0) on the CPU, one sentence at a time for lamp-voice over its socket, with no key
+# and no cloud. Started only once a person chose it in the app (root's keys helper keeps the choice as
+# /etc/lampOS/voice/own/phonon.voice and restarts this unit); removing the choice stops it.
+# The model is not in the image: the first start fetches it (about 65 MB, from its pinned Hugging Face
+# commit) into the state folder, kept only when every file's size and SHA-256 match the pins in
+# lamp_msgs::phonon. Until it serves, the voice speaks in the lamp's own voice.
+[Unit]
+Description=lampOS Phonon (lamp-phonon)
+PartOf=lampos.target
+ConditionPathExists=/etc/lampOS/voice/own/phonon.voice
+After=local-fs.target network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=@LAMP_USER@
+Group=@LAMP_USER@
+# In the voice's slice, as part of speech, but held to two cores' time and a memory ceiling so the rest of the
+# voice keeps its headroom (#8754's bars). Measured on a Mac (M-series, 2 threads): peak RSS about 300 MB.
+Slice=lampos-voice.slice
+CPUQuota=200%
+MemoryHigh=450M
+MemoryMax=600M
+Environment=LAMP_PHONON_THREADS=1
+# On the fastest cores only (the highest cpuinfo_max_freq; lamp-361f's two Cortex-A76), found at start
+# and journalled; LAMP_PHONON_PIN=all leaves it on every core.
+Environment=LAMP_PHONON_PIN=big
+# Only the choice, never the person's keys beside it.
+LoadCredential=own_phonon.voice:/etc/lampOS/voice/own/phonon.voice
+ExecStart=/opt/lampOS/phonon/@PHONON_SHA256@/lamp-phonon serve --socket /run/lampos-phonon/phonon.sock --state /var/lib/lampos-phonon
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-phonon
+NoNewPrivileges=yes
+# The model and voices it fetched and checked; a reset wipes them.
+StateDirectory=lampos-phonon
+StateDirectoryMode=0700
+# The socket's folder: only root (the voice) and this user reach it.
+RuntimeDirectory=lampos-phonon
+RuntimeDirectoryMode=0700
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+CapabilityBoundingSet=
+# The network only for the first fetch, over https; the socket for the voice.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=lampos.target

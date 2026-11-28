@@ -1160,3 +1160,72 @@ fn lamp_cloud_restarts_5_s_after_the_voice_even_while_the_room_keeps_sounding() 
         let _ = fs::remove_dir_all(folder);
     }
 }
+
+/// #8754: Phonon chosen or removed restarts lamp-phonon before the voice,
+/// both under lamp-update's lock once the lamp is quiet, so lamp-phonon
+/// starts on the choice (or stops without it) and the voice, after it, says
+/// what Phonon can't until it is ready; never lamp-cloud. A lamp without the
+/// unit says so and the voice still restarts.
+#[test]
+fn a_phonon_choice_restarts_lamp_phonon_then_the_voice_once_quiet() {
+    use lamp_setup::keys::{self, Done};
+    let (folder, records) = records_folder("keys-phonon");
+    for missing in [false, true] {
+        let done = Done {
+            restart_voice: true,
+            restart_cloud: false,
+            restart_phonon: true,
+            said: "Phonon on the lamp was chosen, voice Toby".to_owned(),
+        };
+        let mut ears = Script {
+            now: 0,
+            at: Box::new(|_| vec![Heard::State(Voice::Resting)]),
+        };
+        let mut units = Units {
+            records: &records,
+            calls: Vec::new(),
+            stop_fails: missing,
+        };
+        let said = keys::restart_after(&done, &mut ears, &records, &mut units);
+        assert_eq!(ears.now, S, "missing {missing}");
+        assert_eq!(
+            units.calls,
+            vec![
+                ("restart lamp-phonon.service".to_owned(), true),
+                ("try-restart lamp-voice.service".to_owned(), true),
+            ],
+            "missing {missing}"
+        );
+        assert_eq!(
+            said[0].starts_with("Phonon could not be restarted"),
+            missing,
+            "{said:?}"
+        );
+        assert_eq!(
+            said[1], "the voice restarted to take them, at a quiet moment",
+            "{said:?}"
+        );
+    }
+    // A key's change leaves lamp-phonon alone.
+    let done = Done {
+        restart_voice: true,
+        restart_cloud: false,
+        restart_phonon: false,
+        said: "the person's ElevenLabs key: it works, kept".to_owned(),
+    };
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| vec![Heard::State(Voice::Resting)]),
+    };
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    keys::restart_after(&done, &mut ears, &records, &mut units);
+    assert_eq!(
+        units.calls,
+        vec![("try-restart lamp-voice.service".to_owned(), true)]
+    );
+    let _ = fs::remove_dir_all(folder);
+}

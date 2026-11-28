@@ -47,13 +47,19 @@ fn never_said(reply: &Value, done: &Option<keys::Done>) {
 fn a_key_absent_present_and_removed() {
     let store = Store(folder("cycle"));
     let mut works = Told(Verdict::Works, vec![]);
-    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let (reply, _) = keys::answer_speaking(
+        r#"{"which":true}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
     // With #8367's, #8362's and #8754's fields beside today's (`offers` is
     // pinned below).
     let none = json!({"deepseek": null, "deepgram": null, "elevenlabs": null, "openai_compatible": null, "openrouter": null, "gemini": null, "anthropic": null, "gemini_voice": null});
     assert_eq!(
         reply,
-        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "anthropic": "lamp", "gemini_voice": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null, "gemini_voice": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null, "agent": "relay", "agent_why": "no_model_key", "voice": null}, "offers": reply["done"]["offers"]}})
+        json!({"done": {"deepseek": "lamp", "deepgram": "lamp", "elevenlabs": "lamp", "openai_compatible": "lamp", "openrouter": "lamp", "gemini": "lamp", "anthropic": "lamp", "gemini_voice": "lamp", "since": none, "deepseek_host": null, "voice_id": {"elevenlabs": null, "gemini_voice": null}, "openai_compatible_host": null, "model": none, "checked": none, "in_use": {"model": null, "agent": "relay", "agent_why": "no_model_key", "voice": null}, "offers": reply["done"]["offers"], "phonon": null}})
     );
     for service in ["deepseek", "deepgram"] {
         let (reply, done) = keys::answer(&set(service, ""), &store, &mut works, true);
@@ -459,7 +465,13 @@ const VOICE: &str = "PersonVoice8367abcdef";
 fn elevenlabs_is_offered_beside_the_model_services() {
     let store = Store(folder("offers"));
     let mut works = Told(Verdict::Works, vec![]);
-    let (reply, _) = keys::answer(r#"{"which":true}"#, &store, &mut works, true);
+    let (reply, _) = keys::answer_speaking(
+        r#"{"which":true}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
     let which = &reply["done"];
     assert_eq!(
         which["offers"],
@@ -472,6 +484,7 @@ fn elevenlabs_is_offered_beside_the_model_services() {
             {"service": "gemini", "name": "Gemini", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai", "agent": true},
             {"service": "anthropic", "name": "Anthropic", "kind": "model", "models": [], "base_url": false, "fields": ["model"], "endpoint": "https://api.anthropic.com/v1", "agent": true},
             {"service": "gemini_voice", "name": "Gemini", "kind": "voice", "models": [], "base_url": false, "fields": ["voice_id"], "voices": keys_voices(), "agent": false},
+            {"service": "phonon", "name": "On this lamp", "kind": "voice", "runs": "lamp", "models": [], "base_url": false, "fields": ["voice_id"], "voices": lamp_msgs::phonon::voice_names(), "agent": false},
         ])
     );
     assert_eq!(which["elevenlabs"], "lamp");
@@ -1585,4 +1598,346 @@ fn the_agent_uses_an_own_model_key_only_once_it_made_a_tool_call() {
         json!({"model": "deepseek", "agent": "relay", "agent_why": "unchecked", "voice": "elevenlabs"})
     );
     let _ = fs::remove_dir_all(store.0.parent().unwrap());
+}
+
+/// #8754: Phonon is offered only while the lamp speaks English, with its
+/// voices and no key; choosing a voice keeps only its name (0600), removes
+/// the person's ElevenLabs voice (one own voice at a time) and restarts the
+/// voice; removing it brings the lamp's own voice back. A key, another
+/// field, a voice not offered or a lamp in another language is refused, and
+/// nothing is kept.
+#[test]
+fn phonon_is_chosen_without_a_key_while_the_lamp_speaks_english() {
+    let store = Store(folder("phonon"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let offered = |here: keys::PhononHere| {
+        let mut works = Told(Verdict::Works, vec![]);
+        let (reply, _) = keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, here);
+        reply["done"]["offers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|offer| offer["service"] == "phonon")
+    };
+    assert!(offered(keys::PhononHere::Offered));
+    assert!(!offered(keys::PhononHere::NotEnglish));
+    assert!(!offered(keys::PhononHere::NotInstalled));
+
+    // An own ElevenLabs voice, then Phonon in its place.
+    let line = set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#));
+    keys::answer_speaking(&line, &store, &mut works, true, keys::PhononHere::Offered);
+    assert!(store.has(Service::ElevenLabs));
+    let (reply, done) = keys::answer_speaking(
+        r#"{"set":"phonon","voice_id":"toby"}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "phonon", "uses": "own", "code": "works", "voice_id": "Toby"}})
+    );
+    let done = done.unwrap();
+    assert!(done.restart_voice && done.restart_phonon && !done.restart_cloud);
+    let kept = store.0.join("phonon.voice");
+    assert_eq!(fs::read_to_string(&kept).unwrap(), "Toby\n");
+    assert_eq!(
+        fs::metadata(&kept).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert!(!store.has(Service::ElevenLabs));
+    assert_eq!(store.phonon().map(|voice| voice.name), Some("Toby"));
+    let (reply, _) = keys::answer_speaking(
+        r#"{"which":true}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
+    assert_eq!(reply["done"]["phonon"], "Toby");
+
+    // An own ElevenLabs voice again takes Phonon's place.
+    keys::answer_speaking(&line, &store, &mut works, true, keys::PhononHere::Offered);
+    assert!(store.has(Service::ElevenLabs) && store.phonon().is_none());
+
+    // Refused, and nothing kept.
+    let (offered, not_english) = (keys::PhononHere::Offered, keys::PhononHere::NotEnglish);
+    for (line, here, code) in [
+        (
+            r#"{"set":"phonon","voice_id":"Freya"}"#,
+            not_english,
+            "unavailable",
+        ),
+        (
+            r#"{"set":"phonon","voice_id":"Kore"}"#,
+            offered,
+            "bad_field",
+        ),
+        (r#"{"set":"phonon"}"#, offered, "bad_field"),
+        (
+            r#"{"set":"phonon","voice_id":"Freya","key":"sk-x"}"#,
+            offered,
+            "bad_field",
+        ),
+    ] {
+        let (reply, done) = keys::answer_speaking(line, &store, &mut works, true, here);
+        assert_eq!(reply["code"], code, "{line}");
+        assert!(done.is_none(), "{line}");
+        assert!(store.phonon().is_none(), "{line}");
+    }
+
+    // Chosen, then removed: the lamp's own voice again.
+    keys::answer_speaking(
+        r#"{"set":"phonon","voice_id":"Freya"}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
+    let (reply, done) = keys::answer_speaking(
+        r#"{"remove":"phonon"}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
+    assert_eq!(
+        reply,
+        json!({"done": {"service": "phonon", "uses": "lamp"}})
+    );
+    let done = done.unwrap();
+    assert!(done.restart_voice && done.restart_phonon && !done.restart_cloud);
+    assert!(store.phonon().is_none() && !kept.exists());
+    // Phonon is never checked against a service.
+    assert!(
+        works
+            .1
+            .iter()
+            .all(|given| given.service == Service::ElevenLabs)
+    );
+}
+
+/// The Reviewer-lead's must-fix on #8754: one own voice at a time between
+/// Gemini and Phonon too. With a Gemini voice kept, choosing Phonon
+/// removes its key, voice name and check and restarts `lamp-phonon` and the
+/// voice; `in_use.voice` says `phonon` where it speaks (`tts_only` with no
+/// model key), and nothing on a lamp where it doesn't.
+#[test]
+fn choosing_phonon_turns_off_a_kept_gemini_voice() {
+    let store = Store(folder("phonon-over-gemini"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let gemini = set("gemini_voice", r#","voice_id":"Kore""#);
+    keys::answer_speaking(&gemini, &store, &mut works, true, keys::PhononHere::Offered);
+    assert!(store.has(Service::GeminiVoice));
+    let (reply, done) = keys::answer_speaking(
+        r#"{"set":"phonon","voice_id":"Freya"}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
+    assert_eq!(reply["done"]["code"], "works");
+    let done = done.unwrap();
+    assert!(done.restart_voice && done.restart_phonon && !done.restart_cloud);
+    assert_eq!(store.phonon().map(|voice| voice.name), Some("Freya"));
+    assert!(!store.has(Service::GeminiVoice));
+    for file in [
+        "gemini_voice.key",
+        "gemini_voice.voice",
+        "gemini_voice.checked",
+    ] {
+        assert!(!store.0.join(file).exists(), "{file}");
+    }
+    let which = |here| {
+        let mut works = Told(Verdict::Works, vec![]);
+        keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, here).0["done"].clone()
+    };
+    let offered = which(keys::PhononHere::Offered);
+    assert_eq!(offered["gemini_voice"], "lamp");
+    assert_eq!(
+        offered["voice_id"],
+        json!({"elevenlabs": null, "gemini_voice": null})
+    );
+    assert_eq!(
+        offered["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "tts_only", "voice": "phonon"})
+    );
+    // A lamp in another language speaks in its own voice, not Phonon.
+    assert_eq!(
+        which(keys::PhononHere::NotEnglish)["in_use"],
+        json!({"model": null, "agent": "relay", "agent_why": "no_model_key", "voice": null})
+    );
+}
+
+/// The Reviewer-lead's must-fix on #8754, the other way: with Phonon
+/// chosen, a Gemini voice that works is kept in its place, Phonon's choice
+/// removed and `lamp-phonon` restarted so it stops, and `in_use.voice` says
+/// `gemini_voice`. A Gemini key Google refuses keeps Phonon. Saving Gemini
+/// again with Phonon already off restarts only the voice.
+#[test]
+fn saving_a_gemini_voice_turns_off_phonon() {
+    let store = Store(folder("gemini-over-phonon"));
+    let choose = r#"{"set":"phonon","voice_id":"Freya"}"#;
+    let gemini = set("gemini_voice", r#","voice_id":"Kore""#);
+    let mut works = Told(Verdict::Works, vec![]);
+    keys::answer_speaking(choose, &store, &mut works, true, keys::PhononHere::Offered);
+    assert!(store.phonon().is_some());
+
+    // Refused: Phonon stays, nothing restarts for it.
+    let mut refuses = Told(Verdict::Refused, vec![]);
+    let (_, done) = keys::answer_speaking(
+        &gemini,
+        &store,
+        &mut refuses,
+        true,
+        keys::PhononHere::Offered,
+    );
+    assert!(!done.unwrap().restart_phonon);
+    assert_eq!(store.phonon().map(|voice| voice.name), Some("Freya"));
+    assert!(!store.has(Service::GeminiVoice));
+
+    let (reply, done) =
+        keys::answer_speaking(&gemini, &store, &mut works, true, keys::PhononHere::Offered);
+    never_said(&reply, &done);
+    assert_eq!(reply["done"]["code"], "works");
+    let done = done.unwrap();
+    assert!(done.restart_voice && done.restart_phonon && !done.restart_cloud);
+    assert!(
+        done.said.contains("Phonon on the lamp was turned off"),
+        "{}",
+        done.said
+    );
+    assert!(store.has(Service::GeminiVoice));
+    assert!(store.phonon().is_none());
+    assert!(!store.0.join("phonon.voice").exists());
+    let (reply, _) = keys::answer_speaking(
+        r#"{"which":true}"#,
+        &store,
+        &mut works,
+        true,
+        keys::PhononHere::Offered,
+    );
+    assert_eq!(reply["done"]["phonon"], Value::Null);
+    assert_eq!(reply["done"]["in_use"]["voice"], "gemini_voice");
+
+    let (_, done) =
+        keys::answer_speaking(&gemini, &store, &mut works, true, keys::PhononHere::Offered);
+    let done = done.unwrap();
+    assert!(done.restart_voice && !done.restart_phonon);
+}
+
+/// Phonon is offered and taken only where `lamp-phonon.service` is
+/// installed (the Reviewer-lead's HOLD on #8768): on a lamp without it,
+/// `keys.get` has no Phonon offer and `which` is as before, and
+/// `keys.set` is refused `not_on_this_lamp` with the person's ElevenLabs
+/// key and voice untouched and nothing restarted.
+#[test]
+fn phonon_is_offered_and_kept_only_where_its_unit_is_installed() {
+    use keys::PhononHere;
+    let units = folder("phonon-units");
+    let (etc, lib) = (units.join("etc"), units.join("lib"));
+    fs::create_dir_all(&etc).unwrap();
+    fs::create_dir_all(&lib).unwrap();
+    let folders = [etc.as_path(), lib.as_path()];
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, true),
+        PhononHere::NotInstalled
+    );
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, false),
+        PhononHere::NotInstalled
+    );
+    // A folder named as the unit is not the unit.
+    fs::create_dir_all(lib.join(keys::PHONON_UNIT)).unwrap();
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, true),
+        PhononHere::NotInstalled
+    );
+    // Installed in any of the folders, as docs/phonon.md has a tester do.
+    fs::write(etc.join(keys::PHONON_UNIT), "[Unit]\n").unwrap();
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, true),
+        PhononHere::Offered
+    );
+    assert_eq!(
+        PhononHere::on_this_lamp(&folders, false),
+        PhononHere::NotEnglish
+    );
+    assert_eq!(
+        PhononHere::on_this_lamp(&[lib.as_path()], true),
+        PhononHere::NotInstalled
+    );
+
+    // Not installed: an own ElevenLabs voice stays, Phonon is neither
+    // offered nor kept.
+    let store = Store(folder("phonon-not-installed"));
+    let mut works = Told(Verdict::Works, vec![]);
+    let line = set("elevenlabs", &format!(r#","voice_id":"{VOICE}""#));
+    keys::answer_speaking(&line, &store, &mut works, true, PhononHere::Offered);
+    assert!(store.has(Service::ElevenLabs));
+    let before: Vec<_> = {
+        let mut files: Vec<_> = fs::read_dir(&store.0)
+            .unwrap()
+            .flatten()
+            .map(|entry| (entry.file_name(), fs::read(entry.path()).unwrap()))
+            .collect();
+        files.sort();
+        files
+    };
+    let which = |here| {
+        let mut works = Told(Verdict::Works, vec![]);
+        keys::answer_speaking(r#"{"which":true}"#, &store, &mut works, true, here).0
+    };
+    let (installed, not) = (which(PhononHere::Offered), which(PhononHere::NotInstalled));
+    assert!(
+        !not["done"]["offers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|offer| offer["service"] == "phonon")
+    );
+    // `which` is otherwise as it was: only the offer differs.
+    let mut without = installed.clone();
+    without["done"]["offers"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|offer| offer["service"] != "phonon");
+    assert_eq!(without, not);
+    assert_eq!(not["done"]["phonon"], Value::Null);
+
+    let (reply, done) = keys::answer_speaking(
+        r#"{"set":"phonon","voice_id":"Freya"}"#,
+        &store,
+        &mut works,
+        true,
+        PhononHere::NotInstalled,
+    );
+    assert_eq!(reply["code"], keys::NOT_ON_THIS_LAMP);
+    assert!(reply["refused"].is_string());
+    assert!(done.is_none());
+    assert!(store.has(Service::ElevenLabs) && store.phonon().is_none());
+    let after: Vec<_> = {
+        let mut files: Vec<_> = fs::read_dir(&store.0)
+            .unwrap()
+            .flatten()
+            .map(|entry| (entry.file_name(), fs::read(entry.path()).unwrap()))
+            .collect();
+        files.sort();
+        files
+    };
+    assert_eq!(before, after);
+
+    // Installed: offered and kept, in the ElevenLabs voice's place.
+    let (reply, done) = keys::answer_speaking(
+        r#"{"set":"phonon","voice_id":"Freya"}"#,
+        &store,
+        &mut works,
+        true,
+        PhononHere::Offered,
+    );
+    assert_eq!(reply["done"]["code"], "works");
+    assert!(done.unwrap().restart_voice);
+    assert_eq!(store.phonon().map(|voice| voice.name), Some("Freya"));
+    assert!(!store.has(Service::ElevenLabs));
 }

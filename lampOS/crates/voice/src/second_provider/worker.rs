@@ -1154,6 +1154,84 @@ pub fn say_own_key_once(bus_root: Option<&Path>, report: &lamp_msgs::Diagnostic)
     let _ = out.publish_json(lamp_ipc::monotonic_us(), report);
 }
 
+/// Whether Phonon speaks (#8754).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PhononChoice {
+    /// Not chosen, the switch off, or a name this build doesn't offer.
+    Not,
+    /// Chosen, but the lamp speaks another language: Phonon 31m is English
+    /// only, so the lamp's one voice speaks.
+    NotEnglish,
+    Chosen(lamp_msgs::phonon::Voice),
+}
+
+/// The person's Phonon choice, from the unit's credential
+/// (`own_phonon.voice`), with `LAMP_OWN_KEYS` `own_keys` and the lamp's
+/// `language` (`None` is English).
+pub(crate) fn phonon_chosen(
+    own_keys: bool,
+    credentials: Option<&std::ffi::OsStr>,
+    language: Option<crate::language::Language>,
+) -> PhononChoice {
+    if !own_keys {
+        return PhononChoice::Not;
+    }
+    let Ok(text) =
+        crate::second_config::unit_credential(credentials, lamp_msgs::phonon::CHOSEN_CREDENTIAL)
+    else {
+        return PhononChoice::Not;
+    };
+    match (
+        lamp_msgs::phonon::voice(text.expose().lines().next().unwrap_or("")),
+        language,
+    ) {
+        (None, _) => PhononChoice::Not,
+        (Some(_), Some(_)) => PhononChoice::NotEnglish,
+        (Some(voice), None) => PhononChoice::Chosen(voice),
+    }
+}
+
+#[cfg(test)]
+mod phonon_choice_tests {
+    use super::{PhononChoice, phonon_chosen};
+    use std::os::unix::fs::PermissionsExt;
+
+    /// #8754: Phonon speaks only when chosen (a voice offered, in the
+    /// unit's `own_phonon.voice`), with `LAMP_OWN_KEYS` on, and while the
+    /// lamp speaks English; otherwise the lamp's one voice, as before.
+    #[test]
+    fn phonon_speaks_when_chosen_switched_on_and_in_english() {
+        let dir = std::env::temp_dir().join(format!("phonon-choice-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let credentials = Some(dir.as_os_str());
+        let choose = |text: &str| {
+            let file = dir.join(lamp_msgs::phonon::CHOSEN_CREDENTIAL);
+            std::fs::write(&file, text).unwrap();
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).unwrap();
+        };
+        assert_eq!(phonon_chosen(true, credentials, None), PhononChoice::Not);
+        assert_eq!(phonon_chosen(true, None, None), PhononChoice::Not);
+        choose("Hugh\n");
+        assert_eq!(
+            phonon_chosen(true, credentials, None),
+            PhononChoice::Chosen(lamp_msgs::phonon::voice("Hugh").unwrap())
+        );
+        assert_eq!(phonon_chosen(false, credentials, None), PhononChoice::Not);
+        assert_eq!(
+            phonon_chosen(
+                true,
+                credentials,
+                Some(crate::language::Language::Vietnamese)
+            ),
+            PhononChoice::NotEnglish
+        );
+        choose("Kore\n");
+        assert_eq!(phonon_chosen(true, credentials, None), PhononChoice::Not);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
 /// The voice's own side of [`own_key_stopping_on_drop`]: with the bus on
 /// (`LAMP_BUS=on`) and `LAMP_OWN_KEYS=on` in its environment, `voice-keys`
 /// is said to be stopping once the second worker was dropped.
@@ -1277,11 +1355,34 @@ pub(crate) fn text_model_said(
 /// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
 /// credentials, in `credentials` (its `CREDENTIALS_DIRECTORY`).
 pub fn services(
+    config: crate::second_config::SecondConfig,
+    provider: &crate::config::ProviderConfig,
+    route: RouteFlags,
+    credentials: Option<&std::ffi::OsStr>,
+    declare: super::net::Declare,
+) -> io::Result<Net> {
+    let own_keys =
+        std::env::var_os(crate::second_config::OWN_KEYS_ENV).is_some_and(|value| value == "on");
+    services_on_the_lamp(
+        config,
+        provider,
+        route,
+        credentials,
+        declare,
+        (own_keys, std::path::Path::new(lamp_msgs::phonon::SOCKET)),
+    )
+}
+
+/// [`services`], with `LAMP_OWN_KEYS` read as `own_keys` and Phonon
+/// (#8754), when chosen, asked at `phonon_at`: tests give a socket of
+/// their own.
+pub(crate) fn services_on_the_lamp(
     mut config: crate::second_config::SecondConfig,
     provider: &crate::config::ProviderConfig,
     route: RouteFlags,
     credentials: Option<&std::ffi::OsStr>,
     declare: super::net::Declare,
+    (own_keys, phonon_at): (bool, &std::path::Path),
 ) -> io::Result<Net> {
     use crate::second_config::{OPENROUTER_CREDENTIAL, unit_credential};
     let gemini = config.gemini.clone();
@@ -1417,6 +1518,21 @@ pub fn services(
             "lamp-voice second: the voice is the person's own Gemini voice ({}), at Google with their key; the lamp's one voice says what it can't (LAMP_OWN_KEYS)",
             crate::second_config::GEMINI_SPEECH_MODEL
         );
+    }
+    // Phonon on the lamp (#8754): the person's choice, over the lamp's one
+    // voice, which stays for what Phonon can't say.
+    match phonon_chosen(own_keys, credentials, crate::language::at_start()) {
+        PhononChoice::Chosen(voice) => {
+            net = net.speaking_on_the_lamp(phonon_at, voice);
+            eprintln!(
+                "lamp-voice second: the voice is Phonon on the lamp, voice {}, the lamp's one voice for what it can't say (LAMP_OWN_KEYS)",
+                voice.name
+            );
+        }
+        PhononChoice::NotEnglish => eprintln!(
+            "lamp-voice second: Phonon is chosen but speaks English only; the lamp's one voice (LAMP_OWN_KEYS)"
+        ),
+        PhononChoice::Not => {}
     }
     // The chat's connection opened as a line begins (#1712).
     let warm = std::env::var(super::services::CHAT_WARM_ENVIRONMENT)

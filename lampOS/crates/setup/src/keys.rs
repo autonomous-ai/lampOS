@@ -82,6 +82,11 @@ pub const GEMINI_VOICE_API: &str = lamp_msgs::own_voice::GEMINI_API;
 pub const GEMINI_SPEECH_MODEL: &str = lamp_msgs::own_voice::GEMINI_SPEECH_MODEL;
 /// The unit the helper restarts at a quiet moment, so the voice takes it.
 pub const VOICE_UNIT: &str = "lamp-voice.service";
+/// Phonon's unit (#8754): restarted with the voice, so it starts on the
+/// person's choice (its `ConditionPathExists=` on [`lamp_msgs::phonon::CHOSEN_FILE`])
+/// and stops when it is removed. A lamp without the unit says so in the
+/// journal and is left as it is.
+pub const PHONON_UNIT: &str = "lamp-phonon.service";
 
 /// The one unit whose processes may ask the helper (Third's privacy read on
 /// #2094): `lamp-cloud`, which carries the app's request. It runs as
@@ -451,6 +456,9 @@ pub enum Asked {
     Voice(Service, String),
     /// "Use the lamp's own again": the key removed.
     Remove(Service),
+    /// Phonon on the lamp (#8754, `docs/phonon.md`), no key: a voice
+    /// chosen, or `None` for the lamp's own voice again.
+    Phonon(Option<lamp_msgs::phonon::Voice>),
     /// Whose key each service uses.
     Which,
 }
@@ -601,6 +609,26 @@ pub fn parse(line: &str) -> Result<Asked, String> {
                     .to_owned()
             })
     };
+    // Phonon (#8754): no key, only a voice offered.
+    if object.get("set").and_then(Value::as_str) == Some(lamp_msgs::phonon::SERVICE) {
+        if object
+            .keys()
+            .any(|field| !["set", "voice_id"].contains(&field.as_str()))
+        {
+            return Err("Phonon is set with set and voice_id only: it takes no key".into());
+        }
+        return object
+            .get("voice_id")
+            .and_then(Value::as_str)
+            .and_then(lamp_msgs::phonon::voice)
+            .map(|voice| Asked::Phonon(Some(voice)))
+            .ok_or_else(|| "the voice is not one of Phonon's".into());
+    }
+    if object.len() == 1
+        && object.get("remove").and_then(Value::as_str) == Some(lamp_msgs::phonon::SERVICE)
+    {
+        return Ok(Asked::Phonon(None));
+    }
     if object.contains_key("set") {
         if object
             .keys()
@@ -1171,6 +1199,11 @@ impl Store {
             write_private(&self.0.join(file), format!("{model}\n").as_bytes())?;
         }
         write_private(&self.0.join(service.key_file()), given.key.as_bytes())?;
+        // One own voice at a time (#8754): the person's ElevenLabs or
+        // Gemini voice takes Phonon's place.
+        if service.is_voice() {
+            remove(&self.0.join(lamp_msgs::phonon::CHOSEN_FILE))?;
+        }
         // One own model at a time (#8362): keeping one model service's key
         // takes the other's away, so the model in use is never a guess.
         if Service::MODELS.contains(&service) {
@@ -1224,6 +1257,28 @@ impl Store {
             voice_id: Some(voice_id),
             model: None,
         })
+    }
+
+    /// Phonon chosen in `voice` (#8754): kept, and the person's ElevenLabs
+    /// or Gemini voice removed, one own voice at a time, as keeping either
+    /// of those removes Phonon ([`Self::keep`]).
+    pub fn keep_phonon(&self, voice: lamp_msgs::phonon::Voice) -> io::Result<()> {
+        self.folder()?;
+        write_private(
+            &self.0.join(lamp_msgs::phonon::CHOSEN_FILE),
+            format!("{}\n", voice.name).as_bytes(),
+        )?;
+        for service in Service::VOICES {
+            self.remove(service)?;
+        }
+        Ok(())
+    }
+
+    /// The Phonon voice chosen, if any.
+    pub fn phonon(&self) -> Option<lamp_msgs::phonon::Voice> {
+        fs::read_to_string(self.0.join(lamp_msgs::phonon::CHOSEN_FILE))
+            .ok()
+            .and_then(|text| lamp_msgs::phonon::voice(text.lines().next().unwrap_or("")))
     }
 
     /// A voice service's kept voice ID, if any.
@@ -1428,6 +1483,10 @@ pub fn check_and_keep(given: &Given, store: &Store, check: &mut impl Check) -> (
     (verdict, changed)
 }
 
+/// The refusal's code for Phonon chosen on a lamp without
+/// `lamp-phonon.service` (#8754).
+pub const NOT_ON_THIS_LAMP: &str = "not_on_this_lamp";
+
 /// A refusal in the contract's shape: the person's words and its code.
 pub fn refused(why: &str, code: &str) -> Value {
     json!({"refused": why, "code": code})
@@ -1441,6 +1500,9 @@ pub struct Done {
     /// `lamp-cloud` must take it too: a model key changed (#8735), which
     /// #8742's forwarder loads by `LoadCredential=`, copied only at its start.
     pub restart_cloud: bool,
+    /// `lamp-phonon` must start or stop (#8754): Phonon was chosen or
+    /// removed, which it reads only as it starts.
+    pub restart_phonon: bool,
     /// The journal's line: which service and what happened, never a key.
     pub said: String,
 }
@@ -1454,8 +1516,12 @@ pub const CLOUD_AFTER_REPLY: std::time::Duration = std::time::Duration::from_sec
 
 /// After a key change is answered: the voice restarted once it has rested
 /// 1 s, a turn in flight waited out ([`crate::change::KEY_CHANGE_QUIET`],
-/// #8710), and no update is at work, lamp-update's lock held through both
-/// restarts. `lamp-cloud`, when `done.restart_cloud`, restarts
+/// #8710), and no update is at work, lamp-update's lock held through every
+/// restart. When `done.restart_phonon`, [`PHONON_UNIT`] restarts first
+/// (#8754): it starts only while the person's choice exists and reads it as
+/// it starts, so a removed choice stops it; the voice, restarted after it,
+/// says what Phonon can't until it is ready. A lamp without the unit says so
+/// here and the voice still restarts. `lamp-cloud`, when `done.restart_cloud`, restarts
 /// [`CLOUD_AFTER_REPLY`] (5 s) after the voice's restart returns, with no
 /// rest waited for, so its reply is relayed first while the link is up. With
 /// the link down at the change, the reply held in lamp-cloud's memory is lost
@@ -1487,10 +1553,17 @@ pub fn restart_after(
             )];
         }
     };
-    let mut said = vec![match systemd.systemctl(&["try-restart", VOICE_UNIT]) {
+    let mut said = Vec::new();
+    if done.restart_phonon {
+        said.push(match systemd.systemctl(&["restart", PHONON_UNIT]) {
+            Ok(()) => "Phonon restarted to take the person's choice".to_owned(),
+            Err(why) => format!("Phonon could not be restarted: {why}"),
+        });
+    }
+    said.push(match systemd.systemctl(&["try-restart", VOICE_UNIT]) {
         Ok(()) => "the voice restarted to take them, at a quiet moment".to_owned(),
         Err(why) => format!("the voice could not be restarted: {why}"),
-    }];
+    });
     if done.restart_cloud {
         // `listen` takes the whole wait; what it hears doesn't matter here.
         let _ = ears.listen(CLOUD_AFTER_REPLY);
@@ -1510,6 +1583,85 @@ pub fn answer(
     check: &mut impl Check,
     enabled: bool,
 ) -> (Value, Option<Done>) {
+    let here = PhononHere::on_this_lamp(&UNIT_FOLDERS.map(Path::new), speaks_english());
+    answer_speaking(line, store, check, enabled, here)
+}
+
+/// Where systemd keeps units a lamp has installed: a test lamp's
+/// `lamp-phonon.service` is copied into the first (`docs/phonon.md`), and
+/// the product's install would put it in one of them.
+pub const UNIT_FOLDERS: [&str; 3] = [
+    "/etc/systemd/system",
+    "/usr/lib/systemd/system",
+    "/lib/systemd/system",
+];
+
+/// Whether Phonon can be offered on this lamp (#8754, the Reviewer-lead's
+/// HOLD on #8768): only where `lamp-phonon.service` is installed, since a
+/// choice with no service would remove the person's ElevenLabs voice and
+/// leave every sentence to the lamp's own; and only in English.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhononHere {
+    /// Installed, and the lamp speaks English: offered and taken.
+    Offered,
+    /// Installed, but the lamp speaks another language.
+    NotEnglish,
+    /// `lamp-phonon.service` is in none of the unit folders.
+    NotInstalled,
+}
+
+impl PhononHere {
+    /// From the unit `folders` to look in ([`UNIT_FOLDERS`] on a lamp) and
+    /// the lamp's language.
+    pub fn on_this_lamp(folders: &[&Path], english: bool) -> Self {
+        if !folders
+            .iter()
+            .any(|folder| folder.join(PHONON_UNIT).is_file())
+        {
+            Self::NotInstalled
+        } else if english {
+            Self::Offered
+        } else {
+            Self::NotEnglish
+        }
+    }
+}
+
+/// The owner's language, one code (`/etc/lampOS/setup/language`, #4473).
+pub const LANGUAGE_FILE: &str = "/etc/lampOS/setup/language";
+
+/// Whether the lamp speaks English ([`LANGUAGE_FILE`] missing, empty or
+/// `en`), the only language Phonon 31m speaks (#8754).
+pub fn speaks_english() -> bool {
+    fs::read_to_string(LANGUAGE_FILE).map_or(true, |text| lamp_msgs::phonon::speaks(&text))
+}
+
+/// Phonon's `keys.get` offer (#8754): a voice that runs on the lamp, with
+/// no key, its voices for a pick list.
+pub fn phonon_offer() -> Value {
+    json!({
+        "service": lamp_msgs::phonon::SERVICE,
+        "name": lamp_msgs::phonon::NAME,
+        "kind": "voice",
+        "runs": "lamp",
+        "models": [],
+        "base_url": false,
+        "fields": ["voice_id"],
+        "voices": lamp_msgs::phonon::voice_names(),
+        // A voice never serves the agent (#8735).
+        "agent": false,
+    })
+}
+
+/// [`answer`] with Phonon's place on this lamp given: only
+/// [`PhononHere::Offered`] offers Phonon and takes its choice (#8754).
+pub fn answer_speaking(
+    line: &str,
+    store: &Store,
+    check: &mut impl Check,
+    enabled: bool,
+    phonon: PhononHere,
+) -> (Value, Option<Done>) {
     if !enabled {
         return (
             refused("own keys are off on this lamp", "unavailable"),
@@ -1521,13 +1673,80 @@ pub fn answer(
         Err(why) => return (refused(&why, "bad_field"), None),
     };
     match asked {
-        Asked::Which => (json!({"done": store.which()}), None),
+        Asked::Which => {
+            let mut which = store.which();
+            let chosen = store.phonon();
+            which["phonon"] = json!(chosen.map(|voice| voice.name));
+            // Phonon chosen is the own voice in use where it speaks, one own
+            // voice at a time as the kept ones are (#8754).
+            if chosen.is_some() && phonon == PhononHere::Offered {
+                which["in_use"]["voice"] = json!(lamp_msgs::phonon::SERVICE);
+                if which["in_use"]["agent_why"] == "no_model_key" {
+                    which["in_use"]["agent_why"] = json!("tts_only");
+                }
+            }
+            if phonon == PhononHere::Offered
+                && let Some(offers) = which["offers"].as_array_mut()
+            {
+                offers.push(phonon_offer());
+            }
+            (json!({"done": which}), None)
+        }
+        // Nothing is kept or removed: the person's ElevenLabs voice stays.
+        Asked::Phonon(Some(_)) if phonon == PhononHere::NotInstalled => (
+            refused("Phonon is not installed on this lamp", NOT_ON_THIS_LAMP),
+            None,
+        ),
+        Asked::Phonon(Some(_)) if phonon == PhononHere::NotEnglish => (
+            refused(
+                "Phonon speaks English only, and the lamp speaks another language",
+                "unavailable",
+            ),
+            None,
+        ),
+        Asked::Phonon(Some(voice)) => match store.keep_phonon(voice) {
+            Ok(()) => (
+                json!({"done": {"service": lamp_msgs::phonon::SERVICE, "uses": "own", "code": "works", "voice_id": voice.name}}),
+                Some(Done {
+                    restart_voice: true,
+                    restart_cloud: false,
+                    restart_phonon: true,
+                    said: format!("Phonon on the lamp was chosen, voice {}", voice.name),
+                }),
+            ),
+            Err(error) => (
+                refused(
+                    &format!("the choice could not be kept: {}", error.kind()),
+                    "unavailable",
+                ),
+                None,
+            ),
+        },
+        Asked::Phonon(None) => match remove(&store.0.join(lamp_msgs::phonon::CHOSEN_FILE)) {
+            Ok(()) => (
+                json!({"done": {"service": lamp_msgs::phonon::SERVICE, "uses": "lamp"}}),
+                Some(Done {
+                    restart_voice: true,
+                    restart_cloud: false,
+                    restart_phonon: true,
+                    said: "Phonon on the lamp was removed".to_owned(),
+                }),
+            ),
+            Err(error) => (
+                refused(
+                    &format!("the choice could not be removed: {}", error.kind()),
+                    "unavailable",
+                ),
+                None,
+            ),
+        },
         Asked::Remove(service) => match store.remove(service) {
             Ok(()) => (
                 json!({"done": {"service": service.id(), "uses": "lamp"}}),
                 Some(Done {
                     restart_voice: true,
                     restart_cloud: Service::MODELS.contains(&service),
+                    restart_phonon: false,
                     said: format!("the person's {} key was removed", service.said_name()),
                 }),
             ),
@@ -1577,8 +1796,10 @@ pub fn answer(
 
 /// Check `given`, keep it if it works, and the reply and the journal's line.
 fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Done>) {
-    let (verdict, changed) = check_and_keep(&given, store, check);
     let service = given.service;
+    // A voice kept in Phonon's place stops `lamp-phonon` too (#8754).
+    let had_phonon = service.is_voice() && store.phonon().is_some();
+    let (verdict, changed) = check_and_keep(&given, store, check);
     let said = format!(
         "the person's {} key: {}",
         service.said_name(),
@@ -1593,9 +1814,16 @@ fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Do
             Verdict::NoModel => "the endpoint lists no such model, not kept",
         }
     );
+    let restart_phonon = changed && had_phonon && store.phonon().is_none();
+    let said = if restart_phonon {
+        format!("{said}; Phonon on the lamp was turned off, one own voice at a time")
+    } else {
+        said
+    };
     let done = Some(Done {
         restart_voice: changed,
         restart_cloud: changed && Service::MODELS.contains(&service),
+        restart_phonon,
         said,
     });
     if matches!(verdict, Verdict::Works | Verdict::WorksNoTools) {

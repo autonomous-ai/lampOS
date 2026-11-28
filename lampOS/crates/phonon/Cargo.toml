@@ -1,0 +1,38 @@
+[package]
+name = "lamp-phonon"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# Phonon, the voice that runs on the lamp (#8754, docs/phonon.md): one
+# process that loads Gradium's Phonon 31m (English, Apache 2.0) and speaks a
+# sentence at a time for the voice over its socket, with no key and no cloud.
+# The model is not in the image: it is fetched once, when a person first
+# chooses the voice, and kept only when every file's size and SHA-256 match
+# the pins in `lamp_msgs::phonon`. Idle until it is chosen.
+[[bin]]
+name = "lamp-phonon"
+path = "src/main.rs"
+
+[dependencies]
+sha2.workspace = true
+lamp-msgs = { path = "../msgs" }
+# The HTTPS client (`lamp_update::fetch`): only https, bounded, behind a
+# trait the tests replace, as lamp-npu fetches its models.
+lamp-update = { path = "../update" }
+# Phonon's runtime: pure Rust (the `xn` tensor library, no C or C++, no
+# ONNX, no Python), MIT OR Apache-2.0. `hf` is its JSON tokenizer only;
+# without `hub` it never downloads anything itself.
+ptts = { version = "=0.7.1", default-features = false, features = ["hf"] }
+xn = "=0.2.15"
+
+# Pinning to the big cores (`sched_setaffinity`), with no unsafe code here.
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "=1.1.5", features = ["thread"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
