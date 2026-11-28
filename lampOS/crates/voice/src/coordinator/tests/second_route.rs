@@ -130,6 +130,10 @@ struct Script {
     /// The second route tells one voice make under way as its first line
     /// starts (`MakesUnderWay`, #7418), and never that it ended.
     second_makes: bool,
+    /// The capture stalls for half a second once this is so: no frame for
+    /// 500 ms, a gap that cuts what is in hand (#784, #7418), then frames
+    /// again on the grid, the stalled ones never read.
+    capture_stall: Option<When>,
     /// `second_looks`' look is the route's own `take_a_look`, no skill's
     /// search.
     own_look: bool,
@@ -306,6 +310,7 @@ impl Script {
             second_says: None,
             second_looks: false,
             second_makes: false,
+            capture_stall: None,
             own_look: false,
             look_answers: &[],
             note_answer: LookAnswer::Other,
@@ -589,6 +594,8 @@ struct Peers {
     murmur_at: Option<u64>,
     /// The capture frame the push began at (`Script::push`).
     pushed_at: Option<u64>,
+    /// Capture sends nothing until then (`Script::capture_stall`).
+    capture_stalled_until: Option<Instant>,
     /// Last body/hand publication on this run's scenario clock.
     last_hand_publish_us: Option<u64>,
     /// A look's answer held for `Script::answer_after_push`: its peer and
@@ -707,6 +714,19 @@ impl Peers {
             if due {
                 self.script.murmur = None;
                 self.murmur_at = Some(self.frames);
+            }
+        }
+        if let Some(when) = self.script.capture_stall {
+            let due = match when {
+                When::Settled(count) => self.settled >= count,
+                When::Ended(count) => self.ended.len() >= count,
+                When::Accepted(count) => self.accepted >= count,
+                When::LookTurns(count) => self.look_turns >= count,
+            };
+            if due {
+                self.script.capture_stall = None;
+                self.capture_stalled_until =
+                    Some(crate::scenario_clock::instant() + Duration::from_millis(500));
             }
         }
         if let Some(when) = self.script.push {
@@ -935,6 +955,14 @@ impl Peers {
     }
 
     fn tick_capture(&mut self, index: usize) {
+        // Stalled: nothing is read, and the frames due meanwhile never are.
+        if let Some(until) = self.capture_stalled_until {
+            if crate::scenario_clock::instant() < until {
+                return;
+            }
+            self.capture_stalled_until = None;
+            self.next_capture = until;
+        }
         while crate::scenario_clock::instant() >= self.next_capture {
             self.frames += 1;
             let frame = self.frames;
@@ -1916,6 +1944,7 @@ fn run(script: Script) -> Run {
         notes_refused: 0,
         murmur_at: None,
         pushed_at: None,
+        capture_stalled_until: None,
         last_hand_publish_us: None,
         held_answer: None,
         hand,
@@ -4047,6 +4076,33 @@ fn a_hand_stop_ends_a_makes_thinking_with_no_turn() {
     let ended = run.events("make_held_ended");
     assert_eq!(ended.len(), 1, "{}", run.summary());
     assert_eq!(ended[0]["why"], "stopped");
+}
+
+/// #7418, Twelve's P3 1 on #8432, through the loop: a capture gap while a
+/// make is thought on with no turn is the stall itself (`MakeHeld::cut`
+/// with a gap alone), so the thinking goes on through it, to the run's
+/// mute, which ends the conversation. Were a gap a stop (`cut(false)`), the
+/// gap would end the thinking, `make_held_ended` `"stopped"`.
+#[test]
+fn a_capture_gap_keeps_a_makes_thinking_with_no_turn() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        only: true,
+        second: false,
+        second_makes: true,
+        capture_stall: Some(When::Settled(1)),
+        turn_taking: TurnTaking::VadOnly,
+        mute_at_frame: Some(800),
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    assert_eq!(run.events("makes_under_way").len(), 1, "{}", run.summary());
+    assert_eq!(run.events("capture_gap").len(), 1, "{}", run.summary());
+    assert!(
+        run.events("make_held_ended").is_empty(),
+        "{}",
+        run.summary()
+    );
 }
 
 /// (m) #960, lamp-4ace 09:03-09:06: on the second route in a busy room the

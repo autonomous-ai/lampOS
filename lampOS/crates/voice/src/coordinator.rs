@@ -4635,6 +4635,9 @@ struct MakeHeld {
     count: u32,
     /// Stopped: no count re-arms it until the count is 0.
     stopped: bool,
+    /// It ran past its bound and ended, not yet in the trace
+    /// ([`Self::shows`]).
+    ran_out: bool,
 }
 
 impl MakeHeld {
@@ -4652,9 +4655,11 @@ impl MakeHeld {
         if !rose || self.stopped {
             return;
         }
+        // A rise's bound is from now, so it is never earlier than the one
+        // before: the worker tells every make the same `MAKE_WITHIN` and
+        // the loop's clock never runs back (Twelve's P3 2 on #8432).
         let most_ms = crate::make_skill_agent::MAKE_WITHIN.as_millis() as u64;
-        let bound = at_us.saturating_add(within_ms.min(most_ms).saturating_mul(1_000));
-        self.until_us = Some(self.until_us.map_or(bound, |until| until.max(bound)));
+        self.until_us = Some(at_us.saturating_add(within_ms.min(most_ms).saturating_mul(1_000)));
     }
 
     /// The turn was cut at this pass: by a gap alone (`gap_alone`) the make
@@ -4688,9 +4693,15 @@ impl MakeHeld {
     }
 
     /// Whether the lamp thinks for it at `at_us`: only with no turn
-    /// (`no_turn`). Past its bound it ends.
-    fn shows(&mut self, no_turn: bool, at_us: u64) -> bool {
-        no_turn && self.thinking(at_us)
+    /// (`no_turn`). Past its bound it ends, and the trace says so
+    /// (`make_held_ended`, `"bound"`: Twelve's P3 4 on #8432), so a row
+    /// sees the bound end it.
+    fn shows(&mut self, no_turn: bool, at_us: u64, trace: &mut SessionState) -> Result<bool> {
+        let held = no_turn && self.thinking(at_us);
+        if std::mem::take(&mut self.ran_out) {
+            make_held_ended(trace, "bound")?;
+        }
+        Ok(held)
     }
 
     /// Whether it holds at `at_us`. Past its bound it ends.
@@ -4699,9 +4710,7 @@ impl MakeHeld {
             Some(until) if at_us < until => true,
             Some(_) => {
                 self.until_us = None;
-                eprintln!(
-                    "lamp-voice: a make cut from its turn ran past its bound with no line: the lamp rests"
-                );
+                self.ran_out = true;
                 false
             }
             None => false,
@@ -13047,7 +13056,7 @@ fn conversation_with_gate_inner(
                 sound_turn: sound_turn.is_some()
                     && sound_turn == reply.as_ref().map(|current| current.owner.turn()),
                 attention_settled: attention.settled(),
-                make_thinking: make_held.shows(reply.is_none(), clock),
+                make_thinking: make_held.shows(reply.is_none(), clock, trace)?,
             };
             body.tell(body_phase(phase, cues), voice_level, clock);
             // After words of self-harm the body keeps still (#7689): no
@@ -21002,7 +21011,9 @@ mod tests {
             ring,
             BodyCues {
                 about_to_speak: about_to_speak(reply.as_ref()),
-                make_thinking: held.shows(reply.is_none(), at_us),
+                make_thinking: held
+                    .shows(reply.is_none(), at_us, &mut SessionState::default())
+                    .unwrap(),
                 ..BodyCues::default()
             },
         );
@@ -21285,6 +21296,17 @@ mod tests {
                     ));
                 }
                 Then::Bound => {
+                    // The bound ends it, and the trace says so (Twelve's
+                    // P3 4 on #8432), once.
+                    let mut trace = SessionState::default();
+                    assert!(!held.shows(true, 1_000_000 + within, &mut trace).unwrap());
+                    assert!(!held.shows(true, 1_000_000 + within, &mut trace).unwrap());
+                    let ended: Vec<_> = trace
+                        .iter()
+                        .filter(|event| event["kind"] == "make_held_ended")
+                        .map(|event| event["why"].clone())
+                        .collect();
+                    assert_eq!(ended, [json!("bound")]);
                     seen.push(shown(
                         &mut owner,
                         &reply,
@@ -21368,7 +21390,7 @@ mod tests {
         let mut held = MakeHeld::default();
         assert!(!held.microphone(false));
         held.told(1, 1_000, 10);
-        assert!(held.shows(true, 20));
+        assert!(held.shows(true, 20, &mut SessionState::default()).unwrap());
     }
 
     /// Heron's P3 on #8432: a count already queued behind a stop, drained
@@ -21380,20 +21402,39 @@ mod tests {
         // Stopped as the make's turn is cut, its count still on its way.
         assert!(!held.cut(false));
         held.told(1, 600_000, 1_000_000);
-        assert!(!held.shows(true, 2_000_000), "re-armed behind the stop");
+        assert!(
+            !held
+                .shows(true, 2_000_000, &mut SessionState::default())
+                .unwrap(),
+            "re-armed behind the stop"
+        );
         // Stopped while held: the same.
         let mut held = MakeHeld::default();
         held.told(1, 600_000, 1_000_000);
-        assert!(held.shows(true, 2_000_000));
+        assert!(
+            held.shows(true, 2_000_000, &mut SessionState::default())
+                .unwrap()
+        );
         assert!(held.cut(false));
         held.told(2, 600_000, 2_000_000);
-        assert!(!held.shows(true, 3_000_000));
+        assert!(
+            !held
+                .shows(true, 3_000_000, &mut SessionState::default())
+                .unwrap()
+        );
         // The worker's count gone to 0, a new make is thought on again.
         held.told(0, 600_000, 4_000_000);
         held.told(1, 600_000, 5_000_000);
-        assert!(held.shows(true, 6_000_000));
+        assert!(
+            held.shows(true, 6_000_000, &mut SessionState::default())
+                .unwrap()
+        );
         // Never with a turn in hand.
-        assert!(!held.shows(false, 6_000_000));
+        assert!(
+            !held
+                .shows(false, 6_000_000, &mut SessionState::default())
+                .unwrap()
+        );
     }
 
     /// Heron's P3 on #8432: the bound runs from the count that began it; a

@@ -9110,11 +9110,23 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             _ => (0.0, None),
         };
         // A long thinking's wander around its deep pose (#7418, rule 8), in
-        // degrees: none while kept still for someone (#7689). The reach and
-        // the speed bounds below hold it as they hold the rest.
-        let wander = gestures
-            .wander(now_us, asked_now.quiet)
+        // degrees: none while kept still for someone (#7689), nor while
+        // kept down (tired, a heat or tracking rest, unable to lift, seated,
+        // a rest that ends folded): a lamp resting from load or heat drives
+        // no joint for it and keeps none awake. The reach and the speed
+        // bounds below hold it as they hold the rest.
+        let wandering = gestures.wander(now_us, asked_now.quiet || kept_down);
+        let wander = wandering
+            .degrees
             .map(|degrees| degrees * lease::COUNTS_PER_DEGREE);
+        // A joint the wander moves far enough to start it is kept awake
+        // through the move (#7418, #8432's row on lamp-06c1, 25 Nov): left
+        // to rest, a slow move put it to rest at every step under
+        // `ARRIVED_SPEED` and woke it only 20 counts behind, so the head
+        // all but kept still and the base moved in starts.
+        let mut wander_awake = wandering
+            .moving
+            .map(|degrees| degrees * lease::COUNTS_PER_DEGREE >= WAKE_COUNTS);
         let offsets = if unplug_latched {
             [0.0; 3]
         } else {
@@ -9193,6 +9205,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // after the first was taken, the gesture layer wanted 683 counts of yaw, and the base's
             // goal stayed where the look had it; with this, run 6 played them (to 88.9 degrees).
             let glancing = glance_from.filter(|_| !(index == 2 && gesturing));
+            // A glance does not take the wander, nor the unplugged body.
+            wander_awake[index] &= glancing.is_none() && !unplug_latched;
             let wanted = match glancing {
                 // The base is not turned for a glance.
                 Some(_) if index == 2 => continue,
@@ -9208,6 +9222,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     commanded[index] += carried[index];
                     let unbounded = home_now[index] + kept[index] + offset;
                     let wanted = unbounded.clamp(low[index], high[index]);
+                    // At its bound the wander moves nothing: the joint
+                    // rests as before (a head roll of one count's reach).
+                    wander_awake[index] &= wanted == unbounded;
                     // The base's yaw and the head's pitch carry the holder's
                     // look: what the bounds cut is cut from the look.
                     if let Some(aimed) = aimed.as_mut() {
@@ -9222,7 +9239,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             };
             wanted_of[index] = wanted;
             if asleep[index] {
-                if (wanted - commanded[index]).abs() < WAKE_COUNTS && leaving.is_none() {
+                // Woken by the wander as soon as its move is a few counts
+                // on: a move it is kept awake through.
+                let wake = if wander_awake[index] {
+                    ARRIVED_COUNTS
+                } else {
+                    WAKE_COUNTS
+                };
+                if (wanted - commanded[index]).abs() < wake && leaving.is_none() {
                     continue;
                 }
                 asleep[index] = false;
@@ -9716,6 +9740,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         let mut arrived: [Option<f32>; 3] = [None; 3];
         for index in 0..3 {
             let there = !asleep[index]
+                && !wander_awake[index]
                 && !held[index]
                 && !relaxed
                 && gesture_cooling == 0

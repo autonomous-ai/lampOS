@@ -4063,7 +4063,10 @@ cả hai người viết.
   dáng suy nghĩ (`ring_wire::RingPhase::Waiting`) cho tới khi có âm thanh
   tiếp theo; sau đó câu trả lời phát hết dưới một lần phát mới và lượt kết
   thúc. Micro bị nghẽn cắt lượt giữa lúc chờ không còn làm thân đèn rũ về
-  dáng nghỉ (#7418): worker báo cho coordinator số lần tạo đang chạy
+  dáng nghỉ (#7418), và một lần tạo đã chờ tới lượt trong hàng đợi
+  (`run_queued_with`, câu của nó đi qua dịch vụ nói, không có lượt nào chờ
+  nó) cũng suy nghĩ như vậy trong lúc chạy: cả hai trường hợp người dùng
+  đều đang chờ. Worker báo cho coordinator số lần tạo đang chạy
   (`ProviderOutput::MakesUnderWay`, tính từ lúc công việc bắt đầu tới khi
   nó trả về, không tính lúc câu của nó chờ trong dịch vụ nói, không tính
   lần tạo được để chạy tiếp), và khi không có lượt nào thân đèn vẫn suy
@@ -4073,10 +4076,15 @@ cả hai người viết.
   micro không được phép và worker của đường thứ hai mất đi thì kết thúc nó
   (một lần cắt do nghẽn thì không), và sau một lần dừng không số nào bật
   lại nó cho tới khi số về 0; lượt nào cũng giành lại ngay, kể cả lượt của
-  người nói. Qua dáng sâu của nó, đầu đèn lững thững trôi chậm quanh dáng
-  đó ([body.md](../body.md), "A long thinking wanders"), nên một lần nghĩ
-  lâu không bao giờ trông như một cỗ máy bị kẹt. Test:
+  người nói. Mỗi lần kết thúc đều có trong trace là `make_held_ended` kèm
+  `why`, hết hạn thì là `"bound"`. Qua dáng sâu của nó, đầu đèn trôi chậm
+  quanh dáng đó theo góc ngẩng (pitch), góc nghiêng (roll) và góc xoay của
+  đế (yaw), không bao giờ đứng yên quá khoảng 6 giây ([body.md](../body.md),
+  "A long thinking wanders"), nên một lần nghĩ lâu không bao giờ trông như
+  một cỗ máy bị kẹt; đèn đang bị giữ nằm (nghỉ sau khi chịu tải hay quá
+  nóng, đang ngồi) thì không trôi. Test:
   `a_make_cut_by_a_gap_keeps_thinking_with_no_turn_until_its_line`,
+  `a_capture_gap_keeps_a_makes_thinking_with_no_turn`,
   `a_count_queued_behind_a_stop_never_re_arms_a_makes_thinking`,
   `a_makes_bound_moves_on_only_for_a_new_make`,
   `a_second_worker_that_exits_mid_make_rests_at_once`,
@@ -4084,7 +4092,10 @@ cả hai người viết.
   `a_cut_make_is_under_way_while_its_work_runs_not_while_its_line_is_said`,
   `a_make_let_run_on_is_no_longer_under_way` và
   `the_second_worker_tells_the_makes_under_way_only_on_the_one_path`, cùng
-  `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never`. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
+  `a_long_thinking_wanders_around_its_deep_pose_and_a_short_one_never`,
+  `a_long_thinking_moves_the_heads_pitch_and_roll_and_is_never_still_for_long`,
+  `a_long_thinkings_joints_are_kept_awake_through_its_wander` và
+  `a_kept_down_lamps_long_thinking_moves_nothing`. Tắt: câu chờ như hôm nay, và không có câu thứ hai. Test:
   `the_one_path_waiting_line_says_how_long`,
   `a_one_path_makes_waiting_line_says_how_long_and_a_long_one_says_one_more`,
   `a_one_path_makes_waiting_line_completes_its_generation_after_its_audio`

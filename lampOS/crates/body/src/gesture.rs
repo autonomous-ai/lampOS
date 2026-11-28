@@ -76,28 +76,98 @@ const LISTENING_ROLL: f32 = 0.85;
 /// not a lamp thinking. A person thinking a while drifts and settles. The
 /// wander is an offset in degrees ([`Gestures::wander`]), at most these
 /// either way: pitch, roll, and the base's yaw. Big enough to see across a
-/// room, small enough to stay thinking.
-pub const WANDER_DEGREES: [f32; 3] = [3.0, 2.0, 4.0];
-/// The wander begins once the deep pose is reached ([`GLANCE_US`] and
-/// [`DEEPEN_US`]) and grows in from nothing over this, eased, so the head
-/// never jumps from the deep pose. A short thinking never wanders.
-const WANDER_EASE_US: f32 = 3_000_000.0;
-/// Each axis is three slow sines, their periods in seconds between 7 and
-/// 19 and no two in a simple ratio, so the drift never visibly loops. Their
-/// weights add up to 1, so an axis never goes past its
-/// [`WANDER_DEGREES`].
-const WANDER_PERIODS_S: [[f32; 3]; 3] = [[7.3, 11.9, 17.1], [8.7, 13.3, 18.3], [9.1, 15.7, 19.0]];
-const WANDER_WEIGHTS: [f32; 3] = [0.5, 0.3, 0.2];
-/// Every this many seconds the drift slows to a stop and moves on again, a
-/// settle: its time runs at `1 - cos` of this period's phase, never
-/// backwards, at most twice as fast, so the head is never asked to move
-/// faster than about twice the sines alone (under 8 degrees a second on
-/// the base, inside the body's own speed bounds, which still apply).
-const WANDER_SETTLE_S: f32 = 12.7;
-/// Each exchange's thinking starts the sines at other phases (near a golden
-/// turn on per exchange), so no two long thinkings drift alike. From the
-/// exchange count, never chance: the same time and exchange, the same pose.
-const WANDER_PHASE_STEP: f32 = 2.4;
+/// room, small enough to stay thinking. Pitch and roll were 3 and 2 until
+/// #8432's row on lamp-06c1 (25 Nov) saw the head all but still: the
+/// first builder asked for a few degrees of both (17:35).
+pub const WANDER_DEGREES: [f32; 3] = [3.5, 2.5, 4.0];
+/// The wander is a chain of steps: an eased move to a new point around the
+/// deep pose, then a short hold there, each step this long in seconds at
+/// least and at most, the length drawn anew each time, so there is no
+/// beat to it.
+pub const WANDER_STEP_S: (f32, f32) = (2.0, 6.0);
+/// The share of a step held still at its point: half a second to a second
+/// and a half. With the eased ends of the moves on either side, the head is
+/// never still for long (under [`WANDER_STILL_MOST_S`]).
+const WANDER_HOLD_SHARE: f32 = 0.25;
+/// The longest the wander leaves the head still, seconds (the first
+/// builder's "no stillness past about 6 s", 25 Nov), held by the steps'
+/// lengths and holds above. Tests and the docs check against it.
+pub const WANDER_STILL_MOST_S: f32 = 6.0;
+/// The fastest a move is asked to go at its middle, degrees a second: a
+/// move that would go faster takes longer instead. Slow, so it drifts and
+/// never jerks, and inside the body's own speed bounds (`FOLDED`'s 50
+/// counts, 4.4 degrees, a second), which still apply.
+pub const WANDER_PEAK_DEGREES_S: f32 = 3.0;
+/// Each step one axis leads, drawn anew: it crosses to the other side of
+/// the deep pose, to at least this share of its degrees, so every step is a
+/// move the eye can see, and one the joint starts for. The others go
+/// anywhere inside theirs.
+const WANDER_LEAD_SHARE: f32 = 0.8;
+/// The least an axis moves in a step, degrees: one that would move less
+/// stays where it is. 2 degrees is 23 counts, over the body's
+/// `WAKE_COUNTS` (20), so every move is one the joint starts for and is
+/// kept awake through, never one it rests behind (#7418).
+pub const WANDER_LEAST_MOVE_DEGREES: f32 = 2.0;
+
+/// The wander at a time ([`Gestures::wander`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Wander {
+    /// The offset, degrees: pitch, roll and the base's yaw.
+    pub degrees: [f32; 3],
+    /// While a move is under way, its whole length on each axis, degrees,
+    /// unsigned; 0 in a hold and with no wander. The body keeps a joint
+    /// awake through a move it can see, rather than leaving it at rest
+    /// until it is 20 counts behind ([`crate::body`]'s `WAKE_COUNTS`).
+    pub moving: [f32; 3],
+}
+
+/// A number from 0 to under 1 from `seed`, the same for the same seed
+/// (splitmix64): the wander's draws are from the exchange count and the
+/// step, never chance.
+fn draw(seed: u64) -> f32 {
+    let mut z = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z >> 40) as f32 / (1u64 << 24) as f32
+}
+
+/// Step `index` of an exchange's wander, starting at `from`: where it goes,
+/// how long its move takes and how long it then holds, seconds.
+fn wander_step(exchanges: u32, index: u32, from: [f32; 3]) -> ([f32; 3], f32, f32) {
+    let seed = (u64::from(exchanges) << 32 | u64::from(index)) * 8;
+    let lead = ((draw(seed) * 3.0) as usize).min(2);
+    let to: [f32; 3] = std::array::from_fn(|axis| {
+        let most = WANDER_DEGREES[axis];
+        let share = draw(seed + 2 + axis as u64);
+        if axis == lead {
+            let side = if from[axis] > 0.0 {
+                -1.0
+            } else if from[axis] < 0.0 || draw(seed + 1) < 0.5 {
+                1.0
+            } else {
+                -1.0
+            };
+            side * most * (WANDER_LEAD_SHARE + (1.0 - WANDER_LEAD_SHARE) * share)
+        } else {
+            let to = most * (2.0 * share - 1.0);
+            if (to - from[axis]).abs() < WANDER_LEAST_MOVE_DEGREES {
+                from[axis]
+            } else {
+                to
+            }
+        }
+    });
+    let (short, long) = WANDER_STEP_S;
+    let length = short + (long - short) * draw(seed + 5);
+    let hold = length * WANDER_HOLD_SHARE;
+    let farthest = (0..3)
+        .map(|axis| (to[axis] - from[axis]).abs())
+        .fold(0.0, f32::max);
+    // A smootherstep's middle is 1.875 times its average pace.
+    let moving = (length - hold).max(1.875 * farthest / WANDER_PEAK_DEGREES_S);
+    (to, moving, hold)
+}
 
 #[derive(Clone, Debug)]
 pub struct Gestures {
@@ -211,33 +281,40 @@ impl Gestures {
     /// but in thinking past its deep pose, as [`Gestures::target`] last saw
     /// the mood, so a person's voice (listening) ends it at the next step.
     /// None while the lamp keeps still for someone (`still`, the voice's
-    /// care hold, #7689): that hold's still body wins.
-    pub fn wander(&self, now_us: u64, still: bool) -> [f32; 3] {
+    /// care hold, #7689): that hold's still body wins. Its first move
+    /// starts from the deep pose itself, eased, so the head never jumps.
+    pub fn wander(&self, now_us: u64, still: bool) -> Wander {
         if self.mood != Mood::Thinking || still {
-            return [0.0; 3];
+            return Wander::default();
         }
         let deep_us = GLANCE_US + DEEPEN_US;
         let past_us = now_us.saturating_sub(self.since_us) as f32 - deep_us;
         if past_us <= 0.0 {
-            return [0.0; 3];
+            return Wander::default();
         }
-        let share = (past_us / WANDER_EASE_US).min(1.0);
-        let grown = share * share * (3.0 - 2.0 * share);
-        // Time that slows to a stop once a settle period and goes on.
-        let seconds = past_us / 1_000_000.0;
-        let settle = std::f32::consts::TAU / WANDER_SETTLE_S;
-        let drift = seconds - (settle * seconds).sin() / settle;
-        let phase = self.exchanges as f32 * WANDER_PHASE_STEP;
-        std::array::from_fn(|axis| {
-            let sum: f32 = (0..3)
-                .map(|wave| {
-                    let at = std::f32::consts::TAU * drift / WANDER_PERIODS_S[axis][wave]
-                        + phase * (axis * 3 + wave + 1) as f32;
-                    WANDER_WEIGHTS[wave] * at.sin()
-                })
-                .sum();
-            WANDER_DEGREES[axis] * grown * sum
-        })
+        let past = past_us / 1_000_000.0;
+        let (mut from, mut start, mut index) = ([0.0f32; 3], 0.0f32, 0u32);
+        loop {
+            let (to, moving, hold) = wander_step(self.exchanges, index, from);
+            if past < start + moving + hold || index == u32::MAX {
+                let share = ((past - start) / moving).clamp(0.0, 1.0);
+                // Smootherstep: no jerk at either end of a move.
+                let eased = share * share * share * (share * (share * 6.0 - 15.0) + 10.0);
+                return Wander {
+                    degrees: std::array::from_fn(|axis| {
+                        from[axis] + (to[axis] - from[axis]) * eased
+                    }),
+                    moving: std::array::from_fn(|axis| {
+                        if share < 1.0 {
+                            (to[axis] - from[axis]).abs()
+                        } else {
+                            0.0
+                        }
+                    }),
+                };
+            }
+            (from, start, index) = (to, start + moving + hold, index + 1);
+        }
     }
 }
 
@@ -380,50 +457,119 @@ mod tests {
                 gestures.target(Mood::Thinking, 0, at),
                 today.target(Mood::Thinking, 0, at)
             );
-            assert_eq!(gestures.wander(at, false), [0.0; 3], "{at}");
+            assert_eq!(gestures.wander(at, false), Wander::default(), "{at}");
             at += 20_000;
         }
-        // It grows in from nothing: no jump at the deep pose.
+        // It starts from the deep pose: no jump.
         let first = gestures.wander(start + deep_us + 20_000, false);
         assert!(
-            first.iter().all(|degrees| degrees.abs() < 0.01),
+            first.degrees.iter().all(|degrees| degrees.abs() < 0.01),
             "{first:?}"
         );
-        // Over the next minute it moves at least a degree on some axis,
-        // never past its degrees, and never more than a step's worth of a
-        // slow drift between steps 20 ms apart.
-        let mut low = [f32::MAX; 3];
-        let mut high = [f32::MIN; 3];
+        // Over the next minute: never past its degrees, and never faster
+        // than its peak between steps 20 ms apart.
         let mut before = first;
         let mut at = start + deep_us + 20_000;
         while at <= start + deep_us + 60_000_000 {
             gestures.target(Mood::Thinking, 0, at);
             let wander = gestures.wander(at, false);
-            for (axis, &degrees) in wander.iter().enumerate() {
+            for (axis, &degrees) in wander.degrees.iter().enumerate() {
                 assert!(
                     degrees.abs() <= WANDER_DEGREES[axis] + 1e-4,
                     "{at} {wander:?}"
                 );
-                // At most about 8 degrees a second: 0.16 in 20 ms.
-                assert!((degrees - before[axis]).abs() <= 0.2, "{at} {wander:?}");
-                low[axis] = low[axis].min(degrees);
-                high[axis] = high[axis].max(degrees);
+                assert!(
+                    (degrees - before.degrees[axis]).abs() <= WANDER_PEAK_DEGREES_S * 0.02 + 1e-3,
+                    "{at} {before:?} {wander:?}"
+                );
             }
             before = wander;
             at += 20_000;
         }
-        assert!(
-            (0..3).any(|axis| high[axis] - low[axis] >= 1.0),
-            "{low:?} {high:?}"
-        );
         // Kept still for someone (the care hold): no wander.
-        assert_eq!(gestures.wander(at, true), [0.0; 3]);
+        assert_eq!(gestures.wander(at, true), Wander::default());
         // The same time, the same wander: from time alone, no chance.
         assert_eq!(gestures.wander(at, false), gestures.wander(at, false));
-        assert_ne!(gestures.wander(at, false), [0.0; 3]);
+        assert_ne!(gestures.wander(at, false), Wander::default());
         // A person's voice: listening, and the wander is over at once.
         gestures.target(Mood::Listening, 0, at + 20_000);
-        assert_eq!(gestures.wander(at + 20_000, false), [0.0; 3]);
+        assert_eq!(gestures.wander(at + 20_000, false), Wander::default());
+    }
+
+    /// #7418, #8432's row on lamp-06c1 (25 Nov): over 115 s of thinking
+    /// the head's pitch moved 1.14 degrees, its roll none, and the lamp was
+    /// still for 13.1 s once. Over ten long thinkings of two minutes each,
+    /// pitch and roll each go most of their degrees either way, every axis
+    /// moves on in steps of no fixed length, and the wander is never still
+    /// longer than `WANDER_STILL_MOST_S`.
+    #[test]
+    fn a_long_thinking_moves_the_heads_pitch_and_roll_and_is_never_still_for_long() {
+        let deep_us = (GLANCE_US + DEEPEN_US) as u64;
+        let mut lengths = Vec::new();
+        for exchange in 0..10u64 {
+            let mut gestures = Gestures::new().glancing(0.15);
+            let start = 1_000_000 + exchange * 1_000_000_000;
+            // Each listening is a new exchange.
+            gestures.target(Mood::Listening, 0, start - 20_000);
+            let mut low = [f32::MAX; 3];
+            let mut high = [f32::MIN; 3];
+            // Still: no axis a tenth of a degree from where it last was.
+            let mut still_from = start + deep_us;
+            let mut still_at = [0.0f32; 3];
+            let mut longest_still = 0u64;
+            let mut moving_from = None;
+            let mut at = start + deep_us;
+            while at <= start + deep_us + 120_000_000 {
+                gestures.target(Mood::Thinking, 0, at);
+                let wander = gestures.wander(at, false);
+                for axis in 0..3 {
+                    low[axis] = low[axis].min(wander.degrees[axis]);
+                    high[axis] = high[axis].max(wander.degrees[axis]);
+                }
+                if (0..3).any(|axis| (wander.degrees[axis] - still_at[axis]).abs() >= 0.1) {
+                    still_at = wander.degrees;
+                    still_from = at;
+                }
+                longest_still = longest_still.max(at - still_from);
+                // Every axis that moves goes far enough for its joint to
+                // start: none rests behind a small move.
+                for degrees in wander.moving {
+                    assert!(
+                        degrees == 0.0 || degrees >= WANDER_LEAST_MOVE_DEGREES - 1e-4,
+                        "exchange {exchange}: {wander:?}"
+                    );
+                }
+                // The length of each move, to see that they differ.
+                let moving = wander.moving.iter().any(|degrees| *degrees > 0.0);
+                match (moving, moving_from) {
+                    (true, None) => moving_from = Some(at),
+                    (false, Some(from)) => {
+                        lengths.push(at - from);
+                        moving_from = None;
+                    }
+                    _ => {}
+                }
+                at += 20_000;
+            }
+            assert!(
+                longest_still as f32 <= WANDER_STILL_MOST_S * 1e6,
+                "exchange {exchange}: still {longest_still} us"
+            );
+            for axis in 0..3 {
+                assert!(
+                    high[axis] >= 0.6 * WANDER_DEGREES[axis]
+                        && low[axis] <= -0.6 * WANDER_DEGREES[axis],
+                    "exchange {exchange}, axis {axis}: {low:?} {high:?}"
+                );
+            }
+        }
+        // No fixed rhythm: the moves' lengths spread over seconds.
+        let shortest = *lengths.iter().min().unwrap();
+        let longest = *lengths.iter().max().unwrap();
+        assert!(longest - shortest >= 2_000_000, "{shortest} {longest}");
+        lengths.sort_unstable();
+        lengths.dedup_by(|a, b| a.abs_diff(*b) < 100_000);
+        assert!(lengths.len() >= 10, "{lengths:?}");
     }
 
     #[test]
