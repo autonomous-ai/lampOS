@@ -116,6 +116,8 @@ OpenCV solvePnP using each declared landmark source. Pin generic 3D face
 points, camera assumptions, PnP variant and signs before tests; no fitting
 on Pointing'04. Time the full landmark-to-result path and the detector/mesh
 it needs, not only the tiny solvePnP kernel.
+YuNet's five marks remain a separately named five-point control; do not
+invent a chin to call it the six-landmark mesh baseline.
 
 Keep Pointing'04's **2,790 images** as a separate exposed public diagnostic,
 with all per-subject counts, unknowns and the prior frozen reference/crop
@@ -220,6 +222,12 @@ all required faces in the decision. Report the first usable output including
 context filling, cold model load, queue wait, every processing stage and
 actual publication. Keep frame capture-to-publication <=350 ms and source
 age <=500 ms where those live timestamps exist; a replay has null readiness.
+Frozen T50 conversion/parity work can proceed for the released Light-ASD
+model. Its symmetric temporal layers and reverse GRU do not establish an
+incremental stateful implementation. Record target-frame alignment and any
+lookahead separately; time a complete-window replay as such. An incremental
+model change needs its own source/weights and accuracy result on the same
+sealed test, without tuning against that result.
 
 Retain one cold run, 10 explicitly excluded but saved warmup frames,
 at least 300 measured fresh frames and a five-minute sustained run with
