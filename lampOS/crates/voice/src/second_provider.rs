@@ -8809,11 +8809,17 @@ impl Engine {
                     self.let_go_cut(&format!("request {request} is the first line after a stop"));
                     // `LAMP_SIMPLE_CALL`: the lamp's words ended at the stop,
                     // by now at the latest; what it says next counts from here.
-                    self.shared.words_end_at_stop();
+                    self.shared.words_end_at_the_cut();
                     // The rule hears of it before this line is judged.
                     if let Some(did) = &self.shared.did {
                         did(Did::Stopped);
                     }
+                }
+                // `LAMP_SIMPLE_CALL`: a line begun over the lamp's voice cut
+                // it, as the coordinator cut the answer to take the line: its
+                // words end here too, as at a stop.
+                if over_the_lamps_voice {
+                    self.shared.words_end_at_the_cut();
                 }
                 // The lamp's name said alone just before, its answer waiting
                 // for this line (`LAMP_SECOND_NAME_CARRIES`): begin dropped
@@ -10639,15 +10645,16 @@ impl Shared {
         }
     }
 
-    /// With `LAMP_SIMPLE_CALL`, a stop: the lamp's words end here, by now at
-    /// the latest, so the route's own end of them (`said_until_us`, from
-    /// which [`Self::said_through`] counts the next words) is brought back
-    /// to now, never moved on. What was sent ahead and never played counts
-    /// for nothing, and what the lamp says next, a spoken stop's own line
-    /// first, counts from the stop, never from after the cut answer's
-    /// unplayed rest (the Reviewer-lead's P2 on #8892). Without the switch,
-    /// as before.
-    fn words_end_at_stop(&self) {
+    /// With `LAMP_SIMPLE_CALL`, a cut: a stop, or a line begun over the
+    /// lamp's voice (the coordinator cuts the answer to take it). The lamp's
+    /// words end here, by now at the latest, so the route's own end of them
+    /// (`said_until_us`, from which [`Self::said_through`] counts the next
+    /// words) is brought back to now, never moved on. What was sent ahead
+    /// and never played counts for nothing, and what the lamp says next, a
+    /// spoken stop's own line first, counts from the cut, never from after
+    /// the cut answer's unplayed rest (the Reviewer-lead's P2 on #8892).
+    /// Without the switch, as before.
+    fn words_end_at_the_cut(&self) {
         if self.simple_call {
             self.said_until_us
                 .fetch_min(monotonic_us(), Ordering::Relaxed);
@@ -10656,7 +10663,7 @@ impl Shared {
 
     /// With `LAMP_SIMPLE_CALL`, a stop said aloud ("never mind", "stop",
     /// "enough", [`crate::spoken_stop`]), at the stop, before its own line:
-    /// the lamp's words end here ([`Self::words_end_at_stop`]), and the rule
+    /// the lamp's words end here ([`Self::words_end_at_the_cut`]), and the rule
     /// is told the lamp stopped ([`Did::Stopped`]), as it is told of a hand's
     /// Stop when the next line begins. Without the switch, as before: the
     /// rule hears of no stop said aloud.
@@ -10664,7 +10671,7 @@ impl Shared {
         if !self.simple_call {
             return;
         }
-        self.words_end_at_stop();
+        self.words_end_at_the_cut();
         if let Some(did) = &self.did {
             did(Did::Stopped);
         }
