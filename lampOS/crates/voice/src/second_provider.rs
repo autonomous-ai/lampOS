@@ -2078,7 +2078,10 @@ pub enum Did {
     /// audio plays as it is sent, each packet after the one before: a
     /// conversation goes on from the end of what it said, not from when its
     /// answer began (#1712, the first builder at 19:21). The first field is
-    /// the request its words answer (`LAMP_GOING_ON_NOT_OWN`).
+    /// the request its words answer (`LAMP_GOING_ON_NOT_OWN`). With
+    /// `LAMP_SIMPLE_CALL` a fixed line's words are told too (a stop's "Okay,
+    /// I'll stop there.", `Shared::fixed_words_sent`): every time the lamp
+    /// speaks, the window opens.
     Said(u64, u64),
     /// The model declined this request (`not_for_me`, called or written as
     /// words) and no tool ran for it: with `LAMP_DECLINE_SILENT`, it is no
@@ -2087,7 +2090,9 @@ pub enum Did {
     Declined(u64),
     /// A line began right after a stop (its Start's `after_stop`): what the
     /// lamp was saying was stopped, and a conversation carried for the one
-    /// it answered is over (`LAMP_SAME_SPEAKER_CARRIES`).
+    /// it answered is over (`LAMP_SAME_SPEAKER_CARRIES`). With
+    /// `LAMP_SIMPLE_CALL` the window stays: the lamp's words end where the
+    /// stop cut them, by the time it is told, and only the call's carry ends.
     Stopped,
 }
 /// Where the engine says what the lamp did.
@@ -4755,6 +4760,7 @@ async fn play_words(
                 return None;
             }
             shared.said_samples(request, part.len());
+            shared.fixed_words_sent(request, part.len());
             played += part.len();
         }
     } else {
@@ -4775,6 +4781,7 @@ async fn play_words(
                         return None;
                     }
                     shared.said_samples(request, part.len());
+                    shared.fixed_words_sent(request, part.len());
                     played += part.len();
                 }
                 clip.extend(packet);
@@ -10605,6 +10612,25 @@ impl Shared {
             && let Some(piece) = said.1.last_mut()
         {
             piece.samples += samples as u64;
+        }
+    }
+
+    /// With `LAMP_SIMPLE_CALL` ([`Engine::taking_simple_calls`]), `samples`
+    /// more of a fixed line's words sent for `request` ([`play_words`]: a
+    /// stop's "Okay, I'll stop there.", the care line): told to the rule as
+    /// an answer's are ([`Did::Said`], when they will have been played), and
+    /// kept as the end of the lamp's words here, for every time the lamp
+    /// speaks the window opens (the product owner, 27 Nov 2026: "any
+    /// conversation has a 20s window so reminder, proactive, chatting,
+    /// etc."). Without the switch a fixed line tells the rule nothing, as
+    /// before: a stop's line keeps no conversation going.
+    fn fixed_words_sent(&self, request: u64, samples: usize) {
+        if !self.simple_call {
+            return;
+        }
+        let until = self.said_through(samples, monotonic_us());
+        if let Some(did) = &self.did {
+            did(Did::Said(request, until));
         }
     }
 
