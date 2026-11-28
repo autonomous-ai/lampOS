@@ -8803,8 +8803,9 @@ pub(crate) struct Heeding {
     called_at: Option<Instant>,
     /// When the lamp's words sent will have been played
     /// ([`crate::second_provider::Did::Said`]), on the monotonic clock. With
-    /// `LAMP_SIMPLE_CALL` a stop ends them where it cut them, never later
-    /// than when it is told ([`crate::second_provider::Did::Stopped`]).
+    /// `LAMP_SIMPLE_CALL` a stop, or a line begun over them, ends them where
+    /// it cut them, never later than when it is told
+    /// ([`crate::second_provider::Did::Stopped`], [`Self::hear`]).
     said_until_us: Option<u64>,
     /// The request judged last, and what the Policy's gate is told of it
     /// ([`Self::policy_turn`]).
@@ -11740,6 +11741,13 @@ impl Heeding {
                     crate::untied_going_on::in_grace(monotonic_us(), until_us)
                 }))
             .then_some(request);
+            // `LAMP_SIMPLE_CALL`: a line begun over the lamp's voice cut it
+            // (the coordinator cuts the answer to take the line), so its
+            // words end here, as at a stop: what was sent ahead and never
+            // played counts for nothing.
+            if self.simple_call && over_the_lamps_voice {
+                self.words_cut_now();
+            }
             self.tell_a_waiting_write(request, over_the_lamps_voice);
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
@@ -12388,12 +12396,11 @@ impl Heeding {
                 // begins): what was sent ahead and never played counts for
                 // nothing, and anything the lamp says after moves the end on,
                 // as any words do, counted from the stop (the route brings its
-                // own end back too, `Shared::words_end_at_stop`). Only the
+                // own end back too, `Shared::words_end_at_the_cut`). Only the
                 // call's carry ends: it covers a line said right after "Hey
                 // Lamp", before the lamp spoke.
                 if self.simple_call {
-                    let now_us = monotonic_us();
-                    self.said_until_us = self.said_until_us.map(|until_us| until_us.min(now_us));
+                    self.words_cut_now();
                     self.called_at = None;
                 }
                 self.carrying = false;
@@ -12404,6 +12411,14 @@ impl Heeding {
                 }
             }
         }
+    }
+
+    /// With `LAMP_SIMPLE_CALL`, the lamp's words cut now, by a stop or by a
+    /// line begun over them: they end here, by now at the latest
+    /// ([`Self::said_until_us`]), never moved on.
+    fn words_cut_now(&mut self) {
+        let now_us = monotonic_us();
+        self.said_until_us = self.said_until_us.map(|until_us| until_us.min(now_us));
     }
 
     /// The call let out `by` longer ago, as time passes in a test. On a
