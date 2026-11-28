@@ -120,16 +120,21 @@ skills' state `/var/lib/lampos-skills-state` (daily routine claims included),
 the pushed skills and the owner's yes to them `/var/lib/lampOS/skills-dev`, the
 lasting light and volume limits `/var/lib/lampos-output-caps`, schedule `/var/lib/lampos-schedule/store`, voice sessions
 `/var/lib/lampOS/voice/sessions`, reminder delivery
-`/var/lib/lampOS/voice/schedule-delivery`, each reminder's offline clip, its
-words as sound `/var/lib/lampOS/voice/ring-clips` (`LAMP_OFFLINE_RINGS`,
-#8708), the conversation thread
+`/var/lib/lampOS/voice/schedule-delivery`, with each reminder's offline clip,
+its words as sound, inside it at `schedule-delivery/ring-clips`
+(`LAMP_OFFLINE_RINGS`, #8708; no plan path of its own, #7771), the
+conversation thread
 `/run/lampos-voice/thread.json`, the voice's first-output log
 `/var/lib/lampOS/voice/first-output`, what the voice has told of tasks
 `/var/lib/lampOS/voice/tasks-told` (its default, `LAMP_TASKS_TOLD`), the
 near rule's bar measured at setup `/var/lib/lampOS/voice/near-call.json`
 (#753), the
 skills made by voice and kept unconfirmed `/var/lib/lampOS/voice/made-skills`
-(`LAMP_MAKE_SKILL`, #2011), the
+(`LAMP_MAKE_SKILL`, #2011), the "that was weird" session copies
+`/var/lib/lampOS/voice/marked` (`LAMP_MARK_WEIRD`, #7771), the ids of the
+turns sent to the account `/var/lib/lampOS/voice/history-marks.json` (#7771;
+not `history-forget.json` beside it, #8125's record of the account's delete
+still owed, which holds no words and is how the voice notices a reset), the
 person's light kept across a restart `/var/lib/lampOS/light` (emptied)
 (`LAMP_LIGHT_KEEP`), and the privacy light's look kept there too
 (`privacy.json`, #8696: none there is red), the journal the image keeps on the eMMC
@@ -148,7 +153,15 @@ emptied; lamp-tasks writes the lamp's `AGENTS.md` again at its start), and
 Hermes's and OpenClaw's own per-person files, in a step of their own before
 the plan's paths (`reset::forget_agents`, #6343, below; before them since
 #7868, so OpenClaw's check of its cut runs while lamp-cloud's forwarder
-token, which OpenClaw's wrapper needs, is still there), the user's key
+token, which OpenClaw's wrapper needs, is still there), right after them
+every other engine's home under `/var/lib/lampos-agents` (Claude Code's,
+Codex's and any engine's transcripts, history, memory files and sign-ins:
+each home emptied and kept with its owner and mode, anything else there
+removed; `reset::forget_engine_homes`, #7771, below), then the text logs
+and the eMMC log copy (`syslog`, `user.log`, `kern.log` and `auth.log` in
+the `/var/log` RAM disk and then in `/var/log.hdd`, the copy orangepi-ramlog syncs it into,
+truncated in place, their rotated copies removed, and each folder of
+`/var/log.hdd/journal` emptied; `reset::forget_logs`, #7771, below), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
 16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
 name (`/etc/lampOS/person/name`), the owner's place from the app
@@ -195,6 +208,8 @@ lamp-setup check --plan PLAN.json
 lamp-setup resume-reset --plan PLAN.json --enable      # at start, before the lamp
 lamp-setup watch-reset --plan PLAN.json --bus-root /run/lampos-bus --enable
 lamp-setup forget-agents --dry-run [--root DIR]         # what a reset does to the agents' folders
+lamp-setup forget-engine-homes --dry-run [--root DIR]   # what a reset does to the other engines' homes
+lamp-setup forget-logs --dry-run [--root DIR]           # what a reset does to the text logs and the eMMC copy
 ```
 
 Controls already turns the reset button (chip 0 line 100) held 5 s or more and
@@ -372,7 +387,42 @@ lamp-setup reset-now`). That unit, in this order:
    PATH`, `empty PATH`, or `cut PATH (keys: kept …; dropped …)` for a kept
    settings file, key names only, never values. It is the reset's own walk
    (`reset::plan_agents`), only not acted on, so the list cannot drift from
-   the reset;
+   the reset. Right after it (#7771), every other engine's home in
+   `/var/lib/lampos-agents` (`reset::forget_engine_homes`): each home, the
+   engine's whole `HOME` (Claude Code's, Codex's, OpenCode's: transcripts,
+   history, memory files, sign-ins), is emptied and kept with its owner and
+   mode, as the namespace and the next round expect it; anything else
+   there, a link among them, is removed, never followed; the folder itself
+   stays. Then the logs (`reset::forget_logs`, the first builder's four
+   conditions on #7771): orangepi-ramlog keeps `/var/log` in a RAM disk and
+   its copy on the eMMC in `/var/log.hdd`, and writes each into the other
+   (install.md), so in both, the RAM disk first so that a sync between
+   the two brings no old line back, `syslog`, `user.log`, `kern.log` and `auth.log`
+   are truncated in place, never removed, so rsyslog, which holds them open,
+   goes on writing to them, and their rotated copies (`syslog.1`,
+   `syslog.2.gz`, …) are removed; each folder of `/var/log.hdd/journal` (the
+   archived journals, one folder a machine id) is emptied and kept. Files
+   only: neither journald nor rsyslog is restarted (a journald restart
+   broke every service's log pipe on a lamp on 15 Oct), and the live
+   journal is left to the start in place's `journalctl --rotate` and
+   `--vacuum-time=1s`. `lamp-setup forget-engine-homes --dry-run [--root
+   DIR]` and `lamp-setup forget-logs --dry-run [--root DIR]` list what each
+   step would do, one line an entry (`empty PATH`, `remove PATH`, and for a
+   log `truncate PATH`), paths only, never what a home or a log holds, and
+   change nothing; without `--dry-run` each is refused. A failure is
+   handled as each step's data asks (#8671). The engines' homes hold the
+   person's memory, so, as with `forget_agents`, an error there (`EROFS`,
+   or `EPERM` on a stray entry) ends the reset at that point, before the
+   plan's wipes: it is returned, the lamp reboots into setup with the
+   journal kept, and `resume-reset` runs the steps again from the start.
+   The logs step is best effort: a log, or a log folder, that can't be
+   read, truncated or removed (`EACCES`, `EPERM`, `EROFS`) is said with its
+   path and error (`reset: a log could not be emptied: PATH: ERROR`),
+   counted and passed over, and the reset goes on, so a stray log never
+   leaves the person's data half wiped. In the tests that run the reset
+   through the program, `LAMP_SETUP_RESET_ROOT` (`reset::ROOT_ENV`) is
+   where these two steps find `/`, so no test reaches the host's own
+   `/var/log` or `/var/lib/lampos-agents`; it is never set on a lamp;
 5. it removes the journal, syncs, and **starts setup again in place, with no
    reboot** (#4500), on a product lamp: one whose stop is `systemctl stop
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl
@@ -453,6 +503,11 @@ only logs a valid reset and `resume-reset` only says whether one is unfinished.
 `crates/setup/fixtures/reset-plan-example.json` is the plan for lamp-4ace's
 paths; the name and Wi-Fi entries are where setup writes them, and the voice's
 key is not in it.
+
+The product plan is at its bound: 64 paths, the most `check` takes and the
+most an older lamp-setup takes (#7771). The next person store needs a slot
+freed (kept inside a folder the plan already wipes, as the ring clips are in
+`schedule-delivery`) or a decision on the plan's format.
 
 While the reset button is held, the voice's ring worker shows the hold
 counting (#5929, ring-choreography.md, "The reset's red"): nothing under 2 s,

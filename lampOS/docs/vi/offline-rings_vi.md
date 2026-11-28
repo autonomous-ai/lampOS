@@ -24,7 +24,8 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
   (`TtsCache::render_once`), trên một luồng riêng, không bao giờ trong nhịp
   200 ms. Gói tin gửi cho giọng nói vẫn chỉ có id và thời gian, không bao giờ
   có lời. Đoạn âm thanh lưu ở
-  `/var/lib/lampOS/voice/ring-clips/<store_id>-<id>.wav` (0700), kèm một tệp
+  `/var/lib/lampOS/voice/schedule-delivery/ring-clips/<store_id>-<id>.wav`
+  (0700, trong thư mục giao nhắc của consumer), kèm một tệp
   `.json` giữ mã băm SHA-256 của lời và `voice|model|language`; một trong hai
   đổi thì được tạo lại. Khi mất mạng, giọng nói đọc đoạn âm thanh theo id và
   kiểm tra nó với lời của mục đến hạn: đúng thì phát; nhiều lời nhắc trễ gộp
@@ -54,8 +55,23 @@ vốn là một lượt của mô hình, và cổng của nó cần một phiên
   xấu nhất thật (ở 16 kHz sẽ khoảng 82 MB). Quá mức này thì không tạo thêm,
   và nhật ký ghi một dòng.
 - **Khôi phục cài đặt gốc xoá chúng (điểm thêm 1):** các đoạn âm thanh là lời
-  nhắc của người dùng dưới dạng âm thanh, nên
-  `/var/lib/lampOS/voice/ring-clips` nằm trong kế hoạch reset của sản phẩm.
+  nhắc của người dùng dưới dạng âm thanh, nên chúng nằm trong
+  `/var/lib/lampOS/voice/schedule-delivery`, thư mục mà kế hoạch reset của sản
+  phẩm xoá; chúng không chiếm đường dẫn riêng trong kế hoạch, vì kế hoạch đã
+  đủ 64 đường dẫn (#7771).
+- **Thư mục cũ bị xoá khi giọng nói khởi động (các điểm của Reviewer-lead trên
+  #8671):** đèn chạy bản dựng giữa #8906 và #8671 giữ đoạn âm thanh ở
+  `/var/lib/lampOS/voice/ring-clips` (`ring_clips::OLD_DIR`), không đường dẫn
+  nào của kế hoạch reset bao gồm. Mỗi lần giọng nói phục vụ khởi động, nó xoá
+  các tệp thường và symlink trong đó (symlink bị xoá như một liên kết, không
+  bao giờ đi theo), rồi xoá thư mục bằng `remove_dir` thường, và nhật ký ghi
+  một dòng `lamp-voice: the old offline ring clips folder was removed (N files)`.
+  Mục khác (một thư mục) được giữ lại cùng thư mục cũ, và nhật ký ghi
+  `... was left: not empty (N files removed)`. Không có thư mục cũ thì không
+  làm gì và không ghi gì; bước này không bao giờ động đến thư mục mới. Một
+  lần khôi phục cài đặt gốc chạy trước lần khởi động đầu của giọng nói mới để
+  lại thư mục cũ; lần khởi động tiếp theo của giọng nói xoá nó. Mã này PARKED (#8906,
+  #8671): bỏ khi không đèn nào còn có thể chạy bản dựng giữa hai PR đó.
 - **Tắt công tắc thì mọi đoạn âm thanh bị xoá (#8894, P3 2 của Reviewer-lead
   trên #8800):** khi công tắc tắt, mọi đoạn âm thanh bị xoá lúc giọng nói
   hoặc tiến trình con Schedule của nó khởi động. Tiến trình con xoá mọi tệp

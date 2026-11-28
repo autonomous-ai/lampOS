@@ -125,6 +125,12 @@ impl Effects for Removal<'_> {
     fn forget_agents(&mut self) -> io::Result<usize> {
         Ok(0)
     }
+    fn forget_engine_homes(&mut self) -> io::Result<usize> {
+        Ok(0)
+    }
+    fn forget_logs(&mut self) -> io::Result<usize> {
+        Ok(0)
+    }
 }
 
 fn interrupt_each_removal(name: &str, nested: bool, marked: bool) {

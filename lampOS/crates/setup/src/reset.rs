@@ -24,10 +24,31 @@ use std::{
     process::Command,
 };
 
+mod engine_homes;
+mod logs;
 pub(crate) mod query;
 #[cfg(test)]
 mod skill_reset_tests;
 mod skill_staging;
+
+pub use engine_homes::{ENGINE_HOMES, forget_engine_homes, plan_engine_homes};
+pub use logs::{
+    COPY_JOURNAL, LOG_FOLDERS, LogStep, LogsForgotten, TEXT_LOGS, forget_logs, forget_logs_saying,
+    plan_logs,
+};
+
+/// Where [`System`]'s engines' homes and logs steps find `/`, for the
+/// tests that run the reset through the program (#8671's ARM64 run: with
+/// none, a test's reset emptied the CI host's own `/var/log`). Never set on
+/// a lamp: unset or empty, it is `/`.
+pub const ROOT_ENV: &str = "LAMP_SETUP_RESET_ROOT";
+
+/// [`ROOT_ENV`]'s folder, `/` when it is unset or empty.
+pub fn system_root() -> PathBuf {
+    std::env::var_os(ROOT_ENV)
+        .filter(|root| !root.is_empty())
+        .map_or_else(|| PathBuf::from("/"), PathBuf::from)
+}
 
 /// The product plan's journal, read by Wi-Fi's restore of an old network
 /// ([`wifi_restore_allowed`]).
@@ -318,6 +339,13 @@ pub trait Effects {
     /// Hermes's and OpenClaw's per-person files removed and both programs
     /// kept, [`forget_agents`] in [`AGENT_FOLDERS`] (#6343); how many.
     fn forget_agents(&mut self) -> io::Result<usize>;
+    /// Every other engine's home emptied, [`forget_engine_homes`] in
+    /// [`ENGINE_HOMES`] (#7771); how many.
+    fn forget_engine_homes(&mut self) -> io::Result<usize>;
+    /// The text logs and the eMMC log copy emptied, files only,
+    /// [`forget_logs`] (#7771); how many. Best effort: an error here is
+    /// said and the reset goes on.
+    fn forget_logs(&mut self) -> io::Result<usize>;
     /// [`AGENT_USER`]'s own systemd manager, `user@<uid>.service`, its uid
     /// read from [`PASSWD`] at the reset ([`agent_manager_unit`]); none when
     /// there is no such user or the file can't be read (#6343).
@@ -1397,6 +1425,12 @@ impl Effects for System {
     fn forget_agents(&mut self) -> io::Result<usize> {
         forget_agents(Path::new("/"))
     }
+    fn forget_engine_homes(&mut self) -> io::Result<usize> {
+        forget_engine_homes(&system_root())
+    }
+    fn forget_logs(&mut self) -> io::Result<usize> {
+        forget_logs(&system_root())
+    }
 }
 
 /// `argv` run and killed with its children once `most` has passed
@@ -1429,6 +1463,12 @@ pub enum Step {
     /// Hermes's and OpenClaw's per-person files removed, [`forget_agents`]
     /// (#6343): by count, never by name.
     AgentsForgotten,
+    /// Every other engine's home emptied, [`forget_engine_homes`] (#7771):
+    /// by count, never by name.
+    EngineHomesEmptied,
+    /// The text logs and the eMMC log copy emptied, [`forget_logs`]
+    /// (#7771): by count.
+    LogsForgotten,
     /// Setup and what a boot starts, started in place of a reboot (#4500).
     Started,
     Rebooting,
@@ -2134,6 +2174,25 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
             "lamp-setup: reset: removed {forgotten} of Hermes's and OpenClaw's per-person files"
         );
         steps.push(Step::AgentsForgotten);
+    }
+    // Right after (#7771): Claude Code's, Codex's and any other engine's
+    // home, which the step above does not reach.
+    let homes = effects.forget_engine_homes()?;
+    if homes > 0 {
+        eprintln!("lamp-setup: reset: emptied {homes} entries of the engines' homes");
+        steps.push(Step::EngineHomesEmptied);
+    }
+    // The text logs and the eMMC log copy (#7771), files only: no log
+    // service is restarted. Best effort (#8671): a log that can't be
+    // emptied never stops the wipe of the person's data below; the
+    // engines' homes above hold the person's memory, so they fail the reset.
+    let logs = effects.forget_logs().unwrap_or_else(|error| {
+        eprintln!("lamp-setup: reset: the logs could not be emptied: {error}");
+        0
+    });
+    if logs > 0 {
+        eprintln!("lamp-setup: reset: emptied {logs} log entries");
+        steps.push(Step::LogsForgotten);
     }
     for path in &plan.wipe {
         if path.file_name() == Some(WIFI_FILE.as_ref()) {

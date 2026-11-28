@@ -21,7 +21,6 @@
     "/var/lib/lampos-cloud",
     "/var/lib/lampOS/voice/sessions",
     "/var/lib/lampOS/voice/schedule-delivery",
-    "/var/lib/lampOS/voice/ring-clips",
     "/var/lib/lampOS/voice/first-output",
     "/var/lib/lampOS/voice/tasks-told",
     "/var/lib/lampOS/voice/near-call.json",

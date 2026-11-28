@@ -40,15 +40,27 @@ use std::{
     collections::BTreeSet,
     fs,
     io::{self, Cursor, Write},
-    os::unix::fs::PermissionsExt,
+    os::unix::fs::{DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
     sync::mpsc,
     time::{Duration, Instant},
 };
 
-/// Where the clips are kept: the voice's own state (root's, 0700). A
-/// factory reset wipes it (`crates/setup/fixtures/reset-plan-product.json`).
-pub const DIR: &str = "/var/lib/lampOS/voice/ring-clips";
+/// Where the clips are kept: the voice's own state (root's, 0700), inside
+/// the Schedule consumer's delivery folder (`LAMP_SCHEDULE_DELIVERY_DIR`), so
+/// a factory reset wipes them with it, in no plan slot of their own: the
+/// product plan is at its 64 paths (`crates/setup/fixtures/reset-plan-product.json`,
+/// #7771). The ledger there reads only its own names, and a folder made
+/// here is 0700 as the ledger requires of its own.
+pub const DIR: &str = "/var/lib/lampOS/voice/schedule-delivery/ring-clips";
+
+/// PARKED (#8906, #8671): where the clips were kept before #8671, a folder
+/// no reset plan path covers. #8906 turned `LAMP_OFFLINE_RINGS` on, so a
+/// lamp on a build between the two holds clips here, the person's
+/// reminders as sound; each served voice start removes them
+/// ([`remove_old_dir`]). Drop this, [`remove_old_dir`] and its call in
+/// `coordinator.rs` once no lamp can be on a build between #8906 and #8671.
+pub const OLD_DIR: &str = "/var/lib/lampOS/voice/ring-clips";
 
 /// A WAV file's header, as `hound` writes a mono 16-bit one.
 pub const WAV_HEADER_BYTES: u64 = 44;
@@ -244,7 +256,12 @@ impl Clips {
         voice: &str,
         samples: &[i16],
     ) -> io::Result<()> {
-        fs::create_dir_all(&self.dir)?;
+        // The delivery folder too, if the ledger has not made it yet: 0700,
+        // as the ledger makes it and refuses it otherwise.
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&self.dir)?;
         fs::set_permissions(&self.dir, fs::Permissions::from_mode(0o700))?;
         let sidecar = self.sidecar(store_id, id);
         match fs::remove_file(&sidecar) {
@@ -450,6 +467,51 @@ pub fn renderer_from_environment() -> Option<Renderer> {
     }
     let cache = crate::say::tts_cache::built_from_environment()?;
     Some(Renderer::new(Clips::at_dir(), cache))
+}
+
+/// PARKED (#8906, #8671): the old folder ([`OLD_DIR`]) emptied and removed,
+/// at the served voice's start. Only its regular files and symlinks go, each
+/// read without following it, so a link is removed as a link and its target
+/// kept; then the folder by [`fs::remove_dir`], never recursively, so any
+/// other entry (a folder) leaves it in place. Returns the journal line, none
+/// with no old folder.
+pub fn remove_old_dir(dir: &Path) -> Option<String> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return None,
+        Err(error) => {
+            return Some(format!(
+                "lamp-voice: the old offline ring clips folder was left: unreadable ({error})"
+            ));
+        }
+    };
+    let mut removed = 0usize;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        let kind = metadata.file_type();
+        if (kind.is_file() || kind.is_symlink()) && fs::remove_file(&path).is_ok() {
+            removed += 1;
+        }
+    }
+    Some(match fs::remove_dir(dir) {
+        Ok(()) => {
+            format!("lamp-voice: the old offline ring clips folder was removed ({removed} files)")
+        }
+        Err(_) => format!(
+            "lamp-voice: the old offline ring clips folder was left: not empty \
+             ({removed} files removed)"
+        ),
+    })
+}
+
+/// [`remove_old_dir`] over [`OLD_DIR`], its line to the journal.
+pub fn remove_old_dir_at_start() {
+    if let Some(line) = remove_old_dir(Path::new(OLD_DIR)) {
+        eprintln!("{line}");
+    }
 }
 
 #[cfg(test)]
@@ -687,5 +749,112 @@ mod tests {
         assert!(clips.kept(STORE).is_empty());
         assert_eq!(clips.used_bytes(), 0);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The old folder and the new one under one scratch root, as on a lamp:
+    /// `<root>/ring-clips` (before #8671) and
+    /// `<root>/schedule-delivery/ring-clips` (now).
+    fn old_and_new(name: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let root = scratch(name);
+        let old = root.join("ring-clips");
+        let new = root.join("schedule-delivery").join("ring-clips");
+        fs::create_dir_all(&new).unwrap();
+        fs::write(new.join(format!("{STORE}-7.wav")), b"new").unwrap();
+        fs::write(new.join(format!("{STORE}-7.json")), b"{}").unwrap();
+        (root, old, new)
+    }
+
+    fn new_is_untouched(new: &Path) {
+        assert_eq!(
+            fs::read(new.join(format!("{STORE}-7.wav"))).unwrap(),
+            b"new"
+        );
+        assert_eq!(
+            fs::read(new.join(format!("{STORE}-7.json"))).unwrap(),
+            b"{}"
+        );
+    }
+
+    /// The Reviewer-lead's point 1a and 1c on #8671: a lamp updated between
+    /// #8906 and #8671 holds clips in the old folder; the voice's start
+    /// removes them and the folder, one journal line with the count, and the
+    /// new folder's clips stay.
+    #[test]
+    fn a_start_removes_the_old_folders_clips_and_the_folder_with_one_line() {
+        let (root, old, new) = old_and_new("old-removed");
+        fs::create_dir_all(&old).unwrap();
+        fs::write(old.join(format!("{STORE}-1.wav")), b"one").unwrap();
+        fs::write(old.join(format!("{STORE}-1.json")), b"{}").unwrap();
+        fs::write(old.join(format!("{STORE}-2.wav")), b"two").unwrap();
+        let line = remove_old_dir(&old);
+        assert_eq!(
+            line.as_deref(),
+            Some("lamp-voice: the old offline ring clips folder was removed (3 files)")
+        );
+        assert!(
+            fs::symlink_metadata(&old).is_err(),
+            "the old folder is gone"
+        );
+        new_is_untouched(&new);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Point 1b and 1c: with no old folder a start does nothing and journals
+    /// nothing, and the new folder's clips stay.
+    #[test]
+    fn a_start_with_no_old_folder_does_nothing_and_says_nothing() {
+        let (root, old, new) = old_and_new("old-absent");
+        assert_eq!(remove_old_dir(&old), None);
+        assert!(fs::symlink_metadata(&old).is_err());
+        new_is_untouched(&new);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Point 1d: an entry that is not a clip (a folder) is never removed, so
+    /// the old folder is left and the journal says so; its clips still go.
+    #[test]
+    fn an_old_folder_holding_a_folder_is_left_and_said() {
+        let (root, old, new) = old_and_new("old-not-empty");
+        fs::create_dir_all(old.join("inner")).unwrap();
+        fs::write(old.join("inner").join("kept.wav"), b"kept").unwrap();
+        fs::write(old.join(format!("{STORE}-1.wav")), b"one").unwrap();
+        let line = remove_old_dir(&old);
+        assert_eq!(
+            line.as_deref(),
+            Some(
+                "lamp-voice: the old offline ring clips folder was left: not empty \
+                 (1 files removed)"
+            )
+        );
+        assert!(old.join("inner").join("kept.wav").is_file());
+        assert!(fs::symlink_metadata(old.join(format!("{STORE}-1.wav"))).is_err());
+        new_is_untouched(&new);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Point 1d: a symlink in the old folder is removed as a link, never
+    /// followed, so its target stays.
+    #[test]
+    fn a_symlink_in_the_old_folder_is_removed_as_a_link_and_its_target_kept() {
+        let (root, old, new) = old_and_new("old-symlink");
+        fs::create_dir_all(&old).unwrap();
+        let target = root.join("elsewhere.wav");
+        fs::write(&target, b"theirs").unwrap();
+        std::os::unix::fs::symlink(&target, old.join(format!("{STORE}-1.wav"))).unwrap();
+        // A link to a folder is removed as a link too, the folder kept.
+        let folder = root.join("elsewhere");
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("inside.wav"), b"inside").unwrap();
+        std::os::unix::fs::symlink(&folder, old.join("to-folder")).unwrap();
+        let line = remove_old_dir(&old);
+        assert_eq!(
+            line.as_deref(),
+            Some("lamp-voice: the old offline ring clips folder was removed (2 files)")
+        );
+        assert!(fs::symlink_metadata(&old).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"theirs");
+        assert_eq!(fs::read(folder.join("inside.wav")).unwrap(), b"inside");
+        new_is_untouched(&new);
+        let _ = fs::remove_dir_all(&root);
     }
 }

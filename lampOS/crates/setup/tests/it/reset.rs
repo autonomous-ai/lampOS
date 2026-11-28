@@ -139,6 +139,17 @@ struct Fake {
     /// How many of Hermes's and OpenClaw's per-person files
     /// [`reset::forget_agents`] removed in the lamp's folders.
     agents: usize,
+    /// How many engines' homes [`reset::forget_engine_homes`] emptied, and
+    /// whether [`reset::forget_agents`] had run before it (#7771).
+    homes: usize,
+    agents_before_homes: Option<bool>,
+    /// The engines' homes or the logs step fails (#8671).
+    fail_homes: bool,
+    fail_logs: bool,
+    /// How many log entries [`reset::forget_logs`] truncated, removed or
+    /// emptied, and whether the engines' homes were emptied before it.
+    logs: usize,
+    homes_before_logs: Option<bool>,
     /// `lampos`'s own manager, as [`reset::agent_manager_unit`] reads it
     /// from `/etc/passwd`; none: no such user.
     manager: Option<String>,
@@ -254,6 +265,20 @@ impl Effects for Fake {
         self.calls.borrow_mut().push("agents".into());
         self.token_at_forget = self.token.as_ref().map(|token| token.exists());
         Ok(self.agents)
+    }
+    fn forget_engine_homes(&mut self) -> io::Result<usize> {
+        self.agents_before_homes = Some(self.calls.borrow().iter().any(|call| call == "agents"));
+        if self.fail_homes {
+            return Err(io::Error::from(io::ErrorKind::PermissionDenied));
+        }
+        Ok(self.homes)
+    }
+    fn forget_logs(&mut self) -> io::Result<usize> {
+        self.homes_before_logs = Some(self.agents_before_homes.is_some());
+        if self.fail_logs {
+            return Err(io::Error::from(io::ErrorKind::PermissionDenied));
+        }
+        Ok(self.logs)
     }
     fn agent_manager(&mut self) -> Option<String> {
         self.manager.clone()
@@ -1050,8 +1075,9 @@ const PERSON_STORES: [&str; 50] = [
     "/var/lib/lampOS/consent/seen-activity-mark.json",
     "/var/lib/lampOS/voice/schedule-delivery",
     // Each reminder's offline clip, its words as sound (`LAMP_OFFLINE_RINGS`,
-    // #8708): `ring_clips::DIR` in crates/voice/src/ring_clips.rs.
-    "/var/lib/lampOS/voice/ring-clips",
+    // #8708): `ring_clips::DIR` in crates/voice/src/ring_clips.rs, inside
+    // the delivery folder above, which the plan wipes (#7771).
+    "/var/lib/lampOS/voice/schedule-delivery/ring-clips",
     "/var/lib/lampOS/voice/first-output",
     "/run/lampos-voice/thread.json",
     // The voice's default for the task news it has told (reviewer, #817):
@@ -1177,8 +1203,9 @@ fn a_product_reset_removes_the_photo_faces_staging_copy() {
 }
 
 /// #8708, the first builder's add 1: the offline ring clips are the
-/// person's reminders as sound, so a product reset takes them all, the
-/// folder emptied and kept, and leaves the speech cache's own lines beside
+/// person's reminders as sound, so a product reset takes them all through
+/// their `schedule-delivery` parent (#7771: no plan slot of their own), and
+/// leaves the speech cache's own lines beside
 /// them (the lamp's fixed lines, nobody's words).
 #[test]
 fn a_product_reset_leaves_no_ring_clips() {
@@ -1187,7 +1214,7 @@ fn a_product_reset_leaves_no_ring_clips() {
     plan.check().unwrap();
     let root = Root::new();
     let voice = root.0.join("var/lib/lampOS/voice");
-    let clips = voice.join("ring-clips");
+    let clips = voice.join("schedule-delivery/ring-clips");
     fs::create_dir_all(&clips).unwrap();
     let store = "0123456789abcdef0123456789abcdef";
     for name in [
@@ -1420,6 +1447,228 @@ fn every_product_data_folder_is_wiped_by_the_reset_or_kept_for_a_reason() {
         unnamed.is_empty(),
         "kept across a boot, neither wiped by the product's reset plan nor on its keep list: {unnamed:?}"
     );
+    // #7771: a store named only in code, a `const` or `static` of a crate's
+    // source, never in deploy/product (the voice's `marked` and
+    // `history-marks.json`, the engines' homes), slipped past the scan
+    // above. Each is wiped by the plan, forgotten in a code step of the
+    // reset, or kept for a reason.
+    let named_in_code = var_lib_constants();
+    assert!(
+        named_in_code
+            .iter()
+            .any(|path| path == "/var/lib/lampOS/voice/marked"),
+        "the crates' constants were read: {named_in_code:?}"
+    );
+    for (kept, why) in KEPT_IN_CODE.iter().chain(FORGOTTEN_IN_CODE.iter()) {
+        assert!(
+            named_in_code
+                .iter()
+                .any(|path| Path::new(path).starts_with(kept)),
+            "{kept} ({why}) is no longer named in code: take it off the list"
+        );
+    }
+    let unnamed: Vec<&String> = named_in_code
+        .iter()
+        .filter(|named| {
+            let named = Path::new(named.as_str());
+            !wiped
+                .iter()
+                .any(|path| named.starts_with(path) || path.starts_with(named))
+        })
+        .filter(|named| {
+            !KEPT
+                .iter()
+                .chain(KEPT_IN_CODE.iter())
+                .chain(FORGOTTEN_IN_CODE.iter())
+                .any(|(kept, _)| Path::new(named.as_str()).starts_with(kept))
+        })
+        .collect();
+    assert!(
+        unnamed.is_empty(),
+        "named in a crate's code, neither wiped by the product's reset plan nor forgotten by a code step nor kept for a reason: {unnamed:?}"
+    );
+}
+
+/// What a crate's code keeps under `/var/lib` and the reset leaves, each
+/// for a reason (#7771).
+const KEPT_IN_CODE: [(&str, &str); 14] = [
+    // PARKED (#8906, #8671): the ring clips' folder before #8671, no plan
+    // path (the plan is at its 64). The voice's start removes it
+    // (`ring_clips::OLD_DIR`), so a reset run before that start leaves it
+    // only until the next.
+    (
+        "/var/lib/lampOS/voice/ring-clips",
+        "removed at the voice's start",
+    ),
+    // The voice's own counts and system lines, no one's words.
+    ("/var/lib/lampOS/voice/day-tally", "numbers only"),
+    (
+        "/var/lib/lampOS/voice/language-said",
+        "which language line was said",
+    ),
+    ("/var/lib/lampOS/voice/tts-cache", "the system's own lines"),
+    ("/var/lib/lampOS/voice/update-cue", "the update's ring cue"),
+    // #8125's fallback (Friday, 19:00 on #7771): its epoch is how the voice
+    // notices a reset and sends the account's delete a failed reset left
+    // owed; it holds hashes and turn ids, never words, and empties itself.
+    (
+        "/var/lib/lampOS/voice/history-forget.json",
+        "#8125's account delete fallback",
+    ),
+    // The failure lines a moved lamp's voice says (#2943), software.
+    (
+        "/var/lib/lampOS/voice/notices",
+        "the voice's recorded failure lines",
+    ),
+    // The factory's self-test record, kept on purpose (install.md).
+    ("/var/lib/lampOS/selftest", "the self-test's runs"),
+    // The Hermes gateway's loopback key, made by the lamp's own unit.
+    (
+        "/var/lib/lampos-hermes-gateway",
+        "the gateway's own loopback key",
+    ),
+    // OpenClaw's Node and package an install set aside; its state stays in
+    // place, forgotten with OpenClaw's folder.
+    (
+        "/var/lib/lampos-openclaw.old",
+        "OpenClaw's program, set aside",
+    ),
+    // Setup's first-update hold, a time, removed when that round ends.
+    (
+        "/var/lib/lampos-setup/first-update",
+        "the first update's hold",
+    ),
+    // Harness's program and its pin, which install puts on.
+    ("/var/lib/lampos-tasks/.local", "Harness's program"),
+    ("/var/lib/lampos-tasks/harness-hold.env", "Harness's pin"),
+    // Each skill run's folder, removed after its run (skill_run.rs).
+    ("/var/lib/lampos-tasks/runs", "removed after each run"),
+];
+
+/// What a crate's code keeps under `/var/lib` that a code step of the reset
+/// forgets, not a plan path.
+const FORGOTTEN_IN_CODE: [(&str, &str); 5] = [
+    ("/var/lib/lampos-hermes", "reset::forget_agents"),
+    // The Hermes a pin change moved aside, removed whole.
+    ("/var/lib/lampos-hermes.old", "reset::forget_agents"),
+    ("/var/lib/lampos-openclaw", "reset::forget_agents"),
+    ("/var/lib/lampos-agents", "reset::forget_engine_homes"),
+    // The kept Hermes session's id and counts; the session itself goes
+    // with Hermes's sessions in reset::forget_agents.
+    (
+        "/var/lib/lampos-tasks/hermes-direct.json",
+        "the kept session's id, its session forgotten",
+    ),
+];
+
+/// Every `/var/lib/...` path a `const` or `static` of a crate's source
+/// names (a crate's `src`, its test files left out), trailing `/` or `.`
+/// cut.
+fn var_lib_constants() -> Vec<String> {
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let declares = |line: &str| {
+        let line = line
+            .strip_prefix("pub(crate) ")
+            .or_else(|| line.strip_prefix("pub "))
+            .unwrap_or(line);
+        line.starts_with("const ") || line.starts_with("static ")
+    };
+    let mut found = Vec::new();
+    let mut folders_left: Vec<PathBuf> = fs::read_dir(&crates)
+        .unwrap()
+        .map(|entry| entry.unwrap().path().join("src"))
+        .filter(|src| src.is_dir())
+        .collect();
+    while let Some(folder) = folders_left.pop() {
+        for entry in fs::read_dir(folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                if !path.ends_with("tests") {
+                    folders_left.push(path);
+                }
+                continue;
+            }
+            if path.extension().is_none_or(|kind| kind != "rs") || path.ends_with("tests.rs") {
+                continue;
+            }
+            let mut before = String::new();
+            for line in fs::read_to_string(&path).unwrap().lines() {
+                let line = line.trim();
+                if !line.starts_with("//")
+                    && (declares(line) || (declares(&before) && before.ends_with('=')))
+                {
+                    for (at, _) in line.match_indices("\"/var/lib/") {
+                        let named: String = line[at + 1..]
+                            .chars()
+                            .take_while(|c| c.is_ascii_alphanumeric() || "_.@*-/".contains(*c))
+                            .collect();
+                        found.push(named.trim_end_matches(['/', '.']).to_owned());
+                    }
+                }
+                before = line.to_owned();
+            }
+        }
+    }
+    found.sort();
+    found.dedup();
+    found
+}
+
+/// #7771: the product's plan stays within the 64 paths `check` allows, so a
+/// lamp on an older lamp-setup still takes it, and wipes the voice's
+/// "that was weird" copies and the ids of the turns sent to the account.
+#[test]
+fn the_product_plan_fits_the_bound_and_wipes_the_voices_marks() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    assert!(plan.wipe.len() <= 64, "{} paths", plan.wipe.len());
+    plan.check().unwrap();
+    for path in [
+        "/var/lib/lampOS/voice/marked",
+        "/var/lib/lampOS/voice/history-marks.json",
+    ] {
+        assert!(
+            plan.wipe.iter().any(|wiped| wiped == Path::new(path)),
+            "{path} is wiped"
+        );
+    }
+    let kept = Path::new("/var/lib/lampOS/voice/history-forget.json");
+    assert!(
+        !plan
+            .wipe
+            .iter()
+            .any(|wiped| kept.starts_with(wiped) || wiped.starts_with(kept)),
+        "{} is #8125's fallback, never a plan path",
+        kept.display()
+    );
+}
+
+/// #7771, Friday's ask: a product reset, run by the real wipe, leaves none
+/// of the voice's "that was weird" copies and no id of a turn sent to the
+/// account, and keeps #8125's `history-forget.json` beside them.
+#[test]
+fn a_product_reset_leaves_no_voice_marks() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    let root = Root::new();
+    let voice = root.0.join("var/lib/lampOS/voice");
+    let marked = voice.join("marked");
+    fs::create_dir_all(&marked).unwrap();
+    fs::write(marked.join("1.json"), b"synthetic: that was weird").unwrap();
+    let marks = voice.join("history-marks.json");
+    fs::write(&marks, b"[\"synthetic-turn-id\"]").unwrap();
+    let kept = voice.join("history-forget.json");
+    fs::write(&kept, b"{}").unwrap();
+    for path in &plan.wipe {
+        reset::wipe(&root.0.join(path.strip_prefix("/").unwrap())).unwrap();
+    }
+    let left: Vec<_> = fs::read_dir(&marked)
+        .map(|entries| entries.flatten().map(|entry| entry.file_name()).collect())
+        .unwrap_or_default();
+    assert!(left.is_empty(), "{left:?}");
+    assert!(fs::symlink_metadata(&marks).is_err(), "history-marks.json");
+    assert!(kept.is_file(), "#8125's fallback is kept");
 }
 
 /// Reset covers the whole private onboarding directory, including unfinished
@@ -1758,7 +2007,13 @@ fn the_command_checks_plans_and_reports_an_unfinished_reset_without_acting() {
     let plan = lamp(&root);
     let file = root.path("plan.json");
     fs::write(&file, serde_json::to_vec(&plan).unwrap()).unwrap();
-    let run = |args: &[&str]| Command::new(PROGRAM).args(args).output().unwrap();
+    let run = |args: &[&str]| {
+        Command::new(PROGRAM)
+            .args(args)
+            .env(reset::ROOT_ENV, &root.0)
+            .output()
+            .unwrap()
+    };
     let checked = run(&["check", "--plan", file.to_str().unwrap()]);
     assert!(checked.status.success(), "{checked:?}");
     let off = run(&["reset-now", "--plan", file.to_str().unwrap()]);
@@ -1803,8 +2058,11 @@ fn ahead(plan: &Plan, more: serde_json::Value) -> serde_json::Value {
 fn act_on(root: &Root, command: &str, plan: &serde_json::Value) -> std::process::Output {
     let file = root.path("plan.json");
     fs::write(&file, serde_json::to_vec(plan).unwrap()).unwrap();
+    // The program's code steps under the test's root, never the host's
+    // own `/var/log` or `/var/lib/lampos-agents` (#8671's ARM64 run).
     Command::new(PROGRAM)
         .args([command, "--plan", file.to_str().unwrap(), "--enable"])
+        .env(reset::ROOT_ENV, &root.0)
         .output()
         .unwrap()
 }
@@ -3916,6 +4174,482 @@ fn the_reset_forgets_the_agents_before_the_plans_wipes_take_the_token() {
     );
     let steps = reset::reset(&lamp(&Root::new()), &mut Fake::default()).unwrap();
     assert!(!steps.contains(&Step::AgentsForgotten));
+}
+
+/// #7771: every other engine's home is emptied right after Hermes and
+/// OpenClaw are forgotten, before the plan's wipes, said by its step.
+#[test]
+fn the_reset_empties_the_engines_homes_after_the_agents_are_forgotten() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        agents: 3,
+        homes: 2,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(fake.agents_before_homes, Some(true));
+    let agents = steps
+        .iter()
+        .position(|step| *step == Step::AgentsForgotten)
+        .expect("the agents forgotten said");
+    assert_eq!(steps[agents + 1], Step::EngineHomesEmptied);
+    assert!(
+        !steps[..agents + 1]
+            .iter()
+            .any(|step| matches!(step, Step::Wiped(_)))
+    );
+    assert_eq!(
+        serde_json::to_value(&steps[agents + 1]).unwrap(),
+        serde_json::json!({"step": "engine_homes_emptied"})
+    );
+    let mut none = Fake::default();
+    let steps = reset::reset(&lamp(&Root::new()), &mut none).unwrap();
+    assert!(!steps.contains(&Step::EngineHomesEmptied));
+    assert_eq!(none.agents_before_homes, Some(true), "still run, after");
+}
+
+/// #7771: each engine's home under `lampos-agents` (Claude Code's, Codex's:
+/// its transcripts, memory files and sign-ins) is emptied and kept, with
+/// its owner and mode, as the next round expects it; `lampos-agents` stays;
+/// anything else in it is removed, a link as a link. The dry run changes
+/// nothing and names what the reset then does, by path only.
+#[test]
+fn the_engines_homes_are_emptied_and_kept_and_the_dry_run_says_so() {
+    let root = Root::new();
+    let homes = root.path("var/lib/lampos-agents");
+    for (file, text) in [
+        ("claude/.claude/projects/p/session.jsonl", "synthetic words"),
+        ("claude/.claude.json", "{\"oauthAccount\":\"synthetic\"}"),
+        ("codex/.codex/history.jsonl", "synthetic words"),
+    ] {
+        let path = homes.join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    fs::create_dir_all(homes.join("opencode")).unwrap();
+    fs::set_permissions(homes.join("claude"), fs::Permissions::from_mode(0o700)).unwrap();
+    fs::write(homes.join("stray"), b"x").unwrap();
+    fs::create_dir_all(root.path("outside")).unwrap();
+    fs::write(root.path("outside/keep.txt"), b"keep").unwrap();
+    symlink(root.path("outside"), homes.join("link")).unwrap();
+    symlink(root.path("outside"), homes.join("codex/.codex/link")).unwrap();
+
+    let var = root.path("var");
+    let mut before = Vec::new();
+    snapshot(&var, &mut before);
+    let plan = reset::plan_engine_homes(&root.0).unwrap();
+    let mut after_plan = Vec::new();
+    snapshot(&var, &mut after_plan);
+    assert_eq!(before, after_plan, "a dry run changes nothing");
+    let lines: Vec<String> = plan.iter().map(ToString::to_string).collect();
+    let line = |kind: &str, name: &str| format!("{kind} {}", homes.join(name).display());
+    assert_eq!(
+        lines,
+        [
+            line("empty", "claude"),
+            line("empty", "codex"),
+            line("remove", "link"),
+            line("empty", "opencode"),
+            line("remove", "stray"),
+        ]
+    );
+    assert!(!lines.concat().contains("synthetic"));
+
+    assert_eq!(reset::forget_engine_homes(&root.0).unwrap(), 4);
+    assert!(homes.is_dir(), "lampos-agents stays");
+    for engine in ["claude", "codex", "opencode"] {
+        let home = homes.join(engine);
+        assert!(home.is_dir(), "{engine}'s home stays");
+        assert_eq!(fs::read_dir(&home).unwrap().count(), 0, "{engine}");
+    }
+    assert_eq!(
+        fs::metadata(homes.join("claude"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+    assert!(fs::symlink_metadata(homes.join("stray")).is_err());
+    assert!(fs::symlink_metadata(homes.join("link")).is_err());
+    assert_eq!(fs::read(root.path("outside/keep.txt")).unwrap(), b"keep");
+    assert_eq!(reset::forget_engine_homes(&root.0).unwrap(), 0, "done");
+    assert!(
+        reset::plan_engine_homes(&root.0)
+            .unwrap()
+            .iter()
+            .all(|step| matches!(step, reset::AgentStep::Empty(_)))
+    );
+    assert_eq!(reset::forget_engine_homes(&root.path("none")).unwrap(), 0);
+    assert_eq!(
+        reset::forget_engine_homes(Path::new("relative"))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::InvalidInput
+    );
+    // lampos-agents reached through a link is passed over, never followed.
+    let linked = Root::new();
+    fs::create_dir_all(linked.path("var/lib")).unwrap();
+    fs::create_dir_all(linked.path("elsewhere/claude")).unwrap();
+    fs::write(linked.path("elsewhere/claude/x"), b"x").unwrap();
+    symlink(
+        linked.path("elsewhere"),
+        linked.path("var/lib/lampos-agents"),
+    )
+    .unwrap();
+    assert_eq!(reset::forget_engine_homes(&linked.0).unwrap(), 0);
+    assert!(linked.path("elsewhere/claude/x").exists());
+
+    // The command prints the same lines, and refuses to run without --dry-run.
+    fs::write(homes.join("claude/again"), b"x").unwrap();
+    let out = std::process::Command::new(PROGRAM)
+        .args(["forget-engine-homes", "--dry-run", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let again: Vec<String> = reset::plan_engine_homes(&root.0)
+        .unwrap()
+        .iter()
+        .map(|step| format!("{step}\n"))
+        .collect();
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), again.concat());
+    assert!(homes.join("claude/again").exists());
+    let refused = std::process::Command::new(PROGRAM)
+        .args(["forget-engine-homes", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+    assert!(homes.join("claude/again").exists());
+}
+
+/// #7771 (the first builder, 19:05): the log copies are forgotten after the
+/// engines' homes, before the plan's wipes, said by their step.
+#[test]
+fn the_reset_forgets_the_log_copies_after_the_engines_homes() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        agents: 1,
+        homes: 1,
+        logs: 5,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(fake.homes_before_logs, Some(true));
+    let homes = steps
+        .iter()
+        .position(|step| *step == Step::EngineHomesEmptied)
+        .expect("the engines' homes emptied said");
+    assert_eq!(steps[homes + 1], Step::LogsForgotten);
+    assert!(
+        !steps[..homes + 2]
+            .iter()
+            .any(|step| matches!(step, Step::Wiped(_)))
+    );
+    assert_eq!(
+        serde_json::to_value(&steps[homes + 1]).unwrap(),
+        serde_json::json!({"step": "logs_forgotten"})
+    );
+    let mut none = Fake::default();
+    let steps = reset::reset(&lamp(&Root::new()), &mut none).unwrap();
+    assert!(!steps.contains(&Step::LogsForgotten));
+    assert_eq!(none.homes_before_logs, Some(true), "still run, after");
+}
+
+/// #8671: the logs step is best effort, so a log that can't be emptied
+/// never stops the wipe of the person's data; the engines' homes hold the
+/// person's memory, so a failure there fails the reset before the plan's
+/// wipes, as `forget_agents` does, and setup finishes it at its start.
+#[test]
+fn a_failed_log_step_finishes_the_reset_and_a_failed_homes_step_stops_it() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_logs: true,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(!steps.contains(&Step::LogsForgotten));
+    assert!(steps.contains(&Step::JournalRemoved));
+
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_homes: true,
+        ..Fake::default()
+    };
+    assert!(reset::reset(&plan, &mut fake).is_err());
+    assert!(root.path("memory/index.json").exists(), "no plan wipe yet");
+    assert!(plan.journal.exists(), "setup finishes it at its start");
+    assert!(fake.calls.borrow().contains(&"reboot".to_owned()));
+}
+
+/// #8671: a log the step can't remove is said with its path and counted,
+/// and the rest is still emptied.
+#[test]
+fn a_log_that_cannot_be_emptied_is_said_and_the_rest_are_emptied() {
+    if root_user() {
+        return; // root removes from a read-only folder
+    }
+    let root = Root::new();
+    let live = root.path("var/log");
+    let copy = root.path("var/log.hdd");
+    for file in ["var/log/syslog", "var/log/syslog.1", "var/log.hdd/syslog.1"] {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, b"synthetic words").unwrap();
+    }
+    fs::set_permissions(&live, fs::Permissions::from_mode(0o555)).unwrap();
+    let mut said = Vec::new();
+    let done = reset::forget_logs_saying(&root.0, &mut |line| said.push(line.to_owned()));
+    fs::set_permissions(&live, fs::Permissions::from_mode(0o755)).unwrap();
+    let done = done.unwrap();
+    assert_eq!(done.failed, 1, "{said:?}");
+    assert_eq!(done.emptied, 2, "{said:?}");
+    assert_eq!(said.len(), 1);
+    assert!(
+        said[0].starts_with(&format!(
+            "reset: a log could not be emptied: {}: ",
+            live.join("syslog.1").display()
+        )),
+        "{said:?}"
+    );
+    assert!(!said[0].contains("synthetic"));
+    assert_eq!(fs::read(live.join("syslog")).unwrap(), b"");
+    assert!(live.join("syslog.1").exists());
+    assert!(!copy.join("syslog.1").exists());
+}
+
+/// #8671's ARM64 run: the program's reset finds the logs and the engines'
+/// homes under [`reset::ROOT_ENV`], the test's root, never the host's own.
+#[test]
+fn the_programs_reset_empties_the_logs_and_homes_under_its_root() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    for file in [
+        "var/log/syslog",
+        "var/log.hdd/syslog.1",
+        "var/lib/lampos-agents/claude/session.jsonl",
+    ] {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, b"synthetic words").unwrap();
+    }
+    fs::write(root.path("setup/reset.json"), b"{}").unwrap();
+    let out = act_on(&root, "resume-reset", &ahead(&plan, serde_json::json!({})));
+    assert!(out.status.success(), "{out:?}");
+    wiped(&root);
+    assert_eq!(fs::read(root.path("var/log/syslog")).unwrap(), b"");
+    assert!(!root.path("var/log.hdd/syslog.1").exists());
+    assert!(root.path("var/lib/lampos-agents/claude").is_dir());
+    assert_eq!(
+        fs::read_dir(root.path("var/lib/lampos-agents/claude"))
+            .unwrap()
+            .count(),
+        0
+    );
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(!said.contains("could not be emptied"), "{said}");
+}
+
+/// #7771 (the first builder, 19:05): orangepi-ramlog keeps the eMMC copy of
+/// the RAM disk's `/var/log` in `/var/log.hdd` and syncs the RAM disk back
+/// into it. A reset empties the copy's archived journals (each folder
+/// kept) and, in both, the text logs that name what the person said and
+/// did: `syslog`, `user.log`, `kern.log` and `auth.log` are truncated in
+/// place, so a writer that holds one open goes on writing to it, and their
+/// rotated copies are removed. A link is removed, never followed. The live
+/// journal (`/var/log/journal`) and other logs are left as they are; no
+/// service is restarted. The dry run changes nothing and names paths only.
+#[test]
+fn the_log_copies_are_emptied_in_place_and_the_dry_run_says_so() {
+    use std::io::Write as _;
+    use std::os::unix::fs::MetadataExt as _;
+    let root = Root::new();
+    let copy = root.path("var/log.hdd");
+    let live = root.path("var/log");
+    for (file, text) in [
+        ("var/log.hdd/journal/m1/system@a.journal", "synthetic words"),
+        (
+            "var/log.hdd/journal/m1/user-1000@b.journal~",
+            "synthetic words",
+        ),
+        ("var/log.hdd/journal/stray", "x"),
+        ("var/log.hdd/syslog", "synthetic words"),
+        ("var/log.hdd/syslog.1", "synthetic words"),
+        ("var/log.hdd/syslog.2.gz", "synthetic words"),
+        ("var/log.hdd/user.log", "synthetic words"),
+        ("var/log.hdd/kern.log.1", "synthetic words"),
+        ("var/log.hdd/auth.log", ""),
+        ("var/log.hdd/daemon.log", "kept"),
+        ("var/log.hdd/syslogger", "kept"),
+        ("var/log/syslog", "synthetic words"),
+        ("var/log/syslog.1", "synthetic words"),
+        ("var/log/kern.log", "synthetic words"),
+        ("var/log/journal/m1/system.journal", "live"),
+        ("var/log/dpkg.log", "kept"),
+        ("outside/keep.txt", "keep"),
+    ] {
+        let path = root.path(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    fs::create_dir_all(copy.join("journal/m2")).unwrap();
+    symlink(root.path("outside/keep.txt"), live.join("user.log")).unwrap();
+    symlink(root.path("outside"), live.join("auth.log.1")).unwrap();
+    // rsyslog's open file: appended to, as a writer holding it would.
+    let mut open = fs::OpenOptions::new()
+        .append(true)
+        .open(live.join("syslog"))
+        .unwrap();
+    let inode = fs::metadata(live.join("syslog")).unwrap().ino();
+
+    let var = root.path("var");
+    let mut before = Vec::new();
+    snapshot(&var, &mut before);
+    let plan = reset::plan_logs(&root.0).unwrap();
+    let mut after_plan = Vec::new();
+    snapshot(&var, &mut after_plan);
+    assert_eq!(before, after_plan, "a dry run changes nothing");
+    // The RAM disk first (the Reviewer-lead's P3 on #8671): a ramlog sync
+    // between the two can then copy no old RAM log back into the copy.
+    let in_folder = |step: &reset::LogStep, folder: &Path| match step {
+        reset::LogStep::Truncate(path)
+        | reset::LogStep::Remove(path)
+        | reset::LogStep::Empty(path) => path.starts_with(folder),
+    };
+    let last_live = plan
+        .iter()
+        .rposition(|step| in_folder(step, &live))
+        .unwrap();
+    let first_copy = plan.iter().position(|step| in_folder(step, &copy)).unwrap();
+    assert!(
+        last_live < first_copy,
+        "/var/log before /var/log.hdd: {plan:?}"
+    );
+    let mut lines: Vec<String> = plan.iter().map(ToString::to_string).collect();
+    lines.sort();
+    let line = |kind: &str, path: &Path| format!("{kind} {}", path.display());
+    let mut expected = vec![
+        line("empty", &copy.join("journal/m1")),
+        line("empty", &copy.join("journal/m2")),
+        line("remove", &copy.join("journal/stray")),
+        line("truncate", &copy.join("syslog")),
+        line("remove", &copy.join("syslog.1")),
+        line("remove", &copy.join("syslog.2.gz")),
+        line("truncate", &copy.join("user.log")),
+        line("remove", &copy.join("kern.log.1")),
+        line("truncate", &copy.join("auth.log")),
+        line("truncate", &live.join("syslog")),
+        line("remove", &live.join("syslog.1")),
+        line("truncate", &live.join("kern.log")),
+        line("remove", &live.join("user.log")),
+        line("remove", &live.join("auth.log.1")),
+    ];
+    expected.sort();
+    assert_eq!(lines, expected);
+    assert!(!lines.concat().contains("synthetic"));
+
+    // Truncated with content: 4; removed: 7; a journal folder with files: 1.
+    assert_eq!(reset::forget_logs(&root.0).unwrap(), 12);
+    for kept_empty in [
+        copy.join("syslog"),
+        copy.join("user.log"),
+        copy.join("auth.log"),
+    ] {
+        assert_eq!(
+            fs::read(&kept_empty).unwrap(),
+            b"",
+            "{}",
+            kept_empty.display()
+        );
+    }
+    for gone in [
+        copy.join("syslog.1"),
+        copy.join("syslog.2.gz"),
+        copy.join("kern.log.1"),
+        copy.join("journal/stray"),
+        live.join("syslog.1"),
+        live.join("user.log"),
+        live.join("auth.log.1"),
+    ] {
+        assert!(fs::symlink_metadata(&gone).is_err(), "{}", gone.display());
+    }
+    for folder in ["journal/m1", "journal/m2"] {
+        assert!(copy.join(folder).is_dir(), "{folder} stays");
+        assert_eq!(fs::read_dir(copy.join(folder)).unwrap().count(), 0);
+    }
+    assert_eq!(fs::read(live.join("syslog")).unwrap(), b"");
+    assert_eq!(
+        fs::metadata(live.join("syslog")).unwrap().ino(),
+        inode,
+        "truncated in place, never replaced"
+    );
+    open.write_all(b"after\n").unwrap();
+    drop(open);
+    assert_eq!(fs::read(live.join("syslog")).unwrap(), b"after\n");
+    assert_eq!(fs::read(live.join("kern.log")).unwrap(), b"");
+    for (kept, text) in [
+        (copy.join("daemon.log"), "kept"),
+        (copy.join("syslogger"), "kept"),
+        (live.join("dpkg.log"), "kept"),
+        (live.join("journal/m1/system.journal"), "live"),
+        (root.path("outside/keep.txt"), "keep"),
+    ] {
+        assert_eq!(
+            fs::read(&kept).unwrap(),
+            text.as_bytes(),
+            "{}",
+            kept.display()
+        );
+    }
+    assert_eq!(
+        reset::forget_logs(&root.0).unwrap(),
+        1,
+        "the line written after"
+    );
+    assert_eq!(reset::forget_logs(&root.0).unwrap(), 0, "done");
+    assert_eq!(reset::forget_logs(&root.path("none")).unwrap(), 0);
+    assert_eq!(
+        reset::forget_logs(Path::new("relative"))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::InvalidInput
+    );
+    // A log folder reached through a link is passed over, never followed.
+    let linked = Root::new();
+    fs::create_dir_all(linked.path("var")).unwrap();
+    fs::create_dir_all(linked.path("elsewhere")).unwrap();
+    fs::write(linked.path("elsewhere/syslog"), b"x").unwrap();
+    symlink(linked.path("elsewhere"), linked.path("var/log.hdd")).unwrap();
+    assert_eq!(reset::forget_logs(&linked.0).unwrap(), 0);
+    assert_eq!(fs::read(linked.path("elsewhere/syslog")).unwrap(), b"x");
+
+    // The command prints the same lines, and refuses to run without --dry-run.
+    fs::write(copy.join("syslog.1"), b"x").unwrap();
+    let out = std::process::Command::new(PROGRAM)
+        .args(["forget-logs", "--dry-run", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let again: Vec<String> = reset::plan_logs(&root.0)
+        .unwrap()
+        .iter()
+        .map(|step| format!("{step}\n"))
+        .collect();
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), again.concat());
+    let refused = std::process::Command::new(PROGRAM)
+        .args(["forget-logs", "--root"])
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+    assert!(copy.join("syslog.1").exists());
 }
 
 /// #7868 (the Reviewer-lead's HOLD at fdc40d5c50): OpenClaw 2026.11.2

@@ -360,6 +360,12 @@ mod tests {
             fn forget_agents(&mut self) -> io::Result<usize> {
                 panic!("no wipe after a stop that failed");
             }
+            fn forget_engine_homes(&mut self) -> io::Result<usize> {
+                panic!("no wipe after a stop that failed");
+            }
+            fn forget_logs(&mut self) -> io::Result<usize> {
+                panic!("no wipe after a stop that failed");
+            }
         }
         let root = Root::new();
         let marker = root.0.join("done");
