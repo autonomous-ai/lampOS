@@ -9,8 +9,8 @@
 #                         against the artifact's SHA256SUMS, the binary grepped for the new commands and lines; the
 #                         PR's product plan from git at the head, its sha = RESET_PLAN_SHIPPED's first line
 #   ./run.sh preflight    lamp, read-only
-#   ./run.sh go           install (dead-man first), leg 1 (dry runs), leg 2 (seed), leg 2b (the PR's voice removes
-#                         the old clips folder; the stock voice back), the journal window and the
+#   ./run.sh go           install (dead-man first), leg 1 (dry runs), leg 2b (the PR's voice removes the old clips
+#                         folder; the stock voice back), leg 2 (seed), the journal window and the
 #                         kit's files copied off, then (only with CONFIRM_RESET=lamp-75c9, at or after 28 Nov
 #                         10:00) leg 3, the reset; then waits up to 10 min for the lamp and runs `after`
 #   ./run.sh after [DIR]  the lamp again (LAMP_HOST_AFTER, else LAMP_HOST): a live snapshot, the recorder's files,
@@ -160,13 +160,13 @@ go() {
   step leg1 "sh $KR/leg1.sh"
   pull_files leg1-files
   python3 -I $HERE/mac/judge.py --leg1 $RES || { echo "LEG 1 NOT OK: no seed, no reset; putting back" | tee -a $RES/go.txt; on_exit; return 1; }
-  # -- leg 2: the seed and the before
-  step seed "sh $KR/seed.sh"
-  grep -q '^SEED-OK' $RES/seed.txt || { echo "SEED NOT OK: no reset; putting back" | tee -a $RES/go.txt; on_exit; return 1; }
   # -- leg 2b (the first builder's): the PR's voice removes the old clips folder at its start; the stock voice back
   step oldclips "CLEAR_OK=${CLEAR_OK:-0} sh $KR/oldclips.sh"
   grep -q '^LEG2B-DONE' $RES/oldclips.txt && grep -q '^STOCK_BACK=yes' $RES/oldclips.txt && grep -q '^STOCK_MUTED=no' $RES/oldclips.txt \
     || { echo "LEG 2B NOT DONE or the stock voice not back: no reset; putting back" | tee -a $RES/go.txt; on_exit; return 1; }
+  # -- leg 2: the seed and the before
+  step seed "sh $KR/seed.sh"
+  grep -q '^SEED-OK' $RES/seed.txt || { echo "SEED NOT OK: no reset; putting back" | tee -a $RES/go.txt; on_exit; return 1; }
   # -- the journal window and the kit's files, before the reset's vacuum
   pull_window journal-window-before "$(since_spec ROW_START_WALL_US row-start.txt 600)"
   pull_files lamp-files-before

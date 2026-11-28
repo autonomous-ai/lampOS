@@ -1,5 +1,6 @@
 #!/bin/sh
-# Run as root on lamp-75c9 after leg1.sh: sh seed.sh. Leg 2: harmless kit marker files (a fixed text, no person
+# Run as root on lamp-75c9 after leg1.sh and oldclips.sh (leg 2b), the stock voice back: sh seed.sh.
+# Leg 2: harmless kit marker files (a fixed text, no person
 # data), one name ($MNAME), in each place the reset must empty, listed in $K/seeded.tsv (path, kind, folders the
 # kit made) for the judge and the put-back:
 #   home       each engine's home folder in /var/lib/lampos-agents (a link never followed)
@@ -15,6 +16,9 @@
 host_ok; root_ok
 [ -e $K/installed.txt ] || { echo "REFUSE: not installed"; exit 1; }
 [ -s $K/seeded.tsv ] && { echo "REFUSE: $K/seeded.tsv exists: putback.sh first"; exit 1; }
+# After leg 2b (oldclips.sh), with the stock voice back: its PR voice, switch off, clears the new clips folder (#8933)
+[ -e "$OURS" ] && { echo "REFUSE: leg 2b's drop-in is still there: the new clips folder would be cleared"; exit 1; }
+[ "$(sha_of /proc/$(mainpid)/exe)" = "$(sha_of $VSTOCK)" ] || { echo "REFUSE: the running voice is not the stock one"; exit 1; }
 : > $K/seeded.tsv.new; bad=0
 put() { # put FILE KIND MADE_DIRS
   if printf '%s\n' "$MTEXT" > "$1.new" && chmod 600 "$1.new" && mv "$1.new" "$1"; then

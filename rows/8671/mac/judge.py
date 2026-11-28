@@ -137,7 +137,7 @@ leg(2, 'kit markers seeded; the before counted', 'PASS' if ok2 else 'FAIL',
 OLD_RE = re.compile(r'^OLD_REMOVED_COUNT=(\d+)$', re.M)   # ring_clips.rs:468, rendered by oldclips.sh
 oc = text('oldclips.txt'); o = kv('oldclips.txt')
 if not oc:
-    leg('2b', 'the PR\'s voice removes the old clips folder at its start', 'VOID' if not ok2 else 'FAIL', 'not run')
+    leg('2b', 'the PR\'s voice removes the old clips folder at its start', 'VOID' if not ok1 else 'FAIL', 'not run')
 else:
     nn = [int(x) for x in OLD_RE.findall(oc)]
     put = num(o.get('KIT_OLD_FILES')); there = num(o.get('OLD_FILES_BEFORE'))
@@ -147,17 +147,19 @@ else:
     if num(o.get('OLD_KIT_PRESENT')) != put: why.append('%s of %s kit file(s) there at the restart' % (o.get('OLD_KIT_PRESENT'), put))
     if o.get('OLD_LEFT_N') != '0': why.append('a "was left" line')
     if o.get('OLD_AFTER') != 'absent': why.append('the old folder is still there')
-    if o.get('NEW_SAME') != 'yes': why.append('the new folder changed')
     if o.get('SHA_OK') != 'yes' or o.get('SWITCH') != 'off': why.append('the voice was not the PR\'s with the switch off')
     if o.get('MUTED') != 'no' or o.get('STOCK_MUTED') != 'no': why.append('muted by the restart guard')
     if o.get('STOCK_BACK') != 'yes': why.append('the stock voice is not back')
     if o.get('NRESTARTS_AFTER') != o.get('NRESTARTS_BEFORE'): why.append('NRestarts %s, before %s' % (o.get('NRESTARTS_AFTER'), o.get('NRESTARTS_BEFORE')))
     leg('2b', 'the PR\'s voice removes the old clips folder at its start', 'FAIL' if why else 'PASS',
         '%s kit clip file(s) put in /var/lib/lampOS/voice/ring-clips (%s other entr(ies)); `lamp-voice: the old offline '
-        'ring clips folder was removed (N files)` x%s with N=%s; "was left" x%s; the old folder %s after; the new folder\'s '
-        'names and sizes the same: %s; stock voice back: %s%s' % (
+        'ring clips folder was removed (N files)` x%s with N=%s; "was left" x%s; the old folder %s after; stock voice back: '
+        '%s. For information only: the new folder held %s entr(ies) before and %s after (`the offline ring clips were '
+        'cleared` x%s): with `LAMP_OFFLINE_RINGS=off` #8933, in the PR\'s base, clears it at the consumer\'s start by '
+        'design, so this leg puts nothing there and the reset\'s marker is seeded after it%s' % (
             put, o.get('OLD_OTHER_BEFORE', '?'), o.get('OLD_REMOVED_N', '?'), ','.join(map(str, nn)) or '-',
-            o.get('OLD_LEFT_N', '?'), o.get('OLD_AFTER', '?').split(' ')[0], o.get('NEW_SAME', '?'), o.get('STOCK_BACK', '?'),
+            o.get('OLD_LEFT_N', '?'), o.get('OLD_AFTER', '?').split(' ')[0], o.get('STOCK_BACK', '?'),
+            o.get('NEW_ENTRIES_BEFORE', '?'), o.get('NEW_ENTRIES_AFTER', '?'), o.get('NEW_CLEARED_N', '?'),
             ('. NOT OK: ' + '; '.join(why)) if why else ''))
 
 # ---------------------------------------------------------------- the after files

@@ -31,15 +31,16 @@ deploy/factory/steps.sh:648	"$SYSTEMD_RUN" --no-block --collect --unit=lamp-setu
 crates/setup/src/reset.rs:1451	#[serde(rename_all = "snake_case", tag = "step", content = "path")]
 crates/setup/src/reset.rs:1468	EngineHomesEmptied,
 crates/voice/src/ring_clips.rs:63	pub const OLD_DIR: &str = "/var/lib/lampOS/voice/ring-clips";
-crates/voice/src/ring_clips.rs:468	format!("lamp-voice: the old offline ring clips folder was removed ({removed} files)")
-crates/voice/src/ring_clips.rs:471	"lamp-voice: the old offline ring clips folder was left: not empty \
-crates/voice/src/ring_clips.rs:451	"lamp-voice: the old offline ring clips folder was left: unreadable ({error})"
-crates/voice/src/ring_clips.rs:462	if (kind.is_file() || kind.is_symlink()) && fs::remove_file(&path).is_ok() {
-crates/voice/src/ring_clips.rs:480	eprintln!("{line}");
+crates/voice/src/ring_clips.rs:484	format!("lamp-voice: the old offline ring clips folder was removed ({removed} files)")
+crates/voice/src/ring_clips.rs:487	"lamp-voice: the old offline ring clips folder was left: not empty \
+crates/voice/src/ring_clips.rs:467	"lamp-voice: the old offline ring clips folder was left: unreadable ({error})"
+crates/voice/src/ring_clips.rs:478	if (kind.is_file() || kind.is_symlink()) && fs::remove_file(&path).is_ok() {
+crates/voice/src/ring_clips.rs:496	eprintln!("{line}");
 crates/voice/src/ring_clips.rs:136	format!("{store_id}-{id}")
-crates/voice/src/coordinator.rs:3550	crate::ring_clips::remove_old_dir_at_start();
-crates/voice/src/coordinator.rs:10363	json!({"status":"listening_ready","seconds":lifetime.seconds()})
+crates/voice/src/coordinator.rs:3560	crate::ring_clips::remove_old_dir_at_start();
+crates/voice/src/coordinator.rs:10373	json!({"status":"listening_ready","seconds":lifetime.seconds()})
 crates/voice/src/bus_out.rs:977	"(muted by the restart guard after a fault, not by choice)",
 crates/voice/src/offline_rings.rs:42	pub const ENVIRONMENT: &str = "LAMP_OFFLINE_RINGS";
 crates/voice/src/offline_rings.rs:191	value == Some("on")
 crates/setup/tests/it/reset.rs:1501	"removed at the voice's start",
+crates/voice/src/reminders/consumer.rs:1325	"the offline ring clips were cleared ({gone} files): LAMP_OFFLINE_RINGS is off"

@@ -1,18 +1,20 @@
 #!/bin/sh
-# Run as root on lamp-75c9 after seed.sh: sh oldclips.sh. Leg 2b (the first builder's), before the reset:
+# Run as root on lamp-75c9 after leg1.sh and BEFORE seed.sh: sh oldclips.sh. Leg 2b (the first builder's):
 #   1. kit clip files (made-up <store_id>-<id>.wav/.json names, a store id no lamp has, the kit's fixed text, no
-#      person data) put in the OLD folder /var/lib/lampOS/voice/ring-clips (3) and in the PR's new folder (2, added
-#      to seeded.tsv as clips_new, so the reset leg judges them too); refuses if the old folder holds files that
-#      are not the kit's (the PR's voice removes them for good) unless CLEAR_OK=1;
+#      person data) put in the OLD folder /var/lib/lampOS/voice/ring-clips (3), nothing in the new folder;
+#      refuses if the old folder holds files that are not the kit's (the PR's voice removes them for good) unless
+#      CLEAR_OK=1;
 #   2. lamp-voice on the PR's CI build through the kit's /run drop-in (the stock unit's own args,
-#      LAMP_OFFLINE_RINGS=off: no consumer renders or sweeps the new folder meanwhile), ONE restart;
+#      LAMP_OFFLINE_RINGS=off: no consumer renders), ONE restart;
 #   3. from the journal since that restart: `lamp-voice: the old offline ring clips folder was removed (N files)`
-#      with N, and no "was left" line; the old folder gone; the new folder's names and sizes the same;
+#      with N, and no "was left" line; the old folder gone. The NEW folder's entry count before and after is only
+#      recorded: with the switch off, #8933 (in the PR's base) clears it at the consumer's start by design;
 #   4. the drop-in out, ONE restart back onto the stock voice, its exe sha and NRestarts read back.
 # Names and sizes only; no clip is ever opened. Never touches lamp-update, Wi-Fi or any other unit.
 . "$(dirname "$0")/common.sh"
 host_ok; root_ok
-[ -e $K/installed.txt ] && [ -s $K/seeded.tsv ] || { echo "REFUSE: not installed and seeded"; exit 1; }
+[ -e $K/installed.txt ] || { echo "REFUSE: not installed"; exit 1; }
+[ -s $K/seeded.tsv ] && { echo "REFUSE: already seeded: leg 2b runs before the seed (the PR's voice with the switch off clears the new folder)"; exit 1; }
 [ -e "$OURS" ] && { echo "REFUSE: $OURS already there"; exit 1; }
 [ -x $VBIN ] || { echo "REFUSE: no $VBIN"; exit 1; }
 p=$(mainpid); [ "$(sha_of /proc/$p/exe)" = "$(sha_of $VSTOCK)" ] || { echo "REFUSE: the running voice is not the stock one"; exit 1; }
@@ -26,10 +28,8 @@ mk() { printf '%s\n' "$MTEXT" > "$1.new" && chmod 600 "$1.new" && mv "$1.new" "$
 [ -d $CLIPS_OLD ] || { mkdir -m 700 $CLIPS_OLD && touch $K/olddir-made && echo "OLD_DIR_MADE=yes"; }
 : > $K/oldclips.tsv
 for n in 900001.wav 900001.json 900002.wav; do mk "$CLIPS_OLD/$KSTORE-$n" && echo "$CLIPS_OLD/$KSTORE-$n" >> $K/oldclips.tsv; done
-for n in 900101.wav 900101.json; do
-  mk "$CLIPS_NEW/$KSTORE-$n" && printf '%s\tclips_new\t-\n' "$CLIPS_NEW/$KSTORE-$n" >> $K/seeded.tsv; done
 echo "KIT_OLD_FILES=$(wc -l < $K/oldclips.tsv | tr -d ' ')"
-names_sizes $CLIPS_NEW > $K/new-before.lst; sed 's/^/NEW_BEFORE /' $K/new-before.lst
+echo "NEW_ENTRIES_BEFORE=$(find $CLIPS_NEW -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')"
 # -- 2. the PR's voice, one restart
 unit_exec_of $UNIT > $K/before-exec.txt
 write_dropin || { voice_to_stock; echo "LEG2B-FAILED: the drop-in"; exit 1; }
@@ -43,11 +43,11 @@ p=$(mainpid); echo "VOICE_PID=$p EXE=$(readlink /proc/$p/exe) SHA_OK=$([ "$(sha_
 j=$(journalctl -u $UNIT --since "@$(( t / 1000000 ))" -o cat --no-pager)
 echo "OLD_REMOVED_N=$(printf '%s\n' "$j" | grep -cE "$OLD_REMOVED_RE") OLD_LEFT_N=$(printf '%s\n' "$j" | grep -cF "$OLD_LEFT")"
 printf '%s\n' "$j" | grep -E "$OLD_REMOVED_RE" | sed -E "s/$OLD_REMOVED_RE/OLD_REMOVED_COUNT=\\1/"
+echo "NEW_CLEARED_N=$(printf '%s\n' "$j" | grep -cF 'the offline ring clips were cleared (')"
 printf '%s\n' "$j" | grep -qF "$MUTE" && echo "MUTED=yes" || echo "MUTED=no"
 # -- 3. the folders
 echo "OLD_AFTER=$(kind_of $CLIPS_OLD)"
-names_sizes $CLIPS_NEW > $K/new-after.lst
-cmp -s $K/new-before.lst $K/new-after.lst && echo "NEW_SAME=yes" || { echo "NEW_SAME=no"; diff $K/new-before.lst $K/new-after.lst | sed 's/^/NEW_DIFF /'; }
+echo "NEW_ENTRIES_AFTER=$(find $CLIPS_NEW -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ') (information only: #8933 clears it with the switch off)"
 # -- 4. the stock voice back
 if voice_to_stock; then echo "STOCK_BACK=yes"; else echo "STOCK_BACK=no"; fi
 p=$(mainpid); echo "STOCK_EXE=$(readlink /proc/$p/exe) NRESTARTS_AFTER=$(nrestarts)"

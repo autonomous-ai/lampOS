@@ -11,7 +11,7 @@ VARIANTS = {
     'pass': ('PASS', {'1': 'PASS', '2': 'PASS', '2b': 'PASS', '3': 'PASS', '4a': 'PASS', '4b': 'PASS', '4c': 'PASS'}),
     'fail-2b': ('FAIL', {'2b': 'FAIL', '3': 'PASS'}),
     'fail-2b-left': ('FAIL', {'2b': 'FAIL'}),
-    'fail-2b-new': ('FAIL', {'2b': 'FAIL'}),
+    'new-cleared': ('PENDING', {'2b': 'PASS'}),
     'pending': ('PENDING', {'3': 'PASS', '4a': 'PASS', '4b': 'OWED', '4c': 'PASS'}),
     'fail-1': ('FAIL', {'1': 'FAIL'}),
     'fail-3': ('FAIL', {'3': 'FAIL'}),
@@ -50,8 +50,7 @@ def seeded():
     s = [(h + '/' + M, 'home', '-') for h in HOMES] + [(H + '/el8671-kit-stray', 'stray', '-'),
          ('/var/lib/lampOS/voice/marked/' + M, 'marked', '/var/lib/lampOS/voice/marked'),
          ('/var/lib/lampOS/voice/schedule-delivery/ring-clips/' + M, 'clips_new', '/var/lib/lampOS/voice/schedule-delivery/ring-clips'),
-         ('/var/lib/lampOS/voice/schedule-delivery/ring-clips/%s-900101.wav' % KS, 'clips_new', '-'),
-         ('/var/lib/lampOS/voice/schedule-delivery/ring-clips/%s-900101.json' % KS, 'clips_new', '-')]
+]
     return s
 
 
@@ -114,21 +113,21 @@ def make(root, v):
     s += ['KIND ' + k for k in KEPT] + ['HOME %s dir n=4 lampos:lampos:700' % h for h in HOMES] + ['CLIPS_OLD_OTHER=4']
     s += ['LOGFILE ' + l for l in LOGS]
     s += counts(0 if v == 'void-4c' else 310, 0 if v == 'void-4c' else 1200)
-    s += ['SEEDED_N=7', 'SEED-OK']
+    s += ['SEEDED_N=5', 'SEED-OK']
     w('seed.txt', '\n'.join(s) + '\n')
     w('oldclips.txt', '\n'.join([
-        'OLD_OTHER_BEFORE=0', 'NRESTARTS_BEFORE=0', 'KIT_OLD_FILES=3', 'NEW_BEFORE %s-900101.json 41 f' % KS,
+        'OLD_OTHER_BEFORE=0', 'NRESTARTS_BEFORE=0', 'KIT_OLD_FILES=3', 'NEW_ENTRIES_BEFORE=%d' % (4 if v == 'new-cleared' else 0),
         'OLD_FILES_BEFORE=3 OLD_KIT_PRESENT=3', 'RESTART_WALL_US=1', 'listening_ready: pid 901 after 6s',
-        'VOICE_PID=901 EXE=/run/el-8671/lamp-voice SHA_OK=yes SWITCH=off', 'OLD_REMOVED_N=1 OLD_LEFT_N=0',
+        'VOICE_PID=901 EXE=/run/el-8671/lamp-voice SHA_OK=yes SWITCH=off', 'OLD_REMOVED_N=1 OLD_LEFT_N=0', 'NEW_CLEARED_N=%d' % (1 if v == 'new-cleared' else 0),
         'OLD_REMOVED_COUNT=%d' % (2 if v == 'fail-2b' else 3), 'MUTED=no',
         'OLD_AFTER=%s' % ('dir n=0 root:root:700' if v == 'fail-2b-left' else 'absent'),
-        'NEW_SAME=%s' % ('no' if v == 'fail-2b-new' else 'yes'), 'STOCK_BACK=yes',
+        'NEW_ENTRIES_AFTER=0 (information only: #8933 clears it with the switch off)', 'STOCK_BACK=yes',
         'STOCK_EXE=/opt/lampOS/voice/releases/1/lamp-voice NRESTARTS_AFTER=0', 'STOCK_MUTED=no', 'LEG2B-DONE']) + '\n')
     if v == 'noreset':
         w('go.txt', 'NO RESET: CONFIRM_RESET is not lamp-75c9: legs 1-2 only; putting back\n')
         w('putback.log', 'read-back 1: no kit marker left\nPUTBACK-OK\n')
         return
-    w('trigger.txt', 'PRESENT_N=7 SEEDED_N=7\nRESET_CMD=/usr/bin/systemd-run --no-block --collect --unit=lamp-setup-wipe '
+    w('trigger.txt', 'PRESENT_N=5 SEEDED_N=5\nRESET_CMD=/usr/bin/systemd-run --no-block --collect --unit=lamp-setup-wipe '
       '--property=Type=oneshot /run/el-8671/lamp-setup reset-now --plan /run/el-8671/reset-plan.json --enable\n'
       'SYSTEMD_RUN_EXIT=0\nTRIGGERED RESET_WALL_US=%d000000\n' % T)
     if v == 'unreachable':
