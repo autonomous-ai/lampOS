@@ -1199,9 +1199,9 @@ impl Store {
             write_private(&self.0.join(file), format!("{model}\n").as_bytes())?;
         }
         write_private(&self.0.join(service.key_file()), given.key.as_bytes())?;
-        // One own voice at a time (#8754): the person's ElevenLabs voice
-        // takes Phonon's place.
-        if service == Service::ElevenLabs {
+        // One own voice at a time (#8754): the person's ElevenLabs or
+        // Gemini voice takes Phonon's place.
+        if service.is_voice() {
             remove(&self.0.join(lamp_msgs::phonon::CHOSEN_FILE))?;
         }
         // One own model at a time (#8362): keeping one model service's key
@@ -1260,14 +1260,18 @@ impl Store {
     }
 
     /// Phonon chosen in `voice` (#8754): kept, and the person's ElevenLabs
-    /// voice removed, one own voice at a time.
+    /// or Gemini voice removed, one own voice at a time, as keeping either
+    /// of those removes Phonon ([`Self::keep`]).
     pub fn keep_phonon(&self, voice: lamp_msgs::phonon::Voice) -> io::Result<()> {
         self.folder()?;
         write_private(
             &self.0.join(lamp_msgs::phonon::CHOSEN_FILE),
             format!("{}\n", voice.name).as_bytes(),
         )?;
-        self.remove(Service::ElevenLabs)
+        for service in Service::VOICES {
+            self.remove(service)?;
+        }
+        Ok(())
     }
 
     /// The Phonon voice chosen, if any.
@@ -1671,7 +1675,16 @@ pub fn answer_speaking(
     match asked {
         Asked::Which => {
             let mut which = store.which();
-            which["phonon"] = json!(store.phonon().map(|voice| voice.name));
+            let chosen = store.phonon();
+            which["phonon"] = json!(chosen.map(|voice| voice.name));
+            // Phonon chosen is the own voice in use where it speaks, one own
+            // voice at a time as the kept ones are (#8754).
+            if chosen.is_some() && phonon == PhononHere::Offered {
+                which["in_use"]["voice"] = json!(lamp_msgs::phonon::SERVICE);
+                if which["in_use"]["agent_why"] == "no_model_key" {
+                    which["in_use"]["agent_why"] = json!("tts_only");
+                }
+            }
             if phonon == PhononHere::Offered
                 && let Some(offers) = which["offers"].as_array_mut()
             {
@@ -1783,8 +1796,10 @@ pub fn answer_speaking(
 
 /// Check `given`, keep it if it works, and the reply and the journal's line.
 fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Done>) {
-    let (verdict, changed) = check_and_keep(&given, store, check);
     let service = given.service;
+    // A voice kept in Phonon's place stops `lamp-phonon` too (#8754).
+    let had_phonon = service.is_voice() && store.phonon().is_some();
+    let (verdict, changed) = check_and_keep(&given, store, check);
     let said = format!(
         "the person's {} key: {}",
         service.said_name(),
@@ -1799,10 +1814,16 @@ fn set(given: Given, store: &Store, check: &mut impl Check) -> (Value, Option<Do
             Verdict::NoModel => "the endpoint lists no such model, not kept",
         }
     );
+    let restart_phonon = changed && had_phonon && store.phonon().is_none();
+    let said = if restart_phonon {
+        format!("{said}; Phonon on the lamp was turned off, one own voice at a time")
+    } else {
+        said
+    };
     let done = Some(Done {
         restart_voice: changed,
         restart_cloud: changed && Service::MODELS.contains(&service),
-        restart_phonon: false,
+        restart_phonon,
         said,
     });
     if matches!(verdict, Verdict::Works | Verdict::WorksNoTools) {

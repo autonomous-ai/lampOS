@@ -44,7 +44,10 @@ but with no key and no check against a service:
 - **`keys.remove`** `{"service":"phonon"}` removes it. The lamp's own
   voice comes back.
 - **One own voice at a time:** choosing Phonon removes a person's own
-  ElevenLabs key and voice, and keeping an ElevenLabs voice removes Phonon.
+  ElevenLabs or Gemini key and voice, and keeping either of those removes
+  Phonon's choice and restarts `lamp-phonon.service`, which then stays
+  stopped. A refused key keeps Phonon. `keys.get` says `in_use.voice`
+  `"phonon"` while it is chosen on a lamp where it speaks.
 - After a change the helper waits for a quiet moment, restarts
   `lamp-phonon.service` (which starts only while the choice exists), then
   the voice.
@@ -253,5 +256,8 @@ it tests the voice's path as the app would use it.
 - `-p lamp-setup --test it keys`: offered only in English and only where
   the unit is installed (refused `not_on_this_lamp` without it, the
   ElevenLabs files untouched), chosen without a key, one own voice at a
-  time, refusals keeping nothing, and removal.
+  time with ElevenLabs and with Gemini both ways
+  (`choosing_phonon_turns_off_a_kept_gemini_voice`,
+  `saving_a_gemini_voice_turns_off_phonon`), refusals keeping nothing, and
+  removal.
 - `-p lamp-cloud keys`: `keys.set` passes a voice name and refuses a key.

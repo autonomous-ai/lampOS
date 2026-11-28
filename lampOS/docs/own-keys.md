@@ -376,7 +376,7 @@ yet run on a lamp.
   ElevenLabs' offer is as it was, with no `voices`. It also gains
   `"gemini_voice": "own" | "lamp"`, `since.gemini_voice`,
   `voice_id.gemini_voice` (the name, not a secret) and `in_use.voice`
-  (`"elevenlabs"`, `"gemini_voice"` or `null`). `keys.set` takes
+  (`"elevenlabs"`, `"gemini_voice"`, `"phonon"` or `null`). `keys.set` takes
   `{"service": "gemini_voice", "key"?, "voice_id"?, "request_id"?}` as
   ElevenLabs' does: a key needs a voice name with it the first time
   ("Gemini's voice needs a voice name with its key"), and later keeps the
@@ -387,7 +387,10 @@ yet run on a lamp.
   takes `gemini_voice`.
 - **One own voice at a time:** keeping Gemini's voice removes ElevenLabs'
   files, and keeping ElevenLabs' removes Gemini's voice's, as one own
-  model is kept at a time; so the voice in use is never a guess.
+  model is kept at a time; so the voice in use is never a guess. Phonon on
+  the lamp (below) is one of them too: choosing it removes a kept Gemini
+  or ElevenLabs voice, and keeping either of those removes Phonon's choice
+  and restarts `lamp-phonon.service`, which then stays stopped.
 - **Where it's kept:** `gemini_voice.key`, `gemini_voice.voice` and
   `gemini_voice.checked` in `/etc/lampOS/voice/own/`, root's, 0700, each
   file 0600, which only lamp-voice loads (`LoadCredential=own:`), as
@@ -885,7 +888,8 @@ start; the folder stays root's alone, 0700, each file 0600.
   the first line alone. A key kept before #8735 has no second line.
 - **`keys.get`:** `in_use` is `{"model": service | null, "agent": "own" |
   "relay", "agent_why": code | null, "voice": service | null}`, `voice` the
-  own voice kept, one at a time. `own` only when the in-use model key's
+  own voice kept, one at a time: `phonon` while Phonon is chosen on a lamp
+  where it speaks (installed, in English), else `null` for it. `own` only when the in-use model key's
   tool check passed; otherwise `relay`, `agent_why` one of `no_model_key`,
   `tts_only` (an own voice and no model key), `no_tool_calls`, `refused`
   (the last `keys.set` for that service was refused) or `unchecked` (kept
@@ -937,8 +941,10 @@ taken only while the lamp speaks English and only where
 `/usr/lib/systemd/system` or `/lib/systemd/system`); without the unit,
 `keys.get` has no Phonon offer and `keys.set` is refused with code
 `not_on_this_lamp`, nothing removed. Choosing it removes a person's own
-ElevenLabs voice, and keeping an ElevenLabs voice removes it: one own voice
-at a time. While it is chosen, the answers and every other line the lamp
+ElevenLabs or Gemini voice (key, voice and check), and keeping either of
+those removes it and restarts `lamp-phonon.service` so it stops: one own
+voice at a time. `in_use.voice` is `"phonon"` while it is chosen and
+speaks, with `agent_why` `tts_only` when no model key is kept. While it is chosen, the answers and every other line the lamp
 says itself (the say service's lines and the cached fixed lines, rendered
 by the speech cache in the voice's main process) are said by
 `lamp-phonon`, kept under `phonon:<voice>`, and a line it can't say is
