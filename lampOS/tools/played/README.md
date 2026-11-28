@@ -5,6 +5,16 @@ A Mac beside the lamp speaks scripted lines from its own speakers, in macOS
 session over ssh to print what the lamp heard and said, and when. A played
 voice is a smoke test: the lamp hears replayed speech worse than a person.
 
+**Other voices (`PLAYED_WAV_DIR`, off unless set):** a line already rendered
+in that folder as `<sha12 of "VOICE|TEXT">.wav` (16 kHz, 16-bit mono, e.g.
+the ElevenLabs set in the draft release `kit-played-el-1126`, with its
+`voices.tsv` from each macOS speaker to its ElevenLabs voice) is played as
+it is, in `scenario.py`'s `wav_for`; any other line falls back to `say`.
+`stop-lines.sh` takes `STOP_LINES_SAY=el-say.sh`, a `say` stand-in that does
+the same. A figure in other voices is no figure in macOS voices: October's
+74.7% two-person floor was scored in macOS voices, so the first run in
+another set scores stable in it too, as that set's own baseline.
+
 `battery.sh LABEL` runs the whole played test, about 17 minutes:
 
 1. **Two people** (`twopeople829.sh`, one round, #829): four scenes of two
@@ -437,6 +447,78 @@ lampOS/tools/played/night_compare.py r1 r2      # two rounds side by side
   14:00 on weekdays (`LAMP_PLAY_AT_LUNCH=yes` overrides). It takes no lamp
   lock or lease: on a shared lamp, run it under `lamp-lock.sh <lamp> run`,
   as above.
+
+## The scored voice set (voiceset.py)
+
+`voiceset.py LABEL [GROUP | GROUP/SCENE ...]` plays every voice use case as
+a scene, in macOS voices from this computer's speakers. It then scores each
+line from the voice's own events against what should happen:
+
+- `A`: answered.
+- `Q`: left alone.
+- `S`: the lamp stops talking.
+- `-`: played and kept, not scored.
+
+It is the set for runs compared day by day and week by week: the same lines,
+the same voices and the same beds every time. `voiceset.py --list` prints
+the groups:
+
+| Group | What it plays |
+|---|---|
+| `calls`, `calls-2` | "Hey Lamp" in every form and position, in about 20 voices and accents |
+| `follow-ups`, `multi-turn`, `corrections` | Conversations of 2 to 4 turns with the name only at the start, a change of mind, and a line 35 s after an answer (left alone) |
+| `questions`, `everyday`, `controls`, `controls-2`, `timers`, `timers-2` | Asks of each kind, the light by voice (and back), and timers rung out; never the volume |
+| `delivery` | Quiet, fast, slow, hesitant and long asks |
+| `cut-ins` | Stopping the lamp, and a new ask over its answer |
+| `busy`, `room`, `room-2`, `two-people` | Colleagues' talk, phone calls, TV, greetings to people, another person's name, and two people at the lamp |
+| `noise` | A call and its follow-up over make_noise.py's beds (babble, TV, a fan, music, typing) at two levels, with someone else's line in the noise |
+| `day` | The day from `day.sh`, its memory lines and computer task swapped for lines of the same kind, at day.sh's gaps (`october-day`) and as a person paces it (`paced-day`) |
+| `r-calls`, `r-not-calls`, `r-follow-ups`, `r-game`, `r-short`, `r-stop`, `r-greeted` | The product owner's rules of 26 Nov: "Hey Lamp" at a line's start starts a conversation; follow-ups carry 20 s, a word or two included; room talk that opens with a greeting is left alone |
+| `clear-calls`, `calls-3`, `name-at-end`, `repeat-call`, `quiet-voices`, `accents-talk`, `kids` | More calls: clear and quiet ones, the name at a line's end, a call said again, children's and accented voices |
+| `follow-ups-2`, `follow-ons`, `two-asks`, `long-chat`, `multi-talk`, `math-hard-5`, `questions-2`, `delivery-2`, `pauses`, `repeat`, `repeats-3` | Longer conversations, two asks in a line, pauses inside a line, and the same question asked again |
+| `stops`, `talk-over`, `overlap`, `thanks`, `after-quiet`, `handover` | Stopping the lamp, talking over it, thanks at the end, a line after a quiet spell, and asks for a computer's work (`handover`: only on a lamp with no computer paired, or with its person's yes) |
+| `alone`, `alone-2`, `person-words`, `greetings`, `phone`, `tv`, `meeting`, `family`, `about-lamp` | Talk not for the lamp: someone alone thinking aloud, words said to a person, greetings by name, phone calls, TV, a meeting, a family at dinner, and talk about the lamp |
+
+```sh
+export LAMP_HOST=<your lamp's address> LAMP_SSH_KEY=<your key file>
+lampOS/tools/played/make_noise.py              # once: the noise beds
+lampOS/tools/played/voiceset.py --list         # 59 groups, 431 scenes, 699 lines (with `handover`)
+lampOS/tools/played/voiceset.py v1127          # every group but `handover` (58, 421 scenes, 689 lines), about seven hours
+VOICESET_GAP=22 lampOS/tools/played/voiceset.py v1127r r-calls r-not-calls r-greeted   # the rule groups, about 30 minutes
+lampOS/tools/played/voiceset.py v1127h handover                                    # only when named: asks a paired computer
+VOICESET_OCTOBER=1 lampOS/tools/played/voiceset.py o1127 calls calls-2              # older groups as written, for October's comparison
+lampOS/tools/played/voiceset.py d1125 day/paced-day calls room
+```
+
+- **The rule scored.** Every group is scored by the product owner's rule of 26 Nov ("Hey Lamp" opens a
+  conversation): a scene whose first line is answered but doesn't open with "Hey", "Hi" or "Hello" is
+  expected left alone. `VOICESET_OCTOBER=1` scores the older groups as written.
+- **One voice per run.** With `PLAYED_WAV_DIR` set, a run refuses to start if any line it would play has no
+  rendered WAV, and names the count; `scenario.py` and `el-say.sh` never fall back to mac `say` for such a line.
+  `quiet-voices`, `delivery-2` and `pauses` carry mac `say` cues (`[[volm]]`, `[[rate]]`, `[[slnc]]`) that a
+  rendered WAV doesn't, so they test what they say only with mac voices until rendered with the same cue.
+- **Named only.** `handover` asks a paired computer for work, so it never runs in a run that names no group.
+
+- **Waits.** A line's wait is seconds after it, or `6a`: 6 s after the lamp
+  is done with the line, its answer played to its last sample or its turn
+  ended with none (`scenario.py`'s `lamp_done`). A follow-up then comes as a
+  person's would, however long the answer was.
+- **Beds.** A `("bg", NAME, VOLUME, '')` step plays `$PLAYED_OUT/prompts/noise/NAME.wav`
+  under the rest of the scene, at afplay's VOLUME. `make_noise.py` makes the five
+  beds, deterministic, with no recording anyone owns.
+- **Safe on a person's own lamp.** No line writes to the lamp's memory,
+  starts work on a computer, puts the lamp to sleep, turns privacy on or
+  moves its body, so a lamp with no head touch never needs waking. Run it
+  in an empty room. Scenes are 30 s apart (`VOICESET_GAP`), longer than a
+  conversation's 20 s, so each starts outside one.
+- **Results.**
+  - `$PLAYED_OUT/scenarios/voiceset-LABEL.txt`: the scorecard. A line a group, each miss with what was heard, and the first answer sound's median and p90.
+  - `voiceset-LABEL.tsv`: a row a played line.
+  - `voiceset-history.tsv`: a row a group a run (when, label, lamp, group, right, lines), for the trend.
+- **Its limits.** A played voice from a speaker is heard worse than a
+  person, and `say` voices are not people. The lines are a smoke test of
+  each use case, and the desk kit's made voices (above) are the better test
+  of hearing.
 
 ## What it needs
 

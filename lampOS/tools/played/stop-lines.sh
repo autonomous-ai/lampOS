@@ -127,7 +127,8 @@ quiet() { # until the lamp has heard and said nothing for 45 s (a voice just res
 
 say_line() { # TEXT: said from this Mac's speaker, made once and kept
   local f
-  f="$PLAYED_OUT/prompts/generated/stop-lines-$(printf '%s' "$VOICE|$RATE|$1" | shasum -a 256 | cut -c1-16).aiff"
+  # The sayer is in the key (the Reviewer-lead's P2-b on #8673): a mac `say` file is never played for el-say.sh's line.
+  f="$PLAYED_OUT/prompts/generated/stop-lines-$(printf '%s' "$SAY|$VOICE|$RATE|$1" | shasum -a 256 | cut -c1-16).aiff"
   [[ -s $f ]] || "$SAY" -v "$VOICE" -r "$RATE" -o "$f" "$1"
   echo "  $(date +%H:%M:%S) PLAY $1" >>"$report"
   "$PLAY" "$f"

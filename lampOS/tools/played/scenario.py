@@ -5,6 +5,10 @@ usage: scenario.py NAME STEP [STEP ...]
   STEP is  VOICE|TEXT|WAIT_AFTER_SECONDS      e.g.  "Daniel|Lamp, how are you today?|9"
            or  pause|SECONDS
            or  wav|PATH|WAIT_AFTER_SECONDS|LABEL   a wav played as it is, its PLAY line "wav: LABEL"
+           or  bg|NAME|VOLUME[|LEAD]          make_noise.py's bed NAME under the rest of the scene, at afplay's VOLUME
+                                               (0 to 1), LEAD seconds (2) before the next step; "bgstop" ends it
+  WAIT_AFTER_SECONDS may be "6a": 6 s after the lamp is done with the line (its answer played to its last sample, or
+  its turn ended with none), as a person goes on after the lamp stops.
 Speech is synthesised once with macOS `say`, kept in $PLAYED_OUT/prompts/generated/ and reused. A played voice is a smoke
 test: the lamp's voice microphone hears replayed speech worse than a person. Output is also saved under
 $PLAYED_OUT/scenarios/ (PLAYED_OUT defaults to ~/lamp-played). The lamp is reached with lamp_ssh beside this file
@@ -18,6 +22,13 @@ SSH_ENV = dict(os.environ, LAMP_SSH_TIMEOUT='5')
 RATE = os.environ.get('LAMP_SAY_RATE', '185')
 
 def wav_for(voice, text):
+    # PLAYED_WAV_DIR (off by default): every line is played from its rendering there, <sha12 of "voice|text">.wav
+    # (16 kHz 16-bit mono, e.g. ElevenLabs); a line with none stops the run rather than fall back to `say`, so a
+    # rendered set never mixes in mac voices unseen (the Reviewer-lead's P2-b on #8673). Unset: `say`, as before.
+    pre = os.environ.get('PLAYED_WAV_DIR') and f"{os.environ['PLAYED_WAV_DIR']}/{hashlib.sha256(f'{voice}|{text}'.encode()).hexdigest()[:12]}.wav"
+    if pre:
+        if os.path.exists(pre): return pre
+        sys.exit(f'scenario.py: no rendered WAV in PLAYED_WAV_DIR for a {voice} line; render it or unset PLAYED_WAV_DIR.')
     key = hashlib.sha256(f'{voice}|{RATE}|{text}'.encode()).hexdigest()[:16]
     path = f'{V}/prompts/generated/{key}.wav'
     if not os.path.exists(path):
@@ -33,6 +44,38 @@ KEEP = ('listening_ready', 'input_candidate', 'input_admitted', 'local_endpoint'
         'provider_turn_failed', 'provider_unavailable', 'provider_ready', 'input_candidate_rejected', 'duplex_yield', 'duplex_commit', 'duplex_resume', 'barrier_assumed',
         'provider_ownership_assumed', 'provider_turn_complete', 'provider_terminal', 'service_provider_ended', 'provider_first_audio')
 
+TAIL = r'''S=$(sudo -n ls -t /var/lib/lampOS/voice/sessions | head -1); F=$(sudo -n sh -c "ls -t /var/lib/lampOS/voice/sessions/$S/metadata/events-*.jsonl" | head -1); sudo -n tail -n 400 "$F"; python3 -c 'import time; print("NOW", time.monotonic_ns()//1000)' '''
+# The lamp's own output only: what it hears (a noise bed, someone else) never keeps a scene waiting (Twelve's P3 on
+# #8673: under a bed, heard input kept pushing the wait to its cap, past the conversation's window).
+BUSY = ('speaker_first_write', 'provider_audio_enqueued')
+
+def lamp_done(since_us, most=90.0, quiet_us=2_000_000):
+    """Until the lamp is done with the line played at `since_us` (the lamp's clock): a turn finished after it, nothing
+    said for `quiet_us` since, and no answer begun after that turn's end. Gives the seconds since the lamp's last
+    sample, or None after `most` seconds."""
+    until = time.monotonic() + most
+    while time.monotonic() < until:
+        time.sleep(0.8)
+        try:
+            out = lamp(TAIL, timeout=10)
+        except subprocess.TimeoutExpired:
+            continue
+        now, finished, busy = None, 0, 0
+        for line in out.splitlines():
+            if line.startswith('NOW '):
+                now = int(line[4:]); continue
+            try: r = json.loads(line)
+            except ValueError: continue
+            at = r.get('at_us', 0)
+            if at <= since_us: continue
+            if r.get('kind') == 'turn_finished': finished = max(finished, at)
+            elif r.get('kind') in BUSY: busy = max(busy, at)
+        if now and finished and busy <= finished and now - max(finished, busy) >= quiet_us:
+            # Seconds since its last sample, so a wait "Na" counts N from there, not from this poll.
+            return (now - max(finished, busy)) / 1e6
+    print(f'scenario.py: the lamp was not done with the line in {most:.0f} s; going on', file=sys.stderr)
+    return None
+
 def main():
     if not os.environ.get('LAMP_HOST'):
         sys.exit("scenario.py: LAMP_HOST is not set. Set it to your own lamp's address (see README.md). Nothing was played.")
@@ -45,21 +88,38 @@ def main():
     name, steps = sys.argv[1], sys.argv[2:]
     start = int(lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'").strip())
     played = []
+    background, beds = None, []
     for step in steps:
         parts = step.split('|')
         if parts[0] == 'pause':
             time.sleep(float(parts[1])); continue
+        if parts[0] == 'bg':
+            if background: background.terminate()
+            at = int(lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'").strip())
+            background = subprocess.Popen(['/usr/bin/afplay', '-v', parts[2], f'{V}/prompts/noise/{parts[1]}.wav'])
+            beds.append((at, parts[1], parts[2]))
+            time.sleep(float(parts[3]) if len(parts) > 3 else 2.0)
+            continue
+        if parts[0] == 'bgstop':
+            if background: background.terminate(); background = None
+            continue
         if parts[0] == 'wav':
-            voice, path, wait = 'wav', parts[1], float(parts[2])
+            voice, path, wait = 'wav', parts[1], parts[2]
             text = parts[3] if len(parts) > 3 else os.path.basename(path)
         else:
-            voice, text, wait = parts[0], parts[1], float(parts[2])
+            voice, text, wait = parts[0], parts[1], parts[2]
             path = wav_for(voice, text)
         at = int(lamp("python3 -c 'import time; print(time.monotonic_ns()//1000)'").strip())
         subprocess.run(['/usr/bin/afplay', path], check=True)
         done = time.monotonic()
         played.append((at, voice, text))
-        time.sleep(wait)
+        if wait.endswith('a'):
+            since = lamp_done(at) or 0.0
+            time.sleep(max(0.0, float(wait[:-1]) - since))
+        else:
+            time.sleep(float(wait))
+    if background:
+        background.terminate()
     rows = []
     # Turns whose audio reached the speaker, from the whole session: a turn cut before its first write (the person went
     # on talking, 17 Oct 16:2x) has a transcript of words never heard, which read as the lamp saying its opening twice.
@@ -72,6 +132,7 @@ def main():
     rows.sort(key=lambda r: r.get('service_sequence', 0))
     out = [f'scenario {name}  {time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}  say rate {RATE}']
     events = [(at, 'PLAY ', f'{voice}: {text}') for at, voice, text in played]
+    events += [(at, '     ', f'[background {bed} at volume {volume}]') for at, bed, volume in beds]
     ep = None; waits = []
     for r in rows:
         k = r['kind']; at = r['at_us']
