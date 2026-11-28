@@ -333,6 +333,19 @@ pub struct NewsWords {
     pub progress_a_minute: String,
     /// ...or `{minutes}`; nothing when not known.
     pub progress_minutes: String,
+    /// The still-working beats' lines (`task_news::Still`), said as they
+    /// are: the first...
+    #[serde(default = "still_0")]
+    pub still_0: String,
+    /// ...the second and third, in turn while more are due...
+    #[serde(default = "still_1")]
+    pub still_1: String,
+    #[serde(default = "still_2")]
+    pub still_2: String,
+    /// ...and the last. No slots; a skill without them says the built-in
+    /// words.
+    #[serde(default = "still_3")]
+    pub still_3: String,
     /// Each sign.
     pub tests_pass: String,
     pub build_works: String,
@@ -430,6 +443,20 @@ fn failed_not_default() -> String {
 /// switched to another agent (lamp-tasks' `direct::SWITCHED`).
 pub const SWITCHED_LINE: &str =
     "That stopped because I switched to another agent. Please ask me again.";
+
+/// [`NewsWords::still_0`] to `still_3`, built in.
+fn still_0() -> String {
+    "Still on it, I'll tell you when it's ready.".into()
+}
+fn still_1() -> String {
+    "Still working on that, hang on.".into()
+}
+fn still_2() -> String {
+    "Taking a bit longer, I'm still on it.".into()
+}
+fn still_3() -> String {
+    "This one's a long one. I'll tell you as soon as it's done.".into()
+}
 
 /// [`NewsWords::checking`]'s words, built in (#8170).
 fn checking() -> String {
@@ -535,6 +562,10 @@ impl NewsWords {
             progress_signs: " Signs of a step forward in it: {signs}.".into(),
             progress_a_minute: " It has been at it for about a minute.".into(),
             progress_minutes: " It has been at it for about {minutes} minutes.".into(),
+            still_0: still_0(),
+            still_1: still_1(),
+            still_2: still_2(),
+            still_3: still_3(),
             tests_pass: "the tests pass".into(),
             build_works: "the build works".into(),
             fixed: "something was fixed".into(),
@@ -655,6 +686,10 @@ impl NewsWords {
                 ("progress_signs", &self.progress_signs, &["signs"]),
                 ("progress_a_minute", &self.progress_a_minute, &[]),
                 ("progress_minutes", &self.progress_minutes, &["minutes"]),
+                ("still_0", &self.still_0, &[]),
+                ("still_1", &self.still_1, &[]),
+                ("still_2", &self.still_2, &[]),
+                ("still_3", &self.still_3, &[]),
                 ("tests_pass", &self.tests_pass, &[]),
                 ("build_works", &self.build_works, &[]),
                 ("fixed", &self.fixed, &[]),

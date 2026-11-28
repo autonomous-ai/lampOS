@@ -14,8 +14,9 @@ needs = ["eyes", "voice", "body", "light"]
 # installable skills"): the news of work the lamp handed over.
 kind = "core"
 # 1.1.0: the `checking`, `failed_not_started` and `start_unsure` words
-# (#8170), new since 1.0.0.
-version = "1.1.0"
+# (#8170), new since 1.0.0; 1.2.0: the still-working beats' `still_0` to
+# `still_3`.
+version = "1.2.0"
 
 # What it may read and use, and nothing more: the tasks, the faces to look
 # at, the gestures, a step of dim and the voice's news.
@@ -164,6 +165,11 @@ progress = "Progress on work you handed over for the person: {who} is still work
 progress_signs = " Signs of a step forward in it: {signs}."
 progress_a_minute = " It has been at it for about a minute."
 progress_minutes = " It has been at it for about {minutes} minutes."
+# The still-working beats (LAMP_PROGRESS_NEWS=still), said as they are: the first, the second and third in turn, the last.
+still_0 = "Still on it, I'll tell you when it's ready."
+still_1 = "Still working on that, hang on."
+still_2 = "Taking a bit longer, I'm still on it."
+still_3 = "This one's a long one. I'll tell you as soon as it's done."
 tests_pass = "the tests pass"
 build_works = "the build works"
 fixed = "something was fixed"

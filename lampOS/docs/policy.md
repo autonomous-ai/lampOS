@@ -1777,7 +1777,9 @@ when the lamp speaks first, and until now it decided nothing. **Off unless
   ([tasks.md](tasks.md#the-voices-side-of-progress-news-752)): a `say_now`
   at most 60 s old, of the store and about the newest change `tasks/status`
   shows, is fetched and told under the voice's own gates. A `wait` does
-  nothing. Neither side acts without its own switch.
+  nothing. Neither side acts without its own switch. The voice's
+  still-working beats (`LAMP_PROGRESS_NEWS=still`) never go through the
+  policy ([tasks.md](tasks.md#still-working-beats)).
 - **The hard rules** are unchanged and hold before the voice's gates: no
   question while anyone is talking to the lamp, at most one note per task in
   15 minutes. Acting, the notes chosen are no longer added to the turns the
