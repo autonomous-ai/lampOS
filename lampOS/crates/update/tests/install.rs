@@ -2789,6 +2789,38 @@ fn the_product_turns_offline_rings_on_only_in_lamp_voice() {
     }
 }
 
+/// #8881: `LAMP_BEAT_ENGINES` is on in the product only in lamp-cloud,
+/// once. Its one reader is lamp-cloud's heartbeat (`ping::engines_on`,
+/// `ping::ENGINES_ENVIRONMENT`), which says the OpenClaw, Hermes and
+/// Harness versions and installed state from lamp-update's kept
+/// `update/status`. Named here, not taken from lamp-cloud, which already
+/// dev-depends on this crate. A later edit that drops it, sets it twice,
+/// or names it in another unit fails here.
+#[test]
+fn the_product_turns_beat_engines_on_only_in_lamp_cloud() {
+    let name = "LAMP_BEAT_ENGINES";
+    let line = format!("Environment={name}=on");
+    let owners = ["lamp-cloud.service"];
+    for (unit, text) in install::PRODUCT {
+        let on = section(text, "Service")
+            .iter()
+            .filter(|set| **set == line)
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|set| !set.starts_with('#') && set.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+        assert_eq!(mentioned, on, "{unit}: {name}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner} is not a product unit"
+        );
+    }
+}
+
 /// #8839 (the lead's test on lamp-52e6 at stable 16443, 27 Nov): a line
 /// begun over the lamp's own answer is a follow-up like any line in the
 /// conversation's 20 s, with no look and no test of its words, by the
