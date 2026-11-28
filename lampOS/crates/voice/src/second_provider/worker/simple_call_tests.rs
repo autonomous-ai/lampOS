@@ -519,34 +519,66 @@ fn simple_call_a_stop_keeps_the_window_from_the_lamps_last_words() {
 }
 
 /// A stop ends the lamp's words where it cut them: the rest of an answer
-/// sent ahead and never played counts for nothing. Words sent to play 30 s
-/// more, stopped now: a line 5 s later is answered as the conversation going
-/// on, and one 25 s later is held, though both began before the words sent
-/// would have ended.
+/// sent ahead and never played counts for nothing. The stop is told where
+/// the product tells it. A hand's Stop is told as the next line begins
+/// (`after_stop`): an answer begun 10 s ago and sent 40 s ahead, stopped by
+/// a hand 5 s in; the next line, now, is answered as the conversation going
+/// on, and one 25 s later is held. A stop said aloud is told at the stop,
+/// before its own line, whose words the route counts from the stop: an
+/// answer begun 5 s ago and sent 40 s ahead, stopped aloud now, then "Okay,
+/// I'll stop there." for 1.5 s; a line 5 s after it is answered, and one 25 s
+/// after it is held. Every held line began before the words sent would have
+/// ended.
 #[test]
 fn simple_call_a_stop_ends_the_lamps_words_where_it_cut_them() {
     let _one = crate::provider_worker::tests::one_thread();
     use crate::room_told::Room;
+    use crate::second_provider::Did;
     let none = || signs(None, Room::Unknown, vec![]);
+    let held = Some(crate::second_provider::SIMPLE_HELD);
+    // A hand's Stop, told as the next line begins.
     let mut heeding = heeding(true, None);
     let now = monotonic_us();
-    heeding.lamp_did(crate::second_provider::Did::Said(8, now + 30 * S));
-    heeding.lamp_did(crate::second_provider::Did::Stopped);
+    heeding.lamp_did(Did::Said(8, now.saturating_sub(10 * S) + 40 * S));
+    heeding.lamp_did(Did::Stopped);
+    assert_eq!(
+        judged(&mut heeding, 9, now, "So which one is bigger?", none()),
+        None,
+        "the line after a hand's stop"
+    );
+    assert_eq!(
+        judged(&mut heeding, 10, now + 25 * S, "And the other one?", none()),
+        held,
+        "25 s after it"
+    );
+    // A stop said aloud, told at the stop, then its own line's words.
+    let mut heeding = self::heeding(true, None);
+    let now = monotonic_us();
+    heeding.lamp_did(Did::Said(8, now.saturating_sub(5 * S) + 40 * S));
+    heeding.lamp_did(Did::Stopped);
+    let line_until = now + 1_500_000;
+    heeding.lamp_did(Did::Said(9, line_until));
     assert_eq!(
         judged(
             &mut heeding,
-            9,
-            now + 5 * S,
+            10,
+            line_until + 5 * S,
             "So which one is bigger?",
             none()
         ),
         None,
-        "5 s after the cut"
+        "5 s after the stop's line"
     );
     assert_eq!(
-        judged(&mut heeding, 10, now + 25 * S, "And the other one?", none()),
-        Some(crate::second_provider::SIMPLE_HELD),
-        "25 s after the cut"
+        judged(
+            &mut heeding,
+            11,
+            line_until + 25 * S,
+            "And then we went to the market.",
+            none()
+        ),
+        held,
+        "25 s after the stop's line"
     );
 }
 

@@ -16438,61 +16438,188 @@ async fn a_stop_said_over_the_lamp_is_answered_in_the_owners_language() {
     assert!(script.asked.lock().unwrap().is_empty());
 }
 
+/// What the rule is told as a stop said aloud is answered, with
+/// `LAMP_SIMPLE_CALL` or without it: `words` said over a long answer
+/// (request 1, begun 5 s before the stop and sent 40 s ahead, so the words
+/// sent would play until 35 s after it), as request 2. Each tell in order,
+/// with when it came, goes on to `rule` too when one is given, as the long
+/// answer's words do; with the turn's outputs and the clock before the line
+/// and after its turn.
+async fn told_at_a_spoken_stop(
+    words: &str,
+    simple: bool,
+    rule: Option<Arc<Mutex<super::worker::Heeding>>>,
+) -> (Vec<(Did, u64)>, Vec<String>, u64, u64) {
+    const S: u64 = 1_000_000;
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(words.to_owned())].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let built = if simple {
+        built.taking_simple_calls()
+    } else {
+        built
+    };
+    let told: Arc<Mutex<Vec<(Did, u64)>>> = Arc::default();
+    let seen = told.clone();
+    let forward = rule.clone();
+    let mut engine = built
+        .ending_spoken_stops(true)
+        .telling_what_it_did(Arc::new(move |did| {
+            seen.lock().unwrap().push((did, lamp_ipc::monotonic_us()));
+            if let Some(rule) = &forward {
+                rule.lock().unwrap().lamp_did(did);
+            }
+        }));
+    let before = lamp_ipc::monotonic_us();
+    // The long answer's words sent so far, as the route and the rule keep
+    // them: 40 s of them from its start 5 s ago.
+    let sent_until = before.saturating_sub(5 * S) + 40 * S;
+    engine
+        .shared
+        .said_until_us
+        .store(sent_until, Ordering::Relaxed);
+    if let Some(rule) = &rule {
+        rule.lock().unwrap().lamp_did(Did::Said(1, sent_until));
+    }
+    engine.submit(start_marked(2, true, false, false));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let out = turn(&mut engine).await;
+    let after = lamp_ipc::monotonic_us();
+    assert!(
+        out.contains(&format!("said:{}", crate::spoken_stop::LINE)),
+        "{words}, {simple}: {out:?}"
+    );
+    assert!(
+        script.asked.lock().unwrap().is_empty(),
+        "{words}, {simple}: the model is not asked"
+    );
+    let told = told.lock().unwrap().clone();
+    (told, out, before, after)
+}
+
+/// How long the stop's own line plays: the scripted voice says every line
+/// as 1,500 samples, each its text's length.
+fn stop_line_us() -> u64 {
+    1_500 * 1_000_000 / u64::from(net::TTS_SAMPLE_RATE)
+}
+
 /// `LAMP_SIMPLE_CALL` (Fifth's gate on lamp-52e6: "Okay, okay, never mind."
 /// over an answer, the lamp's "Okay, I'll stop there.", and then "So which
 /// one is bigger?" held): every time the lamp speaks the window opens,
 /// so a stop's own line is told to the rule as the lamp's words, as an
 /// answer's are ([`Did::Said`], by its request), and the window runs on from
-/// its end. Without the switch a fixed line tells the rule nothing, as before.
+/// its end. The line counts from the stop, never from the end of the answer
+/// sent ahead (the Reviewer-lead's P2 on #8892): its words end at the stop's
+/// time and the line's length. Without the switch a fixed line tells the
+/// rule nothing, as before.
 #[tokio::test]
 async fn with_simple_call_a_stops_own_line_is_told_as_the_lamps_words() {
     // It may close the voice's conversation: hold the thread and leave it new.
     let _thread = thread_held();
-    for simple in [true, false] {
-        let script = Arc::new(Script {
-            heard: Mutex::new([Ok("Okay, okay, never mind.".to_owned())].into()),
-            ..Script::default()
-        });
-        let (built, _, _) = scripted(script.clone());
-        let built = if simple {
-            built.taking_simple_calls()
-        } else {
-            built
-        };
-        let said: Arc<Mutex<Vec<(u64, u64)>>> = Arc::default();
-        let seen = said.clone();
-        let mut engine = built
-            .ending_spoken_stops(true)
-            .telling_what_it_did(Arc::new(move |did| {
-                if let Did::Said(request, until_us) = did {
-                    seen.lock().unwrap().push((request, until_us));
-                }
-            }));
-        let before = lamp_ipc::monotonic_us();
-        engine.submit(start_marked(1, true, false, false));
-        engine.submit(audio(1, 1));
-        engine.submit(end(1));
-        let out = turn(&mut engine).await;
-        assert!(
-            out.contains(&format!("said:{}", crate::spoken_stop::LINE)),
-            "{simple}: {out:?}"
+    let (told, out, _, after) = told_at_a_spoken_stop("Okay, okay, never mind.", true, None).await;
+    // The scripted voice's audio carries its text's length: the stop's line.
+    assert!(
+        out.contains(&format!("audio:{}", crate::spoken_stop::LINE.len())),
+        "{out:?}"
+    );
+    let stopped_at = told
+        .iter()
+        .find(|(did, _)| *did == Did::Stopped)
+        .map(|(_, at)| *at)
+        .expect("the stop is told");
+    let ends: Vec<u64> = told
+        .iter()
+        .filter_map(|(did, _)| match did {
+            Did::Said(request, until_us) => Some((*request, *until_us)),
+            _ => None,
+        })
+        .map(|(request, until_us)| {
+            assert_eq!(request, 2, "only the stop's line: {told:?}");
+            until_us
+        })
+        .collect();
+    let end = *ends.last().expect("the stop's line is the lamp's words");
+    assert!(
+        stopped_at + stop_line_us() <= end && end <= after + stop_line_us(),
+        "the stop at {stopped_at} and its line's {} us, ended at {end}, the turn over at {after}: {told:?}",
+        stop_line_us()
+    );
+    let (told, _, _, _) = told_at_a_spoken_stop("Okay, okay, never mind.", false, None).await;
+    assert!(told.is_empty(), "off: as before: {told:?}");
+}
+
+/// `LAMP_SIMPLE_CALL` (the Reviewer-lead's P2 on #8892): a stop said aloud,
+/// "never mind", "stop" or "enough", tells the rule the lamp stopped
+/// ([`Did::Stopped`]), as a hand's Stop does at the next line's start: once,
+/// at the stop, before the words of its own line. Without the switch, as
+/// before: the rule hears of no stop said aloud.
+#[tokio::test]
+async fn with_simple_call_a_spoken_stop_tells_the_rule_it_stopped() {
+    let _thread = thread_held();
+    for words in ["Okay, okay, never mind.", "Stop.", "That's enough."] {
+        let (told, _, _, _) = told_at_a_spoken_stop(words, true, None).await;
+        let stops: Vec<usize> = told
+            .iter()
+            .enumerate()
+            .filter(|(_, (did, _))| *did == Did::Stopped)
+            .map(|(at, _)| at)
+            .collect();
+        assert_eq!(
+            stops,
+            [0],
+            "{words}: once, before its line's words: {told:?}"
         );
+        let (told, _, _, _) = told_at_a_spoken_stop(words, false, None).await;
         assert!(
-            script.asked.lock().unwrap().is_empty(),
-            "{simple}: the model is not asked"
+            !told.iter().any(|(did, _)| *did == Did::Stopped),
+            "{words}, off: {told:?}"
         );
-        let said = said.lock().unwrap().clone();
-        if simple {
-            assert!(!said.is_empty(), "the stop's line is the lamp's words");
-            assert!(
-                said.iter()
-                    .all(|(request, until_us)| *request == 1 && *until_us > before),
-                "{said:?}"
-            );
-        } else {
-            assert!(said.is_empty(), "off: as before: {said:?}");
-        }
     }
+}
+
+/// `LAMP_SIMPLE_CALL` (the Reviewer-lead's P2 on #8892): a long answer sent
+/// 40 s ahead, stopped 5 s in by "Okay, okay, never mind.", then the lamp's
+/// "Okay, I'll stop there.": what was sent ahead and never played counts for
+/// nothing, and the window runs from the stop's own line, as the rule is told
+/// of both by the route. A question 5 s after the line is answered; a room
+/// line 25 s after it is held, though it began before the answer's words
+/// sent would have ended.
+#[tokio::test]
+async fn with_simple_call_after_a_stop_the_window_runs_from_its_own_line() {
+    const S: u64 = 1_000_000;
+    let _thread = thread_held();
+    let rule = Arc::new(Mutex::new(super::worker::Heeding::new(
+        true, false, None, None,
+    )));
+    {
+        let mut rule = rule.lock().unwrap();
+        rule.as_the_only_voice(false, true, false);
+        rule.hearing_only_said_to_me();
+        rule.taking_simple_calls();
+    }
+    let (_, _, _, after) =
+        told_at_a_spoken_stop("Okay, okay, never mind.", true, Some(rule.clone())).await;
+    // The stop's line played from the stop, over by then at the latest.
+    let played_until = after + stop_line_us();
+    let mut rule = rule.lock().unwrap();
+    let mut heed = |request: u64, began_us: u64, heard: &str| {
+        let verdict = rule.heed(request, (began_us, began_us + 2_200_000), heard, None);
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        verdict
+    };
+    assert_eq!(
+        heed(3, played_until + 5 * S, "So which one is bigger?"),
+        None,
+        "5 s after the stop's line"
+    );
+    assert_eq!(
+        heed(4, played_until + 25 * S, "And then we went to the market."),
+        Some(SIMPLE_HELD),
+        "25 s after the stop's line"
+    );
 }
 
 /// lamp-06c1, 30 Oct 15:53:43 (#4710): "Okay, I'll stop there." was
