@@ -10,6 +10,7 @@ mod client;
 mod delivery_ledger;
 mod engine;
 mod every;
+mod horizon;
 mod kept;
 mod protocol;
 mod runtime;

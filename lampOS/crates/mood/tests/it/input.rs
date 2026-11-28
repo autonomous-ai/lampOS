@@ -136,6 +136,7 @@ fn due(id: u64) -> ScheduleDue {
         ready: true,
         pending: 1,
         waiting_for_clock: 0,
+        horizon: None,
         oldest: Some(ScheduleNotice {
             id,
             delivery: 1,

@@ -11,7 +11,7 @@ use rustix::fs::{self as unix, Mode, OFlags, RenameFlags};
 use std::{
     fs::{self, File, Metadata, TryLockError},
     io,
-    os::unix::fs::MetadataExt,
+    os::unix::{ffi::OsStrExt, fs::MetadataExt},
     path::{Component, Path, PathBuf},
     time::Duration,
 };
@@ -423,11 +423,39 @@ pub struct Store {
 /// looks, health says reminders were set aside and won't sound (#1562's
 /// follow-up, as lamp-tasks' #1554). Read only for its names.
 pub fn kept_aside(dir: &Path) -> io::Result<Option<String>> {
+    kept_aside_with_limit(dir, usize::MAX, false)
+}
+
+/// The startup horizon scan includes every directory entry, even unrelated or
+/// non-UTF-8 names. An error or excess is unknown, never evidence of emptiness.
+/// It reads names only and must not run on each tick or publication.
+pub const RETAINED_SCAN_ENTRIES: usize = 256;
+
+pub fn kept_aside_bounded(dir: &Path) -> io::Result<Option<String>> {
+    kept_aside_with_limit(dir, RETAINED_SCAN_ENTRIES, true)
+}
+
+fn kept_aside_with_limit(
+    dir: &Path,
+    limit: usize,
+    require_visibility: bool,
+) -> io::Result<Option<String>> {
     let prefix = format!("{DATABASE}.newer-");
     let mut newest: Option<(u64, String)> = None;
-    for entry in fs::read_dir(dir)? {
+    let mut unclassified_retained = false;
+    for (index, entry) in fs::read_dir(dir)?.enumerate() {
+        if index >= limit {
+            return Err(invalid(
+                "too many entries to establish retained schedule visibility",
+            ));
+        }
         let name = entry?.file_name();
-        let Some(name) = name.to_str() else { continue };
+        let Some(name) = name.to_str() else {
+            // Unrelated byte names still count toward the cap. A name in the
+            // reserved archive namespace cannot establish an empty store.
+            unclassified_retained |= name.as_bytes().starts_with(prefix.as_bytes());
+            continue;
+        };
         let Some(rest) = name.strip_prefix(&prefix) else {
             continue;
         };
@@ -436,6 +464,7 @@ pub fn kept_aside(dir: &Path) -> io::Result<Option<String>> {
             .iter()
             .any(|suffix| rest.ends_with(suffix))
         {
+            unclassified_retained = true;
             continue;
         }
         let since = rest
@@ -446,6 +475,9 @@ pub fn kept_aside(dir: &Path) -> io::Result<Option<String>> {
         if newest.as_ref().is_none_or(|(at, _)| since >= *at) {
             newest = Some((since, name.to_owned()));
         }
+    }
+    if require_visibility && newest.is_none() && unclassified_retained {
+        return Err(invalid("unclassified retained schedule artifacts"));
     }
     Ok(newest.map(|(_, name)| name))
 }

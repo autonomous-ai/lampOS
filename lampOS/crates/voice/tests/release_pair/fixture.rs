@@ -385,6 +385,7 @@ impl Fixture {
             ready: true,
             pending: u32::from(self.pending),
             waiting_for_clock: 0,
+            horizon: None,
             oldest: self.pending.then_some(ScheduleNotice {
                 id: 1,
                 delivery: 1,

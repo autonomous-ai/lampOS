@@ -1,6 +1,8 @@
 //! Filesystem and SQLite durability fixtures on this test host. Crashing a
 //! child process proves rollback recovery, not survival of a physical power cut.
-use lamp_schedule::store::{MAX_STATE_BYTES, Store, kept_aside};
+use lamp_schedule::store::{
+    MAX_STATE_BYTES, RETAINED_SCAN_ENTRIES, Store, kept_aside, kept_aside_bounded,
+};
 use rusqlite::Connection;
 use std::{
     fs::{self, DirBuilder, OpenOptions},
@@ -54,6 +56,128 @@ fn private_file(path: &Path, bytes: &[u8]) {
         .unwrap();
     file.write_all(bytes).unwrap();
     file.sync_all().unwrap();
+}
+
+#[test]
+fn retained_visibility_counts_all_names_and_refuses_overfull_directories() {
+    let dir = tempfile::tempdir().unwrap();
+    assert_eq!(kept_aside_bounded(dir.path()).unwrap(), None);
+    let kept = "schedule.sqlite3.newer-99-1791964800";
+    fs::write(dir.path().join(kept), b"private opaque content is not read").unwrap();
+    for index in 1..RETAINED_SCAN_ENTRIES {
+        fs::write(dir.path().join(format!(".unrelated-{index}")), b"").unwrap();
+    }
+    assert_eq!(
+        kept_aside_bounded(dir.path()).unwrap().as_deref(),
+        Some(kept)
+    );
+    fs::write(dir.path().join("one-too-many"), b"").unwrap();
+    assert!(kept_aside_bounded(dir.path()).is_err());
+    assert!(
+        dir.path().join(kept).exists(),
+        "the scan never removes evidence"
+    );
+    assert_eq!(
+        fs::read_dir(dir.path()).unwrap().count(),
+        RETAINED_SCAN_ENTRIES + 1
+    );
+}
+
+#[test]
+fn retained_visibility_reads_names_only_and_errors_are_not_empty() {
+    #[cfg(target_os = "linux")]
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+    let dir = tempfile::tempdir().unwrap();
+    assert!(kept_aside_bounded(&dir.path().join("missing")).is_err());
+    fs::write(dir.path().join("file"), b"private").unwrap();
+    assert!(kept_aside_bounded(&dir.path().join("file")).is_err());
+    // APFS refuses invalid UTF-8 filenames; Linux accepts this separate case.
+    #[cfg(target_os = "linux")]
+    fs::write(dir.path().join(OsString::from_vec(vec![0xff])), b"private").unwrap();
+    fs::write(
+        dir.path().join("schedule.sqlite3.newer-2-99-wal"),
+        b"private",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("schedule.sqlite3.newer-2-99-shm"),
+        b"private",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("schedule.sqlite3.newer-2-99-journal"),
+        b"private",
+    )
+    .unwrap();
+    // A matching name blocks clearance even when it is a symlink; the target
+    // is never opened, and no claim is made about its contents or format.
+    symlink(
+        "missing-private-target",
+        dir.path().join("schedule.sqlite3.newer-3-100"),
+    )
+    .unwrap();
+    assert_eq!(
+        kept_aside_bounded(dir.path()).unwrap().as_deref(),
+        Some("schedule.sqlite3.newer-3-100")
+    );
+}
+
+#[test]
+fn retained_visibility_requires_a_main_archive_for_sidecar_only_evidence() {
+    for suffix in ["-journal", "-wal", "-shm"] {
+        let dir = tempfile::tempdir().unwrap();
+        let main = "schedule.sqlite3.newer-2-1791964800";
+        fs::write(
+            dir.path().join(format!("{main}{suffix}")),
+            b"PRIVATE_SIDECAR",
+        )
+        .unwrap();
+        let error = kept_aside_bounded(dir.path()).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "unclassified retained schedule artifacts"
+        );
+        assert_eq!(
+            kept_aside(dir.path()).unwrap(),
+            None,
+            "legacy classifier is unchanged"
+        );
+        fs::write(dir.path().join(main), b"PRIVATE_MAIN").unwrap();
+        assert_eq!(
+            kept_aside_bounded(dir.path()).unwrap().as_deref(),
+            Some(main)
+        );
+    }
+}
+
+// APFS cannot represent these filenames. The same bounded scanner must handle
+// them on the target Linux filesystem without exporting or echoing their bytes.
+#[cfg(target_os = "linux")]
+#[test]
+fn retained_visibility_distinguishes_unrelated_and_reserved_non_utf8_names() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path()
+            .join(OsString::from_vec(b"unrelated-\xff".to_vec())),
+        b"",
+    )
+    .unwrap();
+    assert_eq!(kept_aside_bounded(dir.path()).unwrap(), None);
+    let name = OsString::from_vec(b"schedule.sqlite3.newer-PRIVATE_NAME-\xff".to_vec());
+    fs::write(dir.path().join(name), b"PRIVATE_BYTES").unwrap();
+    let error = kept_aside_bounded(dir.path()).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "unclassified retained schedule artifacts"
+    );
+    assert_eq!(kept_aside(dir.path()).unwrap(), None);
+    let main = "schedule.sqlite3.newer-2-1791964800";
+    fs::write(dir.path().join(main), b"PRIVATE_MAIN").unwrap();
+    assert_eq!(
+        kept_aside_bounded(dir.path()).unwrap().as_deref(),
+        Some(main)
+    );
 }
 
 #[test]

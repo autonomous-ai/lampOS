@@ -246,6 +246,7 @@ fn an_import_takes_touch_and_reminders_and_can_be_told_the_time_of_day() {
         ready: true,
         pending: 1,
         waiting_for_clock: 0,
+        horizon: None,
         oldest: Some(ScheduleNotice {
             id: 4,
             delivery: 1,

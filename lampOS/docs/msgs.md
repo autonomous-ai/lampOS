@@ -375,12 +375,12 @@ discover the topic; `first_topics()` remains the original seventeen topics.
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
-| `ScheduleDue` | `schedule/due` | latest | 1 / 3 s | Counts and, only while enabled and ready, the oldest pending occurrence's identity and timing; no reminder text |
+| `ScheduleDue` | `schedule/due` | latest | 1 / 3 s | Counts, an optional numeric upcoming-work horizon and, only while enabled and ready, the oldest pending occurrence's identity and timing; no reminder text |
 
 `ScheduleDue` is version 1 of `lamp_msgs/ScheduleDue`. It carries a
 `ClockStamp`, a persistent `store_id` of exactly 32 lowercase hexadecimal
 characters, a `revision`, `enabled`, `ready`, `pending`,
-`waiting_for_clock`, and optional `oldest`. The two counts are each from 0
+`waiting_for_clock`, optional `oldest`, and optional `horizon`. The two counts are each from 0
 through 128 and together cannot exceed 128. `oldest` is present exactly when
 `pending > 0`, `enabled` and `ready` are all true. An unavailable or shadow
 publisher may keep its counts visible but cannot advertise a notice.
@@ -395,6 +395,50 @@ Unknown additive fields are ignored; required fields, numeric types and
 the checks above are enforced. `check()` validates structure, including
 the existing `ClockStamp` identifier contract. It does not read a clock,
 establish current boot/freshness, or deduplicate deliveries.
+
+`horizon` is additive: old readers ignore it and a new reader of an older
+message gets `None`, meaning unsupported/unknown, never an empty schedule.
+It contains only the following typed numbers and enums:
+
+| `state` | Fields | Meaning |
+|---|---|---|
+| `empty` | `sampled_boot_ms` | No active readable or unread items and no retained newer store concealing schedules at that sample. |
+| `next` | `sampled_boot_ms`, `in_ms`, `clock` | Earliest active deadline, as a nonnegative duration at the source sample; pending work is zero. |
+| `unknown` | `reason` | `clock`, `unread`, `retained_store` or `unavailable`; no clear horizon can be established. |
+
+Known (`empty`/`next`) horizons require `enabled && ready` and zero
+`waiting_for_clock`. Empty additionally requires zero pending items; next
+requires `in_ms <= i64::MAX`, and zero `in_ms` when pending is positive.
+Required fields, unsigned integer types and these cross-field checks are
+validated. An unavailable owner withdraws a previously known horizon. None
+of these states changes the notice, acknowledgement or delivery semantics.
+
+The required next-horizon `clock` has basis `elapsed`, or basis `wall` with
+`sampled_unix_ms` in the supported 1970–9999 Unix range. It is wall-dependent
+if any nonpending effective deadline uses wall time, even when an elapsed
+timer is currently earliest. Missing basis metadata is not treated as elapsed.
+The `state` and `basis` tags require these string values; numeric variant
+indexes are refused. Unrelated additive fields remain compatible.
+
+`sampled_boot_ms` is the exact source `ClockSample.boot_ms`, not the later
+publication time. On Linux it uses `CLOCK_BOOTTIME`, which includes suspend;
+the existing `stamp.at_us` uses `CLOCK_MONOTONIC`. A consumer validates both
+the bus envelope and this same-boot source sample, rejects future/stale
+samples, and ages `in_ms` by elapsed boot time. When wall-dependent, the pure
+`ScheduleHorizon::remaining_ms` helper additionally requires current trusted
+Unix time and uses the larger nonnegative wall or boot age. Its result is a
+conservative lower bound for unchanged sampled deadlines in a mixed store.
+The stateless helper cannot remember intermediate clock corrections or an
+owner's durable pending transition. A forward step followed by a rollback can
+therefore make an old sample overstate clearance. Consumers must invalidate
+old samples on observed corrections/source changes and require fresh owner
+state; freshness alone does not exclude an intervening state change.
+The helper does not validate source identity or freshness and returns no
+number for empty/unknown states. A fresh publication cannot make an old sample
+fresh. This is a snapshot, not a reservation: a reminder can be created just
+after publication. No identity,
+reminder text or request content is added to the horizon. See
+[Schedule](schedule.md#upcoming-work-horizon) for the source and consumer rules.
 
 Schedule owns the persistent queue. It advertises the same delivery token
 until an explicit durable socket acknowledgement, cancellation or snooze

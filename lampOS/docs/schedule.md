@@ -244,15 +244,18 @@ all.
 
 **Who is told about the retained reminders.** The journal says it once at
 start, and a crash between the rename and that line leaves none. So health
-says it too, from the file itself: while a `schedule.sqlite3.newer-*` file is
-in Schedule's folder, its `schedule` diagnostic is a warning, "Schedule set
+says it too, from the retained-store visibility found after startup opens:
+when a `schedule.sqlite3.newer-*` file was found in Schedule's folder,
+its `schedule` diagnostic is a warning, "Schedule set
 aside a store from a newer build; its reminders will not sound", with
 `set_aside` naming the newest one (by its trailing seconds), as lamp-tasks'
-health does for its own (#1554). The folder is listed each time the diagnostic is
-published: once a second (`REPORT_EVERY`), and again at each change of
-revision or readiness, and a folder that can't be listed says nothing rather
-than stopping the part. Removing the file, once someone has looked, ends the
-warning. Test: `a_store_set_aside_is_said_in_health_until_it_is_gone`
+health does for its own (#1554). The new visibility scan reads at most 256
+directory entries once, then caches its result for that owner lifetime.
+Unreadable, over-limit or unclassifiable visibility warns and leaves the
+upcoming-work horizon unknown. Publication does not scan the directory.
+Removing a retained file does not clear the warning immediately: a restart
+must establish visibility again. The retained data is never removed by this
+projection. Test: `a_store_set_aside_stays_unknown_until_a_restart_verifies_its_removal`
 (`crates/schedule/tests/it/runtime.rs`).
 
 An existing archive name is never clobbered. Rename, sync or replacement failure
@@ -675,6 +678,8 @@ connection is not evidence that a started mutation was undone.
 | Entire client read/write budget | 1,200 ms from connection acceptance |
 | Idle owner due scan | 50 ms tick; requests also run a due scan |
 | Observer considers owner stale | After 1,500 ms without an updated owner report |
+| Upcoming-work projection | At most 128 active entries, using committed state; no file or network I/O |
+| Retained-store visibility at owner startup | At most 256 directory entries, including unrelated entries; a failed or over-limit scan gives an unknown horizon |
 
 Queued work that has expired before the owner starts it is refused. Once a
 storage call starts, a socket deadline cannot cancel its transaction or bound
@@ -713,7 +718,7 @@ period and a 3-second lifespan. The owner also publishes on revision and
 readiness changes. The period is `runtime::REPORT_EVERY`, given as
 `Config::report_every`; tests give 50 ms, so a test that reads the report
 does not wait a second for it (#1806). Its fields are `stamp`, `store_id`, `revision`, `enabled`,
-`ready`, pending count, waiting-for-clock count, and optional `oldest` metadata:
+`ready`, pending count, waiting-for-clock count, optional `horizon`, and optional `oldest` metadata:
 `id`, `delivery`, `due_unix_ms`, `late`, and optional `late_by_ms`. There is no
 reminder text in this topic. It is a hint to inspect durable work, not a queue
 of speech commands. Multiple due items remain in the private store even though
@@ -731,6 +736,115 @@ pending work remains available through the socket and future publications.
 readiness, publication failures, and refused clients. It does not log reminder
 text or model arguments. Failure diagnostics are not an acknowledgement. There
 is no bus acknowledgement topic: completion is a guarded private `ack` request.
+
+### Upcoming-work horizon
+
+The optional typed `horizon` lets a background evaluator determine whether
+work is due soon without listing private reminders. Old messages omit it;
+that absence means unknown, never an empty schedule. The new field does not
+change the topic version, one-second cadence, notice or delivery protocol.
+
+| State | Fields | Meaning at the source sample |
+|---|---|---|
+| `empty` | `sampled_boot_ms` | The active store is empty, no unread entries or retained newer stores conceal work, and Schedule is available. |
+| `next` | `sampled_boot_ms`, `in_ms`, `clock` | The minimum nonnegative duration to current active work, including timers and reminders. Pending work is zero. |
+| `unknown` | `reason` | `clock`, `unread`, `retained_store` or `unavailable`; timing or complete visibility cannot be established. |
+
+Projection uses only the current committed state, with at most 128 entries.
+It is calculated for each owner report, on the 50 ms idle tick and after
+requests; unchanged bus publication remains once per second.
+It reuses the normal deadline rules: a same-boot timer remains timed when
+wall trust is lost; a calendar reminder or timer after reboot needs trusted
+wall time. Snoozes use their effective deadline. A pending occurrence remains
+zero across clock corrections until Schedule durably acknowledges, cancels,
+snoozes or drops it. The projection never advances repeats or drops late work
+itself. Any unread item or hidden newer store makes the horizon unknown;
+existing zero pending/waiting counts alone cannot establish an empty store.
+
+`clock` is `{ "basis": "elapsed" }` only when every nonpending effective
+deadline uses the current boot's elapsed clock. If any such deadline needs
+wall time, it is `{ "basis": "wall", "sampled_unix_ms": <integer> }`, using
+that same trusted source sample. This includes a rebooted timer even if an
+elapsed timer is currently earliest. A snoozed calendar reminder can instead
+use its current boot's elapsed deadline. The classification covers all active
+work because a wall-clock correction can change which deadline is earliest.
+
+Retained-store visibility is checked after startup opens, under existing
+store ownership, and cached for that owner lifetime. The directory inspection
+has a 256-entry limit including unrelated entries; an I/O error or exceeded
+limit yields unknown. This bounds the new horizon-visibility inspection, not
+the existing identity-recovery scan in `Store::kept_snapshot`, which runs
+during open and retains its prior behavior. Reserved archive names that cannot be classified, or
+orphan retained sidecars without a main archive, cannot establish an empty
+store. No directory scan is added to the tick, publication or
+interactive request path. Ambiguous persistence never publishes a known
+horizon; an unavailable observer withdraws it with the actionable notice.
+The diagnostic uses the same cached visibility: removing a retained newer
+store file does not clear its warning or unknown horizon until the owner
+restarts and checks again. A startup scan error is likewise conservative for
+that owner lifetime.
+The disabled path still starts no clock, filesystem, bus or worker activity.
+
+`sampled_boot_ms` is the exact `ClockSample.boot_ms` used for projection,
+before possible tick/persistence work. Publication and its `ClockStamp` can
+occur later. On Linux the source elapsed clock is `CLOCK_BOOTTIME`, including
+suspend; bus stamps remain `CLOCK_MONOTONIC`. Consumers must validate current
+boot, source/publisher identity and ordering, bus expiry, readiness, and the
+source sample's age independently. Reject future or stale source samples.
+
+For a valid next horizon, `ScheduleHorizon::remaining_ms` first computes
+`boot_age = current_boot_ms - sampled_boot_ms`, refusing a future boot sample.
+Elapsed-only work subtracts that age. Wall-dependent work additionally needs
+a current trusted Unix sample and subtracts
+`max(boot_age, max(0, current_unix_ms - sampled_unix_ms))`. Source and current
+wall times must be within the message's supported Unix range. Against unchanged
+sampled deadlines, a forward wall step shortens the estimate and a backward
+step can make it conservatively short. In a mixed store this is a **lower bound
+for those unchanged deadlines**, not an exact recomputed minimum. The helper returns
+no number for empty/unknown or unusable clock input; it does not validate boot
+identity, publisher, freshness or readiness for its caller.
+
+The helper is stateless: it cannot remember an intermediate wall-clock step
+or Schedule's durable pending transition. For example, a forward step can make
+a calendar reminder pending; a subsequent rollback does not retract that
+pending work, but ageing the older snapshot can again return a positive
+duration. A consumer must invalidate that snapshot after an observed clock
+correction and require fresh owner state reflecting the correction. Freshness
+alone does not rule out an intervening transition, and a source change also
+invalidates the old observation.
+
+A fifteen-minute guard requires a validated estimate to be **greater than**
+900,000 ms, with an additional work and cancellation margin where needed.
+Empty is usable only while the source sample stays fresh. The future nightly
+consumer must define and test a source-age limit and cancellation budget;
+this producer does not implement them. New deadlines can be created
+immediately after admission, so consumers must recheck throughout discretionary
+work and stop when due work, unknown state, wall trust loss, readiness loss or
+a source change appears. This is not a reservation and adds no permission to
+speak, capture, light or move.
+
+The field contains no reminder text, person, request, item or delivery ID.
+Future fleet reports should export aggregate check/defer outcomes only, not
+this precise schedule timing. Publication's one-second cadence is not a
+100 ms creation-to-cancellation guarantee. Hardware latency and the future
+nightly evaluator remain separate validation and integration work.
+
+The host projection target is below 1 ms for 128 entries. On 27 November,
+the release-mode benchmark on x86-64 macOS with Rust 1.96.0 used 2,000
+alternating baseline/extended pairs for each of two full stores:
+
+| 128-item store | Existing `due()` p95 | `due_with_horizon()` p95 | Paired added work p95 |
+|---|---:|---:|---:|
+| Same-boot elapsed timers | 29.718 µs | 64.164 µs | 36.356 µs |
+| Windowed calendar repeats | 89.272 µs | 179.689 µs | 103.002 µs |
+
+The maximum full projection observed was 270.230 µs. Host load was not
+controlled; a separate Linux compilation was active. This boundary includes
+the metadata projection and stamp clone, but excludes clock sampling, disk,
+bus, scheduling, speaker output and target-lamp behavior. Run explicitly with
+`cargo test --release -p lamp-schedule --test it horizon::horizon_projection_host_measurement -- --ignored --exact --nocapture`.
+It has no timing assertion; these host samples do not establish an ARM64
+latency guarantee or a bound on blocking storage.
 
 ## Proposed model tools
 
