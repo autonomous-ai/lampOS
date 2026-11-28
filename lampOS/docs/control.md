@@ -1343,7 +1343,7 @@ a revoke that deletes everything.
 - **Refused** with "this lamp keeps no computer's notes" where lamp-control runs
   without a notes folder (the SDKs' fake lamps keep them in memory).
 - **Changes counted, for the owner's memory** (tracker row C157; the voice's
-  `LAMP_SERVICE_RECORDS_SDK`, off; memory-days.md, "A paired computer's daily
+  `LAMP_SERVICE_RECORDS_SDK`, on in the product since 27 Nov; memory-days.md, "A paired computer's daily
   notes count"). Each kept `notes.set` or `notes.delete` adds one to its
   computer's count, in 15-minute buckets for the last 25 hours, in memory only
   (a count and the time of the last change, never which key); a revoke clears
@@ -1359,6 +1359,8 @@ a revoke that deletes everything.
   `paired_at` in `clients.json` (the same key paired again since makes it
   stale). A keeper's `lamp-control code` is `"keeper"` or not listed. Any other
   `v`, a missing, linked, too large or misshapen file: no computer counts.
+  No writer is built yet, so on a product lamp no computer counts until the
+  pairing side writes it.
 
 ## Skills pushed from a computer (piece 7)
 

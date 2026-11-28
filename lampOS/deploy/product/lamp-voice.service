@@ -757,9 +757,14 @@ Environment=LAMP_SERVICE_RECORDS_REMINDERS=on
 # the person its held write is read back to, through the linked outbox, and two linked lines in the told note. Their
 # whys and rules are their rows in docs/switches.md. On in the product by the product owner's rule of 18 Nov, everything
 # on by default (#6811), beside #7960's ROW on lamp-06c1. The agent's rows need lamp-services' --run-calls
-# (lamp-services.service). The source and sdk rows stay off until their own ROWs (#7960).
+# (lamp-services.service). The source rows stay off until their own ROW (#7960).
 Environment=LAMP_SERVICE_RECORDS_AGENT=on
 Environment=LAMP_SERVICE_RECORDS_LINKED_TOLD=on
+# LAMP_SERVICE_RECORDS_SDK: its why and rules are its row in docs/switches.md. A computer paired from the owner's app
+# gets one row a day in the owner's memory, its notes changes counted, never a key or a value (C157, #7574); read by the
+# second route's worker alone, every 5 min, beside LAMP_SERVICE_RECORDS above. The owner's call of 27 Nov; a row on
+# lamp-06c1 follows. Counts only computers lamp-control's paired-by.json marks `app`, which the pairing side writes.
+Environment=LAMP_SERVICE_RECORDS_SDK=on
 # LAMP_SERVICE_RECORDS_TASKS: its why and rules are its row in docs/switches.md. Work handed to the paired computer
 # on the owner's heard yes is their linked record, its outcome followed for 12 h (#7512); on by the same rule.
 Environment=LAMP_SERVICE_RECORDS_TASKS=on
