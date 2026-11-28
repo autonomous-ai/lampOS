@@ -35,6 +35,9 @@ Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 # A reminder every so many minutes or hours, 15 minutes to 24 hours (repeat_reminder's interval, #4710 2 Nov):
 # on lamp-9adf on 3 Nov "remind me to drink water every fifteen minutes" was set and came due on time.
 Environment=LAMP_SCHEDULE_EVERY=on
+# move_reminder changes a reminder's time and keeps its words and repeat (#8840): on lamp-52e6 on 27 Nov the
+# lamp could not move a daily 4 PM reminder to 4:30, and a cancel and a set left both.
+Environment=LAMP_SCHEDULE_MOVE=on
 # set_timer and set_reminder say that with no length or time in the person's words they set nothing and ask
 # "For how long?" or "What time?" (#8182). The same line in lamp-voice, whose second route refuses such a call.
 Environment=LAMP_TIMER_ASKS_HOW_LONG=on
