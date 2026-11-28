@@ -277,7 +277,7 @@ pub fn message(
 }
 
 /// At most one numeric record, for the same largest detection the mesh uses.
-#[derive(Debug, Serialize)]
+#[derive(Debug, PartialEq, Serialize, serde::Deserialize)]
 pub struct MouthObservation {
     pub at_us: u64,
     pub filled: [usize; 2],

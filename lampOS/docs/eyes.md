@@ -3708,6 +3708,11 @@ root (`LAMP_BUS_ROOT`, or `/run/lampos-bus`) and lamp-eyes does not start
 if it cannot. Monday's silent-face measurement runs without it, so a
 silent face is read.
 
+The [sensor 5 offline reader](speaking-face-sensor.md) groups these existing
+numeric diagnostics by exported voice-line intervals. It preserves missing
+evidence and reports the logged gates; it cannot infer whose line it is or score
+accuracy from the largest anonymous face.
+
 **Explaining an unknown mouth (`--mouth-diagnostics on`, off by default,
 #720).** This is an observation-only CLI option. It requires an already usable
 `LAMP_BUS=on` and `LAMP_EYES_SPEAKING=on`; missing prerequisites fail before
