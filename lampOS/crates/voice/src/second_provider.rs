@@ -2102,6 +2102,10 @@ pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
 /// Whether the lamp's name was heard since a time, by this process's clock
 /// ([`Engine::knowing_the_name_heard`]).
 pub type NameSounded = Arc<dyn Fn(u64) -> bool + Send + Sync>;
+/// `LAMP_SIMPLE_CALL`: whether the one rule lets out a kept line never
+/// judged as the line in hand, by its request, window (first sound to end,
+/// by this process's clock) and words ([`Engine::judging_kept_lines`]).
+pub type KeptLine = Arc<dyn Fn(u64, (u64, u64), &str) -> bool + Send + Sync>;
 /// Whether lamp-name heard the name in a request's line, by its request
 /// ([`Engine::knowing_the_name_fired`]).
 pub type NameFired = Arc<dyn Fn(u64) -> bool + Send + Sync>;
@@ -2498,6 +2502,9 @@ struct Shared {
     call_note: Option<CallNote>,
     /// Whether the lamp's name was heard since a time.
     name_sounded: Option<NameSounded>,
+    /// `LAMP_SIMPLE_CALL`: whether the one rule lets out a kept line never
+    /// judged as the line in hand ([`Engine::judging_kept_lines`]).
+    kept_line: Option<KeptLine>,
     /// Whether lamp-name heard the name in a request's line (#3504 N4).
     name_fired: Option<NameFired>,
     /// With the tasks part: the note that a prepared task waits for a yes.
@@ -5799,6 +5806,7 @@ impl Engine {
                 policy_now: None,
                 call_note: None,
                 name_sounded: None,
+                kept_line: None,
                 name_fired: None,
                 task_waiting: None,
                 task_declined: None,
@@ -8060,6 +8068,17 @@ impl Engine {
     pub fn knowing_the_name_fired(mut self, fired: NameFired) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_fired = Some(fired);
+        }
+        self
+    }
+
+    /// `LAMP_SIMPLE_CALL`: `judge` says whether the one rule lets out a line
+    /// kept and never judged as the line in hand (a name waiting for the line
+    /// after it), by its request, window and words, changing nothing
+    /// (`worker::Heeding::simple_lets_out`). Before any turn only.
+    pub fn judging_kept_lines(mut self, judge: KeptLine) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.kept_line = Some(judge);
         }
         self
     }

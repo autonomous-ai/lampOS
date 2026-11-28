@@ -490,6 +490,73 @@ async fn a_name_carries_only_on_a_sign_of_one_speaker() {
     }
 }
 
+/// `LAMP_SIMPLE_CALL` (the product owner: the words decide nothing). On
+/// lamp-dbda (28 Nov 08:18, lamp-name stopped) "Lamp." with no hearing of
+/// lamp-name's, and nothing the lamp said within 20 s, was answered in the
+/// place of the line after it, held as not shown said by it; the lamp's
+/// answer opened its window and played clips chained in through it for two
+/// hours. A name is answered in a held line's place only when the one rule
+/// lets the name's own line out, judged with its own window: with no
+/// hearing, nothing is answered, no words are told and no window opens;
+/// with lamp-name's hearing at its start, the name is still answered there.
+#[tokio::test(start_paused = true)]
+async fn with_simple_call_a_name_is_answered_in_a_held_place_only_when_its_line_is_let_out() {
+    for heard_the_name in [false, true] {
+        let played = script(&["Lamp.", "I need a gift for my sister."]);
+        let judged = Judged::default();
+        let (engine, now) = lamp_said(
+            &played,
+            true,
+            &judged,
+            Some(Joined::Not(
+                "no voice check, and no one face was seen speaking both".to_owned(),
+            )),
+            &Kept::default(),
+        );
+        let kept: Arc<Mutex<Vec<(u64, u64, String)>>> = Arc::default();
+        let asked_kept = kept.clone();
+        let said: Arc<Mutex<Vec<u64>>> = Arc::default();
+        let seen = said.clone();
+        let mut engine = engine
+            .taking_simple_calls()
+            .judging_kept_lines(Arc::new(move |request, (began, _), words| {
+                asked_kept
+                    .lock()
+                    .unwrap()
+                    .push((request, began, words.to_owned()));
+                heard_the_name
+            }))
+            .telling_what_it_did(Arc::new(move |did| {
+                if let Did::Said(request, _) = did {
+                    seen.lock().unwrap().push(request);
+                }
+            }));
+        say_the_name(&mut engine, false, true);
+        say_after(&mut engine, &now, Duration::from_millis(2_000)).await;
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let asked = asked(&played);
+        let said = said.lock().unwrap().clone();
+        if !heard_the_name {
+            assert!(asked.is_empty(), "nothing answered: {asked:?}");
+            assert!(said.is_empty(), "no words told, no window: {said:?}");
+        }
+        assert_eq!(
+            *kept.lock().unwrap(),
+            [(1, NAME_READ_US, "Lamp.".to_owned())],
+            "{heard_the_name}: the name's own line judged by the rule"
+        );
+        if heard_the_name {
+            assert_eq!(asked.len(), 1, "a call: {asked:?}");
+            assert_eq!(
+                last_words(&asked[0]),
+                Some(&Message::user("Lamp.")),
+                "the name in the held line's place"
+            );
+            assert!(!said.is_empty(), "its answer is the lamp's words");
+        }
+    }
+}
+
 /// El's P2: the coordinator's call whose words are not back when the next
 /// line begins is kept running for them, its newer owner's authority
 /// retiring it first or not, and the line is said by it once they come
