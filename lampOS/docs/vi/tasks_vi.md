@@ -5464,8 +5464,9 @@ hỏi Policy: cùng luồng tiến độ đọc `tasks/status` (không có `on` 
   mỗi việc: `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 đến 3600),
   `LAMP_PROGRESS_STILL_EVERY_S` (90, 10 đến 3600), `LAMP_PROGRESS_STILL_MOST`
   (4, 1 đến 20); giá trị ngoài khoảng hay không phải số nguyên thì dùng mặc
-  định, có một dòng nhật ký. Nhịp không được nói trong 10 s sau thời điểm của
-  nó (`BEAT_LATE`, hoặc `EVERY` nếu ngắn hơn) thì bị bỏ, không bao giờ nói
+  định, có một dòng nhật ký. Nhịp không được nói trong 15 s sau thời điểm của
+  nó (`BEAT_LATE`, hoặc `EVERY` nếu ngắn hơn; 10 s cho đến 28/11, khi trên
+  lamp-ee17 cả ba nhịp của một việc dài bị bỏ) thì bị bỏ, không bao giờ nói
   muộn hay nói hai lần: trên lamp-ee17 (27/11) một nhịp bị giữ 12 s đã được
   nói 4 s trước kết quả của việc, và bị cắt. Một chỗ đã qua khi được xem thì
   bị bỏ qua.
@@ -5493,10 +5494,15 @@ hỏi Policy: cùng luồng tiến độ đọc `tasks/status` (không có `on` 
   ở cuối. Nơi chọn là `beat_words`.
 - **Không bao giờ nói đè lên ai.** Theo các cổng của tin tiến độ (có người ở
   đó: một khuôn mặt, hay tiếng nói nghe trong 15 s; phòng không bận, không
-  có câu trả lời hay lượt nào đang mở), luôn sau 15 s không ai nói với hay
-  bởi đèn, kể cả với `LAMP_TASK_NEWS_AT_PAUSE=on`. Không có ai ở đó thì nhịp
-  vẫn bị giữ (quyết định của chủ sản phẩm, cổng hiện diện của #8783) và bị
-  bỏ khi quá `BEAT_LATE`. Như mọi tin tiến độ, không qua kỹ năng, không có
+  có câu trả lời hay lượt nào đang mở), không bao giờ ở một quãng nghỉ, kể
+  cả với `LAMP_TASK_NEWS_AT_PAUSE=on`, mà khi cuộc nói chuyện đã xong: 10 s
+  không nghe ai và không có lượt nào (`talk_over`, `TALK_OVER_US`), nên nó
+  đến khi người nói vẫn được tính là có ở đó. Cho đến 28/11 nó chờ đủ 15 s
+  yên lặng (`QUIET_US`), và khi không thấy khuôn mặt nào thì không bao giờ
+  gặp người ở đó: trên lamp-ee17 cả ba nhịp của một việc dài bị bỏ. Không có
+  ai ở đó thì nhịp vẫn bị giữ (quyết định của chủ sản phẩm, cổng hiện diện
+  của #8783) và bị bỏ khi quá `BEAT_LATE`: sau một câu trả lời dài của chính
+  đèn (hơn 5 s), 10 s sau đó lời của người đã cũ hơn 15 s. Như mọi tin tiến độ, không qua kỹ năng, không có
   câu "Excuse me", không bao giờ kể lại.
 - **Ghi chú và nhịp không bao giờ liền nhau.** Khi một nhịp của một việc đã
   được nói, ghi chú của Policy về cùng việc đang chờ bị bỏ trong 15 s
@@ -5505,12 +5511,11 @@ hỏi Policy: cùng luồng tiến độ đọc `tasks/status` (không có `on` 
   hai dòng không bao giờ nói liền nhau. Ghi chú thứ hai của Policy, như
   trước, nhịp kế tiếp của việc (cách nhau theo `beat_after`) và dòng của
   việc khác không bị bỏ vì nó.
-- **Hai việc cùng làm.** Một nhịp chờ 15 s yên lặng sau lời cuối của đèn,
-  lâu hơn 10 s nó được giữ: nhịp của việc thứ hai đến hạn ngay sau nhịp của
-  việc thứ nhất bị bỏ, không nói muộn. Mỗi cửa sổ một câu "vẫn đang làm" là
-  đủ cho một chiếc đèn trông như vật sống, không báo cáo từng việc; các nhịp
-  sau của việc kia vẫn đến khi chúng cách xa nhau (`beat_timelines`, "two
-  tasks at work at once").
+- **Hai việc cùng làm.** Khi một nhịp đã được nói, nhịp của việc khác đang
+  chờ cũng bị bỏ trong 15 s (`dropped: ..., just told`), không nói lại cùng
+  lời 10 s sau. Mỗi cửa sổ một câu "vẫn đang làm" là đủ cho một chiếc đèn
+  trông như vật sống, không báo cáo từng việc; các nhịp sau của việc kia
+  vẫn đến khi chúng cách xa nhau.
 - **Dừng** khi việc không còn `working` trên `tasks/status` (xong, dừng,
   đang hỏi, mất) hoặc tin của chính nó đang chờ: nhịp đã xếp hàng khi đó bị
   rút lại. Dòng tiến độ đổi không rút lại một nhịp.

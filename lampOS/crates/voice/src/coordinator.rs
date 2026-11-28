@@ -15213,21 +15213,26 @@ fn conversation_with_gate_inner(
         let (overdue_whole, overdue_short, overdue_pause, overdue_there, overdue_answered) =
             match task_news.as_mut().filter(|news| news.has_waiting()) {
                 Some(news) => {
-                    let quiet = crate::task_news::quiet_for_news(
-                        (news.sign_in_waits() || news_at_pause)
-                            && !news.retelling_first()
-                            && !news.beat_first(),
-                        clock,
-                        last_turn_us,
-                        last_spoke_us,
-                        last_speech_us,
-                        reminder_quiet(
+                    // A still-working beat: once the talk is over (10 s), so
+                    // it comes while the speakers still count as there
+                    // (lamp-ee17, 28 Nov).
+                    let quiet = if news.beat_first() {
+                        crate::task_news::talk_over(clock, last_turn_us, last_speech_us)
+                    } else {
+                        crate::task_news::quiet_for_news(
+                            (news.sign_in_waits() || news_at_pause) && !news.retelling_first(),
                             clock,
-                            reminder_cycle_started_us,
+                            last_turn_us,
+                            last_spoke_us,
                             last_speech_us,
-                            last_capture,
-                        ),
-                    );
+                            reminder_quiet(
+                                clock,
+                                reminder_cycle_started_us,
+                                last_speech_us,
+                                last_capture,
+                            ),
+                        )
+                    };
                     let present = presence
                         .as_ref()
                         .is_some_and(|presence| presence.present(clock));
@@ -15323,22 +15328,33 @@ fn conversation_with_gate_inner(
             && news.waiting().is_some()
             && (overdue_whole || news_step != crate::news_agent::Step::Wait)
             && overdue_pause
-            && crate::task_news::quiet_for_news(
-                // A still-working beat too: never over anyone.
-                (news.sign_in_first() || news_at_pause || overdue_whole)
-                    && !news.retelling_first()
-                    && !news.beat_first(),
-                clock,
-                last_turn_us,
-                last_spoke_us,
-                last_speech_us,
-                reminder_quiet(
-                    clock,
-                    reminder_cycle_started_us,
-                    last_speech_us,
-                    last_capture,
-                ),
-            )
+            && {
+                // The sign-in's news put first before anything is asked of
+                // what is first.
+                let at_pause = news.sign_in_first() || news_at_pause || overdue_whole;
+                if news.beat_first() {
+                    // A still-working beat: never over anyone, never at a
+                    // pause, but once the talk is over (10 s, nobody heard
+                    // and no turn), so it comes while the speakers still
+                    // count as there (15 s); with no face in view, a 15 s
+                    // quiet never met them there (lamp-ee17, 28 Nov).
+                    crate::task_news::talk_over(clock, last_turn_us, last_speech_us)
+                } else {
+                    crate::task_news::quiet_for_news(
+                        at_pause && !news.retelling_first(),
+                        clock,
+                        last_turn_us,
+                        last_spoke_us,
+                        last_speech_us,
+                        reminder_quiet(
+                            clock,
+                            reminder_cycle_started_us,
+                            last_speech_us,
+                            last_capture,
+                        ),
+                    )
+                }
+            }
             // After its short line, the whole news waits for an answer,
             // in a quiet room too (#8783); asked after the sign-in is put
             // first, so a sign-in's news is not held behind it.

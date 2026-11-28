@@ -4793,7 +4793,7 @@ fn news_told_once_more_waits_for_no_conversation_even_at_pause() {
     for news in run.events("task_news") {
         assert_eq!(news["retold"], true, "{}", run.summary());
         assert!(
-            news["since_turn_ms"].as_u64().unwrap() >= crate::task_news::QUIET_US / 1_000,
+            news["since_turn_ms"].as_u64().unwrap() >= crate::task_news::TALK_OVER_US / 1_000,
             "{}",
             run.summary()
         );
@@ -4878,11 +4878,84 @@ fn a_still_working_beat_waits_for_no_conversation_even_at_pause() {
     assert_eq!(news.len(), 1, "the beat is told: {}", run.summary());
     for news in news {
         assert!(
-            news["since_turn_ms"].as_u64().unwrap() >= crate::task_news::QUIET_US / 1_000,
+            news["since_turn_ms"].as_u64().unwrap() >= crate::task_news::TALK_OVER_US / 1_000,
             "{}",
             run.summary()
         );
     }
+}
+
+/// lamp-ee17 (28 Nov): with no face in view, a still-working beat after
+/// the room's talk is told once the talk is over
+/// (`task_news::TALK_OVER_US`, 10 s), while the speakers still count as
+/// there (15 s, `task_news::HEARD_WITHIN_US`); waiting the full 15 s quiet
+/// it never was. Held once nobody is there:
+/// `task_news::tests::a_beat_after_talk_meets_the_speakers_there_or_is_held`.
+#[test]
+fn a_still_working_beat_after_talk_is_told_while_the_speakers_count_as_there() {
+    let _one = super::pilot_faults::one_session();
+    let told = || {
+        let (news, _heard) = crate::task_news::TaskNews::waiting_for_test_heard(
+            crate::task_news::News {
+                key: "s1:2:progress-1-1-b0".into(),
+                note: "(Nobody has spoken. Say only these words, once: \"Still on it.\")".into(),
+                until: None,
+                progress: Some(crate::task_news::ProgressOf {
+                    store: "s1".into(),
+                    task: 2,
+                    change: 1,
+                    run: 1,
+                    beat: Some(0),
+                }),
+                finished: None,
+                also: Vec::new(),
+                short: None,
+            },
+            Duration::from_secs(1),
+        );
+        let news = news.status_for_test(lamp_msgs::TaskStatus {
+            store_id: "s1".into(),
+            run: 1,
+            unread: vec![],
+            settled: Vec::new(),
+            tasks: vec![lamp_msgs::TaskProgress {
+                task: 2,
+                engine: "openclaw".into(),
+                state: lamp_msgs::AgentState::Working,
+                working_s: Some(30),
+                last_active_unix_ms: None,
+                read_unix_ms: 0,
+                changes: 1,
+                changed: false,
+                new_share: 0.0,
+                signs: Vec::new(),
+                signs_seen: Vec::new(),
+            }],
+        });
+        TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+        let run = run(Script {
+            second: false,
+            only: true,
+            written: Written::Said(12),
+            mute_at_frame: Some(2_500),
+            limit: Duration::from_secs(40),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+        TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+        run
+    };
+    let run = told();
+    run.assert_clean();
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "the beat is told: {}", run.summary());
+    let at = news[0]["since_turn_ms"].as_u64().unwrap();
+    assert!(
+        (crate::task_news::TALK_OVER_US / 1_000..crate::task_news::QUIET_US / 1_000).contains(&at),
+        "{at} ms: {}",
+        run.summary()
+    );
 }
 
 /// The reviewer-lead's P2 on #2642: with `LAMP_TASK_NEWS_AT_PAUSE=on`, as

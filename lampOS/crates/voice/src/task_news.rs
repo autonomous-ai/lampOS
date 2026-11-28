@@ -1302,7 +1302,8 @@ impl TaskNews {
     }
 
     /// Whether the news first in line is a beat ([`Still`]): told only
-    /// after [`QUIET_US`], whatever [`AT_PAUSE_ENVIRONMENT`] says.
+    /// once the talk is over ([`talk_over`]), never at a pause, whatever
+    /// [`AT_PAUSE_ENVIRONMENT`] says.
     pub fn beat_first(&self) -> bool {
         self.waiting.front().and_then(News::beat).is_some()
     }
@@ -1381,12 +1382,17 @@ impl TaskNews {
         let window = Duration::from_micros(QUIET_US);
         self.progress_told
             .retain(|_, (at, _)| now.saturating_duration_since(*at) < window);
+        // Nor two tasks' beats: one "still on it" a quiet window, not one
+        // for each task, now that a beat waits only 10 s after talk.
         let told = &self.progress_told;
+        let beat_told = told.iter().map(|((_, task), (_, beat))| (*task, *beat));
+        let other_beat = |task: u64| beat_told.clone().any(|(at, beat)| beat && at != task);
         self.waiting.retain(|news| {
             news.kept(
                 news.progress.as_ref().is_none_or(|of| {
                     told.get(&(of.store.clone(), of.task))
                         .is_none_or(|(_, beat)| *beat == of.beat.is_some())
+                        && (of.beat.is_none() || !other_beat(of.task))
                 }),
                 "just told",
             )
@@ -3061,8 +3067,11 @@ fn beats_due(
 
 /// A beat not said within this of its time is dropped, not said late: on
 /// lamp-ee17 (27 Nov) a beat held 12 s was said 4 s before its task's
-/// result, and cut.
-const BEAT_LATE: Duration = Duration::from_secs(10);
+/// result, and cut. Past the 10 s a beat waits after talk
+/// ([`TALK_OVER_US`]), with room to spare (lamp-ee17, 28 Nov: at 10 s,
+/// all three beats of a long task were dropped).
+const BEAT_LATE: Duration = Duration::from_secs(15);
+const _: () = assert!(BEAT_LATE.as_micros() > TALK_OVER_US as u128);
 
 /// Whether an agent's line reads as what it is doing, not the tail of its
 /// answer (OpenClaw on lamp-ee17, 27 Nov: "se:** Rewrite the frequency
@@ -6686,23 +6695,23 @@ mod tests {
         };
         assert_eq!(due(0, &mut beats), []);
         assert_eq!(due(29, &mut beats), []);
-        assert_eq!(due(30, &mut beats), [(0, at(40))]);
+        assert_eq!(due(30, &mut beats), [(0, at(45))]);
         assert_eq!(due(31, &mut beats), [], "once");
         // Gaps of 90 s, then 120 s, then 150 s, task 2's beats 3 s and
         // 6 s on (`beat_after`).
         assert_eq!(due(119, &mut beats), []);
-        assert_eq!(due(120, &mut beats), [(1, at(130))]);
+        assert_eq!(due(120, &mut beats), [(1, at(135))]);
         assert_eq!(due(242, &mut beats), []);
-        assert_eq!(due(243, &mut beats), [(2, at(253))]);
+        assert_eq!(due(243, &mut beats), [(2, at(258))]);
         assert_eq!(due(395, &mut beats), []);
-        assert_eq!(due(396, &mut beats), [(3, at(406))]);
+        assert_eq!(due(396, &mut beats), [(3, at(411))]);
         assert_eq!(due(600, &mut beats), [], "at most four");
         assert_eq!(due(2_000, &mut beats), []);
         // Looked at late: beat 1's slot is past, so beat 2 comes in it.
         let mut late = Beats::new();
         assert_eq!(due(0, &mut late), []);
-        assert_eq!(due(30, &mut late), [(0, at(40))]);
-        assert_eq!(due(245, &mut late), [(2, at(253))]);
+        assert_eq!(due(30, &mut late), [(0, at(45))]);
+        assert_eq!(due(245, &mut late), [(2, at(258))]);
         // Another task's beats are on by other seconds.
         let gaps = |task: u64| {
             (1..4)
@@ -6846,8 +6855,9 @@ mod tests {
     /// With `on,still`, a task's policy progress note and its beat are
     /// never said back to back: once a beat of a task is told, a policy
     /// note of that task waiting is let go for [`QUIET_US`], and once a
-    /// note is told, a beat of it; a second note, a line of another task,
-    /// or a line after that while is kept.
+    /// note is told, a beat of it; and once a beat is told, another task's
+    /// beat. A second note, another task's note, or a line after that
+    /// while is kept.
     #[test]
     fn a_tasks_progress_is_told_once_a_quiet_window() {
         let line = |task: u64, beat: Option<u32>| News {
@@ -6900,6 +6910,15 @@ mod tests {
             Some(second.key),
             "the beat let go, the note kept"
         );
+        // Two tasks' beats: one a window, the other's let go.
+        let mut news = queued(vec![line(2, Some(0)), line(3, Some(0)), line(3, None)]);
+        news.waiting();
+        assert_eq!(news.tell().map(|told| told.key), Some(line(2, Some(0)).key));
+        assert_eq!(
+            news.waiting().map(|news| news.key.clone()),
+            Some(line(3, None).key),
+            "task 3's beat let go, its note kept"
+        );
         // Once the window is over, the task's next line is kept.
         let mut news = queued(vec![line(2, Some(0)), line(2, None)]);
         news.waiting();
@@ -6911,6 +6930,30 @@ mod tests {
             news.waiting().map(|news| news.key.clone()),
             Some(line(2, None).key)
         );
+    }
+
+    /// A beat waits for the talk to be over (`talk_over`, 10 s), as the
+    /// coordinator asks it, then for someone there (#8783): with no face
+    /// in view, that is the speakers, heard within 15 s. Told 10 s after
+    /// their talk; held, nobody there, once nobody was heard for longer,
+    /// as after a long answer of the lamp's own (lamp-ee17, 28 Nov: at the
+    /// 15 s quiet before, it never met them there).
+    #[test]
+    fn a_beat_after_talk_meets_the_speakers_there_or_is_held() {
+        let s = |seconds: u64| seconds * 1_000_000;
+        let (spoke, face) = (s(100), false);
+        let gate = |now: u64, turn: u64| {
+            (
+                talk_over(now, turn, spoke),
+                someone_there(now, face, spoke, Some(spoke)),
+            )
+        };
+        assert_eq!(gate(s(109), spoke), (false, true), "the talk not over");
+        assert_eq!(gate(s(110), spoke), (true, true), "told");
+        // The lamp answered for 7 s: over at 117 s, past the 115 s the
+        // speakers count as there until.
+        assert_eq!(gate(s(117), s(107)), (true, false), "held, nobody there");
+        assert!(!quiet_for_news(false, s(110), spoke, None, spoke, true));
     }
 
     /// The defaults, as the product runs them.
@@ -6948,11 +6991,10 @@ mod tests {
     }
 
     /// The beats' timelines, second by second, through the beats' own code
-    /// (`beats_due`, `beat_words`, `still_current`) and the strict quiet
-    /// (`quiet_for_news` without the pause), the other gates open: run with
+    /// (`beats_due`, `beat_words`, `still_current`) and the coordinator's
+    /// wait for a beat (`talk_over`, 10 s), the other gates open: run with
     /// `--nocapture` to read them. Each scenario: talk (from, to) in
-    /// seconds, when the tasks settle, when their line changes, and the
-    /// tasks at work.
+    /// seconds, when the task settles, and when its line changes.
     #[test]
     fn beat_timelines() {
         struct Scene {
@@ -6960,14 +7002,12 @@ mod tests {
             talk: &'static [(u64, u64)],
             settles: Option<u64>,
             changes: &'static [u64],
-            tasks: &'static [u64],
         }
         let scene = |name, talk, settles, changes| Scene {
             name,
             talk,
             settles,
             changes,
-            tasks: &[2],
         };
         let scenes = [
             scene("7-min task, no talk, line unchanged", &[], Some(420), &[]),
@@ -6975,13 +7015,6 @@ mod tests {
             scene("person talking 115-250 s", &[(115, 250)], Some(420), &[]),
             scene("task settles at 200 s", &[], Some(200), &[]),
             scene("line changes between beats", &[], Some(420), &[20, 60, 300]),
-            // Two tasks at work at once: one line a quiet window. The
-            // other task's beat, due within it, is dropped, not said late
-            // or back to back: the lamp says it is still on it, not each.
-            Scene {
-                tasks: &[2, 3],
-                ..scene("two tasks at work at once", &[], Some(420), &[])
-            },
         ];
         let (still, words) = (still(), own());
         let task = json!({"text":"Research three good laptops under $1000","target":{"engine":"openclaw"}});
@@ -6998,7 +7031,7 @@ mod tests {
                 let changes =
                     u32::try_from(scene.changes.iter().filter(|at| **at <= t).count()).unwrap();
                 let about = format!("Comparing laptop {changes} for battery and weight");
-                let mut status = status_of(
+                let status = status_of(
                     if settled {
                         AgentState::Idle
                     } else {
@@ -7007,13 +7040,6 @@ mod tests {
                     changes,
                     Some(0),
                 );
-                let entry = status.tasks[0].clone();
-                status.tasks = (scene.tasks.iter())
-                    .map(|task| lamp_msgs::TaskProgress {
-                        task: *task,
-                        ..entry.clone()
-                    })
-                    .collect();
                 if scene.settles == Some(t) {
                     println!("{t:>4} s  task settled");
                 }
@@ -7048,13 +7074,10 @@ mod tests {
                 {
                     last_turn_s = t;
                 }
-                let mut quiet = quiet_for_news(
-                    false,
+                let mut quiet = talk_over(
                     t * 1_000_000,
                     last_turn_s * 1_000_000,
-                    None,
                     last_turn_s * 1_000_000,
-                    false,
                 );
                 if settled && !result_told && quiet {
                     println!("{t:>4} s  result told");
@@ -7075,7 +7098,7 @@ mod tests {
                             .to_owned();
                         println!("{t:>4} s  task {task} b{beat} told: {line}");
                         told.push((task, beat, t, note, kind.starts_with("about")));
-                        // Its own words are a turn: the next waits 15 s.
+                        // Its own words are a turn: the next waits 10 s.
                         last_turn_s = t;
                         quiet = false;
                     } else {
@@ -7111,9 +7134,6 @@ mod tests {
         );
         assert_eq!(beats_of("person talking 115-250 s", 2), [(0, 30), (3, 396)]);
         assert_eq!(beats_of("task settles at 200 s", 2), [(0, 30), (1, 120)]);
-        let two = "two tasks at work at once";
-        assert_eq!(beats_of(two, 2), [(0, 30), (1, 120), (2, 243), (3, 405)]);
-        assert_eq!(beats_of(two, 3), [(3, 390)]);
         let changing = &told_all
             .iter()
             .find(|(scene, _)| scene.starts_with("line changes"))

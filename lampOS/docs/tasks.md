@@ -10638,7 +10638,8 @@ exactly: words other than `on` and `still` (`on,off`) turn nothing on.
   `LAMP_PROGRESS_STILL_EVERY_S` (90, 10 to 3600) and
   `LAMP_PROGRESS_STILL_MOST` (4, 1 to 20); a value out of range or not a
   whole number is its default, with a journal line. A beat not said within
-  10 s of its time (`BEAT_LATE`, or `EVERY` if shorter) is dropped, never
+  15 s of its time (`BEAT_LATE`, or `EVERY` if shorter; 10 s until 28 Nov,
+  when on lamp-ee17 all three beats of a long task were dropped) is dropped, never
   said late or twice: on lamp-ee17 (27 Nov) one held 12 s was said 4 s
   before its task's result, and cut. A slot already past when looked at
   is skipped.
@@ -10669,10 +10670,15 @@ exactly: words other than `on` and `still` (`on,off`) turn nothing on.
   it.", "This one's a long one. I'll tell you as soon as it's done."
 - **Never over anyone.** Told under the progress news' gates (someone
   there: a face, or speech heard within 15 s; the room not busy, no reply
-  or turn open), always after 15 s with nothing said by or to the lamp,
-  even with `LAMP_TASK_NEWS_AT_PAUSE=on`. With nobody there a beat stays
-  held (the owner's call, #8783's presence gate) and is dropped once
-  `BEAT_LATE` is past. Like all progress, never a skill's to tell, never
+  or turn open), never at a pause, even with `LAMP_TASK_NEWS_AT_PAUSE=on`,
+  but once the talk is over: 10 s with nobody heard and no turn
+  (`talk_over`, `TALK_OVER_US`), so it comes while the speakers still
+  count as there. Until 28 Nov it waited the full 15 s quiet (`QUIET_US`),
+  and with no face in view it then never met someone there: on lamp-ee17
+  all three beats of a long task were dropped. With nobody there a beat
+  stays held (the owner's call, #8783's presence gate) and is dropped
+  once `BEAT_LATE` is past: after a long answer of the lamp's own (over
+  5 s), 10 s after it the person's words are over 15 s old. Like all progress, never a skill's to tell, never
   an "Excuse me" short line, never told again.
 - **A note and a beat never back to back.** Once a beat of a task is
   told, a policy note of that task waiting is let go for 15 s
@@ -10681,12 +10687,11 @@ exactly: words other than `on` and `still` (`on,off`) turn nothing on.
   never said back to back. A second policy note, as before, the task's
   next beat (spaced by `beat_after`) and another task's line are not let
   go for it.
-- **Two tasks at work at once.** A beat waits for 15 s of quiet after the
-  lamp's last words, longer than the 10 s it is kept: a second task's beat
-  due just after the first's is dropped, not said late. One "still on it"
-  line a window is enough for a lamp that should seem alive, not report
-  on each task; the other task's later beats still come when they fall
-  apart (`beat_timelines`, "two tasks at work at once").
+- **Two tasks at work at once.** Once a beat is told, another task's beat
+  waiting is let go for 15 s too (`dropped: ..., just told`), not said
+  10 s after it in the same words. One "still on it" line a window is
+  enough for a lamp that should seem alive, not report on each task; the
+  other task's later beats still come when they fall apart.
 - **Stops** once the task is not at work on `tasks/status` (finished,
   stopped, asking, gone) or its own news waits: a beat queued then is
   withdrawn. A change of the progress line does not withdraw a beat.
@@ -10699,7 +10704,8 @@ exactly: words other than `on` and `still` (`on,off`) turn nothing on.
   `... told: task N bK`; `... dropped: task N bK, slot passed` (not said
   within `BEAT_LATE` of its time, or a slot past before it was looked at),
   `, task settled` (not at work, moved off `tasks/status`, or its own news
-  waits) or `, just told` (a line of its task's progress told within 15 s).
+  waits) or `, just told` (a line of its task's progress, or another
+  task's beat, told within 15 s).
 
 Shown in `task_news::tests` (`beats_come_at_first_then_every_at_most_most_in_other_words`,
 `a_beat_counts_from_when_the_task_is_first_seen_at_work`,
@@ -10711,7 +10717,12 @@ Shown in `task_news::tests` (`beats_come_at_first_then_every_at_most_most_in_oth
 `still_alone_beats_a_task_at_work_at_most_most_times_with_no_decision`
 (`crates/voice/tests/it/progress_news.rs`), and in the coordinator's loop
 in `a_still_working_beat_waits_for_no_conversation_even_at_pause` (a face
-there; the beat told, 15 s after the answer). Not run on a lamp.
+there; the beat told at least 10 s after the answer, never at its pause)
+and `a_still_working_beat_after_talk_is_told_while_the_speakers_count_as_there`
+(no face: told 10 to 15 s after the talk); held, nobody there, once the
+speakers were last heard over 15 s before, in
+`task_news::tests::a_beat_after_talk_meets_the_speakers_there_or_is_held`.
+Not run on a lamp.
 
 ### Playing progress news on lamp-4ace
 
