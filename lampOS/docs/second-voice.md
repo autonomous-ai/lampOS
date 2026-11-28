@@ -6310,14 +6310,17 @@ after a take-over, but now for every turn:
       which one is bigger?" after "Okay, I'll stop there." was held): the
       lamp's words end where the stop cut them, by the time it is told at the
       latest, so words sent ahead and never played count for nothing, and
-      anything it says after moves the end on. A stop said aloud ("never
-      mind", "stop", "enough") is told to the rule at the stop, before its
-      own line (`Shared::stop_said`), as a hand's Stop is told when the next
-      line begins (`after_stop`); at either, the route's own end of the
-      lamp's words (`Shared::said_until_us`) is brought back to the stop, so
-      what the lamp says next, the stop's own line first, counts from there,
-      never from after the words sent ahead (the Reviewer-lead's P2 on
-      #8892). A line begun over the lamp's voice cuts it too (the
+      anything it says after moves the end on. A hand or head stop ends the
+      lamp's words when it is delivered, as the authority with no owner
+      (`Engine::stop_through`), in the route (`Shared::said_until_us`) and
+      in the rule (`Did::WentQuiet`), so a later line, told of the stop
+      (`after_stop`) or not, never starts a fresh 20 s, though
+      `LAMP_STOP_TOLD` keeps the stop for 120 s (Reviewer-three's P2 on
+      #8892). A stop said aloud ("never mind", "stop", "enough") is told to
+      the rule at the stop, before its own line (`Shared::stop_said`), and
+      the route's end is brought back to it, so what the lamp says next, the
+      stop's own line first, counts from there, never from after the words
+      sent ahead (the Reviewer-lead's P2 on #8892). A line begun over the lamp's voice cuts it too (the
       coordinator cuts the answer to take the line), and its words end there
       the same way, in the route and in the rule (`Heeding::hear`), so the
       window never runs on unplayed words. A stop ends only the call's carry

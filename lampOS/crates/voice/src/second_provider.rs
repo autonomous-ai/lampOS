@@ -2096,6 +2096,12 @@ pub enum Did {
     /// words end where the stop cut them, by the time it is told, and only
     /// the call's carry ends.
     Stopped,
+    /// With `LAMP_SIMPLE_CALL`, the lamp went quiet by this time, its words
+    /// cut or over: the authority holds no owner ([`Engine::stop_through`]:
+    /// a hand or head stop delivered, the mute, a gap, or its turn over).
+    /// Its words end here at the latest, never at a later line's start
+    /// (Reviewer-three's P2 on #8892); nothing else is told by it.
+    WentQuiet(u64),
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
@@ -9789,6 +9795,12 @@ impl Engine {
     /// it (a reviewer's P2 on the join, 22 Oct: "Lamp, play some jazz", a
     /// hand stop, then "what time is it?" was asked as one line).
     pub fn stop_through(&mut self, through: u64) {
+        // `LAMP_SIMPLE_CALL`: with no owner the lamp is quiet. A hand or head
+        // stop, the mute or a gap cut its words now, and a turn over ended
+        // them already: they end here at the latest, in the route and the
+        // rule, so a later line, told of the stop or not, never starts a
+        // fresh 20 s (Reviewer-three's P2 on #8892).
+        self.shared.went_quiet();
         let stopped = self
             .shared
             .in_flight
@@ -10709,6 +10721,21 @@ impl Shared {
         if self.simple_call {
             self.said_until_us
                 .fetch_min(monotonic_us(), Ordering::Relaxed);
+        }
+    }
+
+    /// With `LAMP_SIMPLE_CALL`, the lamp quiet now, the authority holding no
+    /// owner ([`Engine::stop_through`]): the route's end of its words comes
+    /// back to now, never moved on, and the rule is told
+    /// ([`Did::WentQuiet`]). Without the switch, as before.
+    fn went_quiet(&self) {
+        if !self.simple_call {
+            return;
+        }
+        let now_us = monotonic_us();
+        self.said_until_us.fetch_min(now_us, Ordering::Relaxed);
+        if let Some(did) = &self.did {
+            did(Did::WentQuiet(now_us));
         }
     }
 
