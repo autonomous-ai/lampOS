@@ -206,8 +206,9 @@ class Parts(unittest.TestCase):
 
     def test_what_names_a_lamp(self):
         # 14 Nov (both readers' P2 on #7062): the fleet's lamps count; a part's name doesn't.
-        fleet = ("c0a4", "52e6", "06c1", "4ace", "75c9", "cb94", "9adf", "a0ae", "0c89")
-        parts = ("body", "eyes", "ears", "seen", "peek", "keep", "name", "test", "face", "abcd")
+        # 28 Nov: dbda, the one lamp with no digit, is named in rows.py; other all-letter words (face, abcd, dbdb) still don't.
+        fleet = ("c0a4", "52e6", "06c1", "4ace", "75c9", "cb94", "9adf", "a0ae", "0c89", "dbda")
+        parts = ("body", "eyes", "ears", "seen", "peek", "keep", "name", "test", "face", "abcd", "dbdb", "adbd")
         for lamp, ok in ([("lamp-" + x, True) for x in fleet] + [("lamp-" + x, False) for x in parts]
                          + [("lamp-voice", False), ("lamp-52E6", False), ("lamp-52e", False), ("xlamp-52e6", False),
                             ("lamp-52e6x", False), ("lamp-52g6", False)]):
