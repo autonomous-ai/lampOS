@@ -6317,8 +6317,12 @@ after a take-over, but now for every turn:
       lamp's words (`Shared::said_until_us`) is brought back to the stop, so
       what the lamp says next, the stop's own line first, counts from there,
       never from after the words sent ahead (the Reviewer-lead's P2 on
-      #8892). A stop ends only the call's carry (`called_at`), which covers
-      a line said right after "Hey Lamp" before the lamp spoke. A line with no
+      #8892). A line begun over the lamp's voice cuts it too (the
+      coordinator cuts the answer to take the line), and its words end there
+      the same way, in the route and in the rule (`Heeding::hear`), so the
+      window never runs on unplayed words. A stop ends only the call's carry
+      (`called_at`), which covers a line said right after "Hey Lamp" before
+      the lamp spoke. A line with no
       words in it (a sound, a cough, room noise) is never answered, but as a
       call: `no words heard in it (LAMP_SIMPLE_CALL)`. A
       checked short sound with a word in it, not a filler, is the rule's to
