@@ -12,7 +12,7 @@
 //! - **Words heard** go out only as [`Out::Heard`], for the server to match
 //!   against each connection's own phrases: the words themselves never
 //!   leave the lamp.
-//! - **Lease signals:** talking suspends every lease, resting holds them
+//! - **Lease signals:** thinking or speaking suspends every lease (a bare listening does not), resting holds them
 //!   again; a hand pushing the body, a stop from the head, a pause, the
 //!   privacy switch or sleep loses them.
 //! - **State,** for `get`: presence (counts, never who), the light, the
@@ -243,6 +243,8 @@ pub struct Watch {
     seen_us: Option<u64>,
     present: bool,
     talking: bool,
+    /// Whether a conversation holds the leases now (the voice thinks or speaks; a bare listening does not).
+    suspending: bool,
     paused: bool,
     private: bool,
     /// When the privacy lease was last heard; none before the first.
@@ -382,11 +384,15 @@ impl Watch {
                 payload["muted"] == true && payload["reason"] == "sleep",
                 payload["muted"] == true && payload["muted_by"] == "restart_guard"
             ])),
-            "voice/state" => Some(json!(
-                payload["state"]
-                    .as_str()
-                    .is_some_and(|state| state != "resting")
-            )),
+            // `[talking, suspends]`: a listening and a thinking are different keys, so a thinking right after a
+            // listening is never passed over for being "the same" (REPEAT_EVERY_US) and the leases are suspended on time.
+            "voice/state" => {
+                let state = payload["state"].as_str();
+                Some(json!([
+                    state.is_some_and(|state| state != "resting"),
+                    matches!(state, Some("thinking" | "speaking"))
+                ]))
+            }
             "light/state" | "light/drawn" => Some(
                 json!({"on": payload["on"], "colour": payload["colour"], "level": payload["level"]}),
             ),
@@ -548,17 +554,27 @@ impl Watch {
                 vec![Out::Lose(Some(Part::Body), LeaseWhy::Hand)]
             }
             "voice/state" => {
-                let talking = Self::kept_of(topic, payload) == Some(json!(true));
-                if talking == self.talking {
-                    return Vec::new();
+                let kept = Self::kept_of(topic, payload);
+                let talking =
+                    kept == Some(json!([true, true])) || kept == Some(json!([true, false]));
+                // A conversation takes the leases once the lamp thinks or speaks, not on a bare `listening`: a turn
+                // opened by room noise (0 words heard) listens and goes back to resting, and must not cost a program
+                // its body lease every few seconds (lamp-75c9, 27 Nov: 12 stops in 25 minutes).
+                let suspends = kept == Some(json!([true, true]));
+                let mut out = Vec::new();
+                if suspends != self.suspending {
+                    self.suspending = suspends;
+                    out.push(if suspends {
+                        Out::Suspend(None, LeaseWhy::Conversation)
+                    } else {
+                        Out::Resume
+                    });
                 }
-                self.talking = talking;
-                let signal = if talking {
-                    Out::Suspend(None, LeaseWhy::Conversation)
-                } else {
-                    Out::Resume
-                };
-                vec![signal, self.lamp_changed()]
+                if talking != self.talking {
+                    self.talking = talking;
+                    out.push(self.lamp_changed());
+                }
+                out
             }
             "lamp/pause" => self.flag(
                 Self::kept_of(topic, payload) == Some(json!(true)),
@@ -1157,7 +1173,7 @@ mod tests {
             ),
             (
                 "voice/state",
-                json!({"state": "listening"}),
+                json!({"state": "thinking"}),
                 json!({"state": "speaking"}),
                 json!({"state": "resting"}),
             ),
@@ -1446,7 +1462,14 @@ mod tests {
     #[test]
     fn talking_suspends_leases_and_the_lamps_own_flags_lose_them() {
         let mut watch = Watch::new();
+        // A bare listening (a turn opened by noise, 0 words) is talking for the lamp's own state but keeps every lease.
         let out = watch.take("voice/state", &json!({"state": "listening"}), S);
+        assert!(
+            !out.contains(&Out::Suspend(None, LeaseWhy::Conversation)),
+            "{out:?}"
+        );
+        assert_eq!(out.len(), 1, "only lamp.changed: {out:?}");
+        let out = watch.take("voice/state", &json!({"state": "thinking"}), S);
         assert_eq!(out[0], Out::Suspend(None, LeaseWhy::Conversation));
         assert!(
             watch
@@ -1456,6 +1479,35 @@ mod tests {
         assert_eq!(
             watch.take("voice/state", &json!({"state": "resting"}), S)[0],
             Out::Resume
+        );
+        // A thinking 100 ms after a listening is a different key: the proxy's repeat filter never passes it over, and it suspends.
+        let listening = Watch::kept_of("voice/state", &json!({"state": "listening"})).unwrap();
+        let thinking = Watch::kept_of("voice/state", &json!({"state": "thinking"})).unwrap();
+        assert_ne!(listening, thinking);
+        assert!(!Watch::passes_over(
+            Some(&(listening.clone(), S)),
+            &thinking,
+            S + 100_000
+        ));
+        assert!(Watch::passes_over(
+            Some(&(listening, S)),
+            &Watch::kept_of("voice/state", &json!({"state": "listening"})).unwrap(),
+            S + 100_000
+        ));
+        // Speaking, then a follow-up listening: the leases come back briefly (resumed), only lamp.changed is not told again.
+        let mut follow = Watch::new();
+        follow.take("voice/state", &json!({"state": "speaking"}), S);
+        let out = follow.take("voice/state", &json!({"state": "listening"}), S);
+        assert_eq!(out, [Out::Resume], "{out:?}");
+        let out = follow.take("voice/state", &json!({"state": "thinking"}), S);
+        assert_eq!(out, [Out::Suspend(None, LeaseWhy::Conversation)], "{out:?}");
+        // Listening and straight back to resting: no suspension, no resume, a program's lease is never touched.
+        let mut quiet = Watch::new();
+        quiet.take("voice/state", &json!({"state": "listening"}), S);
+        let out = quiet.take("voice/state", &json!({"state": "resting"}), S);
+        assert!(
+            !out.contains(&Out::Resume) && !out.iter().any(|o| matches!(o, Out::Suspend(..))),
+            "{out:?}"
         );
         assert_eq!(
             watch.take("body/hand", &json!({"pushed": true, "since_us": 1}), S),

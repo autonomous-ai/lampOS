@@ -166,7 +166,7 @@ lamp's lease events (`lease.state`, `lease.lost_why`):
 
 | what happens at the lamp | your lease |
 |---|---|
-| someone talks to the lamp | `suspended` (`conversation`), then `held` again when the talk ends |
+| the voice thinks or speaks (not on a bare listening) | `suspended` (`conversation`), then `held` again when the talk ends or the voice listens again |
 | a hand on its head, or someone says "stop" | `lost` (`hand`, `stop_heard`) |
 | the privacy switch, a pause, or sleep | `lost` (`private`, `paused`, `asleep`); new takes are refused |
 | the owner takes it in the app, or revokes this computer | `lost` (`taken_by_owner_app`, `revoked`) |
