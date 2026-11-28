@@ -8,7 +8,7 @@
 //! tasks part's `stop`:
 //!
 //! - request `{"op":"stop","guard":<as cancel>,"id":<task id>}`;
-//! - answer `{"id":<id>,"stop":"stopped"|"unconfirmed"|"not_started"|"remote"|"not_running"}`,
+//! - answer `{"id":<id>,"stop":"stopped"|"unconfirmed"|"not_started"|"remote"|"cannot_stop"|"not_running"}`,
 //!   at the top level and again in `data`; `busy` while the task is being
 //!   handed over. The tasks part may take up to 32 s to answer: the lamp
 //!   speaks within [`STOP_WAIT`], and the answer is read on by itself.
@@ -21,17 +21,19 @@
 //! words and nothing else, so no claim is made the tasks part did not make.
 //!
 //! Work the person stopped ends with `stopped_by_person`. Its stop line
-//! was said already, so the task news never tells it as stopped or failed,
-//! and never again ([`ended_quietly`], [`hand_over_ended_quietly`]).
+//! was said already, so the task news never tells it as stopped, and never
+//! again ([`ended_quietly`], [`hand_over_ended_quietly`]). Work whose stop
+//! was never confirmed and that then failed is told as a failure.
 use crate::agent_tasks::{Place, ask, guard, label_of, nonce};
 use crate::skill_words::{
-    STOP_BUSY_LINE, STOP_COULD_NOT_LINE, STOP_NOT_RUNNING_LINE, STOP_NOT_STARTED_LINE,
-    STOP_NOTHING_RUNNING_LINE, STOP_REMOTE_LINE, STOP_STOPPED_LINE, STOP_UNCONFIRMED_LINE,
+    STOP_BUSY_LINE, STOP_CANNOT_STOP_LINE, STOP_COULD_NOT_LINE, STOP_NOT_RUNNING_LINE,
+    STOP_NOT_STARTED_LINE, STOP_NOTHING_RUNNING_LINE, STOP_REMOTE_LINE, STOP_STOPPED_LINE,
+    STOP_UNCONFIRMED_LINE,
 };
 use lamp_gemini::Tool;
 use serde_json::{Value, json};
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, VecDeque},
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -142,6 +144,7 @@ pub(crate) fn line_for(outcome: &str) -> &'static str {
         "unconfirmed" => STOP_UNCONFIRMED_LINE,
         "not_started" => STOP_NOT_STARTED_LINE,
         "remote" => STOP_REMOTE_LINE,
+        "cannot_stop" => STOP_CANNOT_STOP_LINE,
         "not_running" => STOP_NOT_RUNNING_LINE,
         "busy" => STOP_BUSY_LINE,
         _ => STOP_COULD_NOT_LINE,
@@ -236,6 +239,44 @@ pub(crate) fn choose(going: &[Going], which: Option<&str>) -> Choice {
     }
 }
 
+/// The ids of the tasks `record` (`tasks_now`) gives as going.
+fn going_ids(record: &Value) -> Vec<u64> {
+    record["tasks"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|task| {
+            task["state"]
+                .as_str()
+                .is_some_and(|state| GOING.contains(&state))
+        })
+        .filter_map(|task| task["task"].as_u64())
+        .collect()
+}
+
+/// The asks of tasks `ids` (`get_task`'s `text`) on `socket`, all asked at
+/// once, each within `deadline`: the stop's wait is one exchange, never
+/// one per task going.
+fn asks_of(socket: &std::path::Path, ids: &[u64], deadline: Duration) -> BTreeMap<u64, String> {
+    std::thread::scope(|scope| {
+        let asked: Vec<_> = ids
+            .iter()
+            .map(|&id| {
+                let handle = scope.spawn(move || {
+                    ask(socket, &json!({"op":"get_task","id":id}), deadline)
+                        .filter(|got| got.get("ok") == Some(&json!(true)))
+                        .and_then(|got| got["text"].as_str().map(str::to_owned))
+                });
+                (id, handle)
+            })
+            .collect();
+        asked
+            .into_iter()
+            .filter_map(|(id, handle)| Some((id, handle.join().ok()??)))
+            .collect()
+    })
+}
+
 /// The work going now, from the tasks part's `tasks_now` `record`, each
 /// with its ask as `asked_of` gives it. A make handed to the lamp's agent is
 /// not the person's work.
@@ -271,6 +312,12 @@ pub(crate) fn going_in(record: &Value, asked_of: impl Fn(u64) -> Option<String>)
 /// Run [`STOP`] at `place`, within `deadline` for the reads; the stop's
 /// answer is waited for at most [`STOP_WAIT`] ([`stop_aside`]). Whether
 /// the tasks part answered.
+///
+/// On the way to the stop: `tasks_now`, then every going task's ask at
+/// once ([`asks_of`]), then the stop, guarded from `tasks_now`'s own reply
+/// (a stop needs no fresh revision, so no `status` read before it). A work
+/// id from the model counts only when it is one of the work going: never a
+/// make brief or work already over.
 pub fn run(place: &Place, args: &Value, request: u64, deadline: Duration) -> (Value, bool) {
     let started = Instant::now();
     let left = || deadline.saturating_sub(started.elapsed());
@@ -280,42 +327,49 @@ pub fn run(place: &Place, args: &Value, request: u64, deadline: Duration) -> (Va
         Some(Value::Number(said)) => said.as_u64(),
         _ => None,
     };
-    let id = match named {
-        Some(id) => id,
-        None => {
-            let Some(record) = ask(&socket, &json!({"op":"tasks_now"}), left()) else {
-                return (unreached(place), false);
-            };
-            if record.get("ok") != Some(&json!(true)) {
-                eprintln!(
-                    "lamp-voice: tasks: request {request}: {STOP} could not read the work going"
-                );
-                return (told("refused"), true);
-            }
-            let going = going_in(&record, |id| {
-                ask(&socket, &json!({"op":"get_task","id":id}), left())
-                    .filter(|got| got.get("ok") == Some(&json!(true)))
-                    .and_then(|got| got["text"].as_str().map(str::to_owned))
-            });
-            let which = args.get(WHICH).and_then(Value::as_str);
-            match choose(&going, which) {
-                Choice::Nothing => return (nothing_running(), true),
-                Choice::AskWhich(labels) => {
-                    eprintln!(
-                        "lamp-voice: tasks: request {request}: {STOP}: {} pieces of work going, asked which",
-                        labels.len()
-                    );
-                    return (ask_which(&labels), true);
-                }
-                Choice::One(id) => id,
-            }
-        }
-    };
-    let Some(status) = ask(&socket, &json!({"op":"status"}), left()) else {
+    let Some(record) = ask(&socket, &json!({"op":"tasks_now"}), left()) else {
         return (unreached(place), false);
     };
-    let store = status["store_id"].as_str().unwrap_or_default().to_owned();
-    let Some(guard) = guard(&status, format!("voice-{request}-stop-{}", nonce())) else {
+    if record.get("ok") != Some(&json!(true)) {
+        eprintln!("lamp-voice: tasks: request {request}: {STOP} could not read the work going");
+        return (told("refused"), true);
+    }
+    let asks = asks_of(&socket, &going_ids(&record), left());
+    let going = going_in(&record, |id| asks.get(&id).cloned());
+    let which = args.get(WHICH).and_then(Value::as_str);
+    let choice = match named {
+        Some(id) if going.iter().any(|work| work.id == id) => Choice::One(id),
+        // Not one of the work going: the person is asked about what is.
+        Some(id) => {
+            eprintln!("lamp-voice: tasks: request {request}: {STOP}: task {id} is not work going");
+            match choose(&going, which) {
+                Choice::One(only) if content_words(which.unwrap_or_default()).is_empty() => {
+                    Choice::AskWhich(
+                        going
+                            .iter()
+                            .filter(|work| work.id == only)
+                            .map(|work| work.label.clone())
+                            .collect(),
+                    )
+                }
+                choice => choice,
+            }
+        }
+        None => choose(&going, which),
+    };
+    let id = match choice {
+        Choice::Nothing => return (nothing_running(), true),
+        Choice::AskWhich(labels) => {
+            eprintln!(
+                "lamp-voice: tasks: request {request}: {STOP}: {} pieces of work going, asked which",
+                labels.len()
+            );
+            return (ask_which(&labels), true);
+        }
+        Choice::One(id) => id,
+    };
+    let store = record["store_id"].as_str().unwrap_or_default().to_owned();
+    let Some(guard) = guard(&record, format!("voice-{request}-stop-{}", nonce())) else {
         return (told("refused"), true);
     };
     let line = json!({"op":"stop","guard":guard,"id":id});
@@ -360,7 +414,9 @@ pub(crate) fn outcome_of(answer: Option<&Value>) -> String {
 
 /// Send `line` (a `stop`) on a thread of its own, which reads its answer
 /// for up to [`STOP_READ`] and asks again while the store is not sure
-/// (`uncertain`, `timeout`), never on `busy`; `done` gets the outcome
+/// (`uncertain`, `timeout`), never on `busy`. A `conflict` (a tasks part
+/// from before a stop needed no fresh revision, its guard stale) is asked
+/// once more with a fresh guard from `status`. `done` gets the outcome
 /// there. The outcome comes back here if it came within `wait`, else
 /// `unconfirmed` at once: the voice's turn is never held for the engine.
 fn stop_aside(
@@ -375,8 +431,25 @@ fn stop_aside(
         .spawn(move || {
             let started = Instant::now();
             let left = || STOP_READ.saturating_sub(started.elapsed());
+            let mut line = line;
+            let mut fresh = false;
             let answer = loop {
                 let answer = ask(&socket, &line, left());
+                let conflict = answer
+                    .as_ref()
+                    .is_some_and(|answer| answer["error"] == "conflict");
+                if conflict && !fresh {
+                    fresh = true;
+                    let renewed =
+                        ask(&socket, &json!({"op":"status"}), left()).and_then(|status| {
+                            let id = line["guard"]["request_id"].as_str().unwrap_or("voice-stop");
+                            guard(&status, format!("{id}-again"))
+                        });
+                    if let Some(renewed) = renewed {
+                        line["guard"] = renewed;
+                        continue;
+                    }
+                }
                 let again = answer
                     .as_ref()
                     .and_then(|answer| answer["error"].as_str())
@@ -408,7 +481,7 @@ fn unreached(place: &Place) -> Value {
 }
 
 /// Keep task `id` of `store` as one the voice asked to stop.
-fn keep_stopped(store: &str, id: u64) {
+pub(crate) fn keep_stopped(store: &str, id: u64) {
     if let Ok(mut kept) = STOPPED_HERE.lock() {
         if kept
             .iter()
@@ -440,12 +513,15 @@ fn says_stopped_by_person(value: &Value) -> bool {
 }
 
 /// Whether the settled look `data` at task `id` of `store` is the end of
-/// a stop the person asked for: news never tells it, as stopped or failed,
-/// or again. Work the voice asked to stop that finished anyway is still
-/// told as done.
+/// a stop the person asked for: news never tells it, or again. That is a
+/// task ended `stopped_by_person`, or one this voice asked to stop that
+/// ended `stopped`. Work the voice asked to stop that failed anyway (its
+/// stop unconfirmed) is told as a failure, and work that finished anyway
+/// as done.
 pub fn ended_quietly(store: &str, id: u64, data: &Value) -> bool {
-    says_stopped_by_person(data)
-        || (matches!(data["state"].as_str(), Some("stopped" | "failed")) && stopped_here(store, id))
+    // Only a stop: a stop never confirmed may not have landed, and a task
+    // that then failed for its own reasons is told as any failure.
+    says_stopped_by_person(data) || (data["state"] == "stopped" && stopped_here(store, id))
 }
 
 /// Whether the hand-over of list `item` of `store` ended because the
@@ -543,6 +619,10 @@ mod tests {
             ),
             ("not_running", "That one had already finished."),
             (
+                "cannot_stop",
+                "Sorry, I can't stop that one right now. It'll keep going until it's done.",
+            ),
+            (
                 "busy",
                 "It's just getting started. Ask me again in a moment and I'll stop it.",
             ),
@@ -565,6 +645,7 @@ mod tests {
             STOP_UNCONFIRMED_LINE,
             STOP_NOT_STARTED_LINE,
             STOP_REMOTE_LINE,
+            STOP_CANNOT_STOP_LINE,
             STOP_NOT_RUNNING_LINE,
             STOP_NOTHING_RUNNING_LINE,
             STOP_COULD_NOT_LINE,
@@ -597,17 +678,13 @@ mod tests {
             vec![
                 (
                     "request.sock",
-                    json!({"ok":true,"tasks":[
+                    json!({"ok":true,"store_id":"s-stop","revision":4,"tasks":[
                         {"task":9,"agent":"claude","target":"office","state":"working"},
                         {"task":7,"agent":"codex","target":"office","state":"idle"}]}),
                 ),
                 (
                     "request.sock",
                     json!({"ok":true,"text":"Fix the parser","target":{"engine":"claude"}}),
-                ),
-                (
-                    "request.sock",
-                    json!({"ok":true,"store_id":"s-stop","revision":4}),
                 ),
                 (
                     "request.sock",
@@ -621,11 +698,11 @@ mod tests {
         let sent: Vec<Value> = seen.try_iter().collect();
         assert_eq!(sent[0], json!({"op":"tasks_now"}));
         assert_eq!(sent[1], json!({"op":"get_task","id":9}));
-        assert_eq!(sent[2], json!({"op":"status"}));
-        assert_eq!(sent[3]["op"], "stop");
-        assert_eq!(sent[3]["id"], 9);
-        assert_eq!(sent[3]["guard"]["store_id"], "s-stop");
-        assert_eq!(sent[3]["guard"]["revision"], 4);
+        // The guard is `tasks_now`'s own: no `status` read before the stop.
+        assert_eq!(sent[2]["op"], "stop");
+        assert_eq!(sent[2]["id"], 9);
+        assert_eq!(sent[2]["guard"]["store_id"], "s-stop");
+        assert_eq!(sent[2]["guard"]["revision"], 4);
         // Its end is never news.
         assert!(ended_quietly(
             "s-stop",
@@ -747,5 +824,230 @@ mod tests {
             "s1",
             &json!({"id":51,"dispatch":{"state":"not_sent","code":"expired"}})
         ));
+    }
+
+    /// A stop the engine never confirmed, then the task really failed: that
+    /// failure is told as any failure, never dropped. Only a task that ended
+    /// stopped stays quiet; one that finished is told as done.
+    #[test]
+    fn stop_a_failure_after_an_unconfirmed_stop_is_told() {
+        keep_stopped("s-unconfirmed", 44);
+        let failed = json!({"state":"failed","answer":"I could not reach the repository."});
+        assert!(!ended_quietly("s-unconfirmed", 44, &failed));
+        assert!(ended_quietly(
+            "s-unconfirmed",
+            44,
+            &json!({"state":"stopped","answer":""})
+        ));
+        assert!(!ended_quietly(
+            "s-unconfirmed",
+            44,
+            &json!({"state":"idle","answer":"Done."})
+        ));
+    }
+
+    /// A fake tasks part answering each line by its op, each connection on
+    /// a thread of its own (so asks sent at once are answered at once):
+    /// `tasks_now` with `record`, `get_task` with `asks` after `slow`,
+    /// `status` with the store, and each `stop` with the next of `stops`.
+    fn by_op(
+        directory: &Path,
+        record: Value,
+        asks: Vec<(u64, &'static str)>,
+        slow: Duration,
+        stops: Vec<Value>,
+    ) -> std::sync::mpsc::Receiver<(Value, Instant)> {
+        use std::io::{BufRead, Write};
+        let listener =
+            std::os::unix::net::UnixListener::bind(directory.join("request.sock")).unwrap();
+        let (sent, seen) = std::sync::mpsc::channel();
+        let stops = std::sync::Arc::new(Mutex::new(VecDeque::from(stops)));
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let (record, asks, stops, sent) =
+                    (record.clone(), asks.clone(), stops.clone(), sent.clone());
+                std::thread::spawn(move || {
+                    let mut line = String::new();
+                    std::io::BufReader::new(&stream)
+                        .read_line(&mut line)
+                        .unwrap();
+                    let asked: Value = serde_json::from_str(&line).unwrap();
+                    let _ = sent.send((asked.clone(), Instant::now()));
+                    let answer = match asked["op"].as_str().unwrap() {
+                        "tasks_now" => record,
+                        "get_task" => {
+                            std::thread::sleep(slow);
+                            asks.iter()
+                                .find(|(id, _)| Some(*id) == asked["id"].as_u64())
+                                .map_or(
+                                    json!({"ok":false,"error":"not_found"}),
+                                    |(_, text)| json!({"ok":true,"text":text}),
+                                )
+                        }
+                        "status" => json!({"ok":true,"store_id":"s-by-op","revision":9}),
+                        "stop" => stops
+                            .lock()
+                            .unwrap()
+                            .pop_front()
+                            .unwrap_or(json!({"ok":false,"error":"bad_request"})),
+                        _ => json!({"ok":false,"error":"bad_request"}),
+                    };
+                    let _ = writeln!(stream, "{answer}");
+                });
+            }
+        });
+        seen
+    }
+
+    fn fresh(name: &str) -> std::path::PathBuf {
+        let directory = std::env::temp_dir().join(format!("{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        directory
+    }
+
+    /// A work id from the model stops only work in the voice's own going
+    /// set: never a make brief, never work already over. Named so, the
+    /// person is asked about the work that is going; nothing is stopped.
+    #[test]
+    fn stop_a_named_id_only_among_the_work_going() {
+        let record = json!({"ok":true,"store_id":"s-by-op","revision":3,"tasks":[
+            {"task":9,"agent":"openclaw","target":"lamp","state":"working"},
+            {"task":7,"agent":"claude","target":"office","state":"working"},
+            {"task":5,"agent":"codex","target":"office","state":"idle"}]});
+        let asks = vec![
+            (9, "Write one lamp skill (lampOS lamp-skills): a timer"),
+            (7, "Fix the parser"),
+            (5, "Write a short poem about tea"),
+        ];
+        for named in ["9", "5", "404"] {
+            let directory = fresh(&format!("task-stop-named-{named}"));
+            let seen = by_op(
+                &directory,
+                record.clone(),
+                asks.clone(),
+                Duration::ZERO,
+                vec![],
+            );
+            let (answered, ok) = run(
+                &place(&directory),
+                &json!({"task": named}),
+                8,
+                Duration::from_secs(5),
+            );
+            assert!(ok, "{answered}");
+            assert_eq!(
+                answered["which"],
+                json!(["Fix the parser"]),
+                "{named}: {answered}"
+            );
+            let ops: Vec<Value> = seen
+                .try_iter()
+                .map(|(line, _)| line["op"].clone())
+                .collect();
+            assert!(!ops.contains(&json!("stop")), "{named}: {ops:?}");
+            std::fs::remove_dir_all(&directory).unwrap();
+        }
+        // The one going, named: stopped, its guard from `tasks_now`'s reply.
+        let directory = fresh("task-stop-named-7");
+        let seen = by_op(
+            &directory,
+            record,
+            asks,
+            Duration::ZERO,
+            vec![json!({"ok":true,"id":7,"stop":"stopped"})],
+        );
+        let (answered, _) = run(
+            &place(&directory),
+            &json!({"task":7}),
+            8,
+            Duration::from_secs(5),
+        );
+        assert_eq!(answered["stop"], "stopped", "{answered}");
+        let sent: Vec<Value> = seen.try_iter().map(|(line, _)| line).collect();
+        let stop = sent.iter().find(|line| line["op"] == "stop").unwrap();
+        assert_eq!(stop["id"], 7);
+        assert_eq!(stop["guard"]["store_id"], "s-by-op");
+        assert_eq!(stop["guard"]["revision"], 3);
+        assert!(!sent.iter().any(|line| line["op"] == "status"), "{sent:?}");
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// Latency: the asks of the work going are read at once, not one after
+    /// another, and the guard comes from `tasks_now`'s own reply, so the
+    /// stop leaves within one `get_task`'s time of the record, whatever the
+    /// number of tasks going.
+    #[test]
+    fn stop_reads_the_asks_of_the_work_going_at_once() {
+        let slow = Duration::from_millis(150);
+        let record = json!({"ok":true,"store_id":"s-by-op","revision":3,"tasks":[
+            {"task":1,"agent":"claude","target":"office","state":"working"},
+            {"task":2,"agent":"codex","target":"office","state":"working"},
+            {"task":3,"agent":"hermes","target":"lamp","state":"working"}]});
+        let directory = fresh("task-stop-at-once");
+        let seen = by_op(
+            &directory,
+            record,
+            vec![
+                (1, "Fix the parser"),
+                (2, "Write a poem about tea"),
+                (3, "Plan my trip"),
+            ],
+            slow,
+            vec![json!({"ok":true,"id":2,"stop":"stopped"})],
+        );
+        let started = Instant::now();
+        let (answered, _) = run(
+            &place(&directory),
+            &json!({"which":"the poem one"}),
+            8,
+            Duration::from_secs(5),
+        );
+        let took = started.elapsed();
+        assert_eq!(answered["stop"], "stopped", "{answered}");
+        let sent: Vec<(Value, Instant)> = seen.try_iter().collect();
+        let (_, stop_at) = sent.iter().find(|(line, _)| line["op"] == "stop").unwrap();
+        let to_stop = stop_at.duration_since(started);
+        eprintln!("task_stop latency: to the stop {to_stop:?}, whole call {took:?}");
+        assert!(
+            to_stop < slow * 2,
+            "the asks were read one by one: {to_stop:?}"
+        );
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// A tasks part from before a stop needed no fresh revision answers a
+    /// stale guard `conflict`: the voice reads `status` and asks once more,
+    /// with a fresh guard and request id, and says what that answers.
+    #[test]
+    fn stop_a_conflict_is_asked_again_once_with_a_fresh_guard() {
+        let record = json!({"ok":true,"store_id":"s-by-op","revision":3,"tasks":[
+            {"task":7,"agent":"claude","target":"office","state":"working"}]});
+        let directory = fresh("task-stop-conflict");
+        let seen = by_op(
+            &directory,
+            record,
+            vec![(7, "Fix the parser")],
+            Duration::ZERO,
+            vec![
+                json!({"ok":false,"error":"conflict"}),
+                json!({"ok":true,"id":7,"stop":"stopped"}),
+                json!({"ok":false,"error":"conflict"}),
+            ],
+        );
+        let (answered, _) = run(&place(&directory), &json!({}), 8, Duration::from_secs(5));
+        assert_eq!(answered["stop"], "stopped", "{answered}");
+        let sent: Vec<Value> = seen.try_iter().map(|(line, _)| line).collect();
+        let stops: Vec<&Value> = sent.iter().filter(|line| line["op"] == "stop").collect();
+        assert_eq!(stops.len(), 2, "{sent:?}");
+        assert_eq!(stops[0]["guard"]["revision"], 3);
+        assert_eq!(stops[1]["guard"]["revision"], 9);
+        assert_ne!(
+            stops[0]["guard"]["request_id"],
+            stops[1]["guard"]["request_id"]
+        );
+        assert!(sent.iter().any(|line| line["op"] == "status"));
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 }

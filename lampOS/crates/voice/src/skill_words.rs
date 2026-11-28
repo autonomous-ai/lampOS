@@ -443,6 +443,11 @@ pub const STOP_NOT_STARTED_LINE: &str = "Okay, I won't start it.";
 /// The work runs on the person's computer, which the lamp can't stop yet.
 pub const STOP_REMOTE_LINE: &str =
     "That one is running on your computer, and I can't stop it from here yet.";
+/// The lamp's own agent has the work, but the lamp can't stop it there
+/// (the tasks part's `cannot_stop`): never "on your computer", never
+/// "finished" while it may still be at work.
+pub const STOP_CANNOT_STOP_LINE: &str =
+    "Sorry, I can't stop that one right now. It'll keep going until it's done.";
 /// The work had already ended.
 pub const STOP_NOT_RUNNING_LINE: &str = "That one had already finished.";
 /// No work handed over is going now.

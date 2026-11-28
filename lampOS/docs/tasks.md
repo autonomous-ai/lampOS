@@ -8686,18 +8686,25 @@ unchanged: it drops that task, and the model is not called.
 - **Arguments.** `which` holds the person's words for the work ("the poem
   one"). `task` holds the `work_id` its hand-over answered. Both are
   optional.
-- **Which work.** With no `task`, the voice reads `tasks_now`, then
-  `get_task` for each piece of work going (`working`, `starting`,
-  `installing`, `needs_input` or `unknown`). A skill's make brief is never
-  counted. "That one", or no content words, means the only work going.
+- **Which work.** The voice reads `tasks_now`, then `get_task` for every
+  piece of work going (`working`, `starting`, `installing`, `needs_input`
+  or `unknown`), all at once, not one after another. A skill's make brief
+  is never counted. A `task` counts only when it is one of that work going:
+  an id for a make brief, for work already over, or for none at all stops
+  nothing, and the model is told to ask about the work that is going (by
+  `which`'s words, if they single one out). "That one", or no content words, means the only work going.
   Words single out the work whose ask shares the most of them. An agent's
   name never counts as such a word. Several pieces of work going, with no
   words that single one out, get `{"which":[…],"next":…}`: the model asks
   which one, naming each by its own ask (its label, at most 60
   characters) and never by its agent. With none going, the lamp says
   "Nothing is running right now."
-- **The stop.** The voice sends `status`, then
-  `{"op":"stop","guard":<as cancel>,"id":<id>}` on a thread of its own.
+- **The stop.** The voice sends `{"op":"stop","guard":<guard>,"id":<id>}`
+  on a thread of its own, its guard from `tasks_now`'s own reply (its
+  `store_id` and `revision`): a stop needs no fresh revision, so no
+  `status` is read first. A tasks part from before that answers a stale
+  guard `conflict`; the voice then reads `status` and asks once more with
+  a fresh guard and request id, never more.
   That thread reads the answer for up to `STOP_READ` (33 s), past the tasks
   part's own 32 s, and asks again only while the store is not sure. The
   call itself waits at most `STOP_WAIT` (3 s), so the turn is never held
@@ -8714,6 +8721,7 @@ unchanged: it drops that task, and the model is not called.
   | `unconfirmed`, or no answer in time | "I asked it to stop, but I couldn't confirm it yet." |
   | `not_started` | "Okay, I won't start it." |
   | `remote` | "That one is running on your computer, and I can't stop it from here yet." |
+  | `cannot_stop` | "Sorry, I can't stop that one right now. It'll keep going until it's done." |
   | `not_running` | "That one had already finished." |
   | error `busy` (being handed over right now) | "It's just getting started. Ask me again in a moment and I'll stop it." |
   | a refusal, or an op this tasks part doesn't know | "I couldn't stop it just now." |
@@ -8721,11 +8729,22 @@ unchanged: it drops that task, and the model is not called.
   No line names an agent, an engine or a code.
 - **Task news stays quiet.** A task that ends `stopped_by_person` (as the
   observation's `code`, `reason` or last words, or the dispatch's `code`)
-  is never told as stopped or failed, and never retold. The same holds for
-  a task this voice asked to stop and was answered `stopped`,
-  `unconfirmed` or `not_started` (`task_stop::ended_quietly`,
-  `hand_over_ended_quietly`). If such work finished anyway, it is still
-  told as done.
+  is never told as stopped or failed, and never retold. So is a task this
+  voice asked to stop (answered `stopped`, `unconfirmed` or `not_started`)
+  that then ended `stopped`, and its hand-over's failure
+  (`task_stop::ended_quietly`, `hand_over_ended_quietly`). If such work
+  failed anyway (an `unconfirmed` stop that never landed), the failure is
+  told as any failure; if it finished anyway, it is told as done.
+- **Latency.** From the call to the stop leaving: `tasks_now`, then the
+  asks at once, then the stop: three local exchanges deep whatever the
+  number of tasks going (before: `tasks_now`, one `get_task` per task,
+  `status`, the stop, one after another). Each is a few milliseconds on
+  the lamp's request socket. The engine's confirmation is then one gateway
+  round trip (OpenClaw's `chat.abort`, Hermes's run stop), and the call
+  waits at most `STOP_WAIT` (3 s). On lamp run 6 the whole reply, the
+  spoken line included, took 1.6 s, so the lamp says no "stopping it"
+  first: one line, said once, is the natural answer, and a filler before
+  it would only add words.
 - **Not yet shown:** a played stop on a lamp with the tasks part's `stop`
   op. Like `tasks_now`, anyone who asks can stop any recent work.
 
@@ -8737,7 +8756,12 @@ Tests: `task_stop::tests::stop_one_running_task_is_that_task`,
 `task_stop::tests::stop_news_stays_silent_on_stopped_by_person`,
 `task_stop::tests::stop_answer_reads_the_top_level_then_data_and_busy_is_never_stopped`,
 `task_stop::tests::stop_never_holds_the_turn_for_a_slow_engine`,
+`task_stop::tests::stop_a_failure_after_an_unconfirmed_stop_is_told`,
+`task_stop::tests::stop_a_named_id_only_among_the_work_going`,
+`task_stop::tests::stop_reads_the_asks_of_the_work_going_at_once`,
+`task_stop::tests::stop_a_conflict_is_asked_again_once_with_a_fresh_guard`,
 `task_news::tests::stop_news_never_tells_a_task_the_person_stopped`,
+`task_news::tests::stop_news_drops_a_hand_over_failure_of_work_asked_to_stop`,
 `agent_tasks::tests::stop_tool_is_declared_with_tasks_now`.
 
 ### The voice asks about its work (#7930)

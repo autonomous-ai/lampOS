@@ -6284,4 +6284,41 @@ mod tests {
         assert_eq!(keys, ["s-news-stop:2:2"], "{news:?}");
         std::fs::remove_dir_all(root).unwrap();
     }
+
+    /// A hand-over that failed for a task this voice asked to stop (kept by
+    /// `task_stop`, no code of its own) is dropped end to end through
+    /// `read_once` (`task_stop::hand_over_ended_quietly`); the same failure
+    /// of a task never stopped is still told.
+    #[test]
+    fn stop_news_drops_a_hand_over_failure_of_work_asked_to_stop() {
+        let root = std::env::temp_dir().join(format!("task-news-stop-hand-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        crate::task_stop::keep_stopped("s-news-hand", 4);
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let failed = json!({"state":"not_sent","code":"harness_refused",
+                    "confirmed":{"monotonic_ms":NOW - 2_000},
+                    "finished":{"boot_id":"boot-a","monotonic_ms":NOW - 1_000}});
+                let answer = match (asked["op"].as_str().unwrap(), asked["id"].as_u64()) {
+                    ("list", _) => json!({"ok":true,"store_id":"s-news-hand","items":[
+                        {"id":4,"observations":0,"dispatch":failed},
+                        {"id":5,"observations":0,"dispatch":failed}]}),
+                    ("get_task", Some(4 | 5)) => task("claude", json!([])),
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let news = read_once(&socket, &now(), &BTreeSet::new(), &BTreeSet::new());
+        let keys: Vec<&str> = news.iter().map(|news| news.key.as_str()).collect();
+        assert_eq!(keys, ["s-news-hand:5:hand-over"], "{news:?}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

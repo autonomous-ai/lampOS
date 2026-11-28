@@ -4203,18 +4203,25 @@ hay "Thôi" cho việc còn chờ chữ "có" vẫn như cũ: việc đó bị b
 
 - **Tham số.** `which` là lời của người dùng gọi việc đó ("cái bài thơ").
   `task` là `work_id` mà lần giao việc đã trả về. Cả hai đều không bắt buộc.
-- **Việc nào.** Khi không có `task`, giọng nói đọc `tasks_now`, rồi gọi
-  `get_task` cho từng việc đang chạy (`working`, `starting`, `installing`,
-  `needs_input` hoặc `unknown`). Bản brief tạo kỹ năng không bao giờ được
-  tính. "Cái đó", hoặc không có từ nội dung nào, nghĩa là việc duy nhất đang
+- **Việc nào.** Giọng nói đọc `tasks_now`, rồi gọi `get_task` cho mọi việc
+  đang chạy (`working`, `starting`, `installing`, `needs_input` hoặc
+  `unknown`), cùng lúc, không lần lượt từng cái. Bản brief tạo kỹ năng không
+  bao giờ được tính. Một `task` chỉ được tính khi nó là một trong các việc
+  đang chạy đó: id của một brief tạo kỹ năng, của việc đã xong, hay không
+  của việc nào, không dừng gì cả, và model được bảo hỏi về việc đang chạy
+  (theo lời trong `which`, nếu lời đó chọn ra được một việc). "Cái đó", hoặc không có từ nội dung nào, nghĩa là việc duy nhất đang
   chạy. Lời nói chọn ra việc có lời nhờ chung nhiều từ nhất với nó. Tên agent
   không bao giờ được tính là một từ như vậy. Khi nhiều việc đang chạy mà lời
   nói không chọn ra được một việc, model nhận `{"which":[…],"next":…}`: nó hỏi
   người dùng muốn dừng việc nào, gọi mỗi việc bằng lời nhờ của chính nó (nhãn,
   tối đa 60 ký tự), không bao giờ bằng tên agent. Khi không có việc nào đang
   chạy, đèn nói "Nothing is running right now."
-- **Lệnh dừng.** Giọng nói gửi `status`, rồi
-  `{"op":"stop","guard":<như cancel>,"id":<id>}` trên một luồng riêng. Luồng
+- **Lệnh dừng.** Giọng nói gửi `{"op":"stop","guard":<guard>,"id":<id>}`
+  trên một luồng riêng, guard lấy từ chính câu trả lời của `tasks_now`
+  (`store_id` và `revision` của nó): lệnh dừng không cần revision mới, nên
+  không đọc `status` trước. Một phần tasks đời trước trả lời guard cũ là
+  `conflict`; khi đó giọng nói đọc `status` và hỏi thêm đúng một lần với
+  guard và request id mới. Luồng
   đó đọc câu trả lời tối đa `STOP_READ` (33 s), lâu hơn 32 s của phần tasks,
   và chỉ hỏi lại khi kho dữ liệu chưa chắc chắn. Bản thân lần gọi chỉ chờ
   tối đa `STOP_WAIT` (3 s), nên lượt nói không bao giờ bị giữ để chờ
@@ -4231,6 +4238,7 @@ hay "Thôi" cho việc còn chờ chữ "có" vẫn như cũ: việc đó bị b
   | `unconfirmed`, hoặc không trả lời kịp | "I asked it to stop, but I couldn't confirm it yet." |
   | `not_started` | "Okay, I won't start it." |
   | `remote` | "That one is running on your computer, and I can't stop it from here yet." |
+  | `cannot_stop` | "Sorry, I can't stop that one right now. It'll keep going until it's done." |
   | `not_running` | "That one had already finished." |
   | lỗi `busy` (việc đang được giao ngay lúc đó) | "It's just getting started. Ask me again in a moment and I'll stop it." |
   | bị từ chối, hoặc phần tasks không biết op này | "I couldn't stop it just now." |
@@ -4239,10 +4247,21 @@ hay "Thôi" cho việc còn chờ chữ "có" vẫn như cũ: việc đó bị b
 - **Tin về việc giữ im lặng.** Một việc kết thúc với `stopped_by_person` (là
   `code` hoặc `reason` của lần quan sát, hoặc lời cuối của nó, hoặc `code` của
   dispatch) không bao giờ được kể là đã dừng hay thất bại, và không bao giờ
-  được kể lại. Điều này cũng đúng với việc mà giọng nói này đã yêu cầu dừng và
-  nhận câu trả lời `stopped`, `unconfirmed` hoặc `not_started`
-  (`task_stop::ended_quietly`, `hand_over_ended_quietly`). Nếu việc đó vẫn
-  làm xong, nó vẫn được kể là đã xong.
+  được kể lại. Cũng vậy với việc mà giọng nói này đã yêu cầu dừng (nhận câu
+  trả lời `stopped`, `unconfirmed` hoặc `not_started`) rồi kết thúc
+  `stopped`, và với lần giao thất bại của nó (`task_stop::ended_quietly`,
+  `hand_over_ended_quietly`). Nếu việc đó vẫn thất bại (một lần dừng
+  `unconfirmed` không có hiệu lực), thất bại được kể như mọi thất bại khác;
+  nếu nó vẫn làm xong, nó được kể là đã xong.
+- **Độ trễ.** Từ lúc gọi tới lúc lệnh dừng được gửi: `tasks_now`, rồi các
+  lời nhờ cùng lúc, rồi lệnh dừng: ba lần trao đổi cục bộ nối tiếp, dù có
+  bao nhiêu việc đang chạy (trước đây: `tasks_now`, mỗi việc một `get_task`,
+  `status`, rồi lệnh dừng, lần lượt). Mỗi lần chỉ vài mili giây trên socket
+  request của đèn. Xác nhận của engine sau đó là một vòng tới gateway
+  (`chat.abort` của OpenClaw, lệnh dừng run của Hermes), và lần gọi chờ tối
+  đa `STOP_WAIT` (3 s). Ở lần chạy 6 trên đèn, cả câu trả lời, gồm câu nói,
+  mất 1,6 s, nên đèn không nói "đang dừng" trước: một câu, nói một lần, là
+  câu trả lời tự nhiên, và một câu đệm trước đó chỉ thêm lời.
 - **Chưa kiểm chứng:** chưa thử dừng bằng giọng nói trên một đèn có op `stop`
   của phần tasks. Giống `tasks_now`, bất kỳ ai hỏi cũng dừng được mọi việc
   gần đây.
@@ -4252,8 +4271,13 @@ hay "Thôi" cho việc còn chờ chữ "có" vẫn như cũ: việc đó bị b
   `stop_against_the_tasks_part_sends_stop_for_the_one_going`,
   `stop_news_stays_silent_on_stopped_by_person`,
   `stop_answer_reads_the_top_level_then_data_and_busy_is_never_stopped`,
-  `stop_never_holds_the_turn_for_a_slow_engine`;
-  `task_news::tests::stop_news_never_tells_a_task_the_person_stopped`;
+  `stop_never_holds_the_turn_for_a_slow_engine`,
+  `stop_a_failure_after_an_unconfirmed_stop_is_told`,
+  `stop_a_named_id_only_among_the_work_going`,
+  `stop_reads_the_asks_of_the_work_going_at_once`,
+  `stop_a_conflict_is_asked_again_once_with_a_fresh_guard`;
+  `task_news::tests::stop_news_never_tells_a_task_the_person_stopped`,
+  `stop_news_drops_a_hand_over_failure_of_work_asked_to_stop`;
   `agent_tasks::tests::stop_tool_is_declared_with_tasks_now`.
 
 ## Chính đèn, với OpenClaw (#6226)
