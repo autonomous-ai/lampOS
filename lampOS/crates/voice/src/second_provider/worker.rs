@@ -14309,9 +14309,11 @@ impl Heeding {
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
         // #8701: the news's reply, still played, is told it may be new work.
-        self.after_news = (after_news
-            && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
-        .then_some(request);
+        // The first line let out after the news takes it whatever let it
+        // out (First's hold on #8809: `LAMP_SIMPLE_CALL`'s own verdict).
+        let let_out = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
+        self.after_news =
+            (let_out && (after_news || attention.let_out_after_news())).then_some(request);
         self.someone_elses_line = (self.alone.is_some() && someone_else).then_some(request);
         // `LAMP_GOING_ON_NOT_OWN`: the answer to a line let out only as the
         // conversation going on renews nothing when it is surely someone
