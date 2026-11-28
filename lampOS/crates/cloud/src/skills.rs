@@ -652,6 +652,31 @@ pub(crate) fn pushed_dir(places: &Places) -> PathBuf {
     places.folder.with_file_name("skills-dev")
 }
 
+/// The folder of the skill `name` and its group, as the page lists it
+/// ([`list`]'s rows: the lamp's own folder first, then the pushed folder,
+/// never a name the lamp's own folder already has); none when no skill has
+/// the name. The one place a name becomes a folder for the reads that take
+/// one (`skills.files`, `crate::skill_files`), so they and the page cannot
+/// disagree.
+pub(crate) fn located(places: &Places, name: &str) -> Option<(PathBuf, Group)> {
+    if let Some((folder, loaded)) = lamp_skills::load_each(&places.folder)
+        .into_iter()
+        .find(|(folder, _)| folder.file_name().is_some_and(|file| file == name))
+    {
+        // A real folder only, as a pushed row is: a link in the lamp's
+        // folder is no skill here, and is never read through (#8629).
+        if !fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
+            return None;
+        }
+        let group = row(&folder, loaded, None, places.addons).group;
+        return Some((folder, group));
+    }
+    pushed_rows(places, None)
+        .into_iter()
+        .find(|row| row.name == name)
+        .map(|row| (pushed_dir(places).join(name), row.group))
+}
+
 /// The rows of the skills a computer pushed, as the page lists them and as
 /// `skills.share` judges them (one test for both, so the row and Share
 /// cannot disagree): each a real folder holding `.pushed.json`, never a

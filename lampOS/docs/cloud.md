@@ -178,7 +178,7 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.seen_more` with the page and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`/`skills.visibility`, `skills.upload`, `attach` with `LAMP_ATTACHMENTS=on` (#7659), `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `led.privacy.get`/`led.privacy.set` with `LAMP_PRIVACY_LIGHT=on` and `LAMP_SETTINGS_CHANGE=on` on a lamp with a slide (#8696), `desk_noticing.get`/`desk_noticing.set` with `LAMP_SEEN_ACTIVITY=on` (#6543), `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera`/`skills.files` with the page (#4099, #8629), `skills.seen_more` with the page and `LAMP_SEEN_MORE_DOINGS=on` in lamp-cloud's own unit (#6543), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`/`skills.visibility`, `skills.upload`, `attach` with `LAMP_ATTACHMENTS=on` (#7659), `skills.secrets`/`skills.secret_set`/`skills.secret_unset` with `LAMP_SKILL_SECRETS=on` while `lamp-services`' admin socket is there, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `led.privacy.get`/`led.privacy.set` with `LAMP_PRIVACY_LIGHT=on` and `LAMP_SETTINGS_CHANGE=on` on a lamp with a slide (#8696), `desk_noticing.get`/`desk_noticing.set` with `LAMP_SEEN_ACTIVITY=on` (#6543), `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there, `monitor.set`/`monitor.get`/`monitor.link` with `LAMP_APP_MONITOR=on` and `LAMP_SETTINGS_CHANGE=on`, #5883), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `developer` | `{"camera": bool, "microphone": bool, "speaker": bool}` while lamp-control's admin socket is there (developer access on), else no field: whether a camera, microphone or speaker stream is usable on this lamp (wired, and for the microphone and the speaker the owner's `--microphone on` and `--speaker on`), asked of lamp-control (`{"features": true}`, "The developer door"). `true` means a stream is allowed, not that one starts now (the ears share their sound on demand). The app offers its grants screen only when the field is there and shows the `microphone` tick disabled while it is `false` (and, once it offers the `speaker` tick, that one while `speaker` is `false`); a lamp-control too old to say reads as all `false`, and one from before the speaker reads `speaker` as `false` (App Only's C, 11 Nov 2026) |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `character` | `{"energy_alone": true}` whenever `character.set` is taken (with `character_energy_supported`, #7566): the lamp takes the movement level alone, `{"energy": N}` with no `text`, and keeps the kept words ([chosen-voice.md](chosen-voice.md)). Missing on an older build, so the app keeps its "save the words first" path there |
@@ -206,7 +206,8 @@ lamp says so.
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`, and `pushed` for a skill a paired computer pushed), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
-| `skills.share` (`{"name", "author"?, "visibility"?, "sha256"}`, or `{"name", "visibility"?, "preview": true}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave and the package's `sha256`, both from one copy of the skill taken once, so a skill made again meanwhile can't pair one text with another package (Mobile's P2 on #4965). A send must give that `sha256`: without it, "show what would be sent first, then send that"; with another, as when the skill was made again since, "the skill changed since you looked: look again before sending", and nothing sent (the Reviewer-lead's P2 on #4948). Without them, "not on this lamp". An optional `visibility` (`public`, `unlisted` or `private`, #5209) says who can see it; the lamp sends none the app does not name, and the preview says the lamp's line for it ("`skills.visibility`" below) |
+| `skills.files` (`{"name"}`, or `{"name", "path"}`) | with `LAMP_SKILLS_PAGE=on` (#8629, "A skill's files" below), read only, no switch of its own: `{"files": {"name", "source", "files": [{"path", "size"} | {"path", "link": true}], "cut"?: true}}`, the plain files under the skill's folder whatever its group (`source` is `built-in`, `store`, `made` or `pushed`), subfolders walked, sorted by path, at most 500 entries and at most 500 folders walked, then `"cut": true`; a link shown as one, never followed, and a skill whose folder is itself a link is no skill here; dot files, `lamp-skill.sig` and the skills state folder never listed. With `path`, `{"file": {"path", "text", "cut"?: true}}`, one UTF-8 text file, cut at 65,536 characters (the preview's cap) and said so, never refused for its length. Refused in plain words: `no skill named NAME on this lamp`, `no file PATH in NAME` (a folder, the signature or nothing there), `not a text file: PATH`, and `not a path in the skill` for `..`, a dot part, an absolute path or a link anywhere along it (the file is opened with `O_NOFOLLOW` too, so a link swapped in after the look fails the same way). Lamp 1's Go server answers a kind of the same name with another shape (`path`/`size`/`binary` rows keyed from the skills root, `mqtt.md`, "`skills.files`"); this is Lamp 2's, the one gated on `can` listing `skills.files`, so the app keys on `can`, never on the name. Without the switch, V1's "not on this lamp" |
+| `skills.share` (`{"name", "author"?, "visibility"?, "sha256"}`, or `{"name", "visibility"?, "preview": true}`) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_SHARE=on`, an account base with a host and the lamp's key ("A made skill sent to the Skills Store" below, fourteen-P13): a skill made here and on, packed and sent for the Store's review, `{"sent": {"id", "name", "version", "review_status"}}`; with `"preview": true`, nothing sent, its files' text as it would leave and the package's `sha256`, both from one copy of the skill taken once, so a skill made again meanwhile can't pair one text with another package (Mobile's P2 on #4965). The files are read as they are: a skill the Store's packer refuses (a made skill with only `asks`) still answers its files, with `"sha256": null` and `"pack_refused": "<why>"`, and a send of it then refuses (#8629). A send must give that `sha256`: without it, "show what would be sent first, then send that"; with another, as when the skill was made again since, "the skill changed since you looked: look again before sending", and nothing sent (the Reviewer-lead's P2 on #4948). Without them, "not on this lamp". An optional `visibility` (`public`, `unlisted` or `private`, #5209) says who can see it; the lamp sends none the app does not name, and the preview says the lamp's line for it ("`skills.visibility`" below) |
 | `skills.shared` (`{}`) | as `skills.share`: this lamp's sent skills, the Store's newest 100, `{"shares": [...]}`, each with its `visibility` and `visibility_note` when the Store says them |
 | `skills.unshare` (`{"id"}`) | as `skills.share`: a sent skill taken back from the Store, `{"unshared": ID}` |
 | `skills.visibility` (`{"id", "visibility"}`) | as `skills.share`: who can see a sent skill, changed later, `{"visibility": {"id", "visibility", "visibility_note"?}}` (#5209). Listed in `can` only with the switch, and it is the key that says this lamp takes `visibility` in `skills.share`: a lamp without it ignores the field, so the app keeps Private hidden there |
@@ -1139,7 +1140,7 @@ gates in `answer::tests` (off: "not on this lamp" and not in `can`; on:
 `skills.made` and `skills.write`), and
 `skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed`.
 
-## The skills page (#1722, `skills.list`, `skills.remove`, `skills.off`, `skills.on`, `skills.camera`, `skills.install`)
+## The skills page (#1722, `skills.list`, `skills.remove`, `skills.off`, `skills.on`, `skills.camera`, `skills.install`, `skills.files`)
 
 The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
 first builder's yes at 17:21 on 19 Oct): the lamp's skills as a phone's
@@ -1181,6 +1182,43 @@ units alike ([switches.md](switches.md)). The folder is 0755 and its files 0644,
 this Mac the 13 skills of `lampOS/skills/` are read in 32 ms (a debug
 build; not yet timed on a lamp). A folder that can't be read is answered
 "the lamp's skills can't be read now".
+
+**A skill's files (#8629, `skills.files`).** The owner asked that every
+skill's files be readable from its page, built-ins included (on lamp-9adf
+a voice-made skill read "not packed" and a built-in showed none). With the
+page on, and no switch of its own since it reads what the page already
+shows for a made skill, `skills.files {"name"}` answers `{"files": {"name",
+"source", "files": [...], "cut"?: true}}`: the plain files under the
+skill's folder, each `{"path", "size"}`, sorted by path with subfolders
+walked (`SKILL.md`, `skill.toml`, `agent.toml`, `scripts/`, `moves/`,
+`sounds/`, `lights/`, `shows/`, `tests/`), and `source` saying where the
+skill came from: `built-in` (a core skill, from the build), `store` (an
+installed one), `made` (`made: here`) or `pushed` (a paired computer's, in
+`skills-dev`). The name becomes a folder as the page's rows do (the lamp's
+own folder first, then the pushed one), so the page and the read cannot
+disagree. The first builder's three conditions (19:23, 25 Nov): **a link is
+never followed** while listing, shown as `{"path", "link": true}` with no
+size and never read through, and a path under one is refused as `..` is;
+**at most 500 entries, and at most 500 folders walked**, then the walk
+stops and the list says `"cut": true`, so one odd folder can't make a reply
+the app chokes on nor keep the lamp walking thousands of empty folders; a
+skill whose folder is itself a link is `no skill named NAME on this lamp`,
+as a pushed row is no row; and **a long text is cut,
+not refused**: `skills.files {"name", "path"}` answers `{"file": {"path",
+"text", "cut"?: true}}`, UTF-8 text only, cut at 65,536 characters (the
+preview's cap) with `"cut": true` so nobody edits a cut copy believing it
+whole. Never listed or read: dot files (`.package.json`, `.pushed.json`,
+`.yes.json`), `lamp-skill.sig`, and anything in the skills state folder
+(yeses, counts, secrets), which is beside the skills folder and never under
+a skill. The refusals, in plain words: `no skill named NAME on this lamp`
+(a name that is not a skill's is refused without being said back, as
+`skills.remove` does), `no file PATH in NAME` (nothing there, a folder, or
+the signature), `not a text file: PATH` (a WAV or an ONNX; the list still
+shows its size), and `not a path in the skill` for `..`, a dot part, an
+absolute path or a link anywhere along it (each part is looked at as it
+is, `lstat`, and the file is opened with `O_NOFOLLOW`, so a link swapped in
+between the look and the open fails the same way). The app shows FILES for every skill when `can` lists
+`skills.files`, and keeps the preview read on older lamps.
 
 **The reply:**
 
@@ -1696,9 +1734,15 @@ since 30 Oct.
   or state is "the Skills Store's answer couldn't be read", since the app
   could never take it back.
   **`"preview": true`** sends nothing: the same copy is made and read back
-  as `{"preview": {"name", "files": [{"path", "text"}]}}` (a file that
-  isn't text gives its `bytes` only; at most 65,536 characters in all), so
-  the app can show the owner exactly what would leave before Send.
+  as `{"preview": {"name", "sha256", "files": [{"path", "text"}]}}` (a file
+  that isn't text gives its `bytes` only; at most 65,536 characters in
+  all), so the app can show the owner exactly what would leave before Send.
+  The files are read as they are, never through the Store's packing rules
+  (#8629: a voice-made skill started only by its own words, `asks` with no
+  trigger or tool, read "not packed: skill.toml needs a trigger or a tool"
+  from its page): when the packer refuses the copy, the preview still shows
+  the files, with `"sha256": null` and the refusal in `"pack_refused"`, and
+  a send of it is refused as before, since the pack check stays the send's.
   **Who can see it** (#5209, the first builder's three modes, Backend3's
   fields on the Store): `visibility` is `public` (everyone), `unlisted`
   (nobody browsing; anyone with its link) or `private` (the owner, on their
