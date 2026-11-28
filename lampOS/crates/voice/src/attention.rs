@@ -2991,6 +2991,23 @@ impl Attention {
         self.tapped || self.opened || self.named_near_the_start
     }
 
+    /// [`Self::simple_called`] for `request`'s line over
+    /// `began_us..=ended_us` that is not the line in hand (a name kept
+    /// waiting for the line after it): lamp-name's newest hearing counted for
+    /// its sound ([`hearing_counts_for_line`]) and begun within
+    /// [`HEY_AT_THE_START_US`] of its start, a tap just before it began, or a
+    /// turn a computer opened for it. Reads only; changes nothing.
+    pub fn simple_called_over(&self, request: u64, began_us: u64, ended_us: u64) -> bool {
+        let named = self.named_us.is_some_and(|at| {
+            hearing_counts_for_line(at, began_us, ended_us)
+                && at <= began_us.saturating_add(HEY_AT_THE_START_US)
+        });
+        let tapped = self.tapped_us.is_some_and(|tapped| {
+            tapped <= began_us && tapped.saturating_add(TAPPED_BEFORE_US) >= began_us
+        });
+        named || tapped || self.opened_request == Some(request)
+    }
+
     /// Whether the line last judged was a turn the lamp began itself.
     pub fn judged_own(&self) -> bool {
         self.judged_own

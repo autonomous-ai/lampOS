@@ -2695,6 +2695,10 @@ struct Shared {
     /// was heard (a newer line began): answered in the next line's place
     /// if that line is held ([`CARRY_WITHIN`], #1712).
     cut: Mutex<Option<Carried>>,
+    /// With `LAMP_SIMPLE_CALL`, the newest lines the one rule let out, by
+    /// request ([`Shared::let_out_by_the_rule`]): only their words are
+    /// answered in a held line's place ([`Shared::words_let_out`]).
+    let_out: Mutex<VecDeque<u64>>,
     /// The request last held, its words not answered: never chained into a
     /// later line's ([`Engine::chain_heard`]).
     held_last: Mutex<Option<u64>>,
@@ -3384,6 +3388,10 @@ struct NameWait {
     /// window for the line said by it begins here, so the name heard in it
     /// counts for that line.
     said_from: u64,
+    /// When its line ended, by the same clock (`u64::MAX` before its end is
+    /// known): with `LAMP_SIMPLE_CALL`, its own window for the rule
+    /// ([`Shared::kept_line_let_out`]).
+    said_to: u64,
     /// Its words are the coordinator's call word put in for a line with no
     /// words, not the person's (`LAMP_NAME_FACE_OR_WORDS`, #8114): the line
     /// said by it is judged by its own words only.
@@ -5868,6 +5876,7 @@ impl Engine {
                 send_content_epoch: Arc::new(AtomicU64::new(0)),
                 answered_request: Mutex::new(None),
                 cut: Mutex::new(None),
+                let_out: Mutex::new(VecDeque::new()),
                 held_last: Mutex::new(None),
                 asked_last: Mutex::new(None),
                 same_speaker: None,
@@ -9947,6 +9956,13 @@ impl Engine {
             words: NameWords::Coming(words),
             until,
             said_from: turn.said.lock().map_or(0, |said| said.0),
+            said_to: turn
+                .said
+                .lock()
+                .ok()
+                .map(|said| said.1)
+                .filter(|ended| *ended > 0)
+                .unwrap_or(u64::MAX),
             put_in: false,
         };
         if let Ok(mut waits) = self.shared.name_waits.lock() {
@@ -10677,6 +10693,56 @@ impl Shared {
         if let Some(did) = &self.did {
             did(Did::Stopped);
         }
+    }
+
+    /// With `LAMP_SIMPLE_CALL`, `request`'s line let out by the one rule:
+    /// its words may be answered in a held line's place, should one cut
+    /// them short ([`Self::words_let_out`]). The newest [`LET_OUT_KEPT`].
+    fn let_out_by_the_rule(&self, request: u64) {
+        if !self.simple_call {
+            return;
+        }
+        if let Ok(mut let_out) = self.let_out.lock() {
+            if let_out.len() == LET_OUT_KEPT {
+                let_out.pop_front();
+            }
+            let_out.push_back(request);
+        }
+    }
+
+    /// With `LAMP_SIMPLE_CALL` (the product owner: the words decide
+    /// nothing), whether `carried` may be answered in a held line's place:
+    /// only when the one rule let out the line that said them
+    /// (`said_by`). On lamp-dbda (28 Nov 08:18, lamp-name stopped) a bare
+    /// "Lamp." no rule let out was answered in a held line's place, and the
+    /// window its answer opened let played clips chain in for two hours.
+    /// Without the switch, always, as before.
+    fn words_let_out(&self, carried: &Carried) -> bool {
+        !self.simple_call
+            || self
+                .let_out
+                .lock()
+                .is_ok_and(|let_out| let_out.contains(&carried.said_by))
+    }
+
+    /// With `LAMP_SIMPLE_CALL`, whether the one rule lets out `request`'s
+    /// line over `said` with `words`, kept and never judged as the line in
+    /// hand (a name waiting for the line after it), judged now and changing
+    /// nothing ([`Engine::judging_kept_lines`]); let out, it is kept as one
+    /// ([`Self::let_out_by_the_rule`]). With no rule to judge it, or without
+    /// the switch, as before: let out.
+    fn kept_line_let_out(&self, request: u64, said: (u64, u64), words: &str) -> bool {
+        if !self.simple_call {
+            return true;
+        }
+        let let_out = self
+            .kept_line
+            .as_ref()
+            .is_none_or(|judge| judge(request, said, words));
+        if let_out {
+            self.let_out_by_the_rule(request);
+        }
+        let_out
     }
 
     fn announcement_due(&self) -> bool {
@@ -12062,6 +12128,7 @@ async fn spoken(
             words: NameWords::Known((text.clone(), called)),
             until: tokio::time::Instant::now() + left,
             said_from: window.0,
+            said_to: if window.1 > 0 { window.1 } else { u64::MAX },
             put_in: wordless_call,
         };
         if let Ok(mut waits) = shared.name_waits.lock() {
@@ -12781,6 +12848,18 @@ async fn spoken(
                 done_though_held(&shared, (request, scope.as_ref()), &text).await;
             }
         };
+        // `LAMP_SIMPLE_CALL`: only words the one rule let out, by the line
+        // that said them, are answered in a held line's place.
+        let carried = carried.filter(|carried| {
+            let let_out = shared.words_let_out(carried);
+            if !let_out {
+                eprintln!(
+                    "lamp-voice second: request {}'s words, cut short, are not answered in request {request}'s place: the line that said them was not let out (LAMP_SIMPLE_CALL)",
+                    carried.request
+                );
+            }
+            let_out
+        });
         if let Some(carried) = carried {
             // In flight before any wait, so a line begun meanwhile carries
             // them (the Reviewer on #2657; reviewer-three's P3 on the chain).
@@ -13055,6 +13134,9 @@ async fn spoken(
     {
         cuts.spoke();
     }
+    // `LAMP_SIMPLE_CALL`: let out by the rule, so its words may be answered
+    // in a held line's place should one cut them short.
+    shared.let_out_by_the_rule(request);
     // The lamp's own words at its start or end are not sent to the model
     // (`LAMP_SECOND_OWN_ECHO`); the line was told as heard above.
     let text = stripped.unwrap_or(text);
@@ -13817,7 +13899,9 @@ async fn answered_if_declined(
         .lock()
         .ok()
         .and_then(|mut declined| declined.take_if(|of| *of == request))
-        .is_some();
+        .is_some()
+        // `LAMP_SIMPLE_CALL`: only words the one rule let out.
+        && shared.words_let_out(&carried);
     if !declined {
         drop_sent_write(shared, None);
         eprintln!(
@@ -14932,6 +15016,17 @@ async fn said_by_the_name(
             } else {
                 CALLED_WORDS.to_owned()
             };
+            // `LAMP_SIMPLE_CALL`: the name is answered in a held line's place
+            // only when the one rule lets its own line out (a call: lamp-name
+            // heard it at its start), never for its words alone (lamp-dbda,
+            // 28 Nov 08:18).
+            if !shared.kept_line_let_out(name.request, (name.said_from, name.said_to), &asked) {
+                eprintln!(
+                    "lamp-voice second: request {}'s name is not answered in request {request}'s place: its own line was not let out (LAMP_SIMPLE_CALL)",
+                    name.request
+                );
+                return None;
+            }
             if let Ok(mut cut) = shared.cut.lock()
                 && cut.is_none()
             {
@@ -16915,6 +17010,11 @@ async fn event_line(
 /// How many requests begun over the lamp's answer are kept for
 /// [`Shared::begun_over`]: a turn asks its chat soon after its line begins.
 const BEGUN_OVER_KEPT: usize = 8;
+
+/// How many lines the one rule let out are kept for
+/// [`Shared::words_let_out`] (`LAMP_SIMPLE_CALL`): words are carried for a
+/// held line only within [`CARRY_WITHIN`] of being cut, a few lines at most.
+const LET_OUT_KEPT: usize = 16;
 
 impl Shared {
     /// `request` began over the lamp's audible answer: kept, with

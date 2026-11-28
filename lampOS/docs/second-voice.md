@@ -6331,6 +6331,17 @@ after a take-over, but now for every turn:
       (#8892, Reviewer-three's P2).
     - **Anything else** is held, `not "Hey Lamp", and no conversation going
       on (LAMP_SIMPLE_CALL)`, and never answered.
+    - **In a held line's place**: words cut short are answered in the place
+      of a held line that cut them (#1712) only when the one rule let out
+      the line that said them (`Shared::words_let_out`, by `said_by`). A
+      name kept waiting for the line after it, when that line is not shown
+      said by it, is judged by the rule with its own window, changing
+      nothing (`Heeding::simple_lets_out`), and answered in the held line's
+      place only if its line is let out: a call, lamp-name's start hearing,
+      never its words. On lamp-dbda (28 Nov 08:18, lamp-name stopped) a bare
+      "Lamp." no rule let out was answered in a held line's place, and the
+      window its answer opened let played clips chain in for two hours.
+      `LAMP_CUT_ASK_ANSWERED`'s "only declined" path takes the same check.
     - **Set aside**: `said_to_me` and the turned-silent rules
       (`silence_turned` is not read), every hold and let-out in
       `judged_verdict` (the face as a sign, lone words, untied and others'

@@ -5698,6 +5698,15 @@ pub fn serve(
                 heeding.taking_simple_calls();
             }
             engine = engine.taking_simple_calls();
+            // Words kept from a line never judged as the line in hand (a
+            // name waiting for the line after it) are answered in a held
+            // line's place only when the rule lets their own line out.
+            let judge = heeding.clone();
+            engine = engine.judging_kept_lines(Arc::new(move |request, said, heard| {
+                judge
+                    .lock()
+                    .is_ok_and(|rule| rule.simple_lets_out(request, said, heard))
+            }));
         }
         // Short replies carry (`LAMP_SHORT_REPLIES_CARRY=on`, #8772, the
         // product owner's rule of 26 Nov 2026).
@@ -10770,12 +10779,7 @@ impl Heeding {
         heard: &str,
     ) -> crate::attention::Verdict {
         use crate::attention::Verdict;
-        let after_the_call = called_at.is_some_and(|at| {
-            let ago_us = u64::try_from(at.elapsed().as_micros()).unwrap_or(u64::MAX);
-            let called_us = monotonic_us().saturating_sub(ago_us);
-            let carries_us = u64::try_from(CALL_CARRIES_FOR.as_micros()).unwrap_or(u64::MAX);
-            began_us.saturating_sub(called_us) <= carries_us
-        });
+        let after_the_call = Self::after_the_call(called_at, began_us);
         if attention.judged_own() {
             Verdict::Play("the lamp began this turn itself")
         } else if attention.simple_called() {
@@ -10795,8 +10799,32 @@ impl Heeding {
     /// line kept and never judged as the line in hand (a name waiting for
     /// the line after it, `LAMP_SECOND_NAME_CARRIES`), by its request,
     /// window and words, judged now and changing nothing.
-    pub(crate) fn simple_lets_out(&self, _request: u64, _said: (u64, u64), _heard: &str) -> bool {
-        true
+    pub(crate) fn simple_lets_out(
+        &self,
+        request: u64,
+        (began_us, ended_us): (u64, u64),
+        heard: &str,
+    ) -> bool {
+        if !self.simple_call {
+            return true;
+        }
+        // As [`Self::simple_verdict`] judges a line, a call first.
+        self.attention
+            .simple_called_over(request, began_us, ended_us)
+            || (heard.chars().any(char::is_alphanumeric)
+                && (crate::follows_on::due(true, false, self.said_until_us, began_us)
+                    || Self::after_the_call(self.called_at, began_us)))
+    }
+
+    /// Whether a line begun at `began_us` began within [`CALL_CARRIES_FOR`]
+    /// of a call let out at `called_at`.
+    fn after_the_call(called_at: Option<Instant>, began_us: u64) -> bool {
+        called_at.is_some_and(|at| {
+            let ago_us = u64::try_from(at.elapsed().as_micros()).unwrap_or(u64::MAX);
+            let called_us = monotonic_us().saturating_sub(ago_us);
+            let carries_us = u64::try_from(CALL_CARRIES_FOR.as_micros()).unwrap_or(u64::MAX);
+            began_us.saturating_sub(called_us) <= carries_us
+        })
     }
 
     /// With [`Self::hearing_only_said_to_me`], a line is named for
