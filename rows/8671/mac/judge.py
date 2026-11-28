@@ -117,7 +117,11 @@ cb = counts(seed, None)
 hdd_text_before = num(cb.get(('TEXT', '/var/log.hdd'), {}).get('voice'))
 hdd_j_before = num(cb.get(('JOURNAL', '/var/log.hdd/journal'), {}).get('voice'))
 trig = kv('trigger.txt')
-need = ['stray', 'marked', 'clips_new']
+# The stray marker is seeded only when /var/lib/lampos-agents exists (seed.sh). A lamp with no engines'
+# folder (HOMES_DIR=absent, or for older runs: no home and no stray seeded) needs none.
+homes_dir = re.search(r'^HOMES_DIR=(\w+)', seed, re.M)
+homes_absent = (homes_dir.group(1) == 'absent') if homes_dir else (not kinds.get('home') and not kinds.get('stray'))
+need = ['marked', 'clips_new'] + ([] if homes_absent else ['stray'])
 missing = [k for k in need if k not in kinds]
 ok2 = 'SEED-OK' in seed and not missing
 if trig.get('SEEDED_N') and trig.get('PRESENT_N') != trig.get('SEEDED_N'):
@@ -200,7 +204,10 @@ else:
     if not end: why.append('no WIPE_END (%s)' % (re.findall(r'^(WIPE_NEVER|WIPE_TIMEOUT)\S*', status, re.M) or ['?'])[0])
     elif not end.group(3).startswith('success'): why.append('wipe result %s' % end.group(3))
     homes_need = len(kinds.get('home', [])) + len(kinds.get('stray', []))
-    if len(hm) != 1 or hm[0] < homes_need: why.append('engines\' homes line %s, needs one with N >= %d' % (hm or 'none', homes_need))
+    # reset.rs prints the engines' homes line only when it emptied something (homes > 0).
+    if homes_need == 0:
+        if hm: why.append('engines\' homes line %s with nothing seeded there' % hm)
+    elif len(hm) != 1 or hm[0] < homes_need: why.append('engines\' homes line %s, needs one with N >= %d' % (hm or 'none', homes_need))
     if len(lm) != 1: why.append('logs line x%d' % len(lm))
     if started < 1: why.append('no "started in place" line')
     if f0.get('BOOT_ID') and f0.get('BOOT_BEFORE') and f0['BOOT_ID'] != f0['BOOT_BEFORE']: why.append('the lamp rebooted (the reset\'s fallback)')
@@ -323,5 +330,9 @@ for n, what, ev, v in legs:
     row.append('| %s | %s | %s | %s |' % (n, what, ev, v))
 row += ['', 'Put-back: %s.' % ('PUTBACK-OK (the lamp left reset, in setup mode; kit markers, the tmpfs and the dead-man '
                                'gone; read back twice)' if putback_ok else 'NOT OK or not run: see putback.log')]
+if homes_absent:
+    row.append('')
+    row.append('Limit: this lamp has no /var/lib/lampos-agents, so the engines\' homes wipe had nothing to empty here: '
+               'its line is rightly absent (reset.rs prints it only when homes > 0), and that step is not exercised on this lamp.')
 (D / 'row.md').write_text('\n'.join(row) + '\n')
 print('\n'.join(row))

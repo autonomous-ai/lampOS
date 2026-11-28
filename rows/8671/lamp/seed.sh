@@ -33,7 +33,7 @@ mkd() { # mkd DIR: made 0700 if missing; prints the folders it made
   done; echo "${made:--}"
 }
 for h in $(homes); do put "$h/$MNAME" home -; done
-[ -d $HOMES ] && put $STRAY stray -
+[ -d $HOMES ] && { echo "HOMES_DIR=present"; put $STRAY stray -; } || echo "HOMES_DIR=absent"
 m=$(mkd $MARKED) && put "$MARKED/$MNAME" marked "$m" || { echo "SEED_FAIL marked"; bad=1; }
 m=$(mkd $CLIPS_NEW) && put "$CLIPS_NEW/$MNAME" clips_new "$m" || { echo "SEED_FAIL clips_new"; bad=1; }
 mv $K/seeded.tsv.new $K/seeded.tsv
