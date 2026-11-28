@@ -75,6 +75,8 @@ Environment=LAMP_STORE_APPS=on
 # and the voice's app.call sent to the app's socket. The same line in lamp-voice and lamp-apps-manage@; its rules are
 # its rows in docs/switches.md.
 Environment=LAMP_APP_TOOLS=on
+# The door's pre-check lets a computer's move through to the most any lamp may take; the body holds it (#7513's switch-on, the same line in lamp-body).
+Environment=LAMP_BODY_APP_REACH=on
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
 # the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
 # root's skills manage helper (skill push) and the ring's light requests on the bus.

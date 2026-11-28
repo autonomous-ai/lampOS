@@ -810,8 +810,9 @@ folded, may wait up to that long for its first motion to begin.
 (`crates/body/src/moves.rs`) judges the rest. The door doesn't know the lamp's
 reach, so its pre-check lets a base yaw through up to 250 counts, the most any
 lamp may be given (with `LAMP_BODY_APP_REACH=on` in lamp-control's environment,
-on a dev lamp, every joint up to `moves::CEILING`: 1,300 counts for the head and
-the base, 1,000 for the arm); the body holds the move to its own reach and drops
+the product's since #7513's switch-on, every joint up to `moves::CEILING`: 1,300 counts for the head and
+the base, 1,000 for the arm); the body holds the move to its own reach (the wide one only on the
+joints its reach map guards, with the map read and on: shoulder, elbow, pitch; the roll and the yaw today's) and drops
 one past it with the reach in its words (`dropped: past this lamp's reach`; with the switch on but the servos' ranges
 unread, `dropped: this lamp's reach is not known`). The schema's `frame` allows
 1,300 counts either way, the most any lamp may take; the door and the body hold

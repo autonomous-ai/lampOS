@@ -111,8 +111,9 @@ impl Reach {
 /// computer's move may take each joint is 90% of the joint's hardware range
 /// from its pose (`moves::Reach::of_hardware`), on each side, read at start
 /// (the servos' own stored ranges for the head and the base, the arm's window
-/// for the shoulder and the elbow), instead of the caps every lamp has. For
-/// the dev lamps (75c9, a63e) until the hardware team signs the numbers; it
+/// for the shoulder and the elbow), instead of the caps every lamp has. On in
+/// the product since #7513's switch-on, behind the lamp's reach map
+/// ([`app_reach_enabled`]; the joints it holds only, `body::app_reach_mapped`); it
 /// reads the servos' own ranges, so it turns on [`OWN_RANGES`] too. The lamp's
 /// own life (its moods, its eyes, its built-in clips), the tipping rule, the
 /// heat stop and every speed and acceleration cap are as they were.
@@ -123,10 +124,17 @@ pub fn app_reach_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// Whether the body takes the app's reach: [`APP_REACH`] on, and the lamp's own reach map read and
+/// holding (`LAMP_BODY_REACH_MAP=on`, `map_guards`; #7513's switch-on, the first builder on #7814:
+/// the wide reach only behind a guard). Without the map every joint keeps today's reach.
+pub fn app_reach_enabled(value: Option<&str>, map_guards: bool) -> bool {
+    app_reach_from(value) && map_guards
+}
+
 /// What the door's pre-check (lamp-control) holds a computer's move to, from
 /// its own environment as the body reads its own: [`Reach::ANY`] with
-/// `LAMP_BODY_APP_REACH=on` (a dev lamp, whose body judges the move against
-/// its own hardware as it begins), else today's, the yaw at 250, the most any
+/// `LAMP_BODY_APP_REACH=on` (the product's since #7513's switch-on; the body judges the move against
+/// its own hardware and its reach map as it begins), else today's, the yaw at 250, the most any
 /// lamp had. Read once.
 pub fn door_reach() -> Reach {
     static DOOR: std::sync::OnceLock<Reach> = std::sync::OnceLock::new();

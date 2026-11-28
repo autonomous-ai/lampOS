@@ -2232,8 +2232,10 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         ) || lamp_body::body::app_reach_from(
             std::env::var(lamp_body::body::APP_REACH).ok().as_deref(),
         ),
-        app_reach: lamp_body::body::app_reach_from(
+        // #7513's switch-on: the wide reach only behind the map's guard, and only for the joints it holds.
+        app_reach: lamp_body::moves::app_reach_enabled(
             std::env::var(lamp_body::body::APP_REACH).ok().as_deref(),
+            reach_refuse,
         ),
         strain_guard: lamp_body::body::strain_guard_from(
             std::env::var(lamp_body::body::STRAIN_GUARD).ok().as_deref(),
@@ -2256,6 +2258,17 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         }),
         ..limits
     };
+    if lamp_body::body::app_reach_from(std::env::var(lamp_body::body::APP_REACH).ok().as_deref()) {
+        if limits.app_reach {
+            eprintln!(
+                "lamp-body: LAMP_BODY_APP_REACH=on under the reach map: a computer's move may take the shoulder, the elbow and the head's pitch 90% of the hardware's range; the roll and the yaw keep today's reach until the map covers them"
+            );
+        } else {
+            eprintln!(
+                "lamp-body: LAMP_BODY_APP_REACH=on but the reach map is not read and holding (LAMP_BODY_REACH_MAP=on): every joint keeps today's reach"
+            );
+        }
+    }
     if limits.move_queue {
         eprintln!(
             "lamp-body: a computer's move may wait for its own move playing ({}=on)",
