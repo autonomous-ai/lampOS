@@ -585,7 +585,9 @@ are rejected. Read operations need no guard:
 
 `list_set` is `list` whose items also say when each was set (`set_local`,
 `set_day`, and `set_unix_ms`, with the reply's `now_unix_ms` on the same
-clock; see the model tools below), and whose first page has the said record
+clock; see the model tools below) and whether it was set by no one, the
+room's (`set_by_room`, never who set it; a move keeps the room's the room's,
+#8840), and whose first page has the said record
 (`said`, above). `{"op":"noticed"}` marks the reminders said late as noticed
 (above).
 
@@ -745,7 +747,7 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own, and the room's (set by no one) |
 | `cancel_reminder` | `id`, or `text` | none | `Cancel` of the selected whole item/series, only the line's own or the room's; by `text`, the one item whose text holds the words (case and edge spaces aside), resolved from the line's own list, else the matches named and nothing cancelled |
 | `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, or of a one-time one said within two minutes (its said delivery, from `ListSet`'s `said`), only the line's own or the room's |
-| `move_reminder` (`LAMP_SCHEDULE_MOVE=on`, #8840) | `time`, and `id` or `text` | `day` (a one-time reminder only) | The one reminder named, resolved from the line's own list as a cancel by `text` is: `Set` again with its words, as the mover's, at `time`, keeping how it repeats (daily stays `Daily`, weekly keeps its weekday, once stays `At`), then `Cancel` of the old one. Never both left: a failed `Set` changes nothing, and a failed `Cancel` is told as not moved with `old_kept`, and the new one's id. Several or none matching: named, nothing moves. A timer, or an `every` series, is not moved by clock: told so, nothing changes. A new id, not the old one: there is no edit op in lamp-schedule, so a store an older build reads is the same |
+| `move_reminder` (`LAMP_SCHEDULE_MOVE=on`, #8840) | `time`, and `id` or `text` | `day` (a one-time reminder only) | The one reminder named, resolved from the line's own list as a cancel by `text` is: `Set` again with its words at `time`, keeping how it repeats (daily stays `Daily`, weekly keeps its weekday, once stays `At`), its zone, and for a one-time one moved with no `day` its own date; as the mover's, or as the room's when the old one was the room's (`list_set`'s `set_by_room`); then `Cancel` of the old one. Never neither: a failed `Set` changes nothing. A failed `Cancel` leaves both, told as not moved with `old_kept`, `old_id` and the new `id`. A `Set` whose reply is lost (`uncertain`) is told as uncertain with no `old_id`, so both may then be set, as when lamp-actions stops between the two. Several or none matching: named, nothing moves. A timer, or an `every` series, is not moved by clock: told so, nothing changes. A new id, not the old one: there is no edit op in lamp-schedule, so a store an older build reads is the same |
 
 Text is 1–300 UTF-8 bytes, nonblank and without controls. Seconds are whole
 integers from 1 through 31,536,000. `time` is exact `HH:MM`; `day` is `today`,
@@ -761,14 +763,22 @@ move a daily 4 PM reminder to 4:30; asked again, it set the new one and
 said it couldn't cancel the old one. On 28 Nov at 16605 a cancel by voice
 during a move reached no part and left no line anywhere. `move_reminder`
 does both halves in lamp-actions, in that order. The Policy holds it as a
-set: it runs on a reply to the lamp ("4:30" to the lamp's "What time?"),
-and a cancel still doesn't (Fourth on #1054). A call the Policy holds on the
+set: it runs on a reply to the lamp ("4:30" to the lamp's "What time?").
+So does `cancel_reminder` now ("cancel it", said back to the lamp): the
+first builder's ruling on #8840, from the product owner's base that every
+line in the 20 s after the lamp's words is answered, replaces Fourth's on
+#1054. A call the Policy holds on the
 second route is now journaled, "held by the Policy's decision for the
 turn". With `LAMP_TIMER_ASKS_HOW_LONG`, a move whose words give no time is
 asked "What time?", as a set is. The creator's linked record
 (`LAMP_SERVICE_RECORDS_REMINDERS`) follows it: the old one dismissed, the
 new one set. Tests: `move_by_text_keeps_the_repeat_and_changes_only_the_time`,
-`move_reminder_is_offered_only_with_its_switch` (actions),
+`move_reminder_is_offered_only_with_its_switch`,
+`a_one_time_reminder_moved_with_no_day_stays_on_its_date`,
+`a_weekly_reminder_moved_by_id_keeps_its_weekday_and_zone`,
+`a_room_reminder_moved_by_a_person_stays_the_rooms`,
+`a_move_whose_cancel_fails_says_both_are_set` (actions),
+`a_move_follows_the_reminder_and_one_with_the_old_kept_keeps_both`,
 `a_move_reads_as_a_cancel_and_sets_as_a_set` (voice).
 
 **`pending_only` means due, not set (#1595).** An item is pending only once

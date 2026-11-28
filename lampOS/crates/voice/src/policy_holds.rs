@@ -56,16 +56,20 @@
 //! - **A reply to the lamp is not held from its schedule** (#1040): a
 //!   `stay_quiet` whose `follows_lamp` answer is [`FOLLOWS_FROM`] or more
 //!   ([`Verdict::StayQuietFollowing`]) still holds the volume, the light
-//!   and the executive's functions, but not `set_timer` or `set_reminder`
-//!   ([`SETS`]). On lamp-4ace on 2026-10-16 at 11:20 "Set a timer for
+//!   and the executive's functions, but not `set_timer`, `set_reminder`,
+//!   `cancel_reminder` or `move_reminder` ([`SETS`]; the cancel and the move
+//!   since #8840, below). On lamp-4ace on 2026-10-16 at 11:20 "Set a timer for
 //!   1 minute", said to the lamp in a conversation with it, was held, and no
 //!   timer was set: the fitted weights count a follow-up to the lamp against
 //!   answering, though Jev's `follows_lamp` told the lamp's lines apart
 //!   (median 0.60 on 33 said to the lamp, 0.29 on 46 not). A timer nobody
 //!   asked for is a smaller harm than one asked for and not set, and it can
-//!   be cancelled by asking. Not so `cancel_reminder`, which stays held: a
-//!   wrong cancel is silent, nothing puts the reminder back, and the person
-//!   finds out only when it does not come (Fourth on #1054). Until the
+//!   be cancelled by asking. `cancel_reminder` was held here (Fourth on
+//!   #1054: a wrong cancel is silent), until the product owner's base of
+//!   27 Nov answers every line said in the 20 s after the lamp's words, and
+//!   the first builder ruled on #8840 that a cancel said back to the lamp
+//!   runs: a move by voice set the new one and its held cancel left both
+//!   (lamp-52e6, 27 and 28 Nov). Until the
 //!   weights are fitted again (#1040). The 11:20 turn itself scored
 //!   `follows_lamp` 0.35, so at 0.6 it is still held: this lets through 17
 //!   of the 33 turns said to the lamp, not that one; 0.35 would let through
@@ -154,12 +158,19 @@ pub const SCHEDULE_HELD: [&str; 4] = [
 ];
 
 /// Of [`SCHEDULE_HELD`], those that a reply to the lamp still runs
-/// ([`Verdict::StayQuietFollowing`]): they set something to come, which can
-/// be cancelled or moved back by asking. `cancel_reminder` is not one
-/// (Fourth on #1054). `move_reminder` is (#8840): "4:30, please", said back
-/// to the lamp's "what time?", moves it; held, the lamp set nothing new and
-/// the person was told it could not change it (lamp-52e6, 27 Nov).
-pub const SETS: [&str; 3] = ["set_timer", "set_reminder", lamp_actions::schedule::MOVE];
+/// ([`Verdict::StayQuietFollowing`]): all four (#8840). A line said back to
+/// the lamp is answered, the product owner's base on 27 Nov (every line in
+/// the 20 s after the lamp's words), and the first builder's ruling on
+/// #8840 (28 Nov 08:18), which replaces Fourth's on #1054 for a cancel.
+/// "4:30, please", said back to the lamp's "What time?", moves it; "cancel
+/// it", said back to a reminder, cancels it. On lamp-52e6 on 27 and 28 Nov a
+/// move by voice set the new one and the held cancel left both.
+pub const SETS: [&str; 4] = [
+    "set_timer",
+    "set_reminder",
+    "cancel_reminder",
+    lamp_actions::schedule::MOVE,
+];
 
 /// Whether a call, by its route and its name, waits for the Policy's
 /// decision: every one of the executive's and the connected services'
@@ -576,8 +587,8 @@ mod tests {
         for (name, run) in [
             ("set_timer", Gate::Run),
             ("set_reminder", Gate::Run),
-            ("cancel_reminder", Gate::Hold),
-            // #8840: a move runs on a reply, as a set does.
+            // #8840: a cancel and a move run on a reply, as a set does.
+            ("cancel_reminder", Gate::Run),
             (lamp_actions::schedule::MOVE, Gate::Run),
         ] {
             assert!(
@@ -599,17 +610,26 @@ mod tests {
         assert!(HELD.contains("Say nothing"));
     }
 
-    /// Only the schedule's `set_timer` and `set_reminder` are what a reply
-    /// to the lamp still runs: never a cancel, and never another route's
-    /// function of the same name.
+    /// The schedule's `set_timer`, `set_reminder`, `cancel_reminder` and
+    /// `move_reminder` are what a reply to the lamp still runs (a cancel and
+    /// a move since #8840), never another route's function of the same name.
     #[test]
-    fn only_the_schedule_s_two_that_set_run_on_a_reply_to_the_lamp() {
+    fn only_the_schedule_s_sets_cancel_and_move_run_on_a_reply_to_the_lamp() {
         use crate::tools::Route;
         let place = std::path::PathBuf::from("/run/lamp-actions");
-        for name in crate::tools::SCHEDULE_NAMES {
+        for name in crate::tools::SCHEDULE_NAMES
+            .into_iter()
+            .chain([lamp_actions::schedule::MOVE])
+        {
             assert_eq!(
                 sets(&Route::Schedule(place.clone()), name),
-                ["set_timer", "set_reminder"].contains(&name),
+                [
+                    "set_timer",
+                    "set_reminder",
+                    "cancel_reminder",
+                    lamp_actions::schedule::MOVE
+                ]
+                .contains(&name),
                 "{name}"
             );
         }
