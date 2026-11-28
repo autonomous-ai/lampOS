@@ -2040,6 +2040,11 @@ pub trait Sources {
     fn update_status(&mut self) -> Option<lamp_msgs::UpdateStatus> {
         None
     }
+    /// The build the lamp runs now, which a health or crash report is filed
+    /// against (#8884); none by default.
+    fn build(&mut self) -> Option<Build> {
+        None
+    }
     /// Whether the voice is resting (not in a turn); true when unknown.
     fn voice_resting(&mut self) -> bool;
     /// Asks taken from `reports/request` since the last look.
@@ -2084,11 +2089,14 @@ pub fn step(
     shared: &Shared,
     sources: &mut impl Sources,
     timing: &mut Timing,
-    build: Option<&Build>,
     now: Instant,
     now_s: u64,
 ) -> bool {
     let mut put = false;
+    // The build the lamp runs at this second, so a crash after an update is
+    // filed against the build that crashed (#8884).
+    let build = sources.build();
+    let build = build.as_ref();
     // Only a no is ever taken from the bus. It is kept as held only when
     // every no taken was from a held line: one heard is the person's.
     let noes: Vec<_> = sources
@@ -2192,20 +2200,13 @@ impl ElapsedAt for Instant {
 
 /// The driver: [`step`] once a second, forever, waking the connection
 /// when something is due.
-pub async fn run(shared: Arc<Shared>, mut sources: impl Sources, build: Option<Build>) {
+pub async fn run(shared: Arc<Shared>, mut sources: impl Sources) {
     let mut timing = Timing::new(Instant::now());
     let mut tick = tokio::time::interval(Duration::from_secs(1));
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         tick.tick().await;
-        if step(
-            &shared,
-            &mut sources,
-            &mut timing,
-            build.as_ref(),
-            Instant::now(),
-            now_s(),
-        ) {
+        if step(&shared, &mut sources, &mut timing, Instant::now(), now_s()) {
             shared.wake.notify_one();
         }
     }
@@ -2234,6 +2235,8 @@ pub struct Lamp {
     pub skills: Option<skills::Places>,
     /// `voice/turn_time`, taken for the report counters.
     turn_times: Option<lamp_bus::Subscriber>,
+    /// The build the lamp runs now ([`Sources::build`]); none says none.
+    pub running: Option<crate::lamp::Running>,
 }
 
 impl Lamp {
@@ -2249,6 +2252,7 @@ impl Lamp {
             units_read: None,
             skills: Some(skills::Places::product()),
             turn_times: None,
+            running: None,
         }
     }
 
@@ -2276,6 +2280,10 @@ impl Lamp {
 }
 
 impl Sources for Lamp {
+    fn build(&mut self) -> Option<Build> {
+        Build::of(&self.running.as_ref()?.now())
+    }
+
     fn seen(&mut self) -> Seen {
         Seen {
             health: self.latest(Health::TOPIC),
@@ -2561,7 +2569,6 @@ pub(crate) mod tests {
             &shared,
             &mut source,
             &mut timing,
-            None,
             start + FIRST_HEALTH,
             NOW
         ));
@@ -2574,7 +2581,7 @@ pub(crate) mod tests {
             due,
             due + VOICE_WAIT - Duration::from_secs(1),
         ] {
-            assert!(!step(&shared, &mut source, &mut timing, None, at, NOW));
+            assert!(!step(&shared, &mut source, &mut timing, at, NOW));
             assert!(
                 !called.exists(),
                 "no systemd query before the due voice wait ends"
@@ -2584,7 +2591,6 @@ pub(crate) mod tests {
             &shared,
             &mut source,
             &mut timing,
-            None,
             due + VOICE_WAIT,
             NOW
         ));
@@ -2613,14 +2619,7 @@ pub(crate) mod tests {
         source.lamp.units_read.as_mut().unwrap().0 = Instant::now() - Duration::from_secs(61);
         source.resting = true;
         let next = timing.next_health;
-        assert!(step(
-            &shared,
-            &mut source,
-            &mut timing,
-            None,
-            next,
-            NOW + 900
-        ));
+        assert!(step(&shared, &mut source, &mut timing, next, NOW + 900));
         let recovered = shared.with(sent);
         assert_eq!(recovered.len(), 1);
         assert_eq!(recovered[0]["failed_units"], json!([]));
@@ -2639,10 +2638,69 @@ pub(crate) mod tests {
         shared.with(|reports| reports.stop(NOW + 901, false).unwrap());
         let reads = source.seen;
         let next = timing.next_health;
-        step(&shared, &mut source, &mut timing, None, next, NOW + 1_800);
+        step(&shared, &mut source, &mut timing, next, NOW + 1_800);
         assert_eq!(source.seen, reads);
         assert_eq!(fs::read_to_string(&called).unwrap(), invocation.repeat(3));
         let _ = fs::remove_dir_all(root);
+    }
+
+    /// #8884: health and crash reports are filed against the build the lamp
+    /// runs at that moment, not the one lamp-cloud started with: a crash
+    /// after an update is the new build's.
+    #[test]
+    fn a_crash_after_an_update_is_filed_against_the_build_that_crashed() {
+        let root = PathBuf::from(format!("/tmp/lcrb-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let places = places("running-build");
+        yes(&places);
+        let shared = Shared::new(Reports::open(places.clone()));
+        let mut lamp = Lamp::new(Some(bus.clone()));
+        lamp.systemctl = root.join("no-systemctl");
+        lamp.skills = None;
+        lamp.running = Some(crate::lamp::Running::new(
+            Some(bus.clone()),
+            "812+460a1a1aa2b3".into(),
+        ));
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+        let first = start + HEALTH_EVERY;
+        step(&shared, &mut lamp, &mut timing, first, NOW);
+        let health = shared.with(sent);
+        assert_eq!(health.len(), 1);
+        assert_eq!(health[0]["build"], "812+460a1a1aa2b3");
+        shared.with(|reports| {
+            reports.acked(1);
+            reports.unhand(None);
+        });
+        // The update switches the lamp to 813 with lamp-cloud running on.
+        bus.publisher_declared(
+            lamp_msgs::UpdateStatus::TOPIC,
+            &lamp_msgs::UpdateStatus::declaration(),
+            "update",
+        )
+        .unwrap()
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &json!({"running": {"sequence": 813, "commit": "9f00aa11bb22cc33dd44"}, "now": "idle", "last": null}),
+        )
+        .unwrap();
+        fs::create_dir_all(&places.exits).unwrap();
+        write_exit_note(&places.exits, &planted_note("lamp-air.service", 5)).unwrap();
+        step(
+            &shared,
+            &mut lamp,
+            &mut timing,
+            first + NOTES_EVERY,
+            NOW + 60,
+        );
+        let crash = shared.with(sent);
+        assert_eq!(crash.len(), 1, "{crash:?}");
+        assert_eq!(crash[0]["kind"], "crash");
+        assert_eq!(crash[0]["build"], "813+9f00aa11bb22");
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(places.own.parent().unwrap());
     }
 
     /// Through a real bus, as the voice's `reports_stop` sends it: a no on
@@ -2698,7 +2756,7 @@ pub(crate) mod tests {
         let mut timing = Timing::new(start);
         // The first health, as the lamp starts with a yes.
         let first = start + HEALTH_EVERY;
-        step(&shared, &mut lamp, &mut timing, None, first, NOW);
+        step(&shared, &mut lamp, &mut timing, first, NOW);
         let kinds = shared.with(sent_kinds);
         assert_eq!(kinds, [json!("health")]);
         shared.with(|reports| {
@@ -2726,7 +2784,7 @@ pub(crate) mod tests {
         assert_eq!(sent.delivered, 1, "lamp-cloud is listening");
         let mut at = first + Duration::from_secs(1);
         for _ in 0..50 {
-            step(&shared, &mut lamp, &mut timing, None, at, NOW + 1);
+            step(&shared, &mut lamp, &mut timing, at, NOW + 1);
             if !shared.with(|reports| reports.consent().share) {
                 break;
             }
@@ -2745,7 +2803,6 @@ pub(crate) mod tests {
             &shared,
             &mut lamp,
             &mut timing,
-            None,
             first + HEALTH_EVERY,
             NOW + 900,
         );
@@ -2753,7 +2810,6 @@ pub(crate) mod tests {
             &shared,
             &mut lamp,
             &mut timing,
-            None,
             first + 2 * HEALTH_EVERY,
             NOW + 1800,
         );
@@ -3194,7 +3250,6 @@ pub(crate) mod tests {
                 &shared,
                 lamp,
                 timing,
-                None,
                 start + Duration::from_secs(second),
                 NOW + second,
             );
@@ -3999,12 +4054,12 @@ pub(crate) mod tests {
             asked: vec![ask(true, false)],
             told: Vec::new(),
         };
-        step(&shared, &mut bus, &mut timing, None, now, NOW);
+        step(&shared, &mut bus, &mut timing, now, NOW);
         assert!(!shared.with(|r| r.consent().share));
         assert_eq!(bus.told.last().map(|s| s.share), Some(false));
         yes(&places);
         bus.asked = vec![ask(true, false), ask(false, true)];
-        assert!(step(&shared, &mut bus, &mut timing, None, now, NOW + 1));
+        assert!(step(&shared, &mut bus, &mut timing, now, NOW + 1));
         assert!(!shared.with(|r| r.consent().share));
         // A held line's no is said on `reports/state` as the voice's, held,
         // and when (#1880).
@@ -4021,7 +4076,7 @@ pub(crate) mod tests {
         // A held no beside one heard is the person's: not kept as held.
         yes_again(&places);
         bus.asked = vec![ask(false, true), ask(false, false)];
-        assert!(step(&shared, &mut bus, &mut timing, None, now, NOW + 2));
+        assert!(step(&shared, &mut bus, &mut timing, now, NOW + 2));
         assert_eq!(
             bus.told.last().map(|s| (s.by, s.held)),
             Some((Some(lamp_msgs::ReportsBy::Voice), false))
@@ -4067,7 +4122,7 @@ pub(crate) mod tests {
             then(second, shared);
             let now = sources.start + Duration::from_secs(second);
             sources.now = now;
-            step(shared, sources, timing, None, now, NOW + second);
+            step(shared, sources, timing, now, NOW + second);
         }
     }
 

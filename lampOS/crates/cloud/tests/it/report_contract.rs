@@ -171,7 +171,7 @@ fn the_apps_switch_reads_the_agreed_reply_and_its_refusal() {
         places: LampPlaces::default(),
         bus: None,
         device_id: "d-42".into(),
-        build: String::new(),
+        build: Default::default(),
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::default(),

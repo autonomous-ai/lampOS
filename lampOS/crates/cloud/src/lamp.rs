@@ -2,7 +2,7 @@
 //! the volume through `lamp-actions`' socket (its only writer), the
 //! microphones and health from the bus, the person's light asked of the
 //! ring on the bus as anyone asks it, the build from `lamp-update`'s
-//! state, the network and the host from `/proc` and `/sys`. Nothing here
+//! state and status, the network and the host from `/proc` and `/sys`. Nothing here
 //! needs root.
 use crate::answer::{Lamp, Mic, PREVIEW_HOLDS, Volume};
 use lamp_bus::{Bus, Publisher, Subscriber};
@@ -65,8 +65,9 @@ pub struct Real {
     pub bus: Option<Bus>,
     /// The backend's device id.
     pub device_id: String,
-    /// The installed build, as `version` says it.
-    pub build: String,
+    /// The build the lamp runs ([`Running`]): `version` in every reply and
+    /// the ping, the app's About and the reports say [`Real::build_now`].
+    pub build: Running,
     /// The Wi-Fi's name, asked of `iw` within a bound and kept a while.
     pub wifi: Wifi,
     /// The light asked of the ring.
@@ -334,10 +335,137 @@ pub fn build(state: &str) -> String {
     };
     let installed = &state["installed"];
     match (installed["sequence"].as_u64(), installed["commit"].as_str()) {
-        (Some(sequence), Some(commit)) => {
-            format!("{sequence}+{}", commit.get(..12).unwrap_or(commit))
-        }
+        (Some(sequence), Some(commit)) => said(sequence, commit),
         _ => String::new(),
+    }
+}
+
+/// A build as `version` says it: `<sequence>+<commit>`, the commit's first
+/// twelve.
+fn said(sequence: u64, commit: &str) -> String {
+    format!("{sequence}+{}", commit.get(..12).unwrap_or(commit))
+}
+
+/// The build `lamp-update`'s status says the lamp runs, said as [`build`]
+/// says it; none when the status was said in another boot, cannot be read,
+/// says a phase it could not have said, or names no build. A status that
+/// has only gone quiet (older than its 180 s) still says what is installed:
+/// only `lamp-update` changes that, and it says each change.
+pub fn running_build(status: &lamp_bus::Message, now: &lamp_bus::Now<'_>) -> Option<String> {
+    if status.header.stamp_clock(now) == lamp_bus::StampClock::OtherBoot {
+        return None;
+    }
+    let status = status.parse::<lamp_msgs::UpdateStatus>().ok()?;
+    if !lamp_msgs::UpdateStatus::NOW.contains(&status.now.as_str()) {
+        return None;
+    }
+    let running = status.running?;
+    (!running.commit.is_empty()).then(|| said(running.sequence, &running.commit))
+}
+
+/// The build the lamp runs now (#8874, #8884), shared by the identity, the
+/// app's About and the reports: the one `lamp-update` last said on
+/// `update/status` in this boot, so an update shows without a restart of
+/// lamp-cloud. When what is on the bus now cannot be read, the last build
+/// read this boot is kept; before any, the build in `state.json` when
+/// lamp-cloud started. `/run`, where the bus keeps its values, is emptied
+/// at boot.
+#[derive(Clone, Default)]
+pub struct Running {
+    bus: Option<Bus>,
+    started: String,
+    last: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+}
+
+impl Running {
+    pub fn new(bus: Option<Bus>, started: String) -> Self {
+        Self {
+            bus,
+            started,
+            last: Default::default(),
+        }
+    }
+
+    /// The build as `version` says it, `<sequence>+<commit>`.
+    pub fn now(&self) -> String {
+        let said = self.bus.as_ref().and_then(|bus| {
+            let status = bus.latest(lamp_msgs::UpdateStatus::TOPIC).ok().flatten()?;
+            running_build(&status, &bus.now())
+        });
+        let mut last = self
+            .last
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(build) = said {
+            last.replace(build.clone());
+            return build;
+        }
+        last.clone().unwrap_or_else(|| self.started.clone())
+    }
+}
+
+/// A build with no bus to look at: always the one given.
+impl From<&str> for Running {
+    fn from(started: &str) -> Self {
+        Self::new(None, started.to_owned())
+    }
+}
+
+/// Looks at `lamp` again every `every` and sends its [`Real::identity`]
+/// on when it changed, for `info` and the ping; never ends.
+pub async fn look(
+    identity: tokio::sync::watch::Sender<crate::wire::Identity>,
+    lamp: Real,
+    every: Duration,
+) {
+    loop {
+        tokio::time::sleep(every).await;
+        identity.send_if_modified(|me| {
+            let now = lamp.identity();
+            let changed = *me != now;
+            *me = now;
+            changed
+        });
+    }
+}
+
+/// A lamp with only its places, bus, device id and the build it started
+/// with, for tests.
+#[cfg(test)]
+pub(crate) fn bare(places: Places, bus: Option<Bus>, build: &str) -> Real {
+    Real {
+        places,
+        build: Running::new(bus.clone(), build.into()),
+        bus,
+        device_id: "d-42".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        update_checks: Default::default(),
+        restart: None,
+        guard: None,
+        harness_sign_in: None,
+        make_skill: None,
+        write_skill: None,
+        share: None,
+        services: None,
+        control: None,
+        consent: None,
+        desk_noticing: None,
+        privacy_light: None,
+        monitor: None,
+        devices: None,
+        apps: None,
+        upload: None,
+        attachments: None,
+        shutdown: None,
     }
 }
 
@@ -427,6 +555,24 @@ fn read(path: &Path) -> String {
 }
 
 impl Real {
+    /// What every reply and the ping say of the lamp: its build, address
+    /// and zone as they are now.
+    pub fn identity(&self) -> crate::wire::Identity {
+        crate::wire::Identity {
+            device: "lamp".into(),
+            version: self.build_now(),
+            id: self.device_id.clone(),
+            mac: self.hostname(),
+            timezone: self.timezone(),
+            local_ip: self.local_ip(),
+        }
+    }
+
+    /// The build the lamp runs now ([`Running::now`]).
+    pub fn build_now(&self) -> String {
+        self.build.now()
+    }
+
     pub fn hostname(&self) -> String {
         read(&self.places.proc.join("sys/kernel/hostname"))
     }
@@ -574,8 +720,9 @@ struct Level {
 impl Lamp for Real {
     fn versions(&mut self) -> Value {
         // `firmware` is what the app's About reads (Fourth on #1404): the
-        // build, as `build` also says.
-        json!({"firmware": self.build, "build": self.build, "lamp-cloud": env!("CARGO_PKG_VERSION")})
+        // build the lamp runs now, as `build` and the ping also say (#8884).
+        let build = self.build_now();
+        json!({"firmware": build, "build": build, "lamp-cloud": env!("CARGO_PKG_VERSION")})
     }
 
     fn network(&mut self) -> Value {
@@ -1494,7 +1641,7 @@ mod tests {
             places,
             bus: Some(Bus::new(&bus_root).unwrap()),
             device_id: "d-42".into(),
-            build: String::new(),
+            build: Running::default(),
             wifi: Wifi::default(),
             ring: Ring::default(),
             texts: Texts::default(),
@@ -1698,5 +1845,91 @@ mod tests {
         );
         assert!(wifi.stuck.is_none());
         std::fs::remove_dir_all(answering.parent().unwrap()).unwrap();
+    }
+
+    /// #8874: until lamp-update says a build, and whenever what it says
+    /// cannot be read, the identity names the build lamp-cloud started with.
+    #[test]
+    fn the_identity_names_the_started_build_until_a_readable_status() {
+        let (places, root) = places("started-build");
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path()).unwrap();
+        let lamp = bare(places, Some(bus.clone()), "812+460a1a1aa2b3");
+        assert_eq!(lamp.identity().version, "812+460a1a1aa2b3");
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        for unreadable in [
+            json!({"running": null, "now": "idle", "last": null}),
+            json!({"running": {"sequence": 813}, "now": "idle", "last": null}),
+            json!({"running": {"sequence": "813", "commit": "9f00aa11bb22cc33"}, "now": "idle", "last": null}),
+            json!({"running": {"sequence": 813, "commit": ""}, "now": "idle", "last": null}),
+            json!({"running": {"sequence": 813, "commit": "9f00aa11bb22cc33"}, "now": "elsewhere", "last": null}),
+            json!("nonsense"),
+        ] {
+            says.publish_json(lamp_ipc::monotonic_us(), &unreadable)
+                .unwrap();
+            assert_eq!(lamp.identity().version, "812+460a1a1aa2b3", "{unreadable}");
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #8884: the app's About (`firmware`, and `build` beside it) names the
+    /// build the lamp runs now, said as the ping says it, not the one
+    /// lamp-cloud started with.
+    #[test]
+    fn the_apps_versions_name_the_build_the_lamp_runs_now() {
+        let (places, root) = places("versions-now");
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path()).unwrap();
+        let mut lamp = bare(places, Some(bus.clone()), "812+460a1a1aa2b3");
+        assert_eq!(lamp.versions()["firmware"], "812+460a1a1aa2b3");
+        bus.publisher_declared(
+            lamp_msgs::UpdateStatus::TOPIC,
+            &lamp_msgs::UpdateStatus::declaration(),
+            "update",
+        )
+        .unwrap()
+        .publish_json(
+            lamp_ipc::monotonic_us(),
+            &json!({"running": {"sequence": 813, "commit": "9f00aa11bb22cc33dd44"}, "now": "idle", "last": null}),
+        )
+        .unwrap();
+        let versions = lamp.versions();
+        assert_eq!(versions["firmware"], "813+9f00aa11bb22", "{versions}");
+        assert_eq!(versions["build"], "813+9f00aa11bb22", "{versions}");
+        assert_eq!(versions["build"], lamp.identity().version.as_str());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #8884: a status said in another boot is never taken: the build
+    /// lamp-cloud started with is said until lamp-update says one in this
+    /// boot.
+    #[test]
+    fn a_status_from_another_boot_is_not_the_running_build() {
+        let (places, root) = places("other-boot");
+        let dir = tempfile::tempdir().unwrap();
+        let before = Bus::new(dir.path()).unwrap().boot_id(Some("boot-a"));
+        let mut says = before
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        assert!(says.stamp_monotonic_clock());
+        says.publish_json(
+            lamp_ipc::monotonic_us(),
+            &json!({"running": {"sequence": 813, "commit": "9f00aa11bb22cc33dd44"}, "now": "idle", "last": null}),
+        )
+        .unwrap();
+        let now = Bus::new(dir.path()).unwrap().boot_id(Some("boot-b"));
+        let lamp = bare(places, Some(now), "812+460a1a1aa2b3");
+        assert_eq!(lamp.identity().version, "812+460a1a1aa2b3");
+        let _ = std::fs::remove_dir_all(root);
     }
 }
