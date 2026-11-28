@@ -14502,9 +14502,16 @@ impl Heeding {
     /// (the first builder at 04:54 and their yes at 05:01). A line answering
     /// the lamp's own question is never let out only as the conversation
     /// going on, so it sets what it asks for, as on Live.
+    ///
+    /// Only what sets something to come: a cancel or a move said back to the
+    /// lamp runs (#8840, the first builder's ruling of 28 Nov 08:18: every
+    /// line in the 20 s after the lamp's words is answered). On lamp-52e6 on
+    /// 28 Nov at 14:22 (#8945's ROW) "Actually, cancel that.", said right after
+    /// the lamp set a reminder, was held here, and the reminder stayed.
     pub(crate) fn holds_call(&self, request: u64, name: &str) -> bool {
         self.alone == Some(request)
             && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+            && !matches!(name, "cancel_reminder" | lamp_actions::schedule::MOVE)
             && !self.names_the_schedule(request)
     }
 
@@ -35500,7 +35507,9 @@ mod tests {
         );
         assert!(heeding.holds_call(9, "set_timer"));
         assert!(heeding.holds_call(9, "set_reminder"));
-        assert!(heeding.holds_call(9, "cancel_reminder"));
+        // #8840: a cancel or a move said back to the lamp runs.
+        assert!(!heeding.holds_call(9, "cancel_reminder"));
+        assert!(!heeding.holds_call(9, lamp_actions::schedule::MOVE));
         assert!(!heeding.holds_call(9, "the_time"));
         assert!(!heeding.holds_call(8, "set_timer"), "another request");
         assert_eq!(
