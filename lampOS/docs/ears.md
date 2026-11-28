@@ -230,6 +230,25 @@ permit and fence checked again.
 Later heartbeats cannot extend a held block's permission. Mute, source restart,
 lease gaps and owner invalidation retire the old capture era.
 
+For the source-only [sensor 5 pilot](sensor5-pilot.md), the additional diagnostic
+switch `LAMP_BUS_AUDIO_CAPTURE_PERMIT=on` attaches the block's original
+`capture_permit` to its Audio JSON header. It acts only with the existing
+privacy runtime and `LAMP_BUS_AUDIO=on`; no unit enables it. The fields are
+`clock_id` (kernel boot clock), `epoch` (Ears' own capture-permission era), and
+`until_us` (the original monotonic deadline). Packing takes these from the
+captured block, never a newer lease. The normal gate still checks the original
+permit before packing and at publication. With the extra switch absent or
+anything other than exact `on`, the existing bytes are unchanged.
+
+Old `Audio::split` readers ignore the additive JSON field. The new
+`Audio::split_with_capture_permit` also reads old payloads, returning no ticket;
+the diagnostic recorder refuses that missing authority rather than guessing a
+deadline. It checks clock, source era, original deadline and current Voice
+permission again at its final retention boundary. An Ears epoch is local to
+that publisher and is not numerically compared with a different subscriber's
+lease epoch. This metadata constrains a separately consented diagnostic; it
+does not grant recording, renew a queued block or change the ADC timing claim.
+
 Buffer clearing is best effort, not secure erasure of compiler/kernel/subscriber
 copies. The final callback cannot retract a datagram already handed to the
 kernel. The ordinary Audio payload does not carry a consumer retention grant:

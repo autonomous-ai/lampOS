@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "protocol_id": "sensor5-lamp-pilot-20261128-v1",
+  "approval_record": "https://github.com/autonomous-ai/lampOS/issues/8848#issuecomment-7235605689",
+  "participants": [
+    {"alias": "P01", "split": "tune", "playback_speaker": "P02"},
+    {"alias": "P02", "split": "tune", "playback_speaker": "P01"},
+    {"alias": "P03", "split": "test", "playback_speaker": "P04"},
+    {"alias": "P04", "split": "test", "playback_speaker": "P03"}
+  ],
+  "distances_m": [0.6, 1.0, 1.5],
+  "lighting": ["daylight", "lamplight"],
+  "paired_repeats_per_condition": 5,
+  "clip_seconds": 10,
+  "decision_midpoint_us": 5000000,
+  "playback_seconds_per_person": 30,
+  "total_main_clips": 240,
+  "total_main_minutes": 40,
+  "total_recorded_minutes_with_sources": 42,
+  "A": "One visible participant speaks audibly across midpoint; paired background playback also runs.",
+  "B": "Visible participant silent with natural movement; another consented participant speaks in nearby off-camera playback.",
+  "label_policy": "Two independent model-blind raters; reconcile before inference. Missing or uncertain truth/input/output remains unknown in planned denominator.",
+  "person_policy": "Four distinct people, bound locally to aliases before any capture; no reassignment using scores; no playback-source person crosses splits.",
+  "model_policy": "Frozen released weights and windows. Published threshold first; fit one threshold per model using tuning people only, then lock before test scoring.",
+  "light_asd": {"frames": 50, "published_threshold": 0.5, "comparison": ">=", "public_fitted_threshold": 0.030683545, "upstream_commit": "ed38c232de5efe0261dbd68627c0ade7cdfe14eb", "weights_sha256": "d44bc3ea7baa8e0946fa3921311714a630ed8b90a1928fab0dbe30d918909317"},
+  "talknet": {"frames": 25, "published_threshold": 0.5, "comparison": ">", "public_fitted_threshold": 0.004595612175762653, "upstream_commit": "6d6821479af485e251c4991487e40573b42181b4", "weights_sha256": "a83d7e88c46633ebd06025337512a7d78edd8ebb8981b148b702c02de767a4e0"},
+  "advance_rule": "At least 95% A recall and B rejection on planned test A60/B60 justifies requesting a larger body/two-face/latency test; never release qualification.",
+  "retention": "All original full frames/audio, sources, derivatives, failed attempts, labels and consent map stay in encrypted local storage, with README and SHA256. No media or private labels on GitHub.",
+  "default": "No capture, playback, installation or product effect. Operator authorization, consent and verified physical/software privacy authority are prerequisites for live acquisition."
+}

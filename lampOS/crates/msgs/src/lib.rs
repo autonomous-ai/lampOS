@@ -236,6 +236,19 @@ pub struct Audio {
     pub sequence: u64,
 }
 
+/// Original authority of an Ears PCM block, exported only for an explicitly
+/// enabled diagnostic consumer. This does not grant permission: the consumer
+/// must check this original deadline and clock alongside its current lease.
+/// `epoch` is the Ears owner's local capture era, not another reader's epoch.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AudioCapturePermit {
+    /// Kernel boot ID for the owner's CLOCK_MONOTONIC timestamps.
+    pub clock_id: String,
+    pub epoch: u64,
+    /// Exclusive original expiry in microseconds on `clock_id`.
+    pub until_us: u64,
+}
+
 impl Audio {
     pub const TYPE: &str = "lamp_msgs/Audio";
     pub const VERSION: u32 = 1;
@@ -289,6 +302,29 @@ impl Audio {
         Ok(payload)
     }
 
+    /// Add the immutable capture permit to the JSON header; sample bytes and
+    /// the existing encoding/type stay unchanged. Older `Audio` readers ignore
+    /// the additive field. Ordinary publishers continue using [`Audio::block`].
+    pub fn block_with_capture_permit(
+        &self,
+        samples: &[u8],
+        capture_permit: &AudioCapturePermit,
+    ) -> io::Result<Vec<u8>> {
+        #[derive(Serialize)]
+        struct Header<'a> {
+            #[serde(flatten)]
+            audio: &'a Audio,
+            capture_permit: &'a AudioCapturePermit,
+        }
+        let mut payload = serde_json::to_vec(&Header {
+            audio: self,
+            capture_permit,
+        })?;
+        payload.push(b'\n');
+        payload.extend_from_slice(samples);
+        Ok(payload)
+    }
+
     /// The header and the samples of a payload made by [`Audio::block`].
     pub fn split(payload: &[u8]) -> io::Result<(Self, &[u8])> {
         let Some(end) = payload.iter().position(|&byte| byte == b'\n') else {
@@ -299,6 +335,48 @@ impl Audio {
         };
         Ok((
             serde_json::from_slice(&payload[..end])?,
+            &payload[end + 1..],
+        ))
+    }
+
+    /// Read optional diagnostic authority without changing legacy `split`.
+    /// Only an absent field means `None`: null, malformed or duplicate known
+    /// fields are errors. A newer consumer must refuse absence when original
+    /// capture authority is required; a current lease cannot reconstruct it.
+    pub fn split_with_capture_permit(
+        payload: &[u8],
+    ) -> io::Result<(Self, Option<AudioCapturePermit>, &[u8])> {
+        fn present<'de, D: serde::Deserializer<'de>>(
+            deserializer: D,
+        ) -> Result<Option<AudioCapturePermit>, D::Error> {
+            AudioCapturePermit::deserialize(deserializer).map(Some)
+        }
+        // Explicit typed fields keep serde's duplicate-field rejection. In
+        // particular, parsing through Value first would discard duplicates.
+        #[derive(Deserialize)]
+        struct Header {
+            sample_rate: u32,
+            channels: u8,
+            sample_format: String,
+            sequence: u64,
+            #[serde(default, deserialize_with = "present")]
+            capture_permit: Option<AudioCapturePermit>,
+        }
+        let Some(end) = payload.iter().position(|&byte| byte == b'\n') else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "no line end after the audio header",
+            ));
+        };
+        let header: Header = serde_json::from_slice(&payload[..end])?;
+        Ok((
+            Self {
+                sample_rate: header.sample_rate,
+                channels: header.channels,
+                sample_format: header.sample_format,
+                sequence: header.sequence,
+            },
+            header.capture_permit,
             &payload[end + 1..],
         ))
     }
@@ -2910,6 +2988,106 @@ mod tests {
         assert!(Audio::split(&bare).unwrap().1.is_empty());
         assert!(Audio::split(text.as_bytes()).is_err());
         assert!(Audio::split(b"{}\nxx").is_err());
+    }
+
+    #[test]
+    fn audio_capture_permit_is_additive_and_legacy_payload_bytes_stay_exact() {
+        let audio = Audio {
+            sample_rate: 16_000,
+            channels: 1,
+            sample_format: Audio::S16LE.into(),
+            sequence: 9,
+        };
+        let permit = AudioCapturePermit {
+            clock_id: "synthetic-kernel-boot".into(),
+            epoch: 4,
+            until_us: 90_000,
+        };
+        let samples = [0, 255, 10, 13, 128, 1];
+        let legacy = audio.block(&samples).unwrap();
+        let expected =
+            b"{\"sample_rate\":16000,\"channels\":1,\"sample_format\":\"S16LE\",\"sequence\":9}\n";
+        assert_eq!(&legacy[..expected.len()], expected);
+        assert_eq!(&legacy[expected.len()..], &samples);
+        assert_eq!(
+            Audio::split_with_capture_permit(&legacy).unwrap(),
+            (audio.clone(), None, samples.as_slice())
+        );
+        let diagnostic = audio.block_with_capture_permit(&samples, &permit).unwrap();
+        assert_eq!(
+            Audio::split(&diagnostic).unwrap(),
+            (audio.clone(), samples.as_slice()),
+            "old readers ignore the additive field without changing PCM"
+        );
+        assert_eq!(
+            Audio::split_with_capture_permit(&diagnostic).unwrap(),
+            (audio.clone(), Some(permit.clone()), samples.as_slice())
+        );
+        let (header, _) = diagnostic.split_at(diagnostic.iter().position(|b| *b == b'\n').unwrap());
+        assert_eq!(
+            std::str::from_utf8(header).unwrap(),
+            "{\"sample_rate\":16000,\"channels\":1,\"sample_format\":\"S16LE\",\"sequence\":9,\"capture_permit\":{\"clock_id\":\"synthetic-kernel-boot\",\"epoch\":4,\"until_us\":90000}}"
+        );
+        // Future outer fields remain compatible, while known authority fields
+        // are read directly from typed JSON rather than a lossy Value map.
+        let mut future = serde_json::from_slice::<serde_json::Value>(header).unwrap();
+        future["added_later"] = serde_json::json!({"anything": [1, 2]});
+        let mut future_payload = serde_json::to_vec(&future).unwrap();
+        future_payload.push(b'\n');
+        future_payload.extend_from_slice(&samples);
+        assert_eq!(
+            Audio::split_with_capture_permit(&future_payload).unwrap(),
+            (audio, Some(permit), samples.as_slice())
+        );
+    }
+
+    #[test]
+    fn audio_capture_permit_rejects_null_malformed_and_duplicate_authority_fields() {
+        let base = r#""sample_rate":16000,"channels":1,"sample_format":"S16LE","sequence":9"#;
+        let valid = r#"{"clock_id":"boot","epoch":1,"until_us":90000}"#;
+        let mut invalid = vec![
+            "null".to_owned(),
+            "[]".to_owned(),
+            "{}".to_owned(),
+            r#"{"clock_id":"boot","epoch":1}"#.to_owned(),
+            r#"{"clock_id":null,"epoch":1,"until_us":90000}"#.to_owned(),
+            r#"{"clock_id":7,"epoch":1,"until_us":90000}"#.to_owned(),
+            r#"{"clock_id":"boot","epoch":-1,"until_us":90000}"#.to_owned(),
+            r#"{"clock_id":"boot","epoch":1.5,"until_us":90000}"#.to_owned(),
+            r#"{"clock_id":"boot","epoch":"1","until_us":90000}"#.to_owned(),
+            r#"{"clock_id":"boot","epoch":1,"until_us":18446744073709551616}"#.to_owned(),
+        ];
+        for extra in [
+            r#""clock_id":"other""#,
+            r#""epoch":2"#,
+            r#""until_us":130000"#,
+        ] {
+            invalid.push(format!("{},{} }}", valid.trim_end_matches('}'), extra));
+        }
+        for permit in invalid {
+            let payload = format!("{{{base},\"capture_permit\":{permit}}}\n");
+            assert!(
+                Audio::split_with_capture_permit(payload.as_bytes()).is_err(),
+                "{payload}"
+            );
+        }
+        for duplicate in [
+            format!("\"capture_permit\":{valid}"),
+            "\"capture_permit\":null".into(),
+            "\"sample_rate\":8000".into(),
+            "\"channels\":2".into(),
+            "\"sample_format\":\"other\"".into(),
+            "\"sequence\":10".into(),
+        ] {
+            let payload = format!("{{{base},\"capture_permit\":{valid},{duplicate}}}\n");
+            assert!(
+                Audio::split_with_capture_permit(payload.as_bytes()).is_err(),
+                "{payload}"
+            );
+        }
+        for malformed in [b"{}".as_slice(), b"{}\n", b"{\n", b"[]\n"] {
+            assert!(Audio::split_with_capture_permit(malformed).is_err());
+        }
     }
 
     #[test]

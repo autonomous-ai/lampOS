@@ -472,6 +472,20 @@ publishes `Health`, `BoardState`, `BoardHeat` and the board's own `Diagnostic`
 (`crates/ears/src/pcm.rs`) and the voice on `mic2/audio`, with `VoiceLink`
 on `voice/link` (`crates/voice/src/bus_out.rs`). Nothing publishes
 `ImageRef` yet.
+
+The sensor 5 source candidate adds optional `AudioCapturePermit`
+(`clock_id:String`, `epoch:u64`, `until_us:u64`) as `capture_permit` in the
+Audio JSON header only when Ears explicitly enables
+`LAMP_BUS_AUDIO_CAPTURE_PERMIT=on` alongside its existing PCM export.
+`Audio::block`/`split`, the existing Audio struct, version 1 and raw PCM layout
+remain unchanged. `block_with_capture_permit` writes the additive header;
+`split_with_capture_permit` returns the same Audio/samples plus an optional
+ticket. Old readers ignore it; new readers can recognize its absence on old
+publishers. Duplicate or malformed ticket fields are rejected by the new
+parser. The ticket carries Ears' original clock/era/deadline, not renewed
+permission; consent and current privacy remain separate requirements. See
+[the recorder protocol](sensor5-pilot.md) and [Ears](ears.md).
+
 `VoiceLink`'s seven reasons group the voice program's
 fault categories and have not been agreed with its owner. Which way a face's
 yaw is positive is written down and no detector has been held to it.

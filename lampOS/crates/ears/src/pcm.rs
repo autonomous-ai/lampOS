@@ -6,7 +6,7 @@ use crate::{
     BLOCK, RATE,
     privacy::{Permit, PublicationGate},
 };
-use lamp_msgs::Audio;
+use lamp_msgs::{Audio, AudioCapturePermit};
 use std::{io, sync::Mutex};
 
 /// Only Ears mic1 expires after 50 ms. The Bus receiver additionally applies
@@ -92,6 +92,26 @@ impl Pcm {
     /// Recheck permission before packing. The eventual publisher must check
     /// again at its final boundary: this check grants no future publication.
     pub fn pack(&self, gate: &PublicationGate, now_us: u64) -> io::Result<Option<Packet>> {
+        self.pack_original(gate, now_us, None)
+    }
+
+    /// Diagnostic export of this block's own original permit. There is no
+    /// caller-supplied permit to substitute a newer heartbeat's deadline.
+    pub fn pack_with_capture_permit(
+        &self,
+        gate: &PublicationGate,
+        now_us: u64,
+        clock_id: &str,
+    ) -> io::Result<Option<Packet>> {
+        self.pack_original(gate, now_us, Some(clock_id))
+    }
+
+    fn pack_original(
+        &self,
+        gate: &PublicationGate,
+        now_us: u64,
+        capture_clock: Option<&str>,
+    ) -> io::Result<Option<Packet>> {
         if !gate.allows(self.permit, self.fence, now_us) {
             return Ok(None);
         }
@@ -99,13 +119,23 @@ impl Pcm {
         for (sample, pair) in self.samples.iter().zip(bytes.chunks_exact_mut(2)) {
             pair.copy_from_slice(&sample.to_le_bytes());
         }
-        let result = Audio {
+        let audio = Audio {
             sample_rate: RATE,
             channels: 1,
             sample_format: Audio::S16LE.to_owned(),
             sequence: self.sequence,
-        }
-        .block(&bytes);
+        };
+        let result = match capture_clock {
+            Some(clock_id) => audio.block_with_capture_permit(
+                &bytes,
+                &AudioCapturePermit {
+                    clock_id: clock_id.to_owned(),
+                    epoch: self.permit.epoch,
+                    until_us: self.permit.until_us,
+                },
+            ),
+            None => audio.block(&bytes),
+        };
         bytes.fill(0);
         let packet = Packet {
             bytes: result?,
@@ -334,12 +364,117 @@ pub fn export_enabled(audio: Option<&str>, privacy: Option<&str>) -> io::Result<
     Ok(true)
 }
 
+/// Optional metadata cannot enable PCM export or select a new capture route.
+pub fn capture_permit_enabled(export: bool, switch: Option<&str>) -> bool {
+    export && switch == Some("on")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn permit(epoch: u64, until_us: u64) -> Permit {
         Permit { epoch, until_us }
+    }
+
+    #[test]
+    fn capture_permit_metadata_needs_exact_opt_in_and_existing_audio_export() {
+        for switch in [
+            None,
+            Some(""),
+            Some("off"),
+            Some("ON"),
+            Some("true"),
+            Some("1"),
+            Some("on "),
+            Some(" on"),
+        ] {
+            assert!(!capture_permit_enabled(true, switch), "{switch:?}");
+            assert!(!capture_permit_enabled(false, switch), "{switch:?}");
+        }
+        assert!(!capture_permit_enabled(false, Some("on")));
+        assert!(capture_permit_enabled(true, Some("on")));
+    }
+
+    #[test]
+    fn diagnostic_wire_keeps_original_expiry_after_same_era_renewal() {
+        let gate = PublicationGate::default();
+        let original = permit(1, 90_000);
+        gate.update(Some(original), 0);
+        let mut mailbox = Mailbox::new(true);
+        assert!(mailbox.offer(&[7; BLOCK], &gate, original, 0, 99, 85_000));
+        let pcm = mailbox.take(&gate, 86_000).unwrap();
+        // Packing after renewal still serializes the authority held at capture.
+        gate.update(Some(permit(1, 130_000)), 0);
+        let packet = pcm
+            .pack_with_capture_permit(&gate, 87_000, "synthetic-boot")
+            .unwrap()
+            .unwrap();
+        let bytes = packet.bytes_if_allowed(&gate, 87_000).unwrap();
+        let (audio, exported, samples) = Audio::split_with_capture_permit(bytes).unwrap();
+        assert_eq!(
+            exported.unwrap(),
+            AudioCapturePermit {
+                clock_id: "synthetic-boot".into(),
+                epoch: 1,
+                until_us: 90_000
+            }
+        );
+        assert_eq!(Audio::split(bytes).unwrap(), (audio.clone(), samples));
+        assert_eq!(samples.len(), BLOCK * 2);
+        assert_eq!(packet.permit(), original);
+        let ordinary = pcm.pack(&gate, 87_000).unwrap().unwrap();
+        let ordinary_bytes = ordinary.bytes_if_allowed(&gate, 87_000).unwrap();
+        assert_eq!(
+            Audio::split_with_capture_permit(ordinary_bytes).unwrap(),
+            (audio.clone(), None, samples)
+        );
+        assert_eq!(ordinary_bytes, audio.block(samples).unwrap());
+        assert!(packet.allows(&gate, 89_999));
+        assert!(!packet.allows(&gate, 90_000));
+        assert!(!packet.allows(&gate, 94_002));
+        assert!(
+            pcm.pack_with_capture_permit(&gate, 94_002, "synthetic-boot")
+                .unwrap()
+                .is_none()
+        );
+        assert!(packet.bytes_if_allowed(&gate, 94_002).is_none());
+        gate.fence();
+        assert!(
+            pcm.pack_with_capture_permit(&gate, 87_001, "synthetic-boot")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn diagnostic_packing_host_cost_excludes_capture_bus_and_device_readiness() {
+        let gate = PublicationGate::default();
+        let original = permit(1, 90_000);
+        gate.update(Some(original), 0);
+        let mut mailbox = Mailbox::new(true);
+        assert!(mailbox.offer(&[7; BLOCK], &gate, original, 0, 1, 85_000));
+        let pcm = mailbox.take(&gate, 86_000).unwrap();
+        for diagnostic in [false, true] {
+            let mut times = Vec::new();
+            for _ in 0..1000 {
+                let start = std::time::Instant::now();
+                let packet = if diagnostic {
+                    pcm.pack_with_capture_permit(&gate, 87_000, "synthetic-boot")
+                } else {
+                    pcm.pack(&gate, 87_000)
+                }
+                .unwrap()
+                .unwrap();
+                times.push(start.elapsed().as_nanos());
+                assert!(packet.allows(&gate, 87_000));
+            }
+            times.sort_unstable();
+            eprintln!(
+                "Ears host packing only diagnostic={diagnostic}: p50={}ns p95={}ns max={}ns; 1000 synthetic 20ms blocks; design target <1ms; excludes capture, Bus, target hardware and readiness",
+                times[500], times[950], times[999]
+            );
+        }
     }
 
     #[test]

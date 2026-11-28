@@ -55,6 +55,26 @@ pub const SOURCE: &str = "lamp-eyes";
 pub const RETRY_BIND_US: u64 = 5_000_000;
 /// The one unit whose peer may read the link.
 pub const READER_UNIT: &str = "lamp-seen.service";
+/// The diagnostic recorder is a distinct, explicitly selected peer.
+pub const SENSOR5_READER_UNIT: &str = "lamp-sensor5-capture.service";
+
+/// Selecting the diagnostic reader replaces the normal reader; it does not
+/// broaden the default policy or grant camera permission.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ReaderPolicy {
+    #[default]
+    Seen,
+    Sensor5Capture,
+}
+
+impl ReaderPolicy {
+    pub fn may(self, caller: Option<&Caller>, uid: Option<u32>) -> bool {
+        match self {
+            Self::Seen => reader_may(caller, uid),
+            Self::Sensor5Capture => lamp_ipc::caller::is_unit_as(caller, uid, SENSOR5_READER_UNIT),
+        }
+    }
+}
 /// The boots file is read up to this many bytes (`lamp-seen frame-link`
 /// writes about 170).
 const BOOTS_MOST_BYTES: u64 = 1024;
@@ -292,12 +312,23 @@ impl FrameLink {
     /// hold. Nothing is served until [`turn`](Self::turn) sees a hold. Only
     /// `lamp-seen.service` run as this user may connect ([`reader_may`]).
     pub fn new(config: Config, max_frame_bytes: usize, now_us: u64) -> io::Result<Self> {
+        Self::new_with_policy(config, max_frame_bytes, now_us, ReaderPolicy::Seen)
+    }
+
+    /// Explicit alternative peer for a consented local diagnostic. This
+    /// changes only the reader identity; all camera holds and grants remain.
+    pub fn new_with_policy(
+        config: Config,
+        max_frame_bytes: usize,
+        now_us: u64,
+        policy: ReaderPolicy,
+    ) -> io::Result<Self> {
         let uid = rustix::process::geteuid().as_raw();
         Self::new_allowing(
             config,
             max_frame_bytes,
             now_us,
-            Arc::new(move |caller| reader_may(caller, Some(uid))),
+            Arc::new(move |caller| policy.may(caller, Some(uid))),
         )
     }
 
@@ -499,6 +530,11 @@ impl FrameLink {
 
 /// One journal line for a link event.
 pub fn said(event: &LinkEvent) -> String {
+    said_for_policy(event, ReaderPolicy::Seen)
+}
+
+/// Journal the configured peer without changing the normal reader's text.
+pub fn said_for_policy(event: &LinkEvent, policy: ReaderPolicy) -> String {
     match event {
         LinkEvent::Connected { role, .. } => {
             format!("frame link: the {} reader connected", role.as_str())
@@ -513,7 +549,11 @@ pub fn said(event: &LinkEvent) -> String {
             role.map_or("a connection", |role| role.as_str()),
             match reason {
                 CloseReason::PrivacyClosed => ": cut, the camera's permission ended or changed",
-                CloseReason::PeerRefused => ": not lamp-seen.service as this user",
+                CloseReason::PeerRefused => match policy {
+                    ReaderPolicy::Seen => ": not lamp-seen.service as this user",
+                    ReaderPolicy::Sensor5Capture =>
+                        ": not lamp-sensor5-capture.service as this user",
+                },
                 _ => "",
             },
             if *partial_frame_discarded {

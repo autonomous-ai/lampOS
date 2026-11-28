@@ -3878,6 +3878,17 @@ LAMP_EYES_VISITS=--visits on
 The two boots are the ones `lamp-seen` says as its controller and own boot.
 A hello with any other boot, or a second connection, is refused.
 
+For the consented [sensor 5 pilot](sensor5-pilot.md), the source candidate adds
+`--frame-link-reader-policy seen|sensor5-capture`. It requires both link paths;
+omitting it keeps `seen` and the existing reader rules. `sensor5-capture`
+replaces the sole permitted same-UID peer with the kernel-identified
+`lamp-sensor5-capture.service`; it never permits both readers, grants camera
+permission or changes the frame protocol. Unknown peers and another UID are
+refused under either policy. A default/older Eyes refuses the diagnostic peer.
+No deployed unit selects this policy. The recorder keeps its own private boots
+file and never impersonates `lamp-seen`; separate review and operator setup are
+required before a live session. Physical closure and cadence are unverified.
+
 **In the product** (#6543, [seen.md](seen.md#the-product-unit)),
 `lamp-eyes.service` always passes `--frame-link
 /run/lampos-eyes-frames/camera.frames --frame-link-boots
