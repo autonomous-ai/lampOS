@@ -732,7 +732,7 @@ is no bus acknowledgement topic: completion is a guarded private `ack` request.
 
 ## Proposed model tools
 
-The six proposals are now implemented in Actions' optional adapter and Voice's
+The six proposals, and `move_reminder` (#8840), are now implemented in Actions' optional adapter and Voice's
 declaration/routing gate. Enable `LAMP_SCHEDULE_TOOLS=on` in both processes and
 provide Voice's existing `LAMP_ACTIONS_DIR`. The executable provider declarations
 are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
@@ -745,6 +745,7 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own, and the room's (set by no one) |
 | `cancel_reminder` | `id`, or `text` | none | `Cancel` of the selected whole item/series, only the line's own or the room's; by `text`, the one item whose text holds the words (case and edge spaces aside), resolved from the line's own list, else the matches named and nothing cancelled |
 | `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, or of a one-time one said within two minutes (its said delivery, from `ListSet`'s `said`), only the line's own or the room's |
+| `move_reminder` (`LAMP_SCHEDULE_MOVE=on`, #8840) | `time`, and `id` or `text` | `day` (a one-time reminder only) | The one reminder named, resolved from the line's own list as a cancel by `text` is: `Set` again with its words, as the mover's, at `time`, keeping how it repeats (daily stays `Daily`, weekly keeps its weekday, once stays `At`), then `Cancel` of the old one. Never both left: a failed `Set` changes nothing, and a failed `Cancel` is told as not moved with `old_kept`, and the new one's id. Several or none matching: named, nothing moves. A timer, or an `every` series, is not moved by clock: told so, nothing changes. A new id, not the old one: there is no edit op in lamp-schedule, so a store an older build reads is the same |
 
 Text is 1–300 UTF-8 bytes, nonblank and without controls. Seconds are whole
 integers from 1 through 31,536,000. `time` is exact `HH:MM`; `day` is `today`,
@@ -754,6 +755,21 @@ Schedule's configured zone. Fold is `earlier`, `later`, or `reject`. `every`
 is `daily` or `weekly`; weekday uses its full lowercase English name. IDs
 must come from a current list, never a guess. Omit optional values rather
 than passing null; unknown or null fields are refused before IPC.
+
+**A move by voice (#8840).** On lamp-52e6 on 27 Nov the lamp couldn't
+move a daily 4 PM reminder to 4:30; asked again, it set the new one and
+said it couldn't cancel the old one. On 28 Nov at 16605 a cancel by voice
+during a move reached no part and left no line anywhere. `move_reminder`
+does both halves in lamp-actions, in that order. The Policy holds it as a
+set: it runs on a reply to the lamp ("4:30" to the lamp's "What time?"),
+and a cancel still doesn't (Fourth on #1054). A call the Policy holds on the
+second route is now journaled, "held by the Policy's decision for the
+turn". With `LAMP_TIMER_ASKS_HOW_LONG`, a move whose words give no time is
+asked "What time?", as a set is. The creator's linked record
+(`LAMP_SERVICE_RECORDS_REMINDERS`) follows it: the old one dismissed, the
+new one set. Tests: `move_by_text_keeps_the_repeat_and_changes_only_the_time`,
+`move_reminder_is_offered_only_with_its_switch` (actions),
+`a_move_reads_as_a_cancel_and_sets_as_a_set` (voice).
 
 **`pending_only` means due, not set (#1595).** An item is pending only once
 its time has come and it is not yet said (`engine.rs`, `tick`), so a list
