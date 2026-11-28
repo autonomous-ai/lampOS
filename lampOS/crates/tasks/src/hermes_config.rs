@@ -42,8 +42,10 @@
 //!   `web.keyless_fallback` and `web.keyless_rescue` are set on, so a
 //!   search the lamp's route fails is served by that pool. A person's own
 //!   `SEARXNG_URL` is kept, and ours is not added. Without the token,
-//!   nothing of it is added and Hermes searches through its keyless pool
-//!   alone, as before. Hermes's "Could not reach SearXNG at <url>" error
+//!   nothing of it is added, and a `web.search_backend` naming `searxng`
+//!   is taken out (ours from a token that has since gone would name a
+//!   backend with no URL), so Hermes searches through its keyless pool, or
+//!   a person's own `SEARXNG_URL` by its autodetect. Hermes's "Could not reach SearXNG at <url>" error
 //!   names the URL, so the model may see this token: it is search-only and
 //!   answered on loopback only (lamp-cloud's search route).
 //!
@@ -665,7 +667,8 @@ pub fn merge_config(text: &str, port: u16) -> Result<String, Refused> {
 /// on, the lamp's `mcp_servers` entry ([`mcp_entry`]) set; off, that entry
 /// taken out, and `mcp_servers` with it when nothing else is left there.
 /// With `search`, the `web:` settings for the lamp's search route first
-/// (module doc); without it, `web:` is left as it is.
+/// (module doc); without it, a `web.search_backend` naming `searxng` is
+/// taken out and the rest of `web:` is left as it is.
 pub fn merge_config_for(
     text: &str,
     port: u16,
@@ -726,6 +729,14 @@ pub fn merge_config_for(
         for on in ["keyless_fallback", "keyless_rescue"] {
             set_child(&mut parts, "web", on, Some(&[format!("{on}: true")]))?;
         }
+    } else if child_value(&parts, "web", "search_backend")?
+        .is_some_and(|value| value.trim_matches(['"', '\'']) == "searxng")
+    {
+        // The search token gone, our SEARXNG_URL left `.env`: a `searxng`
+        // pin would name a backend with no URL. Unpinned, Hermes's
+        // autodetect picks SearXNG when a person's own URL is set, else
+        // the keyless pool; the rest of `web:` is kept.
+        set_child(&mut parts, "web", "search_backend", None)?;
     }
     let mut out = String::new();
     for part in &parts {
@@ -1761,5 +1772,26 @@ skills:
         assert!(env.ends_with(&format!("{SEARCH_ENV}={}\n", search_url(7741, FOUND))));
         let again = write_for(home.path(), 7741, TOKEN, false, Some(FOUND)).unwrap();
         assert!(!again.config_changed && !again.env_changed);
+    }
+
+    /// The search token gone, the next write takes out both the URL and
+    /// the `searxng` pin, and keeps the keyless pool's settings.
+    #[test]
+    fn a_token_gone_takes_the_searxng_pin_out() {
+        let home = tempfile::tempdir().unwrap();
+        fs::write(home.path().join("config.yaml"), HARNESS).unwrap();
+        write_for(home.path(), 7741, TOKEN, false, Some(FOUND)).unwrap();
+        let gone = write_for(home.path(), 7741, TOKEN, false, None).unwrap();
+        assert!(gone.config_changed && gone.env_changed);
+        let config = fs::read_to_string(home.path().join("config.yaml")).unwrap();
+        let env = fs::read_to_string(home.path().join(".env")).unwrap();
+        assert!(!env.contains(SEARCH_ENV), "{env}");
+        assert!(!config.contains("search_backend"), "{config}");
+        assert!(
+            config.ends_with("web:\n  extract_backend: \"exa\"\n  keyless_fallback: true\n  keyless_rescue: true\n"),
+            "{config}"
+        );
+        let still = write_for(home.path(), 7741, TOKEN, false, None).unwrap();
+        assert!(!still.config_changed && !still.env_changed);
     }
 }
