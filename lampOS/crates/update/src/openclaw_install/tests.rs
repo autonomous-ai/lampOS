@@ -231,6 +231,8 @@ struct Runs {
     /// Hermes's gateway's `ActiveState`: `inactive` unless a test says
     /// otherwise.
     hermes: &'static str,
+    /// Whether `npm ci` puts the SearXNG plugin in too.
+    searxng: bool,
 }
 
 impl Runs {
@@ -248,6 +250,7 @@ impl Runs {
             restart_at_add: RefCell::new(0),
             inactive: RefCell::new(0),
             hermes: "inactive",
+            searxng: false,
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -321,6 +324,9 @@ impl Runs {
                 Ok(String::new())
             } else if line.contains(&format!("{NPM_CI_ENV}=on")) {
                 put_package(&self.root, self.package);
+                if self.searxng {
+                    fs::create_dir_all(on(&self.root, SEARXNG_DIR)).unwrap();
+                }
                 Ok(String::new())
             } else if line.ends_with(" --version") {
                 // It runs in the namespace script: none there, it fails.
@@ -2480,8 +2486,18 @@ fn the_one_path_writes_nothing_to_openclaws_shared_config() {
     let source = include_str!("../openclaw_install.rs");
     let code = source.split("\n#[cfg(test)]").next().unwrap();
     // The writer, and (#7868) a round's read-only check of the `gateway`
-    // block, which writes nothing.
-    assert_eq!(code.matches("on(root, CONFIG)").count(), 2);
+    // block, and the install's look for lamp-tasks' search merge, which
+    // write nothing.
+    assert_eq!(code.matches("on(root, CONFIG)").count(), 3);
+    let merge_look = code
+        .split_once("fn names_searxng(")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(merge_look.contains("fs::read(on(root, CONFIG))"));
+    assert!(!merge_look.contains("write") && !merge_look.contains("replace"));
     let reader = code
         .split_once("fn gateway_block_due(")
         .unwrap()
@@ -4798,4 +4814,100 @@ fn the_gateway_block_restarts_no_gateway_that_is_not_wanted() {
         "{said:#?}"
     );
     assert_eq!(gateway_starts(&runs), Vec::<String>::new());
+}
+
+/// lamp-ee17, 28 Nov: the install restarted lamp-tasks and then the
+/// gateway at once, before lamp-tasks' merge put the SearXNG plugin in
+/// `plugins.load.paths`; OpenClaw loads plugins only at its start, so it
+/// ran with no `web_search`. With the search token and the plugin there,
+/// the restart now waits for the merge (bounded), said in a line before
+/// it; without the token nothing is waited for.
+#[test]
+fn the_installs_gateway_restart_waits_for_lamp_tasks_search_merge() {
+    let restart_after_wait = |token: &str| {
+        let lamp = Lamp::new();
+        lamp.harness_there();
+        let mut systemd = Fake::default();
+        round(&lamp, &mut systemd, true, 10).unwrap();
+        fs::create_dir_all(lamp.at(SEARCH_TOKEN).parent().unwrap()).unwrap();
+        fs::write(lamp.at(SEARCH_TOKEN), token).unwrap();
+        let runs = Runs {
+            searxng: true,
+            ..Runs::new(&lamp)
+        };
+        let lines = RefCell::new(Vec::<String>::new());
+        let said = install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut runs.runner(),
+            &mut || 20,
+            &mut |line: &str| lines.borrow_mut().push(line.to_owned()),
+            &kit(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+        runs.position(&format!("systemctl restart {UNIT}"));
+        lines.into_inner()
+    };
+    let lines = restart_after_wait("srch");
+    let waits = lines
+        .iter()
+        .position(|line| line.contains("the restart waits for lamp-tasks' web search merge"))
+        .unwrap_or_else(|| panic!("{lines:#?}"));
+    let gave_up = lines
+        .iter()
+        .position(|line| {
+            line.contains(&format!(
+                "merge not in after {} s: restarted anyway",
+                SEARCH_MERGE_AT_MOST.as_secs()
+            ))
+        })
+        .unwrap_or_else(|| panic!("{lines:#?}"));
+    assert!(waits < gave_up, "{lines:#?}");
+    let lines = restart_after_wait("");
+    assert!(
+        !lines.iter().any(|line| line.contains("web search merge")),
+        "no token, no wait: {lines:#?}"
+    );
+}
+
+/// The merge landing during the wait ends it at the next look; one
+/// already in place waits for nothing.
+#[test]
+fn the_search_merge_wait_ends_once_the_load_path_is_in() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(SEARXNG_DIR)).unwrap();
+    fs::create_dir_all(lamp.at(SEARCH_TOKEN).parent().unwrap()).unwrap();
+    fs::write(lamp.at(SEARCH_TOKEN), "srch").unwrap();
+    fs::create_dir_all(lamp.at(CONFIG).parent().unwrap()).unwrap();
+    fs::write(lamp.at(CONFIG), r#"{"plugins": {"allow": ["openai"]}}"#).unwrap();
+    let merged = serde_json::json!({"plugins": {"load": {"paths": [SEARXNG_DIR]}}}).to_string();
+    let mut pauses = 0;
+    let mut lines = Vec::new();
+    search_merged(
+        lamp.root(),
+        &mut |line: &str| lines.push(line.to_owned()),
+        &mut || {
+            pauses += 1;
+            if pauses == 3 {
+                fs::write(lamp.at(CONFIG), &merged).unwrap();
+            }
+        },
+    );
+    assert_eq!(pauses, 3);
+    assert!(
+        lines
+            .last()
+            .unwrap()
+            .ends_with("merge in after 6 s: restarted with it"),
+        "{lines:#?}"
+    );
+    let mut lines = Vec::new();
+    search_merged(
+        lamp.root(),
+        &mut |line: &str| lines.push(line.to_owned()),
+        &mut || panic!("no wait"),
+    );
+    assert!(lines.is_empty());
 }

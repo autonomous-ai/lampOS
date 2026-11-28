@@ -4929,7 +4929,11 @@ là phần của một coder khác trong #6226; thiết kế:
   plugin". OpenClaw coi plugin, đường
   dẫn hay biến bị thiếu là cảnh báo, không bao giờ từ chối file. Plugin này
   không có sẵn trong OpenClaw 2026.11.2; lamp-update cài nó cùng OpenClaw
-  (docs/install.md, "From a pinned lockfile"). **Rủi ro thời gian khởi động
+  (docs/install.md, "From a pinned lockfile"). OpenClaw chỉ nạp plugin lúc
+  Gateway khởi động, nên một lần ghi bật tìm kiếm cần Gateway khởi động sau
+  nó: bản cài khởi động lại lamp-tasks, rồi chờ lần gộp này (tối đa 90 s)
+  trước khi (khởi động lại) Gateway (docs/install.md, "The Gateway").
+  **Rủi ro thời gian khởi động
   (#6226):** thêm hai plugin vào danh sách cho phép; cả hai chỉ nạp khi
   dùng, nhưng thời gian Gateway sẵn sàng và lượt tìm kiếm đầu tiên phải được
   đo trong một lamp row trước khi coi là không tốn gì.

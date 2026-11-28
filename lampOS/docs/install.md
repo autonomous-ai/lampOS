@@ -2730,7 +2730,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      startup), and a second stop seconds after a start was SIGKILLed and
      left OpenClaw's state unreadable (gate G); a stop 60 s or more after
      the listen took under 10 s. A gateway started long ago and listening,
-     or not running, is restarted at once. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
+     or not running, is restarted at once. Before the install's (re)start
+     (a new install, lamp-tasks just started again), with lamp-cloud's
+     search token and the SearXNG plugin there, the one-shot also waits
+     for lamp-tasks' merge to name the plugin's folder in
+     `plugins.load.paths` of `openclaw.json` (looking every 2 s, 90 s at
+     most, then restarted anyway, said in one line): OpenClaw loads plugins
+     only at its gateway's start, and a restart right after lamp-tasks'
+     own ran without `web_search` until the next start (lamp-ee17, 28
+     Nov). Without the token or the plugin nothing is waited for. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
      its row), or `LAMP_HERMES_GATEWAY=on` (on in the product), it runs only while OpenClaw is the lamp's default agent, as
      lamp-tasks says it on its app socket: `serve` asks every 10 s and
      each round once, enables and starts it for `openclaw`, disables and

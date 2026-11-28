@@ -2172,6 +2172,9 @@ fn steps(
             if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
                 say(&format!("{UNIT} not reset-failed: {why}"));
             }
+            if !pinned_there {
+                search_merged(root, say, &mut || std::thread::sleep(SETTLE_SLEEP));
+            }
             settled(root, run, say, false);
             // Looked at again after `settled`'s wait (up to SETTLE_AT_MOST):
             // a switch meanwhile, or Hermes's gateway not down (a round
@@ -2190,6 +2193,9 @@ fn steps(
             }
         }
         Gateway::Unknown => {
+            if !pinned_there {
+                search_merged(root, say, &mut || std::thread::sleep(SETTLE_SLEEP));
+            }
             settled(root, run, say, false);
             if let Err(why) = run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
                 return fail(
@@ -2523,6 +2529,70 @@ fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str), retry: bool
         std::thread::sleep(SETTLE_SLEEP);
         waited += SETTLE_EVERY;
     }
+}
+
+/// The longest [`search_merged`] waits for lamp-tasks' merge.
+pub const SEARCH_MERGE_AT_MOST: Duration = Duration::from_secs(90);
+
+/// Before the install's (re)start of the gateway, lamp-tasks just started
+/// again: with lamp-cloud's search token ([`SEARCH_TOKEN`], not empty) and
+/// the SearXNG plugin ([`SEARXNG_DIR`]) there, the merge lamp-tasks writes
+/// at its start (web search on, the plugin's folder in
+/// `plugins.load.paths` of [`CONFIG`]) is waited for, looking every
+/// [`SETTLE_EVERY`] and [`SEARCH_MERGE_AT_MOST`] at most, then the gateway
+/// is (re)started either way. OpenClaw loads its plugins only at the
+/// gateway's start, and lamp-tasks' write is checked by OpenClaw (seconds
+/// to a minute): a restart right after lamp-tasks' own left the gateway
+/// without `web_search` until its next start (lamp-ee17, 28 Nov: started
+/// 16:20:38 with `memory-core, openai`; `searxng` only after a switch at
+/// 16:35:22). Without the token or the plugin nothing is waited for.
+/// `pause` sleeps one step.
+fn search_merged(root: &Path, say: &mut dyn FnMut(&str), pause: &mut dyn FnMut()) {
+    let token =
+        fs::metadata(on(root, SEARCH_TOKEN)).is_ok_and(|file| file.is_file() && file.len() > 0);
+    if !token || !on(root, SEARXNG_DIR).is_dir() {
+        return;
+    }
+    let mut waited = Duration::ZERO;
+    loop {
+        if names_searxng(root) {
+            if waited > Duration::ZERO {
+                say(&format!(
+                    "{UNIT}: lamp-tasks' web search merge in after {} s: restarted with it",
+                    waited.as_secs()
+                ));
+            }
+            return;
+        }
+        if waited >= SEARCH_MERGE_AT_MOST {
+            say(&format!(
+                "{UNIT}: lamp-tasks' web search merge not in after {} s: restarted anyway, web_search from its next start",
+                waited.as_secs()
+            ));
+            return;
+        }
+        if waited == Duration::ZERO {
+            say(&format!(
+                "{UNIT}: the restart waits for lamp-tasks' web search merge (the SearXNG plugin loads only at the gateway's start)"
+            ));
+        }
+        pause();
+        waited += SETTLE_EVERY;
+    }
+}
+
+/// Whether [`CONFIG`]'s `plugins.load.paths` names [`SEARXNG_DIR`].
+fn names_searxng(root: &Path) -> bool {
+    fs::read(on(root, CONFIG))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|config| {
+            config
+                .pointer("/plugins/load/paths")?
+                .as_array()
+                .map(|paths| paths.iter().any(|path| path.as_str() == Some(SEARXNG_DIR)))
+        })
+        .unwrap_or(false)
 }
 
 /// When systemd started the gateway's current process, on the monotonic

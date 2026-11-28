@@ -3451,7 +3451,11 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   search token" or "web search off: no SearXNG plugin". OpenClaw takes a missing plugin, path
   or variable as a warning, never a refused file. The plugin is not
   bundled in OpenClaw 2026.11.2; lamp-update installs it with OpenClaw
-  (docs/install.md, "From a pinned lockfile"). **Start-time risk (#6226):**
+  (docs/install.md, "From a pinned lockfile"). OpenClaw loads plugins only
+  at its Gateway's start, so a write that turns search on needs a gateway
+  start after it: the install starts lamp-tasks again, then waits for this
+  merge (up to 90 s) before it (re)starts the gateway (docs/install.md,
+  "The Gateway"). **Start-time risk (#6226):**
   two more plugins in the allow list; both load on use, but the Gateway's
   ready time and a first search turn must be measured in a lamp row before
   this is taken as free.
