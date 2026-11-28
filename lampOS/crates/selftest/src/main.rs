@@ -143,8 +143,9 @@ fn main() -> ExitCode {
             AGAIN_AFTER.as_secs()
         );
         std::thread::sleep(AGAIN_AFTER);
-        quiet::wait(|| quiet::read(&bus), std::thread::sleep);
-        test = lamp_selftest::again(test, &mut checks, BUDGET);
+        test = retry_passive(test, &mut checks, || {
+            quiet::wait(|| quiet::read(&bus), std::thread::sleep)
+        });
     }
     print!("{}", report::text(&test));
     match report::keep(&arguments.dir, &test) {
@@ -164,6 +165,30 @@ fn main() -> ExitCode {
     }
 }
 
+/// A failed passive part is only confirmed after another quiet admission.
+/// A conversation that outlasts the wait leaves the retry unmeasured; its
+/// first failure and readings stay in the report, without running any check.
+fn retry_passive(
+    mut first: SelfTest,
+    checks: &mut [Box<dyn lamp_selftest::Check + '_>],
+    wait: impl FnOnce() -> bool,
+) -> SelfTest {
+    if wait() {
+        return lamp_selftest::again(first, checks, BUDGET);
+    }
+    for part in &mut first.parts {
+        if part.verdict == Verdict::Fail {
+            part.verdict = Verdict::NotChecked;
+            part.reason = format!(
+                "retry deferred: the voice stayed in a turn; first check failed: {}",
+                part.reason
+            );
+        }
+    }
+    first.verdict = SelfTest::verdict_of(&first.parts);
+    first
+}
+
 fn publish(bus: &Bus, test: &SelfTest, started: Instant) -> std::io::Result<()> {
     let mut out = bus.publisher_declared(SelfTest::TOPIC, &SelfTest::declaration(), "selftest")?;
     out.publish_json(started.elapsed().as_micros() as u64, test)?;
@@ -173,6 +198,105 @@ fn publish(bus: &Bus, test: &SelfTest, started: Instant) -> std::io::Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lamp_msgs::{PartResult, Voice};
+    use lamp_selftest::Check;
+    use std::{cell::Cell, time::Duration};
+
+    struct RetryCheck<'a> {
+        part: &'static str,
+        calls: &'a Cell<usize>,
+        verdict: Verdict,
+    }
+
+    impl Check for RetryCheck<'_> {
+        fn part(&self) -> &str {
+            self.part
+        }
+
+        fn run(&mut self, _deadline: Instant) -> PartResult {
+            self.calls.set(self.calls.get() + 1);
+            PartResult::new(self.part, self.verdict, "retry observation")
+        }
+    }
+
+    fn failed_passive_run() -> SelfTest {
+        SelfTest {
+            occasion: Occasion::FirstBoot,
+            started: 123.0,
+            took: 0.25,
+            verdict: Verdict::Fail,
+            parts: vec![
+                PartResult::new("room_mic", Verdict::Fail, "digital silence").with("dbfs", -90),
+                PartResult::new("board", Verdict::Pass, ""),
+                PartResult::new("air", Verdict::NotFitted, "not fitted"),
+            ],
+            build: Some("test-build".into()),
+            lamp: None,
+        }
+    }
+
+    #[test]
+    fn a_conversation_that_outlasts_the_retry_wait_never_runs_another_check() {
+        let calls = Cell::new(0);
+        let mut checks: Vec<Box<dyn Check + '_>> = vec![Box::new(RetryCheck {
+            part: "room_mic",
+            calls: &calls,
+            verdict: Verdict::Pass,
+        })];
+        let first = failed_passive_run();
+        let original = first.clone();
+        let mut slept = Duration::ZERO;
+        let result = retry_passive(first, &mut checks, || {
+            quiet::wait(|| Some((Voice::Thinking, 0)), |pause| slept += pause)
+        });
+        assert_eq!(slept, quiet::MOST);
+        assert_eq!(calls.get(), 0);
+        assert_eq!(result.verdict, Verdict::NotChecked);
+        assert_eq!(result.parts[0].verdict, Verdict::NotChecked);
+        assert!(result.parts[0].reason.contains("retry deferred"));
+        assert!(result.parts[0].reason.ends_with("digital silence"));
+        assert_eq!(result.parts[0].values, original.parts[0].values);
+        assert_eq!(result.parts[0].took, original.parts[0].took);
+        assert_eq!(result.parts[1..], original.parts[1..]);
+        assert_eq!(result.started, original.started);
+        assert_eq!(result.took, original.took);
+        assert_eq!(result.build, original.build);
+        assert_eq!(result.occasion, Occasion::FirstBoot);
+        assert_eq!(result.check(), Ok(()));
+    }
+
+    #[test]
+    fn a_quiet_retry_only_rechecks_the_failed_parts_and_keeps_its_real_result() {
+        for verdict in [Verdict::Pass, Verdict::Fail, Verdict::NotChecked] {
+            let failed_calls = Cell::new(0);
+            let passed_calls = Cell::new(0);
+            let mut checks: Vec<Box<dyn Check + '_>> = vec![
+                Box::new(RetryCheck {
+                    part: "room_mic",
+                    calls: &failed_calls,
+                    verdict,
+                }),
+                Box::new(RetryCheck {
+                    part: "board",
+                    calls: &passed_calls,
+                    verdict: Verdict::Fail,
+                }),
+            ];
+            let first = failed_passive_run();
+            let unchanged = first.parts[1..].to_vec();
+            let mut slept = Duration::ZERO;
+            let result = retry_passive(first, &mut checks, || {
+                quiet::wait(|| Some((Voice::Resting, 0)), |pause| slept += pause)
+            });
+            assert_eq!(slept, quiet::EVERY * (quiet::CALM - 1));
+            assert_eq!(failed_calls.get(), 1);
+            assert_eq!(passed_calls.get(), 0);
+            assert_eq!(result.parts[0].verdict, verdict);
+            assert_eq!(result.verdict, verdict);
+            assert_eq!(result.parts[1..], unchanged);
+            assert_eq!(result.check(), Ok(()));
+        }
+    }
 
     fn args(given: &[&str]) -> Result<Option<Arguments>, String> {
         parse(&given.iter().map(|s| s.to_string()).collect::<Vec<_>>())
