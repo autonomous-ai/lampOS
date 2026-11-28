@@ -173,6 +173,9 @@ Environment=LAMP_OWN_KEYS=on
 # LAMP_PRIVACY_LIGHT: #8696, led.privacy.get/set through root's change helper (with LAMP_SETTINGS_CHANGE, on a lamp
 # with a slide); on in the product by the lead's call (c7207644723, 27 Nov). The same line in lamp-voice.service.
 Environment=LAMP_PRIVACY_LIGHT=on
+# LAMP_BEAT_ENGINES: the 15 s heartbeat also carries the OpenClaw, Hermes and Harness versions and installed state,
+# versions only, from lamp-update's kept update/status. Its why and rules are its row in docs/switches.md (#8881).
+Environment=LAMP_BEAT_ENGINES=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
