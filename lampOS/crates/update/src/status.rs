@@ -165,6 +165,8 @@ pub struct Telling {
     /// the owner's Update now asked for it.
     waiting: Option<&'static str>,
     asked_now: bool,
+    /// The owner's Auto update took this round (#8769).
+    asked_auto: bool,
     /// The lamp's agents (#6240), with `LAMP_APP_ENGINES=on`.
     engines: Option<Engines>,
 }
@@ -270,6 +272,7 @@ impl Telling {
             target: None,
             waiting: None,
             asked_now: false,
+            asked_auto: false,
             engines,
         }
     }
@@ -315,6 +318,17 @@ impl Telling {
         self.tell_round();
     }
 
+    /// The owner's Auto update took this round's switch (#8769): said at
+    /// once as `asked` `auto`, kept to the round's end; an Update now says
+    /// `now` instead.
+    pub fn asked_auto(&mut self) {
+        if self.phase.is_none() || self.asked_auto || self.asked_now {
+            return;
+        }
+        self.asked_auto = true;
+        self.tell_round();
+    }
+
     /// The owner's Update now asked for this round, or took it over while it
     /// waited (#7517): said at once, and kept to the round's end.
     pub fn asked_now(&mut self) {
@@ -336,7 +350,11 @@ impl Telling {
             step_started_at_unix_ms: self.step_began_unix_ms.max(began),
             target: self.target.clone(),
             waiting: self.waiting.map(str::to_owned),
-            asked: self.asked_now.then(|| UpdateRound::ASKED_NOW.to_owned()),
+            asked: if self.asked_now {
+                Some(UpdateRound::ASKED_NOW.to_owned())
+            } else {
+                self.asked_auto.then(|| UpdateRound::ASKED_AUTO.to_owned())
+            },
         };
         let status = status_with(
             &self.records,
@@ -356,9 +374,18 @@ impl Telling {
             self.phase.take(),
             self.began_unix_ms.take(),
         ));
+        // Auto update off (#8769): the build that waits for the owner's
+        // Update now is the end's `sequence`, so the app's banner can show it.
+        if let (Some(last), Outcome::NotQuiet(why), Some(target)) =
+            (self.last.as_mut(), outcome, self.target.as_ref())
+            && why == crate::auto::OFF_WAITS
+        {
+            last.sequence = Some(target.sequence);
+        }
         self.target = None;
         self.waiting = None;
         self.asked_now = false;
+        self.asked_auto = false;
         let status = status_with(
             &self.records,
             "idle",
@@ -378,6 +405,7 @@ impl Telling {
         self.target = None;
         self.waiting = None;
         self.asked_now = false;
+        self.asked_auto = false;
         let status = status(&self.records, "idle", self.last.as_ref(), None);
         self.tell(status);
     }
@@ -699,6 +727,14 @@ mod tests {
         assert_eq!((before, kept().round), (after, None));
         telling.phase_at("checking", 30_000);
         assert_eq!(kept().round.and_then(|round| round.target), None);
+        // Auto update off (#8769): the end gives the build that waits.
+        telling.target(&two);
+        telling.ended(&Outcome::NotQuiet(crate::auto::OFF_WAITS.into()), 31_000);
+        assert_eq!(kept().last.and_then(|last| last.sequence), Some(10_580));
+        telling.phase_at("checking", 40_000);
+        telling.target(&two);
+        telling.ended(&Outcome::NotQuiet("someone talked".into()), 41_000);
+        assert_eq!(kept().last.and_then(|last| last.sequence), None);
     }
 
     /// #5197: Harness's record, written between rounds by its one-shot, is

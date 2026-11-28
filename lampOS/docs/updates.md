@@ -1649,6 +1649,8 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the owner asked to update now: the switch waits for no quiet moment` | the owner's Update now (#7517) started this round, or took over its wait for quiet |
 | `Update now: the voice gave way; switching` | an Update now round's moment for the voice ended in its 3 s of quiet: the switch goes on |
 | `Update now: no quiet in 10 s (…); switching anyway` | an Update now round's 10 s for the voice passed without 3 s of quiet: the switch goes on anyway |
+| `Auto update is on: the switch waits for no quiet moment` | the owner's Auto update (#8769, "Auto update" below) takes this round's switch: it gives way as Update now does, then `Auto update: the voice gave way; switching` or `Auto update: no quiet in 10 s (…); switching anyway` |
+| `not switched: Auto update is off: the new build waits for the owner's Update now` | the owner turned Auto update off (#8769): the round ends `not-quiet` and only Update now switches |
 | `switching to build N` | the parts' switch begins |
 | `… is moved aside to …, the build's lamp-body taking the servo's own acceleration cap (#7946)` | a switch that changes lamp-body, after its journal is saved: the factory's acceleration drop-in (`head_touch::acceleration_only`) is copied into the records' `aside/` folder, never deleted, and taken from its place |
 | `… is put back where it was (#7946)` | a build put back, or a round cut short: that drop-in written back where it was, before the reload, for the old lamp-body |
@@ -1815,6 +1817,54 @@ for no quiet moment`, `Update now: the voice gave way; switching` or
 `Update now: no quiet in 10 s (…); switching anyway`, and `an Update now is
 taken as a plain check: …`. The app's side is [cloud.md](cloud.md), "Update
 now".
+
+### Auto update (#8769, `LAMP_UPDATE_AUTO`)
+
+The product owner's rule through the lead (26 Nov): the owner's **Auto
+update** switch, on by default. With `LAMP_UPDATE_AUTO` on (unset: on on a
+product lamp, `auto::PRODUCT_DEFAULT`, as `LAMP_FIRST_UPDATE` is, since
+lamp-update's own unit is never carried by a round; `off` turns it off),
+each round reads the owner's mark, `/etc/lampOS/setup/auto-update-off`
+(`lamp_msgs::AUTO_UPDATE_OFF`), before its switch:
+
+- **No mark (on, the default, and after a reset):** the round waits for no
+  quiet moment and for no one to stop speaking. It gives the voice its
+  moment as Update now does (`update_now::GIVE_WAY_QUIET` 3 s, at most
+  `GIVE_WAY_MOST` 10 s), then switches, quiet or not, and is not asked
+  quiet again at the voice's own boundary. `update/status`'s `round` says
+  `asked` `auto`. With lamp-voice's `LAMP_UPDATE_AUTO_SAY=on` (off by
+  default, the product owner, 27 Nov: the team ships builds often, and a lamp
+  telling each one bothers its owner; off, nothing is said, day or night,
+  not even to someone who speaks during the round, and the first update after
+  setup still says its line as before), by day the
+  voice says "I'm updating now. I'll be back in a minute." once even with
+  nobody near, and the ring breathes while the
+  build comes and swells once it is kept (`LAMP_RING_UPDATE`, on with this).
+  Once the round has brought its build in (`last.outcome` `switched`, or
+  `self-switched` with `running` at that build; a climb, which took only the
+  updater, is not), by day the new build's voice says "I'm back. The update
+  is done." once, in the owner's language, and the ring is back to normal.
+  A done line not said within 5 minutes, or by the quiet hours, is dropped.
+  In the lamp's quiet hours (22:00 to 07:00 local,
+  `lamp_local_time::quiet_hours`) nothing is said before or after and the
+  ring shows nothing; only someone who speaks during the round (a turn
+  under way, or speech since the voice saw the round) is told it is
+  updating, and a line heard during the give-way is answered with the same
+  words, day or night.
+- **The mark there (off):** the round fetches and checks as before but does
+  not switch: it ends `not-quiet` with "Auto update is off: the new build
+  waits for the owner's Update now", and its end's `sequence` is the build
+  that waits, which lamp-cloud gives as `update.status`'s `available`. The
+  owner's Update now (above) switches as before.
+
+The first update after setup, the setup walk's hold, a reset's hold and
+the first 180 s after a boot, and the watch with its put-back are as
+before, on or off. The mark is written and removed by setup's change helper
+for the app's `update.auto` (cloud.md), and lamp-cloud says it as
+`update.status`'s `auto`. Journal lines: `Auto update is on: the switch
+waits for no quiet moment`, `Auto update: the voice gave way; switching`,
+`Auto update: no quiet in 10 s (…); switching anyway`. Tests:
+`crates/update/tests/round/auto_update.rs`.
 
 ### lamp-update's own build on a product lamp
 

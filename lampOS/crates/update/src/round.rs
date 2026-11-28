@@ -133,6 +133,10 @@ pub struct Config {
     /// `LAMP_FIRST_UPDATE=on` (#6284, crate::first_update): while the first
     /// update after a setup is owed, the setup walk does not hold a round.
     pub first_update: bool,
+    /// `LAMP_UPDATE_AUTO` (#8769, crate::auto): the owner's Auto update
+    /// decides a round's switch. Off, a round waits for a quiet moment as
+    /// before.
+    pub auto_update: bool,
     /// This program's own bytes, from which a round refreshes the settings
     /// writer before it looks at a build (crate::writer_swap). None: the
     /// writer is never refreshed.
@@ -470,6 +474,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         held: None,
         apply_failed: false,
         asked_now: false,
+        auto: false,
         gave_way: false,
         lines: Vec::new(),
     };
@@ -644,6 +649,10 @@ struct Run<'r, 'w> {
     /// it waited (#7517): no quiet moment is waited for, only the voice's
     /// moment to give way ([`Self::give_way`]), once.
     asked_now: bool,
+    /// The owner's Auto update is on and took this round's switch (#8769):
+    /// as [`Self::asked_now`], no quiet moment, only the voice's moment to
+    /// give way, once.
+    auto: bool,
     gave_way: bool,
     /// What this round said, kept for [`Self::keep_lines`] (#6266 5b): at most
     /// [`MOST_LINES`] lines of [`MOST_LINE`] characters.
@@ -2340,6 +2349,11 @@ impl Run<'_, '_> {
             return;
         }
         self.gave_way = true;
+        let asked = if self.asked_now {
+            "Update now"
+        } else {
+            "Auto update"
+        };
         self.tell_waiting(Some(lamp_msgs::UpdateRound::WAITING_GIVE_WAY));
         let start = self.world.clock.now_ms();
         self.quiet = Quiet::new(start);
@@ -2354,12 +2368,12 @@ impl Run<'_, '_> {
                 .for_at_least(crate::update_now::GIVE_WAY_QUIET, now)
             {
                 Ok(()) => {
-                    self.say("Update now: the voice gave way; switching");
+                    self.say(&format!("{asked}: the voice gave way; switching"));
                     break;
                 }
                 Err(why) if now >= until => {
                     self.say(&format!(
-                        "Update now: no quiet in {} s ({why}); switching anyway",
+                        "{asked}: no quiet in {} s ({why}); switching anyway",
                         crate::update_now::GIVE_WAY_MOST.as_secs()
                     ));
                     break;
@@ -2415,7 +2429,7 @@ impl Run<'_, '_> {
             // The owner's Update now (#7517): asked before or during this
             // wait, the voice is given its moment, and no more quiet is
             // waited for, here or at any later wait of this round.
-            if !unseen_is_quiet && self.hear_now() {
+            if !unseen_is_quiet && (self.auto || self.hear_now()) {
                 self.give_way();
                 return Ok(());
             }
@@ -2849,6 +2863,21 @@ impl Run<'_, '_> {
         // A count that can't be kept holds nothing: the wait goes on as
         // before, with the walk no longer looked at.
         let walk = !crate::walk::spent(self.records.folder());
+        // The owner's Auto update (#8769): on, this round takes the switch as
+        // Update now does; off, only Update now switches. Not the first
+        // update after setup, which waits for nothing either way. Without
+        // the switch, the quiet wait below as before.
+        if self.config.auto_update && !self.forced() && !self.hear_now() {
+            if crate::auto::on(&self.config.root) {
+                self.auto = true;
+                if let Some(now) = self.world.now.as_mut() {
+                    now.auto();
+                }
+                self.say("Auto update is on: the switch waits for no quiet moment");
+            } else {
+                return Outcome::NotQuiet(crate::auto::OFF_WAITS.to_owned());
+            }
+        }
         self.tell_waiting(Some(lamp_msgs::UpdateRound::WAITING_QUIET));
         let waited = self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, walk);
         self.tell_waiting(None);
@@ -3020,6 +3049,7 @@ impl Run<'_, '_> {
         if self.voice_running()
             && !self.forced()
             && !self.asked_now
+            && !self.auto
             && let Err(why) = self.quiet.for_at_least(self.quiet_needed(), now)
         {
             let restored = self.put_units_and_links_back(&backs);
@@ -4977,6 +5007,7 @@ mod tests {
             product_settings: false,
             image: false,
             first_update: false,
+            auto_update: false,
             writer_from: None,
         }
     }

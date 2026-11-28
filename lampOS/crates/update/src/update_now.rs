@@ -128,6 +128,8 @@ pub trait NowAsk {
     fn waiting(&mut self, waiting: Option<&'static str>);
     /// The round is one of Update now's.
     fn asked(&mut self);
+    /// The round's switch is the owner's Auto update's (#8769).
+    fn auto(&mut self) {}
 }
 
 #[cfg(test)]

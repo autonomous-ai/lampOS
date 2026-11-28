@@ -148,6 +148,26 @@ pub fn status(kept: Option<lamp_bus::Message>, engines: bool) -> Result<Option<V
     Ok(Some(reply))
 }
 
+/// The owner's Auto update (#8769) in `update.status`'s answer: `auto`
+/// true unless the off mark setup's change helper keeps
+/// (`lamp_msgs::AUTO_UPDATE_OFF`, under `root`) is a plain file, as
+/// lamp-update reads it. Off, with the last round's end `not-quiet` at a
+/// build newer than the one running (lamp-update gives the build that waits
+/// for Update now), `available` gives `{"sequence"}`, so the app's banner
+/// shows the waiting build.
+pub fn add_auto(status: &mut Value, root: &std::path::Path) {
+    let off = root.join(lamp_msgs::AUTO_UPDATE_OFF.trim_start_matches('/'));
+    let on = !std::fs::symlink_metadata(off).is_ok_and(|meta| meta.is_file());
+    status["auto"] = json!(on);
+    let running = status["running"]["sequence"].as_u64().unwrap_or(0);
+    let waiting = status["last"]["sequence"]
+        .as_u64()
+        .filter(|sequence| *sequence > running);
+    if let Some(sequence) = waiting.filter(|_| !on && status["last"]["outcome"] == "not-quiet") {
+        status["available"] = json!({ "sequence": sequence });
+    }
+}
+
 /// Whether `engine` may be installed by the app, as `status` (as [`status`]
 /// answers it) says: `not_installed` or `failed`. Refused with
 /// [`NO_ENGINE`] when it is not said, [`NOT_INSTALLABLE`] for one this
@@ -391,6 +411,40 @@ impl Checks {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn auto_update_is_on_unless_the_off_mark_is_there() {
+        let root = tempfile::tempdir().unwrap();
+        let mut status = json!({"now": "idle"});
+        add_auto(&mut status, root.path());
+        assert_eq!(status["auto"], json!(true));
+        let off = root
+            .path()
+            .join(lamp_msgs::AUTO_UPDATE_OFF.trim_start_matches('/'));
+        std::fs::create_dir_all(off.parent().unwrap()).unwrap();
+        std::fs::write(&off, "off\n").unwrap();
+        add_auto(&mut status, root.path());
+        assert_eq!(status["auto"], json!(false));
+        assert_eq!(status["now"], json!("idle"));
+        assert_eq!(status.get("available"), None);
+        // Off, a newer build waiting for Update now is given.
+        let waiting = |outcome: &str, sequence: u64| {
+            json!({"now": "idle", "running": {"sequence": 10, "commit": "a"},
+                "last": {"outcome": outcome, "sequence": sequence, "at_unix_ms": 1}})
+        };
+        let mut status = waiting("not-quiet", 12);
+        add_auto(&mut status, root.path());
+        assert_eq!(status["available"], json!({"sequence": 12}));
+        for (outcome, sequence) in [("not-quiet", 10), ("up-to-date", 12)] {
+            let mut status = waiting(outcome, sequence);
+            add_auto(&mut status, root.path());
+            assert_eq!(status.get("available"), None, "{outcome} {sequence}");
+        }
+        std::fs::remove_file(&off).unwrap();
+        let mut status = waiting("not-quiet", 12);
+        add_auto(&mut status, root.path());
+        assert_eq!(status.get("available"), None, "on: nothing waits");
+    }
 
     #[test]
     fn update_now_starts_a_round_or_takes_over_a_wait_for_quiet_and_nothing_else() {

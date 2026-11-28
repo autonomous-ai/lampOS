@@ -859,6 +859,7 @@ fn config(
         image: lamp_update::image::on(std::env::var(lamp_update::image::SWITCH).ok().as_deref()),
         // Set below: the product default needs the config's root and units.
         first_update: false,
+        auto_update: false,
         writer_from: lamp_update::fixed_copy::own_bytes()
             .ok()
             .map(lamp_update::writer_swap::Running::new),
@@ -877,6 +878,17 @@ fn config(
                 &config.on(&config.units),
             ),
         lamp_update::first_update::PRODUCT_DEFAULT,
+    );
+    // The owner's Auto update (#8769): on by this build's default on a
+    // product lamp, for the same reason; LAMP_UPDATE_AUTO=off turns it off.
+    config.auto_update = lamp_update::hermes_install::wanted(
+        std::env::var(lamp_update::auto::SWITCH).ok().as_deref(),
+        config.apply
+            && lamp_update::harness_install::product::product_lamp(
+                &config.root,
+                &config.on(&config.units),
+            ),
+        lamp_update::auto::PRODUCT_DEFAULT,
     );
     Ok((
         config,
@@ -1831,6 +1843,12 @@ impl lamp_update::update_now::NowAsk for NowAsked<'_, '_> {
     fn asked(&mut self) {
         if let Some(telling) = self.telling.borrow_mut().as_mut() {
             telling.asked_now();
+        }
+    }
+
+    fn auto(&mut self) {
+        if let Some(telling) = self.telling.borrow_mut().as_mut() {
+            telling.asked_auto();
         }
     }
 }

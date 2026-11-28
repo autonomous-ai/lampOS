@@ -269,6 +269,7 @@ mod tests {
                 product_settings: false,
                 image: false,
                 first_update: on(switch),
+                auto_update: false,
                 writer_from: None,
             };
             fs::create_dir_all(config.on(&config.records)).unwrap();

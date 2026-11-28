@@ -692,6 +692,62 @@ fn the_dev_monitor_writes_lamp_peeks_drop_in_and_the_reset_forgets_it() {
     );
 }
 
+/// The owner's Auto update (`update.auto`, #8769): off writes lamp-update's
+/// off mark, 0644, on removes it; nothing restarts; anything but one boolean
+/// is refused; the product's path is lamp-update's, and the reset forgets it.
+#[test]
+fn auto_update_off_writes_lamp_updates_mark_and_on_and_the_reset_remove_it() {
+    let root = Root::new();
+    let config = root.config();
+    let mark = &config.auto_update_off;
+    let (reply, done) = answer(r#"{"auto_update": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    assert_eq!(done.unwrap().said, "Auto update is on already");
+    assert!(!mark.exists());
+    let (reply, done) = answer(r#"{"auto_update": false}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": false}}));
+    let done = done.unwrap();
+    assert_eq!(done.said, "Auto update is off");
+    assert!(
+        !done.restart_voice
+            && !done.restart_control
+            && !done.restart_peek
+            && !done.restart_schedule
+            && !done.restart_ears
+    );
+    assert_eq!(fs::read_to_string(mark).unwrap(), "off\n");
+    assert_eq!(mode(mark), 0o644);
+    let (_, done) = answer(r#"{"auto_update": false}"#, &config, true);
+    assert_eq!(done.unwrap().said, "Auto update is off already");
+    let (reply, _) = answer(r#"{"auto_update": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    assert!(!mark.exists());
+    for line in [r#"{"auto_update": "off"}"#, r#"{"auto_update": null}"#] {
+        let (reply, done) = answer(line, &config, true);
+        assert_eq!(
+            reply,
+            json!({"refused": "auto_update must be true or false"}),
+            "{line}"
+        );
+        assert!(done.is_none());
+    }
+    let own: Config =
+        serde_json::from_str(include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.auto_update_off,
+        std::path::Path::new(lamp_msgs::AUTO_UPDATE_OFF)
+    );
+    let plan: Value =
+        serde_json::from_str(include_str!("../../fixtures/reset-plan-product.json")).unwrap();
+    assert!(
+        plan["wipe"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w == lamp_msgs::AUTO_UPDATE_OFF)
+    );
+}
+
 #[test]
 fn the_lamps_name_in_the_app_is_kept_readable_and_never_empty() {
     let root = Root::new();

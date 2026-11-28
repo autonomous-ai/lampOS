@@ -13628,13 +13628,14 @@ fn conversation_with_gate_inner(
         }
         // The owner's Update now (#7517): once a round, to someone near, the
         // lamp says it is updating, in the owner's words, before lamp-update
-        // restarts it. Nobody near: nothing.
-        let give_way_near = give_way::near(
+        // restarts it. Nobody near: nothing. Auto update (#8769): by day to
+        // the room, and once its round has switched, the done line by day.
+        let give_way_near = give_way.near(
             reply.is_some() || admission.owns_stream(),
             Some(last_speech_us.max(said_at_us.unwrap_or(0))).filter(|at| *at > 0),
             clock,
         );
-        if give_way.owed(give_way_near)
+        if (give_way.owed(give_way_near) || give_way.done_owed())
             && reply.is_none()
             && provider_queue.is_empty()
             && speaker_pending.is_none()
@@ -13644,7 +13645,7 @@ fn conversation_with_gate_inner(
             && playback_mask.available(clock)
             && snapshot.listening_ready(now())
             && owner.snapshot(now())?.microphone_permission() == Permission::Allowed
-            && let Some(note) = give_way::GiveWay::line()
+            && let Some(note) = give_way.note()
             && let Some(provider_session) = unasked_session(&cloud, unasked_paused)
         {
             snapshot = commit_written_turn(
