@@ -102,7 +102,7 @@ pub struct Config {
     pub policy_key: PathBuf,
     /// The person's name, for the voice to give the model.
     pub name: PathBuf,
-    /// wpa_supplicant's two-letter country.
+    /// Fallback two-letter Wi-Fi country when the home zone has no country.
     pub country: String,
     #[serde(default = "default_interface")]
     pub interface: String,
@@ -256,6 +256,20 @@ pub fn read(bytes: &[u8]) -> Result<(Config, Vec<String>), String> {
 }
 
 impl Config {
+    /// Country for the next join. First setup supplies its accepted zone;
+    /// recovery and Wi-Fi changes supply None to keep the home's saved zone.
+    /// The configured country (US in the product) remains the fallback.
+    pub fn wifi_country(&self, timezone: Option<&str>) -> String {
+        let saved = timezone
+            .is_none()
+            .then(|| fs::read_to_string(&self.timezone_file).ok())
+            .flatten();
+        let country = timezone
+            .or_else(|| saved.as_deref().map(str::trim))
+            .and_then(|zone| country_for_zone(zone, &self.zoneinfo));
+        country.unwrap_or_else(|| self.country.clone())
+    }
+
     pub fn check(&self) -> Result<(), String> {
         for path in [
             &self.marker,
@@ -717,6 +731,44 @@ pub fn zone_known(zone: &str, zoneinfo: &Path) -> bool {
             .and_then(|mut opened| io::Read::read_exact(&mut opened, &mut magic))
             .is_ok()
         && &magic == b"TZif"
+}
+
+/// As in Voice's local_time::country_of, zone.tab's first column is one
+/// country, unlike zone1970.tab's possibly multiple countries. Match the
+/// named row before following links: distinct countries can share zone data.
+fn country_for_zone(zone: &str, zoneinfo: &Path) -> Option<String> {
+    let zone = zone
+        .strip_prefix("posix/")
+        .or_else(|| zone.strip_prefix("right/"))
+        .unwrap_or(zone);
+    if !zone_known(zone, zoneinfo) {
+        return None;
+    }
+    let table = fs::read_to_string(zoneinfo.join("zone.tab")).ok()?;
+    let find = |name: &str| {
+        table
+            .lines()
+            .filter(|line| !line.starts_with('#'))
+            .find_map(|line| {
+                let mut columns = line.split('\t');
+                let country = columns.next()?;
+                let named = columns.nth(1)?;
+                (named == name
+                    && country.len() == 2
+                    && country.bytes().all(|b| b.is_ascii_uppercase()))
+                .then(|| country.to_owned())
+            })
+    };
+    if let Some(country) = find(zone) {
+        return Some(country);
+    }
+    // Accepted aliases (for example Asia/Saigon) may have no table row.
+    // Only an in-tree link target is usable; equal TZif bytes are not proof
+    // that two names belong to the same country.
+    let root = zoneinfo.canonicalize().ok()?;
+    let file = zoneinfo.join(zone).canonicalize().ok()?;
+    let canonical = file.strip_prefix(root).ok()?.to_str()?;
+    find(canonical)
 }
 
 /// The languages the lamp speaks (#4473, fr #8381), as the voice reads them
@@ -1193,6 +1245,26 @@ pub fn start_unless_stopped(
         }
         Err(error) => Err(error),
     }
+}
+
+/// The product's join: recovery ignores request settings, including its zone.
+/// Keeping this choice with Save prevents network-only recovery from applying
+/// a zone it is not allowed to save.
+pub fn run_configured(
+    status: &Arc<Mutex<Status>>,
+    accepted: &Accepted,
+    config: &Config,
+    host: &mut impl Host,
+    save: &mut impl Save,
+    station_ip: impl Fn() -> Option<String> + Send + Sync + 'static,
+) {
+    let zone = if save.keeps_settings() {
+        accepted.timezone.as_deref()
+    } else {
+        None
+    };
+    let country = config.wifi_country(zone);
+    run(status, accepted, &country, host, save, station_ip);
 }
 
 /// One setup run, after V1's 2 s pause: join, then save, then the marker.
