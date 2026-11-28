@@ -760,16 +760,16 @@ than passing null; unknown or null fields are refused before IPC.
 
 **A move by voice (#8840).** On lamp-52e6 on 27 Nov the lamp couldn't
 move a daily 4 PM reminder to 4:30; asked again, it set the new one and
-said it couldn't cancel the old one. On 28 Nov at 16605 a cancel by voice
-during a move reached no part and left no line anywhere. `move_reminder`
-does both halves in lamp-actions, in that order. The Policy holds it as a
-set: it runs on a reply to the lamp ("4:30" to the lamp's "What time?").
-So does `cancel_reminder` now ("cancel it", said back to the lamp): the
-first builder's ruling on #8840, from the product owner's base that every
-line in the 20 s after the lamp's words is answered, replaces Fourth's on
-#1054. A call the Policy holds on the
-second route is now journaled, "held by the Policy's decision for the
-turn". With `LAMP_TIMER_ASKS_HOW_LONG`, a move whose words give no time is
+said it couldn't cancel the old one. Why its cancel failed is not known:
+neither journal was kept (52e6's journal lives in memory, and the lamp
+restarted since). `move_reminder` does both halves in lamp-actions, in
+that order, so a move never depends on the model chaining a cancel and a
+set. With `LAMP_POLICY_HOLDS_ACTIONS=on` (off in the product), the Policy
+holds it as a set: it runs on a reply to the lamp ("4:30" to the lamp's
+"What time?"). So does `cancel_reminder` now ("cancel it", said back to
+the lamp): the first builder's ruling on #8840, from the product owner's
+base that every line in the 20 s after the lamp's words is answered,
+replaces Fourth's on #1054. With `LAMP_TIMER_ASKS_HOW_LONG`, a move whose words give no time is
 asked "What time?", as a set is. The creator's linked record
 (`LAMP_SERVICE_RECORDS_REMINDERS`) follows it: the old one dismissed, the
 new one set. Tests: `move_by_text_keeps_the_repeat_and_changes_only_the_time`,

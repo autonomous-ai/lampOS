@@ -68,8 +68,7 @@
 //!   #1054: a wrong cancel is silent), until the product owner's base of
 //!   27 Nov answers every line said in the 20 s after the lamp's words, and
 //!   the first builder ruled on #8840 that a cancel said back to the lamp
-//!   runs: a move by voice set the new one and its held cancel left both
-//!   (lamp-52e6, 27 and 28 Nov). Until the
+//!   runs. Until the
 //!   weights are fitted again (#1040). The 11:20 turn itself scored
 //!   `follows_lamp` 0.35, so at 0.6 it is still held: this lets through 17
 //!   of the 33 turns said to the lamp, not that one; 0.35 would let through
@@ -163,8 +162,7 @@ pub const SCHEDULE_HELD: [&str; 4] = [
 /// the 20 s after the lamp's words), and the first builder's ruling on
 /// #8840 (28 Nov 08:18), which replaces Fourth's on #1054 for a cancel.
 /// "4:30, please", said back to the lamp's "What time?", moves it; "cancel
-/// it", said back to a reminder, cancels it. On lamp-52e6 on 27 and 28 Nov a
-/// move by voice set the new one and the held cancel left both.
+/// it", said back to a reminder, cancels it.
 pub const SETS: [&str; 4] = [
     "set_timer",
     "set_reminder",
