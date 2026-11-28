@@ -2,7 +2,39 @@
 
 The simple base admits every ordinary in-window follow-up. The percentages below describe the **sensor’s own explicit classifications**. “Kept” means a same-caller pair classified as same. “Rejected” means another speaker classified as different. Wrong and unknown answers both count as misses. Each comparator receives identical PCM.
 
-## Held-out ElevenLabs and Gemini voices
+## ECAPA on the same two sets
+
+At the frozen median frame cosine threshold of 0.25, the ECAPA sensor missed the 95% caller-retention target on both sets. Its other-voice rejection reached 94.6% on provider audio and 67.9% on the physical microphone. The shared reviewer verified all 1,152 decisions. [EVAL and retained data](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7236567550) · [Registered rule](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7235630577)
+
+| Set and condition | Same caller kept | Other voice rejected |
+|---|---:|---:|
+| Provider, all | 130/554 (23.5%) | 524/554 (94.6%) |
+| Provider, 1–3 words, quiet | 36/121 | 113/121 |
+| Provider, 4+ words, quiet | 36/156 | 149/156 |
+| Provider, 1–3 words, +5 dB | 27/121 | 112/121 |
+| Provider, 4+ words, +5 dB | 31/156 | 150/156 |
+| dbda microphone, all | 10/16 (62.5%) | 19/28 (67.9%) |
+| dbda microphone, 1–3 words, quiet | 7/9 | 12/18 |
+| dbda microphone, 4+ words, quiet | 3/7 | 7/10 |
+| dbda microphone, background, either length | Unmeasured | Unmeasured |
+
+Five provider trials per class returned unknown. The 44 physical pairs all yielded a decision. The ECAPA provider reports at the registered snapshot and published implementation revision had byte-identical frame scores across 211,994 frame positions. On Mac 2, the physical manifest used 46 waveforms joined to their six original synthetic voices using the sealed scene plan. The collector retains the source recordings, per-frame decisions, earlier attempts, two separate source inventories and the shared reviewer's report. [Reproduction and local data locations](../../../tools/caller-frame-bench/strong-replay.md)
+
+### Latency on lamp-dbda
+
+The team lead ran the native ARM64 child on lamp-dbda with its regular services active. The eight synthetic 16 kHz fixtures included quiet and +5 dB speech. Every timed request sent both the “Hey Lamp” reference and the line from memory and ended at the decision newline. The timer excludes microphone capture, ASR and audible reply. Its three process starts and 24 warm requests all completed. [Lead’s board receipt](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7236523867)
+
+| Warm request on lamp-dbda | Lines | p50 | p95 |
+|---|---:|---:|---:|
+| All fixtures | 24 | 398 ms | 2,082 ms |
+| 1–3 words | 12 | 375 ms | 415 ms |
+| 6–7 words | 12 | 601 ms | 2,122 ms |
+
+The overall warm p95 exceeded the 500 ms target. Across three fresh processes, median spawn to ready was 2,031 ms, the first one-word request after ready took 302 ms at the median, and median spawn to first decision was 2,334 ms. All six timing summaries were reproduced from the physical board’s raw TSV, SHA-256 `09adb90d3a6c641c048dd99f2220498c60fdc528658c1921b7363910deb3ac7e`. The model runs asynchronously and the simple window admits lines independently.
+
+<a id="held-out-elevenlabs-and-gemini-voices"></a>
+
+## Earlier ST trial on held-out ElevenLabs and Gemini voices
 
 On 1,108 paired comparisons the frame model kept **457/554 same callers (82.5%)** and rejected **88/554 other voices (15.9%)**. The guarded whole-line model kept 0/554 and rejected 84/554 (15.2%). The frame model rejected **0/277 other voices in +5 dB noise**. Sensor 6 stays off and outside the combined judge. [EVAL, raw counts and report hashes](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496)
 
@@ -21,7 +53,9 @@ On the benchmark Mac, the frame model’s first paired inference took 3.062 ms a
 
 The official #8885 scorer reconciled all 2,216 method-by-pair predictions. The private corpus inventory SHA-256 is `907573417595c3347c56f9a152fb00a0dc5b9ac3f46014bf92071af7d16f873a`. Archive `sensor6-8849-20261127` holds the complete provider tar, original and processed WAVs, acoustic stages and noise stems, source metadata, posteriors, timing, executables and all failed attempts. Real people’s recordings stay on their collecting Mac.
 
-## Played through lamp-dbda’s microphone
+<a id="played-through-lamp-dbdas-microphone"></a>
+
+## Earlier ST trial through lamp-dbda’s microphone
 
 The team lead played labelled synthetic voices into the lamp’s microphone and scored the recorded 16 kHz audio on Mac 2. Frames kept **16/16** same-caller follow-ups and rejected **1/28 (3.6%)** constructed impostor comparisons. Of the remaining impostors, 25 were classified as the caller and two were unknown. Guarded CAM++ abstained on all 44 measured pairs. Each wake-only cut was 0.55–0.81 s. [Lead’s physical EVAL and archive](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7226611814)
 

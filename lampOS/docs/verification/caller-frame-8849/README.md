@@ -16,6 +16,8 @@ ruby tools/caller-frame-bench/prepare-ecapa.rb embedding_model.ckpt ecapa-voxcel
 
 Each ECAPA journal row identifies the model and its score scale. The paired replay saves raw cosines, the frame trace and timing for each complete line in the collector's private archive. [Commands for both original sets](../../../tools/caller-frame-bench/strong-replay.md)
 
+<a id="what-the-two-checks-measure"></a>
+
 ## Earlier whole-line and Personal VAD ST comparisons
 
 The whole-line comparator uses the product’s CAM++ model. Both captured inputs must reach 24,000 samples (1.5 seconds). It embeds the first 28,800 samples at most (1.8 seconds, including capture pre-roll). Cosines of at least 0.70 indicate the caller, and values below 0.30 indicate another speaker. Intermediate, unavailable and too-short inputs abstain. The replay also emits a separate diagnostic that runs the same model and bands even when the length guard would abstain. [CAM++ provenance](../../same-voice.md)
@@ -25,6 +27,8 @@ The frame candidate uses the public, independently trained reproduction of the P
 We fixed the following line rule before viewing the evaluation results. Count frames whose largest posterior is uniquely caller speech or other speech. At least eight speech frames are required. The result is **same** when at least 60% of these frames select the caller, **different** at 40% or less, and **unknown** in between. A missing reference, digital silence, an incomplete capture or a line outside the 3-second reference / 12-second follow-up bounds gives no result. Every abstention still counts as a miss for its ground-truth class.
 
 The development measurements include the per-cell numerators, guarded and unguarded CAM++ results, timings and the reference parity check. [Bench tables and retained data](bench.md)
+
+<a id="replaying-a-labelled-set"></a>
 
 ## Replaying the earlier ST comparison
 
@@ -48,6 +52,6 @@ The voice supervisor passes the frame switch and model path only to the second-r
 
 ## Decision for the combined judge
 
-The held-out provider run kept 82.5% of same callers and rejected 15.9% of other voices. In +5 dB noise the frame sensor rejected none of the 277 other-voice trials. On the physical microphone it kept 16/16 same-caller follow-ups and rejected 1/28 constructed impostors. Both background cells fell in the recorder gap. It stays off. [Primary and physical EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496)
+ECAPA kept **130/554 callers (23.5%)** and rejected **524/554 other voices (94.6%)** on the provider set. On the lamp microphone it kept **10/16 (62.5%)** and rejected **19/28 (67.9%)**. Qualification requires at least 95% kept and 90% rejected on each set. Sensor 6 stays off and outside the combined judge. [ECAPA EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7236567550) · [Counts by length and condition](bench.md#ecapa-on-the-same-two-sets) · [Quality bar](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7235605349)
 
-For the ECAPA trial, the lead requires at least 95% of same callers kept and 90% of other voices rejected on each set. On the 1,108 provider pairs this means at least 527/554 and 499/554 respectively. On the 44 physical pairs it means 16/16 and at least 26/28. Report short (1–3 words) and longer lines separately in quiet and noisy conditions, with the whole denominator in each cell. [Lead's scope and quality bar](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7235605349) · [Shared reviewer scoring](https://github.com/autonomous-ai/lampOS/pull/8885)
+The earlier ST candidate kept 457/554 and rejected 88/554 on the provider set. On the same microphone pairs it kept 16/16 and rejected 1/28. All 28 recorded negatives were constructed impostor pairs. A gap in the recording left both background conditions unmeasured. [Earlier provider EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496) · [Original microphone EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7226611814)

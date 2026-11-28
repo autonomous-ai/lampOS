@@ -10,7 +10,13 @@ Tiến trình đo dùng duy nhất bộ trọng số nhận dạng người nói
 
 Từ thư mục `lampOS/`, chạy `ruby tools/caller-frame-bench/prepare-ecapa.rb embedding_model.ckpt ecapa-voxceleb.onnx` với tệp trọng số gốc. Công cụ kiểm tra SHA-256 của nguồn `0575cb64845e6b9a10db9bcb74d5ac32b326b8dc90352671d345e2ee3d0126a2`. Tiến trình Rust xác minh tệp ONNX `d8c32b0dbc17e31c7b13c9d7910f0adaca2ea0b0b3351da05041c9168e741994`. Trỏ `LAMP_CALLER_FRAME_MODEL` đến đường dẫn tuyệt đối của thư mục chứa tệp. Công tắc riêng `LAMP_CALLER_FRAME_VAD=on` chỉ bật phép đo trên tuyến cuộc gọi đơn giản. Bảy tín hiệu tổng hợp dài từ 0,04 đến 3 giây cho sai lệch tối đa dưới 0,000002 ở từng thành phần vectơ so với bản gốc. [Nguồn trọng số đã cố định](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb/tree/0f99f2d0ebe89ac095bcc5903c4dd8f72b367286)
 
+Ở ngưỡng đã chốt, ECAPA giữ 130/554 câu của người gọi (23,5%) và loại 524/554 câu của người khác (94,6%) trên bộ nhà cung cấp. Trên mic của đèn dbda, các số tương ứng là 10/16 (62,5%) và 19/28 (67,9%). Ở môi trường yên tĩnh, câu ngắn trên mic đạt 7/9 và 12/18, câu dài đạt 3/7 và 7/10. Hai ô có tiếng ồn trên mic chưa đo được do khoảng trống trong bản thu gốc. Bộ chấm chung đối chiếu đủ 1.152 quyết định. Cảm biến chưa đạt yêu cầu để đưa vào bộ quyết định chung. [Bảng số liệu theo từng điều kiện](../verification/caller-frame-8849/bench.md)
+
+Trên bo ARM64 của lamp-dbda, các dịch vụ của đèn vẫn hoạt động bình thường. Với 24 lượt sau khi mô hình sẵn sàng, thời gian từ lúc bắt đầu gửi âm thanh đến khi nhận quyết định là 398 ms ở p50 và 2.082 ms ở p95. Với 12 câu ngắn 1–3 từ, p50/p95 là 375/415 ms. Với 12 câu dài 6–7 từ, hai số này là 601/2.122 ms. Mỗi lượt tính lại cả tiếng gọi lẫn câu nói tiếp từ âm thanh có sẵn trong bộ nhớ. Phép đo không bao gồm thời gian thu âm, nhận dạng lời nói và phát câu trả lời. P95 trên toàn bộ mẫu vượt mục tiêu 500 ms. [Biên bản đo trên đèn](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7236523867)
+
 Nhật ký của tiến trình ghi tên mô hình và thang điểm. Kho dữ liệu riêng của máy thu giữ điểm cosine gốc, điểm từng khung và thời gian đo của từng câu. [Lệnh chạy cho cả hai bộ](../../tools/caller-frame-bench/strong-replay.md)
+
+Qua ba lần khởi động tiến trình mới trên đèn, trung vị từ khi khởi động đến lúc sẵn sàng là 2.031 ms. Câu đầu gồm một từ mất thêm 302 ms tính từ khi bắt đầu gửi yêu cầu. Trung vị từ khi khởi động đến quyết định đầu tiên là 2.334 ms. Cả sáu nhóm số liệu đều được kiểm tra lại từ 27 dòng thời gian gốc. [Báo cáo EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7236567550) · [Dữ liệu độ trễ trên lamp-dbda](../verification/caller-frame-8849/bench.md#latency-on-lamp-dbda)
 
 ## Kết quả trước đây của CAM++ và Personal VAD ST
 
