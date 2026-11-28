@@ -1975,6 +1975,10 @@ fn worker_command(
             role,
             var(crate::ring_update::ENVIRONMENT).as_deref(),
         ))
+        .envs(ring_speaker_worker_environment(
+            role,
+            var(crate::ring_speaker::ENVIRONMENT).as_deref(),
+        ))
         .envs(rest_through_sounds_worker_environment(
             role,
             var(crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT).as_deref(),
@@ -3675,6 +3679,17 @@ fn ring_update_worker_environment(
         .then_some((crate::ring_update::ENVIRONMENT, "on"))
 }
 
+// The speaker muted or at 0 on the ring, the same narrow way: the exact
+// `on`, to the ring only, which reads the speaker and the lamp's name and
+// shapes its faces by them.
+fn ring_speaker_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "ring" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::ring_speaker::ENVIRONMENT, "on"))
+}
+
 // Resting through sounds at night (#1672, #4285), the same narrow way: the
 // exact `on`, to the second route only, which holds back its answer to the
 // lamp's name alone while Expression says the night's sleep rests so.
@@ -4720,6 +4735,12 @@ mod tests {
                         "LAMP_DID_RING",
                         ["ring", "privacy"].as_slice(),
                     ),
+                    // The speaker muted or at 0 on the ring: the ring alone.
+                    (
+                        ring_speaker_worker_environment,
+                        "LAMP_RING_SPEAKER_MUTED",
+                        ["ring"].as_slice(),
+                    ),
                     // A final line that is a running app's trigger told to
                     // it: the second route alone (#7415 piece 6).
                     (
@@ -4887,6 +4908,21 @@ mod tests {
         "capture", "provider", "second", "speaker", "ring", "camera", "denoise", "echo", "privacy",
         "unknown",
     ];
+
+    /// The speaker's mute on the ring reaches the ring worker alone, and
+    /// only as the exact `on`.
+    #[test]
+    fn the_speakers_mute_on_the_ring_reaches_the_ring_alone_as_exactly_on() {
+        for role in BUS_ROOT_ROLES {
+            for value in ["on", "ON", "true", "1", "off", "", "on "] {
+                let got = ring_speaker_worker_environment(role, Some(std::ffi::OsStr::new(value)));
+                let expected = (role == "ring" && value == "on")
+                    .then_some((crate::ring_speaker::ENVIRONMENT, "on"));
+                assert_eq!(got, expected, "role {role}, value {value:?}");
+            }
+            assert_eq!(ring_speaker_worker_environment(role, None), None);
+        }
+    }
 
     /// The detector's input (#828) goes to the capture worker only, and only
     /// as one of its two exact values.
@@ -5125,6 +5161,7 @@ mod tests {
                     lamp_msgs::SHUTDOWN_SWITCH,
                     crate::ring_night::ENVIRONMENT,
                     crate::ring_update::ENVIRONMENT,
+                    crate::ring_speaker::ENVIRONMENT,
                     crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT,
                     crate::person::OWNER_ONLY_ENVIRONMENT,
                     crate::known_faces::AT_DESK_ENVIRONMENT,
@@ -5699,6 +5736,7 @@ mod tests {
                 vec![
                     "LAMP_DID_RING=on",
                     "LAMP_NIGHT_ASLEEP_FACE=on",
+                    "LAMP_RING_SPEAKER_MUTED=on",
                     "LAMP_RING_UPDATE=on",
                     "LAMP_SHUTDOWN=on",
                     "LAMP_UNPLUG=on",

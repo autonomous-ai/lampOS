@@ -117,6 +117,51 @@ const LEVEL_GLOW: [(f32, f32); LEVELS as usize] = [
 /// on the asleep face (#7224, [`crate::ring_asleep::guard_pixels`]).
 pub const OFFLINE_TINT: [f32; 3] = [1.0, 0.55, 0.12];
 
+/// The speaker muted or at 0 (`LAMP_RING_SPEAKER_MUTED`,
+/// [`crate::ring_speaker`]): a soft teal, the one hue no face, light or
+/// other writer of the ring uses. Cool, but not blue: blue is the listening
+/// face's, the setup light's while it joins the Wi-Fi, and the person's blue
+/// and cyan lights'. Teal is the gap between the person's green and cyan,
+/// and neither warm, as the resting, thinking and speaking faces are, nor
+/// the privacy switch's dark red. Two channels only, so a dim breath keeps
+/// its colour from pixel to pixel ([`EMBER_STEPS`] says why).
+pub const MUTED_TINT: [f32; 3] = [0.0, 1.0, 0.70];
+/// A light that is off, with the speaker muted: the ember's own few pixels
+/// at three steps of green and two of blue, the faintest teal there is.
+const MUTED_EMBER_STEPS: (f32, f32) = (3.0, 2.0);
+/// With the speaker muted, the person's light at this level or under rests
+/// in [`MUTED_TINT`]: the first light's dim glow, which most lamps keep, says
+/// the lamp is there, and its colour can say its voice is off. Above it the
+/// light is one to see by and stays as the person set it; the mute shows in
+/// the speaking face and a hearing's swell, the moments it matters (decided
+/// on #8934, 27 Nov).
+pub const MUTED_REST_MOST_LEVEL: u8 = 1;
+/// The lamp's name heard while the speaker is muted (`name/heard`): one swell
+/// of the whole ring into [`MUTED_TINT`] at this share of the ceiling, up
+/// over [`HEARD_RISE_US`] and back down over the rest of [`HEARD_US`], so a
+/// caller sees it heard them though its voice is off.
+const HEARD_GLOW: f32 = 0.6;
+const HEARD_RISE_US: u64 = 150_000;
+pub const HEARD_US: u64 = 1_000_000;
+
+/// How the speaker's mute shows on the face (`LAMP_RING_SPEAKER_MUTED`,
+/// [`crate::ring_speaker`]).
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Muted {
+    /// The speaker is heard, or nobody knows: every face as before.
+    #[default]
+    No,
+    /// Muted or at 0 while a light someone asked for holds the rest (a
+    /// skill's, a self-test's, a paired computer's): the Speaking face and a
+    /// hearing's swell only. Whoever asked for a light keeps it.
+    InTurns,
+    /// Muted or at 0 over the person's own light: the resting face too while
+    /// that light is off (the ember's few pixels) or at its lowest level,
+    /// [`MUTED_REST_MOST_LEVEL`]. Above it their light wins, and only the
+    /// Speaking face and a hearing's swell show the mute.
+    AtRest,
+}
+
 /// A light that is off still shows an ember, in amber: the ring at rest
 /// is also the sign that the lamp can hear, and that sign is not the
 /// lamp's to switch off because it was asked for darkness.
@@ -370,6 +415,12 @@ pub struct Face {
     swings: std::collections::VecDeque<u64>,
     /// Whether the last frame was a light's own pixels.
     drew_own: bool,
+    /// The speaker muted or at 0 ([`Face::speaker_muted`]), and when a
+    /// hearing of the name while it was began its swell ([`Face::heard`]).
+    muted: Muted,
+    heard_us: Option<u64>,
+    /// Whether the last frame drawn had a hearing's swell in it.
+    swelled: bool,
 }
 
 impl Default for Face {
@@ -411,7 +462,44 @@ impl Face {
             rest_shown: None,
             swings: std::collections::VecDeque::new(),
             drew_own: false,
+            muted: Muted::No,
+            heard_us: None,
+            swelled: false,
         }
+    }
+
+    /// Whether the last frame drawn had a hearing's swell in it: never a
+    /// computer's own pixels at rest, which are drawn as given. The ring
+    /// worker journals a swell only from a frame written with it.
+    pub fn swelled(&self) -> bool {
+        self.swelled
+    }
+
+    /// The speaker muted or at 0, as [`Muted`] says
+    /// ([`crate::ring_speaker`]). Heard again, the next frame eases back to
+    /// the plain faces at the face's own pace, as any change does, and a
+    /// hearing's swell under way ends with it.
+    pub fn speaker_muted(&mut self, muted: Muted) {
+        self.muted = muted;
+        if muted == Muted::No {
+            self.heard_us = None;
+        }
+    }
+
+    /// The lamp's name heard at `at_us` (`name/heard`): while the speaker is
+    /// muted, one swell into [`MUTED_TINT`] over [`HEARD_US`], over whatever
+    /// face is drawn but a computer's own pixels. One at a time: a hearing
+    /// during a swell is the same call. Whether it began one.
+    pub fn heard(&mut self, at_us: u64) -> bool {
+        if self.muted == Muted::No
+            || self
+                .heard_us
+                .is_some_and(|since| at_us.saturating_sub(since) < HEARD_US)
+        {
+            return false;
+        }
+        self.heard_us = Some(at_us);
+        true
     }
 
     /// How long a hand has been kept on the head, as Controls counts it, or
@@ -661,6 +749,7 @@ impl Face {
         ceiling: u8,
     ) -> [Rgb; PIXEL_COUNT] {
         self.drew_own = false;
+        self.swelled = false;
         let frame = self.render_face(mood, level, now_us, ceiling);
         if mood != Mood::Resting {
             return frame;
@@ -803,6 +892,21 @@ impl Face {
             None if settling || waking => SETTLE_EASE_US,
             None => EASE_US,
         };
+        // A hearing of the name while the speaker is muted: how far into
+        // its swell the face is, 0 outside one. A swell eases at the face's
+        // own pace, never at a slow fade's, so it is seen at once.
+        let heard = self
+            .heard_us
+            .filter(|_| self.muted != Muted::No)
+            .map_or(0.0, |at| heard_share(now_us.saturating_sub(at)));
+        if self
+            .heard_us
+            .is_some_and(|at| now_us.saturating_sub(at) >= HEARD_US)
+        {
+            self.heard_us = None;
+        }
+        self.swelled = heard > 0.0;
+        let pace = if heard > 0.0 { pace.min(EASE_US) } else { pace };
         let ease = follow(step_us, pace);
         let accent_t = (self.accent != 0
             && now_us >= self.accent_at_us
@@ -830,13 +934,22 @@ impl Face {
                 Some(motion) => moving(self.lit, motion, pixel),
                 None => look(
                     mood, self.level, seconds, breath, angle, self.lit, held, ceiling, look_to,
+                    self.muted,
                 ),
             };
             let scale = accent_t.map_or([1.0; 3], |t| accent_scale(self.accent, t, angle));
-            for (((channel, target), scale), glow) in
-                shown.iter_mut().zip(wanted).zip(scale).zip(glow)
-            {
-                *channel += ((target + glow) * brighten * open * scale - *channel) * ease;
+            // The face, and over it a hearing's swell into the muted colour,
+            // as much of the way as the swell has come.
+            let wanted: [f32; 3] = std::array::from_fn(|channel| {
+                let face = (wanted[channel] + glow[channel]) * brighten * open * scale[channel];
+                if heard > 0.0 {
+                    face + (MUTED_TINT[channel] * HEARD_GLOW - face) * heard
+                } else {
+                    face
+                }
+            });
+            for (channel, target) in shown.iter_mut().zip(wanted) {
+                *channel += (target - *channel) * ease;
             }
             // A share of the ceiling rarely lands on a whole step. Each pixel
             // rounds at its own fixed point, so a level between two steps is
@@ -920,6 +1033,21 @@ fn accent_scale(code: u8, t: f32, angle: f32) -> [f32; 3] {
         // Sleepy: a slow dimming.
         7 => [1.0 - 0.4 * swell; 3],
         _ => [1.0; 3],
+    }
+}
+
+/// How far into a hearing's swell the face is `since_us` after it began,
+/// from 0 to 1 and back: up eased over [`HEARD_RISE_US`], down on a
+/// half cosine over the rest of [`HEARD_US`], nothing after.
+fn heard_share(since_us: u64) -> f32 {
+    if since_us >= HEARD_US {
+        0.0
+    } else if since_us < HEARD_RISE_US {
+        let up = since_us as f32 / HEARD_RISE_US as f32;
+        up * up * (3.0 - 2.0 * up)
+    } else {
+        let down = (since_us - HEARD_RISE_US) as f32 / (HEARD_US - HEARD_RISE_US) as f32;
+        0.5 + 0.5 * (PI * down).cos()
     }
 }
 
@@ -1023,7 +1151,7 @@ pub const SKILL_SPEAKING_LEVEL: u8 = 3;
 /// person and how much the far side dims, from 0 to 1. `breath`: where the
 /// resting breath is, from 0 to 1 ([`Face::breath`]). `held`: a skill's
 /// light that tints the Speaking face ([`Face::skill_light`]), with the
-/// switch on.
+/// switch on. `muted`: the speaker muted or at 0 ([`Face::speaker_muted`]).
 #[allow(clippy::too_many_arguments)]
 fn look(
     mood: Mood,
@@ -1035,6 +1163,7 @@ fn look(
     held: Option<Lit>,
     ceiling: u8,
     look_to: Option<(f32, f32)>,
+    muted: Muted,
 ) -> [f32; 3] {
     let (tint, glow) = match mood {
         Mood::Resting => {
@@ -1043,13 +1172,19 @@ fn look(
             // look the same. Its lowest level is low on purpose: on this
             // ring a few steps of 255 are already a clear glow, and V1
             // rested at one. A light that is off is an ember of the same.
+            // With the speaker muted, the same breath at the same level in
+            // the muted colour: only the colour says its voice is off. Only
+            // over the light off or at its lowest: a brighter light is one
+            // to see by, and stays as the person set it.
             let patch = wave(seconds, 23.0, 1.0, angle).powi(4);
+            let muted = muted == Muted::AtRest && (!lit.on || lit.level <= MUTED_REST_MOST_LEVEL);
             if lit.on {
                 let (glow, breathes) = LEVEL_GLOW[usize::from(lit.level.clamp(1, LEVELS)) - 1];
                 // The patch is for the dim levels: a bright ring needs
                 // nothing to show that it is alive.
                 let patches = if lit.level == 1 { 0.03 } else { 0.0 };
-                (lit.tint, glow + breathes * breath + patches * patch)
+                let tint = if muted { MUTED_TINT } else { lit.tint };
+                (tint, glow + breathes * breath + patches * patch)
             } else {
                 let pixel = (angle * PIXEL_COUNT as f32 / TAU).round() as usize;
                 if !pixel.is_multiple_of(EMBER_EVERY) {
@@ -1057,6 +1192,9 @@ fn look(
                 }
                 let share =
                     |steps: f32| ((steps + WHOLE_STEP) / f32::from(ceiling.max(1))).min(1.0);
+                if muted {
+                    return [0.0, share(MUTED_EMBER_STEPS.0), share(MUTED_EMBER_STEPS.1)];
+                }
                 return [share(EMBER_STEPS.0), share(EMBER_STEPS.1), 0.0];
             }
         }
@@ -1090,7 +1228,12 @@ fn look(
             // Warm, and as bright as the lamp's own voice is loud, with a
             // slow two-lobed turn so that it is never a flat disc.
             let turn = wave(seconds, 3.1, 2.0, angle);
+            let plain = (SPEAKING_LEAST + 0.74 * level.powf(0.8)) * (0.90 + 0.10 * turn);
             match held.filter(|held| held.on) {
+                // The speaker muted or at 0: the same mouth, moving with the
+                // voice the speaker is handed, in the muted colour, over a
+                // skill's light too: answering, but not heard.
+                _ if muted != Muted::No => (MUTED_TINT, plain),
                 // A skill's light held with the words: its colour mixed into
                 // the face, and the face's least glow that of the middle
                 // level whatever the light's, so the colour shows over
@@ -1109,10 +1252,7 @@ fn look(
                         (least + (1.0 - least) * level.powf(0.8)) * (0.90 + 0.10 * turn),
                     )
                 }
-                None => (
-                    SPEAKING_TINT,
-                    (SPEAKING_LEAST + 0.74 * level.powf(0.8)) * (0.90 + 0.10 * turn),
-                ),
+                None => (SPEAKING_TINT, plain),
             }
         }
     };
@@ -2781,5 +2921,575 @@ mod tests {
 
     fn wrap(given: &[[u8; 3]; PIXEL_COUNT]) -> [Rgb; PIXEL_COUNT] {
         given.map(|[r, g, b]| Rgb::new(r, g, b))
+    }
+
+    /// A face whose speaker is muted as `muted` says, resting in `lit`.
+    fn muted_face(muted: Muted, lit: Lit) -> Face {
+        let mut face = Face::new();
+        face.light(lit);
+        face.speaker_muted(muted);
+        face
+    }
+
+    /// The product owner, 27 Nov: a muted lamp has a colour of its own. At
+    /// rest over the person's own light at its lowest level, the first light
+    /// most lamps keep, it breathes as ever in teal: no red at all, more
+    /// green than blue, about as bright as the plain rest; at that level in
+    /// any colour, teal too; and with their light off, the ember's few pixels
+    /// are teal.
+    #[test]
+    fn muted_the_rest_is_teal_with_the_light_off_or_at_level_one() {
+        let first = rested(&mut muted_face(Muted::AtRest, Lit::first()));
+        let [red, green, blue] = first;
+        assert!(red == 0 && green > blue && blue * 2 > green, "{first:?}");
+        let plain = rested(&mut Face::new());
+        let (muted_total, plain_total) = (first.iter().sum::<u32>(), plain.iter().sum::<u32>());
+        assert!(
+            muted_total * 2 > plain_total && muted_total < plain_total * 2,
+            "{muted_total} against {plain_total}"
+        );
+        // It still breathes: a clear difference between its lowest and
+        // highest, and no visible jump from one frame to the next.
+        let mut breathing = muted_face(Muted::AtRest, Lit::first());
+        play(&mut breathing, Mood::Resting, 0, 1_000, 100);
+        let levels: Vec<u32> = play(&mut breathing, Mood::Resting, 0, 2_001_000, 600)
+            .iter()
+            .map(brightness)
+            .collect();
+        let (low, high) = (levels.iter().min().unwrap(), levels.iter().max().unwrap());
+        assert!(*high as f32 > *low as f32 * 1.4, "{low} {high}");
+        assert!(
+            levels
+                .windows(2)
+                .all(|pair| pair[0].abs_diff(pair[1]) <= 12)
+        );
+        // At the lowest level, whatever colour was asked for: teal.
+        assert_eq!(MUTED_REST_MOST_LEVEL, 1);
+        for colour in Lit::colours() {
+            let lit = Lit::of(true, colour, MUTED_REST_MOST_LEVEL).unwrap();
+            let [red, green, blue] = rested(&mut muted_face(Muted::AtRest, lit));
+            assert!(
+                red == 0 && green > blue && blue > 0,
+                "{colour}: {red} {green} {blue}"
+            );
+        }
+        // The person's light off, at any level it was set to: the ember's own
+        // pixels, teal, the rest dark.
+        for level in 1..=LEVELS {
+            let mut off = muted_face(Muted::AtRest, Lit::of(false, "warm", level).unwrap());
+            let settled = (0..200u64)
+                .map(|frame| off.render(Mood::Resting, 0, 1_000 + frame * 25_000, 24))
+                .last()
+                .unwrap();
+            for (pixel, shown) in settled.iter().enumerate() {
+                let wanted = if pixel % 4 == 0 {
+                    Rgb::new(0, 3, 2)
+                } else {
+                    Rgb::BLACK
+                };
+                assert_eq!(*shown, wanted, "level {level}, pixel {pixel}");
+            }
+        }
+    }
+
+    /// Decided on #8934: above level 1 the person's light wins. A light set
+    /// to see by (level 4 in white, say) rests muted exactly as it rests
+    /// heard, frame for frame, in every colour and at every level from 2 up.
+    #[test]
+    fn muted_a_light_above_level_one_stays_as_the_person_set_it() {
+        for level in MUTED_REST_MOST_LEVEL + 1..=LEVELS {
+            for colour in Lit::colours() {
+                let lit = Lit::of(true, colour, level).unwrap();
+                let mut plain = Face::new();
+                plain.light(lit);
+                let mut muted = muted_face(Muted::AtRest, lit);
+                assert_eq!(
+                    play(&mut plain, Mood::Resting, 0, 1, 200),
+                    play(&mut muted, Mood::Resting, 0, 1, 200),
+                    "{colour} {level}"
+                );
+            }
+        }
+        // Level 4 in white: its own white, no teal in it.
+        let [red, green, blue] = rested(&mut muted_face(
+            Muted::AtRest,
+            Lit::of(true, "white", 4).unwrap(),
+        ));
+        assert!(
+            red > green && green > blue && blue > 0,
+            "{red} {green} {blue}"
+        );
+    }
+
+    /// At every level of the person's light, and with it off, the mute still
+    /// shows when it matters: the Speaking face is teal, and a hearing of the
+    /// name swells the ring into teal and lets it back to the rest as it was.
+    #[test]
+    fn muted_the_swell_and_the_speaking_face_show_at_every_level() {
+        let lights = (1..=LEVELS)
+            .flat_map(|level| {
+                ["warm", "white", "blue"].map(|colour| Lit::of(true, colour, level).unwrap())
+            })
+            .chain([Lit::of(false, "warm", 4).unwrap()]);
+        for lit in lights {
+            // Speaking: teal, and moved by the voice.
+            let mut speaking = muted_face(Muted::AtRest, lit);
+            let quiet = *play(&mut speaking, Mood::Speaking, 0, 1, 50)
+                .last()
+                .unwrap();
+            let loud = *play(&mut speaking, Mood::Speaking, 255, 1_000_001, 50)
+                .last()
+                .unwrap();
+            let [red, green, blue] = channels(&quiet);
+            assert!(
+                red == 0 && green > blue && blue > 0,
+                "{lit:?} speaking: {red} {green} {blue}"
+            );
+            assert!(total(&loud) > total(&quiet) * 2, "{lit:?}");
+            // A hearing: teal at its height, and the rest as it was after it.
+            let start = 4_000_000_000u64;
+            let at = start + 2_000_000;
+            let mut rest = muted_face(Muted::AtRest, lit);
+            play(&mut rest, Mood::Resting, 0, start, 100);
+            let mut called = rest.clone();
+            assert!(called.heard(at), "{lit:?}");
+            let plain = play(&mut rest, Mood::Resting, 0, at, 70);
+            let swelled = play(&mut called, Mood::Resting, 0, at, 70);
+            let [red, green, blue] = channels(&swelled[12]);
+            assert!(
+                green > blue && blue > red * 2,
+                "{lit:?} at 240 ms: {red} {green} {blue}"
+            );
+            let left = total(&swelled[69]) as f32 / total(&plain[69]) as f32;
+            assert!((0.95..1.05).contains(&left), "{lit:?} after: {left}");
+        }
+    }
+
+    /// Heard, or not known, every face is as it was, frame for frame, in
+    /// every mood and light, and a hearing swells nothing: the switch on
+    /// changes nothing until the speaker is muted.
+    #[test]
+    fn heard_every_face_is_as_it_was() {
+        for lit in [
+            Lit::first(),
+            Lit::of(true, "blue", 4).unwrap(),
+            Lit::of(false, "warm", 2).unwrap(),
+        ] {
+            for mood in [
+                Mood::Resting,
+                Mood::Listening,
+                Mood::Thinking,
+                Mood::Speaking,
+                Mood::Offline,
+            ] {
+                let mut plain = Face::new();
+                plain.light(lit);
+                let mut told = muted_face(Muted::No, lit);
+                assert!(!told.heard(1_000));
+                assert_eq!(
+                    play(&mut plain, mood, 120, 1, 100),
+                    play(&mut told, mood, 120, 1, 100),
+                    "{lit:?} {mood:?}"
+                );
+            }
+        }
+    }
+
+    /// Muted while a light someone asked for holds the rest (a skill's, a
+    /// self-test's): the rest is that light, frame for frame, since whoever
+    /// asked for it keeps it. Only the turns show the mute.
+    #[test]
+    fn muted_in_turns_leaves_the_rest_to_the_light_shown() {
+        for lit in [
+            Lit::first(),
+            Lit::of(true, "blue", 4).unwrap(),
+            Lit::of(false, "warm", 2).unwrap(),
+        ] {
+            let mut plain = Face::new();
+            plain.light(lit);
+            let mut muted = muted_face(Muted::InTurns, lit);
+            assert_eq!(
+                play(&mut plain, Mood::Resting, 0, 1, 200),
+                play(&mut muted, Mood::Resting, 0, 1, 200),
+                "{lit:?}"
+            );
+        }
+    }
+
+    /// Muted, the lamp's answer is the speaking face in teal, moving with
+    /// the voice as plain speaking does, over a skill's light too; the other
+    /// faces of a turn are their own, muted or not.
+    #[test]
+    fn muted_the_speaking_face_is_teal_and_follows_the_voice() {
+        let last = |frames: Vec<[Rgb; PIXEL_COUNT]>| *frames.last().unwrap();
+        for muted in [Muted::InTurns, Muted::AtRest] {
+            let speak = |level: u8| {
+                last(play(
+                    &mut muted_face(muted, Lit::first()),
+                    Mood::Speaking,
+                    level,
+                    1,
+                    50,
+                ))
+            };
+            let (quiet, loud) = (speak(0), speak(255));
+            let [red, green, blue] = channels(&quiet);
+            assert!(
+                red == 0 && green > blue && blue > 0,
+                "{muted:?}: {:?}",
+                channels(&quiet)
+            );
+            // As bright and as moved by the voice as plain speaking.
+            let plain =
+                |level: u8| total(&last(play(&mut Face::new(), Mood::Speaking, level, 1, 50)));
+            let span = |quiet: u32, loud: u32| f64::from(loud - quiet) / f64::from(loud);
+            let (muted_span, plain_span) = (
+                span(total(&quiet), total(&loud)),
+                span(plain(0), plain(255)),
+            );
+            assert!(
+                (muted_span - plain_span).abs() < 0.1,
+                "{muted_span:.2} against {plain_span:.2}"
+            );
+            // Over a skill's light that tints Speaking: teal, not the light.
+            let mut tinted = muted_face(muted, Lit::first());
+            tinted.tints_speaking(true);
+            tinted.skill_light(Lit::of(true, "blue", 4));
+            assert_eq!(
+                play(&mut tinted, Mood::Speaking, 120, 1, 50),
+                play(
+                    &mut muted_face(muted, Lit::first()),
+                    Mood::Speaking,
+                    120,
+                    1,
+                    50
+                )
+            );
+            // Listening, thinking and the offline breath are as ever.
+            for mood in [Mood::Listening, Mood::Thinking, Mood::Offline] {
+                assert_eq!(
+                    play(&mut muted_face(muted, Lit::first()), mood, 120, 1, 80),
+                    play(&mut Face::new(), mood, 120, 1, 80),
+                    "{muted:?} {mood:?}"
+                );
+            }
+        }
+    }
+
+    /// Heard again, the plain faces are back at once: most of the way within
+    /// a tenth of a second, all of it within half a second, at rest and
+    /// speaking alike.
+    #[test]
+    fn unmuting_brings_the_plain_faces_back_at_once() {
+        let apart = |a: &[Rgb; PIXEL_COUNT], b: &[Rgb; PIXEL_COUNT]| -> u32 {
+            a.iter()
+                .zip(b)
+                .map(|(a, b)| {
+                    u32::from(a.red.abs_diff(b.red))
+                        + u32::from(a.green.abs_diff(b.green))
+                        + u32::from(a.blue.abs_diff(b.blue))
+                })
+                .sum()
+        };
+        for (mood, level) in [(Mood::Resting, 0), (Mood::Speaking, 100)] {
+            let mut plain = Face::new();
+            let mut face = muted_face(Muted::AtRest, Lit::first());
+            let wide = apart(
+                play(&mut face, mood, level, 1, 100).last().unwrap(),
+                play(&mut plain, mood, level, 1, 100).last().unwrap(),
+            );
+            assert!(wide > 0, "{mood:?}");
+            face.speaker_muted(Muted::No);
+            let after = play(&mut face, mood, level, 2_000_001, 25);
+            let plain_after = play(&mut plain, mood, level, 2_000_001, 25);
+            let left =
+                |frame: usize| apart(&after[frame], &plain_after[frame]) as f32 / wide as f32;
+            assert!(left(0) < 0.9, "{mood:?}: it begins at once, {}", left(0));
+            assert!(left(5) < 0.3, "{mood:?}: {}", left(5));
+            assert!(left(24) < 0.05, "{mood:?}: {}", left(24));
+        }
+    }
+
+    /// The lamp's name heard while muted: one swell into teal, plainly seen
+    /// within a tenth of a second and gone in a little over a second, one at
+    /// a time; over a turn's listening face too; nothing while the speaker
+    /// is heard; and unmuted during it, it ends.
+    #[test]
+    fn a_hearing_while_muted_swells_once_in_teal() {
+        let start = 4_000_000_000u64;
+        let at = start + 2_000_000;
+        let mut quiet = muted_face(Muted::AtRest, Lit::first());
+        play(&mut quiet, Mood::Resting, 0, start, 100);
+        let mut called = quiet.clone();
+        assert!(called.heard(at));
+        assert!(!called.heard(at + HEARD_US / 2), "one at a time");
+        let plain = play(&mut quiet, Mood::Resting, 0, at, 80);
+        let swelled = play(&mut called, Mood::Resting, 0, at, 80);
+        let rise = total(&swelled[5]) as f32 / total(&plain[5]) as f32;
+        assert!(rise > 2.0, "brighter within 100 ms: {rise}");
+        let peak = swelled.iter().map(total).max().unwrap();
+        let [red, green, blue] = channels(&swelled[10]);
+        assert!(
+            red == 0 && green > blue && blue > 0,
+            "teal: {red} {green} {blue}"
+        );
+        // Not a flash: at most the swell's share of the ceiling (48 here),
+        // on every pixel and channel.
+        assert!(
+            swelled
+                .iter()
+                .flatten()
+                .all(|pixel| pixel.green <= 30 && pixel.blue <= 21 && pixel.red == 0),
+            "peak {peak}"
+        );
+        // Gone after it: at 1.3 s the face is the plain muted rest again.
+        let left = total(&swelled[65]) as f32 / total(&plain[65]) as f32;
+        assert!((0.95..1.05).contains(&left), "{left}");
+        // A new hearing after one swells again.
+        assert!(called.heard(at + HEARD_US + 1));
+        // Over the listening face of the turn the call begins: toward teal.
+        let mut listening = muted_face(Muted::InTurns, Lit::first());
+        play(&mut listening, Mood::Listening, 120, start, 50);
+        let mut heard = listening.clone();
+        assert!(heard.heard(at));
+        let open = play(&mut listening, Mood::Listening, 120, at, 16);
+        let swelled = play(&mut heard, Mood::Listening, 120, at, 16);
+        let ([r0, _, b0], [r1, g1, b1]) = (
+            channels(open.last().unwrap()),
+            channels(swelled.last().unwrap()),
+        );
+        assert!(
+            r1 * 3 < r0 && b1 < b0 && g1 > b1,
+            "{r0} {b0}: {r1} {g1} {b1}"
+        );
+        // The speaker heard: no swell, and every frame as the plain face's.
+        let mut face = Face::new();
+        assert!(!face.heard(at));
+        assert_eq!(
+            play(&mut face, Mood::Resting, 0, start, 120),
+            play(&mut Face::new(), Mood::Resting, 0, start, 120)
+        );
+        // Unmuted during a swell: it ends, and the plain face comes back.
+        let mut face = muted_face(Muted::AtRest, Lit::first());
+        play(&mut face, Mood::Resting, 0, start, 100);
+        assert!(face.heard(at));
+        play(&mut face, Mood::Resting, 0, at, 5);
+        face.speaker_muted(Muted::No);
+        let mut plain = Face::new();
+        play(&mut plain, Mood::Resting, 0, start, 100);
+        play(&mut plain, Mood::Resting, 0, at, 5);
+        let back = play(&mut face, Mood::Resting, 0, at + 100_000, 25);
+        let plain_back = play(&mut plain, Mood::Resting, 0, at + 100_000, 25);
+        let left = total(&back[24]) as f32 / total(&plain_back[24]) as f32;
+        assert!((0.95..1.05).contains(&left), "{left}");
+        assert!(!face.heard(at + 200_000), "heard: no swell");
+    }
+
+    /// The face says whether its last frame had a hearing's swell in it, so
+    /// the ring tells the journal only what it drew (#8934's review): during
+    /// a swell over its own face, at rest or in a turn, yes; after it, or at
+    /// rest under a computer's own pixels, no.
+    #[test]
+    fn the_face_says_whether_its_last_frame_had_the_swell() {
+        let at = 4_000_000_000u64;
+        let mut face = muted_face(Muted::AtRest, Lit::first());
+        play(&mut face, Mood::Resting, 0, at, 10);
+        assert!(!face.swelled(), "no hearing");
+        assert!(face.heard(at + 1_000_000));
+        play(&mut face, Mood::Resting, 0, at + 1_100_000, 1);
+        assert!(face.swelled());
+        play(&mut face, Mood::Listening, 120, at + 1_200_000, 1);
+        assert!(face.swelled(), "over a turn's face too");
+        play(&mut face, Mood::Resting, 0, at + 1_000_000 + HEARD_US, 1);
+        assert!(!face.swelled(), "after its second");
+        // At rest under a computer's own pixels: none, though one is due.
+        let mut face = muted_face(Muted::InTurns, Lit::first());
+        face.pixels(Some(&[[200, 0, 200]; PIXEL_COUNT]));
+        assert!(face.heard(at));
+        play(&mut face, Mood::Resting, 0, at + 100_000, 1);
+        assert!(!face.swelled() && face.draws_own_pixels());
+        // A turn's face over the same pixels has it.
+        play(&mut face, Mood::Listening, 120, at + 150_000, 1);
+        assert!(face.swelled());
+    }
+
+    /// No muted face and no swell ever passes the ceiling, by day or at
+    /// night.
+    #[test]
+    fn the_muted_faces_and_the_swell_never_pass_the_ceiling() {
+        for ceiling in [0, 1, 12, 24, 60, 120] {
+            for muted in [Muted::InTurns, Muted::AtRest] {
+                for lit in [Lit::first(), Lit::of(true, "white", LEVELS).unwrap()] {
+                    let mut face = muted_face(muted, lit);
+                    for mood in [Mood::Resting, Mood::Listening, Mood::Speaking] {
+                        for frame in 0..120u64 {
+                            let at = 1 + frame * 20_000;
+                            if frame % 60 == 0 {
+                                face.heard(at);
+                            }
+                            let pixels = face.render(mood, 255, at, ceiling);
+                            assert!(pixels.iter().all(|pixel| pixel.red <= ceiling
+                                && pixel.green <= ceiling
+                                && pixel.blue <= ceiling));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// The hue of a colour in degrees, and how saturated it is, 0 to 1.
+    fn hue([red, green, blue]: [f32; 3]) -> (f32, f32) {
+        let (most, least) = (red.max(green).max(blue), red.min(green).min(blue));
+        let chroma = most - least;
+        if chroma <= 0.0 {
+            return (0.0, 0.0);
+        }
+        let sixths = if most == red {
+            ((green - blue) / chroma).rem_euclid(6.0)
+        } else if most == green {
+            (blue - red) / chroma + 2.0
+        } else {
+            (red - green) / chroma + 4.0
+        };
+        (sixths * 60.0, chroma / most)
+    }
+
+    /// A frame's colour over the whole ring.
+    fn colour_of(pixels: &[Rgb; PIXEL_COUNT]) -> [f32; 3] {
+        channels(pixels).map(|sum| sum as f32)
+    }
+
+    /// The muted colour is a hue no face, light or other writer of the ring
+    /// draws, measured from what each draws: at least 20 degrees from every
+    /// one of them, so it is not the listening face's cool, the person's
+    /// green or cyan, the setup light's blue or the unplug green.
+    #[test]
+    fn the_muted_colour_is_a_hue_no_face_or_light_draws() {
+        let face = |mood: Mood, lit: Lit| {
+            let mut face = Face::new();
+            face.light(lit);
+            colour_of(play(&mut face, mood, 120, 1, 60).last().unwrap())
+        };
+        let mut drawn: Vec<(String, [f32; 3])> = Vec::new();
+        for colour in Lit::colours() {
+            drawn.push((
+                format!("the {colour} light"),
+                face(Mood::Resting, Lit::of(true, colour, 3).unwrap()),
+            ));
+        }
+        for mood in [
+            Mood::Listening,
+            Mood::Thinking,
+            Mood::Speaking,
+            Mood::Offline,
+        ] {
+            drawn.push((format!("{mood:?}"), face(mood, Lit::first())));
+        }
+        drawn.push((
+            "the ember".into(),
+            face(Mood::Resting, Lit::of(false, "warm", 1).unwrap()),
+        ));
+        let fixed = |name: &str, rgb: Rgb| {
+            (
+                name.to_owned(),
+                [rgb.red, rgb.green, rgb.blue].map(f32::from),
+            )
+        };
+        use lamp_ring::setup::SetupLook;
+        for look in [
+            SetupLook::Waiting,
+            SetupLook::Joining,
+            SetupLook::Failed,
+            SetupLook::Unplug,
+        ] {
+            drawn.push(fixed(&format!("setup {look:?}"), look.colour()));
+        }
+        drawn.extend([
+            fixed("the asleep face", lamp_ring::asleep::PEAK),
+            fixed("the waking face", lamp_ring::waking::AWAKE),
+            fixed("the privacy breath", Rgb::new(10, 0, 0)),
+            fixed(
+                "the reset's red",
+                Rgb::new(lamp_ring::setup::PEAK_CHANNEL, 0, 0),
+            ),
+            fixed("a computer's mark", crate::ring_mark::MARK_BRIGHT),
+        ]);
+        let (muted, _) = hue(MUTED_TINT);
+        for (name, colour) in drawn {
+            let (other, saturation) = hue(colour);
+            // A near grey has no hue to be mistaken for.
+            if saturation < 0.2 {
+                continue;
+            }
+            let apart = (muted - other).abs();
+            let apart = apart.min(360.0 - apart);
+            assert!(
+                apart >= 20.0,
+                "{name} at {other:.0} degrees, the muted colour at {muted:.0}"
+            );
+        }
+        // Two channels, and never red.
+        assert_eq!(MUTED_TINT[0], 0.0);
+    }
+
+    /// The muted face is a face like any other: once the privacy switch
+    /// closes, the ring refuses its speaking frame and writes nothing of it.
+    #[test]
+    fn a_muted_speaking_frame_is_refused_once_the_privacy_switch_closes() {
+        use lamp_ipc::monotonic_us;
+        use lamp_ring::{ChannelCeiling, FrameSink, GuardedRing};
+        use lamp_turn_owner::{
+            AdmissionState, CaptureState, Controller, MonoTime, OutputKind, Permission,
+        };
+        let now = || MonoTime::from_micros(monotonic_us());
+        let boot = crate::process::new_boot().unwrap();
+        let mut controller = Controller::new(boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let until = MonoTime::from_micros(now().as_micros() + 500_000);
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        let owner = controller
+            .admit(now(), lamp_turn_owner::AdmittedInput::NewTurn)
+            .unwrap();
+        controller.input_ended(now(), owner).unwrap();
+        let plan = controller
+            .plan_output(now(), owner, OutputKind::Light, None)
+            .unwrap();
+        let permit = controller.issue_output(now(), plan, 100_000).unwrap();
+        struct Counted(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+        impl FrameSink for Counted {
+            fn write_frame(&mut self, _: &lamp_ring::EncodedFrame) -> std::io::Result<()> {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        let writes = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut ring = GuardedRing::new(Counted(writes.clone()), boot).unwrap();
+        ring.install_authority(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let mut face = muted_face(Muted::AtRest, Lit::first());
+        assert!(face.heard(monotonic_us()));
+        let pixels = face.render(Mood::Speaking, 120, monotonic_us(), 40);
+        let ceiling = ChannelCeiling::new(40).unwrap();
+        assert!(ring.show(&pixels, ceiling, permit).is_ok());
+        controller
+            .set_microphone_permission(now(), Permission::Denied)
+            .unwrap();
+        ring.install_authority(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let written = writes.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(ring.show(&pixels, ceiling, permit).is_err());
+        assert!(pixels.iter().any(|pixel| pixel.green > 0));
+        assert!(
+            writes.load(std::sync::atomic::Ordering::SeqCst) <= written + 1,
+            "nothing written under privacy but black"
+        );
     }
 }

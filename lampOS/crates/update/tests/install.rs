@@ -1937,6 +1937,50 @@ fn the_product_lets_the_app_pick_the_privacy_lights_look() {
     );
 }
 
+/// The speaker muted or at 0 shows on the ring (`LAMP_RING_SPEAKER_MUTED`,
+/// the product owner's ask of 27 Nov, after a lamp at 0% answered eight
+/// calls nobody heard): on in the product's voice, exactly once, beside the
+/// bus its ring reads; and lamp-actions says the speaker's state on that bus
+/// (`LAMP_REQUESTED_AUDIO=on`, `--bus-root`), the word the ring prefers, so a
+/// level set to 0 outside lamp-actions shows too.
+#[test]
+fn the_product_shows_a_muted_speaker_on_the_ring() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let voice = section(unit("lamp-voice.service"), "Service");
+    assert_eq!(
+        voice
+            .iter()
+            .filter(|line| line.starts_with("Environment=LAMP_RING_SPEAKER_MUTED="))
+            .collect::<Vec<_>>(),
+        [&"Environment=LAMP_RING_SPEAKER_MUTED=on"],
+        "the voice sets LAMP_RING_SPEAKER_MUTED=on once"
+    );
+    for line in [
+        "Environment=LAMP_BUS=on",
+        "Environment=LAMP_BUS_ROOT=/run/lampos-bus",
+    ] {
+        assert!(voice.contains(&line), "the voice lacks {line}");
+    }
+    let actions = section(unit("lamp-actions.service"), "Service");
+    assert!(
+        actions.contains(&"Environment=LAMP_REQUESTED_AUDIO=on"),
+        "lamp-actions does not say speaker/state"
+    );
+    assert!(
+        actions
+            .iter()
+            .any(|line| line.starts_with("ExecStart=")
+                && line.contains("--bus-root /run/lampos-bus")),
+        "lamp-actions does not say the speaker on the voice's bus"
+    );
+}
+
 /// CAM++ one way only (`LAMP_SAME_VOICE_CONFIRMS`, the memory owner's
 /// decision of 4 Nov) stays off in the product: the lead's ruling of 11 Nov
 /// (#1711) keeps the lead's 20 Oct ruling, as CAM++'s weights are trained on

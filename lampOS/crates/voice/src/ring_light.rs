@@ -733,6 +733,14 @@ impl RingLight {
             .and_then(lit)
     }
 
+    /// Whether the face rests in the person's own light now: no self-test
+    /// and no request over it. The speaker's mute tints only that
+    /// ([`crate::ring_face::Muted::AtRest`]): whoever asked for a light
+    /// keeps it.
+    pub fn persons_own(&self) -> bool {
+        self.testing.is_none() && self.requested.is_none()
+    }
+
     /// The light given to the face now: a test's, a request's that holds,
     /// or the person's.
     pub fn face(&self) -> &Light {

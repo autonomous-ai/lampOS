@@ -20,6 +20,7 @@ qualification work.
 | Matched speaker acceptance followed by `playback_started` | The speaking face: warm, as bright as the lamp's own voice is loud. Provider audio arrival alone does not start it. |
 | A duplex yield in force (`--turn-taking duplex`: the lamp has stopped handing reply audio to the speaker for someone speaking over it) | The listening face, as bright as that person's voice is loud, on frames that are still speaking frames in phase, owner and permit (`RingFrame.attending`). It ends with the yield: the speaking face again if the reply resumes, the ordinary listening phase if the interruption is taken. |
 | Playback's actual final sample retired | End the speaking phase; completion clears the owner and cue, and in `serve` the resting face eases back in. |
+| The speaker muted or at 0 (`LAMP_RING_SPEAKER_MUTED=on`) | The speaking face in teal, one teal swell when the lamp's name is heard, and the resting face in teal while the person's own light is off or at level 1 (above it, their light as they set it); heard again, the plain faces at once. Never over the privacy switch's breath ("The speaker muted or at 0", below). |
 | New admitted question, privacy closure, expired authority or stop | Retire the old cue under its original identity. A successor can obtain its own cue. |
 
 ### The face
@@ -717,6 +718,150 @@ builder's ask), `a_look_is_kept_before_it_is_drawn_and_never_drawn_again_after_a
 `a_look_due_while_a_light_holds_the_ring_is_dropped`,
 `its_looks_stay_under_the_light_but_the_one_level_swell` and
 `the_kept_end_reads_back`. Not shown on a lamp.
+
+### The speaker muted or at 0
+
+On 27 Nov 2026 a test lamp's speaker sat at 0% for hours. The lamp heard and
+answered eight calls that nobody heard, and nothing on the lamp showed it.
+The product owner: "when lamp is on mute, we should have a different color
+code or something on the lamp so people know." With
+`LAMP_RING_SPEAKER_MUTED=on` in the voice's unit (on in the product; off
+unless `on` exactly; passed to its ring worker only,
+`crates/voice/src/ring_speaker.rs`), the ring shows a muted speaker in a
+colour of its own, teal:
+
+| While the speaker is muted or at 0 | What the ring shows |
+|---|---|
+| At rest, the person's own light at level 1 (the first light most lamps keep) | The resting face as ever, the same breath, in teal (`ring_face::MUTED_TINT`: green 1.0 and blue 0.70 of the face's glow, no red) |
+| At rest, the person's light off | The ember's own pixels, one in four, at 3 steps of green and 2 of blue |
+| At rest, the person's light at level 2 or above | Their light as they set it, frame for frame: a light to see by is theirs (`MUTED_REST_MOST_LEVEL`, decided on #8934). The mute shows in the speaking face and the swell below |
+| At rest under a light someone asked for (a skill's, a self-test's, a paired computer's pixels) | That light, frame for frame: whoever asked for it keeps it |
+| Answering (the speaking face) | The speaking face in teal, moving with the voice it hands the speaker as ever, over a skill's light on it too: answering, but not heard |
+| The lamp's name heard (`name/heard`, lamp-name's own, scored 0.9 or more, said under 0.5 s before it is read) | One swell of the whole ring into teal, to 0.6 of the ceiling: up over 150 ms, back over 850 ms (1 s in all, `HEARD_US`), over whatever face is drawn but a computer's own pixels. One at a time: a hearing during a swell is the same call |
+| Listening, thinking, the offline breath, a tap's listening face | As ever |
+| Heard again (unmuted, or the volume raised) | The plain faces from the next frame, eased at the face's own 70 ms: most of the way within 0.1 s. A swell under way ends with it |
+
+- **Why teal:** cool, as the first idea had it, but not blue. Blue is the
+  listening face's (a pale sky blue), the setup light's while it joins the
+  Wi-Fi, and the person's blue and cyan lights'. Teal sits in the gap between
+  the person's green and cyan lights, which no face uses; it is neither warm,
+  as the resting, thinking and speaking faces are, nor the privacy switch's
+  dark red. It has two channels only, so a dim breath keeps its colour from
+  pixel to pixel (the ember's lesson, "The lamp's own light" below). The
+  test `the_muted_colour_is_a_hue_no_face_or_light_draws` measures every
+  face, light and other writer of the ring as drawn, and finds teal at least
+  20 degrees of hue from each (the nearest are the cyan light and the unplug
+  light's soft green, about 25).
+- **Calm:** at rest only the colour changes, never the breath, its pace or
+  its level, and only in the dim glow, so it reads as the same creature with
+  its voice off and a light set to see by is never recoloured. The swell
+  comes only when someone calls, once a call, at every level of the light.
+- **What counts as muted** (`ring_speaker::speaker`), the first that holds:
+  - a fresh `speaker/state` (lamp-actions' read of the mixer about once a
+    second, good for 3 s, on this boot's clock; with `LAMP_REQUESTED_AUDIO=on`
+    in lamp-actions, on in the product): muted at a level of 0, or when it
+    says muted with no level read; heard at any level over 0, even under a
+    mute asked for, since a level raised again outside lamp-actions is what a
+    person hears; not known with no level read and no mute. A level set to 0
+    outside lamp-actions, by `amixer`, is seen at lamp-actions' next read of
+    the mixer, within about a second;
+  - else `speaker/volume` (said at lamp-actions' start and after each change
+    it makes, and kept by the bus), but only if it was said after the newest
+    `speaker/state`, or there is none (requested audio off): muted at 0. One
+    said before is older than that state's word, which has lapsed. It knows
+    only lamp-actions' own changes, not a level set by `amixer`;
+  - else nothing is known: **nothing is shown**, and the faces are as ever.
+    The ring's own reader's last look counts for 1 s, so a reader that
+    stalls is no word either.
+- **When a hearing counts:** while fresh, said under 0.5 s before the ring's
+  reader takes it, by the clock its header calls for ([bus.md](bus.md)): a
+  header's `at_us` is its publisher's own unless it says this boot's clock,
+  and lamp-name's say none (its `at_us` counts from its own start), so their
+  wall stamp decides. On #8934's first lamp row (lamp-dbda, 28 Nov) the
+  reader took `at_us` as the host's clock, lamp-name's was 17,513 s behind,
+  and no real hearing ever swelled. The swell is dated by when it was read.
+- **Never over privacy or a mute:** it is the face's, drawn only where the
+  face is. With the privacy switch closed the ring refuses its frames as any
+  face's, and the dark-red breath (or the person's look) is the privacy
+  worker's, which never reads the speaker. While the voice is muted the ring
+  worker is gone, and the asleep face is as before.
+- **Within the caps:** the tint and the swell are shares of the ceiling each
+  frame is drawn under, the output cap's included, so they never pass it.
+- **What is said:** `light/state` and `light/drawn` go on saying the person's
+  light, as under the night's sleep: the teal is the face's, not a light.
+- **With the ring's other looks at rest,** both off in the product: the
+  night's asleep face (`LAMP_NIGHT_ASLEEP_FACE`) still eases in over the
+  light off, over the teal ember too, and an update's breath
+  (`LAMP_RING_UPDATE`) slows and dims the teal face as it would the person's
+  light. The shutdown's and the reset's warnings and the unplug picture come
+  before any face, as ever.
+- **How fast:** lamp-actions says an explicit mute before its mixer write.
+  The ring's reader looks every 50 ms and wakes at once for a hearing; the
+  ring's loop takes what it found on its next pass (2 ms), into the next
+  resting frame (25 ms) or turn frame, and the face eases at 70 ms. So the
+  teal face begins within about 80 ms of lamp-actions' word, and is gone as
+  fast once heard; a swell begins within about 30 ms of `name/heard` and is
+  plainly brighter within 100 ms. Not measured on a lamp.
+- **Said in the journal**, once per change and never per frame, each
+  number as what it is, since the two are not one scale: `raw` for the
+  mixer's own value in `speaker/state`, `%` for `speaker/volume`'s share of
+  what the lamp allows:
+  `lamp-voice ring: speaker muted (speaker/state, raw 0): its faces in teal`,
+  `lamp-voice ring: speaker heard (speaker/state, raw 35): its faces as ever`,
+  `lamp-voice ring: speaker muted (speaker/volume, 0%): its faces in teal`,
+  `lamp-voice ring: speaker not known: its faces as ever`. A swell is said
+  only as drawn: once the first frame with it is written,
+  `lamp-voice ring: speaker muted: the name heard (score 0.97), one teal swell`;
+  with none written by the end of its second (or by the ring's end), why not:
+  `lamp-voice ring: speaker muted: the name heard (score 0.96), no swell (not drawn: privacy)`,
+  or `(not drawn: a computer's pixels)`, and likewise `a warning`,
+  `the unplug picture`, `the night's asleep face`, `refused` (any other
+  refusal of its frames) or `no frame`.
+  A reader that cannot start says so once
+  (`lamp-voice ring: the speaker's mute is not shown: …`) and the ring runs
+  as before.
+
+Tests: `ring_face`'s `muted_the_rest_is_teal_with_the_light_off_or_at_level_one`,
+`muted_a_light_above_level_one_stays_as_the_person_set_it` (levels 2 to 5,
+every colour, frame for frame as heard),
+`muted_the_swell_and_the_speaking_face_show_at_every_level`,
+`heard_every_face_is_as_it_was` (heard or not known, every frame as before),
+`muted_in_turns_leaves_the_rest_to_the_light_shown`,
+`muted_the_speaking_face_is_teal_and_follows_the_voice`,
+`unmuting_brings_the_plain_faces_back_at_once`,
+`a_hearing_while_muted_swells_once_in_teal`,
+`the_muted_faces_and_the_swell_never_pass_the_ceiling`,
+`the_muted_colour_is_a_hue_no_face_or_light_draws`,
+`a_muted_speaking_frame_is_refused_once_the_privacy_switch_closes` and
+`the_face_says_whether_its_last_frame_had_the_swell` (never at rest under a
+computer's own pixels);
+`ring_speaker`'s `a_fresh_state_decides_and_a_level_of_zero_is_muted`,
+`without_a_fresh_state_only_a_newer_volume_counts`,
+`only_lamp_actions_own_valid_words_count`,
+`the_rest_shows_it_only_over_the_persons_own_light`,
+`a_hearing_is_lamp_names_own_sure_and_fresh_by_the_clock_its_header_calls_for`,
+`a_hearing_on_lamp_names_own_clock_is_taken_fresh_and_never_old` (a real
+bus: a hearing stamped as lamp-name stamps it, `at_us` far behind, is taken
+just said and not 2 s late; it failed on the first lamp row's head),
+`the_journal_hears_each_change_once` (raw and % apart),
+`a_swells_line_says_drawn_once_or_not_drawn_and_why`,
+`the_thread_reads_the_speaker_and_hands_each_hearing_over_once` (a real bus),
+`the_worker_rests_in_teal_only_while_the_speaker_is_muted_and_never_over_privacy`
+(the actual worker loop and guarded sink: teal only while muted, the warm
+first light when heard or not known, nothing but black with the switch
+closed, a skill's light kept, and the person's light asked for at level 4
+kept warm while at level 1 it rests teal),
+`a_swell_is_journalled_once_drawn_and_never_over_privacy` and
+`a_swell_under_a_computers_pixels_is_journalled_not_drawn` (the same loop:
+one teal swell when drawn, "not drawn: privacy" with the switch closed,
+"not drawn: a computer's pixels" under them; both fail with the reviewed
+head's journal line put back);
+`ring_worker`'s
+`the_muted_face_and_its_swell_are_never_drawn_over_privacy_or_a_turn` and
+`a_resting_frame_tells_a_swell_drawn_only_as_written_with_it`; and
+`process`'s `the_speakers_mute_on_the_ring_reaches_the_ring_alone_as_exactly_on`.
+Not yet seen on a lamp: how the teal looks at the night's cap of 24, and
+whether a person reads it as the speaker's mute, are for the lamp check.
 
 ### The reset's red (#5929)
 
