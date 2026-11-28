@@ -1,0 +1,99 @@
+{
+  "schema": "sensor4-shared-identity-source/1",
+  "status": "source_recipe_ready_media_and_realized_geometry_hashes_not_yet_sealed",
+  "parameters_file": "identity-parameters-v1.json",
+  "parameters_sha256": "62115de6706c05dbec95f17939b4c4d732a433999ff7a018eee4fac6407092ea",
+  "construction_file": "shared_identity_v1.py",
+  "construction_sha256": "6c307a551d9f397e4835a4ac7b125a7cd7b2341ea79912e241758715ab5ee9dd",
+  "blender": {
+    "version": "4.5.17 LTS",
+    "build_commit": "2f5ec98689b8",
+    "archive_url": "https://download.blender.org/release/Blender4.5/blender-4.5.17-macos-x64.dmg",
+    "archive_sha256": "52aacbe2adcde47d49634e48ae8097eab740a5522fb2c5ab76721753cb92cbba",
+    "archive_bytes": 339778015
+  },
+  "mpfb": {
+    "version": "2.0.18",
+    "commit": "d9648f3257a0b9712281d466245f30d656250154",
+    "archive_url": "https://codeload.github.com/makehumancommunity/mpfb2/tar.gz/d9648f3257a0b9712281d466245f30d656250154",
+    "archive_sha256": "902258fab82a48fba5bf8bccb3baf88e36e0a0441d88aca44a63ec4711162c5c",
+    "licence_code": "GPL-3.0-or-later",
+    "licence_assets": "CC0-1.0",
+    "licence_source": "https://github.com/makehumancommunity/mpfb2/blob/d9648f3257a0b9712281d466245f30d656250154/LICENSE.md",
+    "asset_licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
+    "all_2881_git_blobs_verified": true
+  },
+  "core_assets": {
+    "source": "https://files2.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip",
+    "etag": "\"10bbb7ea-6160e7c0d7996\"",
+    "archive_bytes": 280737770,
+    "mode": "selective HTTP ranges, each local header/size/CRC checked and SHA256 pinned",
+    "licence": "CC0-1.0",
+    "licence_source": "https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html",
+    "skin_names": [
+      "young_african_female",
+      "young_african_male",
+      "young_asian_female",
+      "young_asian_male",
+      "young_caucasian_female",
+      "young_caucasian_male"
+    ],
+    "assets": [
+      "eyes/low-poly",
+      "eyes/materials/brown",
+      "eyebrows/eyebrow001",
+      "eyelashes/eyelashes01",
+      "hair/short04",
+      "hair/long01",
+      "clothes/male_casualsuit06"
+    ]
+  },
+  "glasses": {
+    "name": "spamrakuen_sagerfrogs_glasses_01",
+    "adapter_author": "spamrakuen",
+    "original_author": "sagerfrog",
+    "licence": "CC0-1.0",
+    "licence_source": "https://static.makehumancommunity.org/assets/assetpacks/glasses01.html",
+    "member_header": "# license: CC0",
+    "original_source_listing": "https://blendswap.com/3d/lensing",
+    "notes": "kwnet_at_optical_glasses and frankyaye_glasses_library_male were acquired for audit but are excluded due to conflicting AGPL headers. No procedural placeholder glasses used."
+  },
+  "construction": {
+    "scale": 0.1,
+    "neutral_head_origin": "zero-based MakeHuman base vertex 297, independently identified nose tip",
+    "neutral_head_axes": "x right, y down, z backwards; canonical front is -z",
+    "neutral_base_from_head_rotation": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        -1,
+        0
+      ]
+    ],
+    "rig": "default with imported pinned weights",
+    "material_mode": "GAMEENGINE",
+    "subdivision_levels": 0,
+    "skin_hair_glasses_balance": "Each six-identity block uses every skin once, none/short/long hair twice each, glasses on odd suffixes",
+    "geometry_hash_definition": "SHA256 of little-endian float64 neutral nose-centred canonical coordinates of body vertices whose summed head-descendant bone weights are at least0.99999; store membership hash too",
+    "pointing_data_use": "none"
+  },
+  "preview": {
+    "identity": "A00",
+    "count": 1,
+    "image_sha256": "6adecbf8daed0abad86c16a5bec49ec8abfbfef55172a6654326d9e3375ed20c",
+    "excluded_from_benchmark": true,
+    "render_seconds": 3.071482880972326,
+    "yunet_score": 0.9254774451255798,
+    "yunet_threshold": 0.5
+  },
+  "full_media_seal_pending": true
+}

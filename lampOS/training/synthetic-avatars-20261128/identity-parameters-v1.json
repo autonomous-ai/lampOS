@@ -1,0 +1,894 @@
+{
+  "schema": "sensor4-identity-parameters/1",
+  "identity_seed_rule": "20261128 + numeric suffix",
+  "identities": [
+    {
+      "identity_id": "A00",
+      "seed": 20261128,
+      "phase": "train",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.7964329950831446,
+        "muscle": 0.5059051197584474,
+        "weight": 0.4787924995181621,
+        "proportions": 0.5,
+        "height": 0.5899739547242469,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.24779876664515807,
+          "caucasian": 0.36610117045087254,
+          "african": 0.3861000629039695
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.21836662305945093,
+        "head/head-scale-vert-decr.target.gz": 0.1949832089062573,
+        "head/head-scale-depth-incr.target.gz": 0.12210435181355916,
+        "nose/nose-scale-horiz-decr.target.gz": 0.2263304403374527,
+        "nose/nose-scale-vert-incr.target.gz": 0.19318405350554335,
+        "nose/nose-scale-depth-decr.target.gz": 0.1550416853932633,
+        "chin/chin-width-decr.target.gz": 0.13905806082374242,
+        "chin/chin-height-incr.target.gz": 0.10850154087133951,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.1338451684894631
+      },
+      "skin_material_index": 0,
+      "skin_asset": "young_african_female",
+      "hair_class": "none",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A01",
+      "seed": 20261129,
+      "phase": "train",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.78860363821345,
+        "muscle": 0.4079105803558152,
+        "weight": 0.5873622878177984,
+        "proportions": 0.5,
+        "height": 0.5744993662376181,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.1134382123979864,
+          "caucasian": 0.6603558091519629,
+          "african": 0.22620597845005072
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.18340163100210727,
+        "head/head-scale-vert-decr.target.gz": 0.2082909432462175,
+        "head/head-scale-depth-decr.target.gz": 0.008725363219949378,
+        "nose/nose-scale-horiz-decr.target.gz": 0.2502472110542294,
+        "nose/nose-scale-vert-decr.target.gz": 0.060957224928567755,
+        "nose/nose-scale-depth-incr.target.gz": 0.007736824780172236,
+        "chin/chin-width-incr.target.gz": 0.17159970807810487,
+        "chin/chin-height-incr.target.gz": 0.07071563598067387,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.029954157428888573
+      },
+      "skin_material_index": 1,
+      "skin_asset": "young_african_male",
+      "hair_class": "short",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A02",
+      "seed": 20261130,
+      "phase": "train",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.7634085052070618,
+        "muscle": 0.6448258110864191,
+        "weight": 0.379812089796858,
+        "proportions": 0.5,
+        "height": 0.5495762428332213,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.5024579715147435,
+          "caucasian": 0.4006321357178152,
+          "african": 0.0969098927674413
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.14133066530750937,
+        "head/head-scale-vert-incr.target.gz": 0.16358578891430683,
+        "head/head-scale-depth-incr.target.gz": 0.1520663524994143,
+        "nose/nose-scale-horiz-decr.target.gz": 0.1851284806821479,
+        "nose/nose-scale-vert-incr.target.gz": 0.19213792682257896,
+        "nose/nose-scale-depth-incr.target.gz": 0.08124926763082485,
+        "chin/chin-width-decr.target.gz": 0.2407969017322973,
+        "chin/chin-height-incr.target.gz": 0.12196167800250018,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.14058672855725413
+      },
+      "skin_material_index": 2,
+      "skin_asset": "young_asian_female",
+      "hair_class": "long",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A03",
+      "seed": 20261131,
+      "phase": "train",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.6672152064656431,
+        "muscle": 0.5754279201092218,
+        "weight": 0.41596006090636883,
+        "proportions": 0.5,
+        "height": 0.5445035114973483,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.4430990698639313,
+          "caucasian": 0.2649187461632602,
+          "african": 0.29198218397280845
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.2150418900803025,
+        "head/head-scale-vert-decr.target.gz": 0.01411711269747834,
+        "head/head-scale-depth-decr.target.gz": 0.11626993079203729,
+        "nose/nose-scale-horiz-incr.target.gz": 0.2074642730651961,
+        "nose/nose-scale-vert-incr.target.gz": 0.09977984983605231,
+        "nose/nose-scale-depth-decr.target.gz": 0.05179443378579479,
+        "chin/chin-width-incr.target.gz": 0.26299014790601355,
+        "chin/chin-height-incr.target.gz": 0.20153172701606298,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.059957758075299905
+      },
+      "skin_material_index": 3,
+      "skin_asset": "young_asian_male",
+      "hair_class": "none",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A04",
+      "seed": 20261132,
+      "phase": "train",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5600891060065017,
+        "muscle": 0.37716017276566616,
+        "weight": 0.5006963405261478,
+        "proportions": 0.5,
+        "height": 0.4541747787333027,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.19279411059856105,
+          "caucasian": 0.36940025363986734,
+          "african": 0.43780563576157167
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.00014485894640403618,
+        "head/head-scale-vert-decr.target.gz": 0.07984755782069253,
+        "head/head-scale-depth-incr.target.gz": 0.1689434139494499,
+        "nose/nose-scale-horiz-decr.target.gz": 0.21081925743670854,
+        "nose/nose-scale-vert-incr.target.gz": 0.24119942014260448,
+        "nose/nose-scale-depth-decr.target.gz": 0.1191893474666128,
+        "chin/chin-width-incr.target.gz": 0.1421303457395624,
+        "chin/chin-height-incr.target.gz": 0.2328862353344462,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.13058038364644126
+      },
+      "skin_material_index": 4,
+      "skin_asset": "young_caucasian_female",
+      "hair_class": "short",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A05",
+      "seed": 20261133,
+      "phase": "train",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.5510899964211613,
+        "muscle": 0.5282219736544598,
+        "weight": 0.607279577295311,
+        "proportions": 0.5,
+        "height": 0.5992687904688212,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.5267797625506724,
+          "caucasian": 0.2590361593794586,
+          "african": 0.214184078069869
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.21112840741528094,
+        "head/head-scale-vert-incr.target.gz": 0.14736614960018388,
+        "head/head-scale-depth-decr.target.gz": 0.1046169694282334,
+        "nose/nose-scale-horiz-decr.target.gz": 0.06678762852388509,
+        "nose/nose-scale-vert-incr.target.gz": 0.22307951809549575,
+        "nose/nose-scale-depth-decr.target.gz": 0.06533372323677122,
+        "chin/chin-width-decr.target.gz": 0.2928727300897442,
+        "chin/chin-height-decr.target.gz": 0.24341197842161127,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.09602993589985653
+      },
+      "skin_material_index": 5,
+      "skin_asset": "young_caucasian_male",
+      "hair_class": "long",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A06",
+      "seed": 20261134,
+      "phase": "train",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5763201770063975,
+        "muscle": 0.5161280392805891,
+        "weight": 0.5562860853400643,
+        "proportions": 0.5,
+        "height": 0.47381989940955616,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.3199017874589393,
+          "caucasian": 0.40238090964733336,
+          "african": 0.2777173028937273
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.22637562778114423,
+        "head/head-scale-vert-decr.target.gz": 0.11571598426234504,
+        "head/head-scale-depth-incr.target.gz": 0.08107982947996356,
+        "nose/nose-scale-horiz-decr.target.gz": 0.1888193861336359,
+        "nose/nose-scale-vert-decr.target.gz": 0.23599461662410176,
+        "nose/nose-scale-depth-decr.target.gz": 0.05151684606848839,
+        "chin/chin-width-incr.target.gz": 0.015627339767840642,
+        "chin/chin-height-decr.target.gz": 0.24545285679449574,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.04200657656307141
+      },
+      "skin_material_index": 0,
+      "skin_asset": "young_african_female",
+      "hair_class": "none",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A07",
+      "seed": 20261135,
+      "phase": "train",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.7085146833164835,
+        "muscle": 0.37142531166688564,
+        "weight": 0.5918191508436674,
+        "proportions": 0.5,
+        "height": 0.5124525911085136,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.5430398639975033,
+          "caucasian": 0.15983007897839915,
+          "african": 0.29713005702409756
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.2784855433345616,
+        "head/head-scale-vert-decr.target.gz": 0.04285192388316722,
+        "head/head-scale-depth-incr.target.gz": 0.21438784651515047,
+        "nose/nose-scale-horiz-decr.target.gz": 0.19739615361344617,
+        "nose/nose-scale-vert-incr.target.gz": 0.00935354547070949,
+        "nose/nose-scale-depth-incr.target.gz": 0.04144088275380603,
+        "chin/chin-width-decr.target.gz": 0.23936522718621867,
+        "chin/chin-height-incr.target.gz": 0.24460251728066906,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.0135647255392628
+      },
+      "skin_material_index": 1,
+      "skin_asset": "young_african_male",
+      "hair_class": "short",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A08",
+      "seed": 20261136,
+      "phase": "train",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.7833627114064459,
+        "muscle": 0.4170614413345395,
+        "weight": 0.490826156605793,
+        "proportions": 0.5,
+        "height": 0.494872652098769,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.5285888956679712,
+          "caucasian": 0.17118038090023635,
+          "african": 0.30023072343179247
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.21741078094505134,
+        "head/head-scale-vert-decr.target.gz": 0.03263986145576103,
+        "head/head-scale-depth-decr.target.gz": 0.24446783822736412,
+        "nose/nose-scale-horiz-incr.target.gz": 0.1834029236680338,
+        "nose/nose-scale-vert-incr.target.gz": 0.05001821491108044,
+        "nose/nose-scale-depth-incr.target.gz": 0.1758888365598495,
+        "chin/chin-width-decr.target.gz": 0.07209098076003018,
+        "chin/chin-height-incr.target.gz": 0.20589709535777007,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.14078955946336763
+      },
+      "skin_material_index": 2,
+      "skin_asset": "young_asian_female",
+      "hair_class": "long",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A09",
+      "seed": 20261137,
+      "phase": "train",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.6522978907425492,
+        "muscle": 0.5414774215185016,
+        "weight": 0.4333010559111313,
+        "proportions": 0.5,
+        "height": 0.5388380093879623,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.17618412999944727,
+          "caucasian": 0.4464793254775744,
+          "african": 0.37733654452297827
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.033139524012846144,
+        "head/head-scale-vert-decr.target.gz": 0.05306756713214816,
+        "head/head-scale-depth-incr.target.gz": 0.004997132391652781,
+        "nose/nose-scale-horiz-incr.target.gz": 0.038683755517441076,
+        "nose/nose-scale-vert-decr.target.gz": 0.1519444514521563,
+        "nose/nose-scale-depth-incr.target.gz": 0.18843745023878833,
+        "chin/chin-width-decr.target.gz": 0.06495179903943754,
+        "chin/chin-height-decr.target.gz": 0.14221660548882764,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.0975456954838251
+      },
+      "skin_material_index": 3,
+      "skin_asset": "young_asian_male",
+      "hair_class": "none",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A10",
+      "seed": 20261138,
+      "phase": "train",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.6915261602701089,
+        "muscle": 0.4068025474177124,
+        "weight": 0.44733787402591135,
+        "proportions": 0.5,
+        "height": 0.5416309469680883,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.46777588883542837,
+          "caucasian": 0.33465215543692406,
+          "african": 0.19757195572764763
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.22079485917282082,
+        "head/head-scale-vert-incr.target.gz": 0.15876969433195012,
+        "head/head-scale-depth-decr.target.gz": 0.10504306796722268,
+        "nose/nose-scale-horiz-incr.target.gz": 0.18889060569652144,
+        "nose/nose-scale-vert-incr.target.gz": 0.07257873741136567,
+        "nose/nose-scale-depth-incr.target.gz": 0.21080671819070612,
+        "chin/chin-width-decr.target.gz": 0.07473336239835765,
+        "chin/chin-height-incr.target.gz": 0.24650052860418387,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.1483849531406311
+      },
+      "skin_material_index": 4,
+      "skin_asset": "young_caucasian_female",
+      "hair_class": "short",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A11",
+      "seed": 20261139,
+      "phase": "train",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.6821329177438169,
+        "muscle": 0.261122595935752,
+        "weight": 0.5858531866659371,
+        "proportions": 0.5,
+        "height": 0.5699140288427904,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.5365307352934219,
+          "caucasian": 0.055845402404762205,
+          "african": 0.40762386230181585
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.19671119617930294,
+        "head/head-scale-vert-incr.target.gz": 0.182198562085966,
+        "head/head-scale-depth-decr.target.gz": 0.15175185207889835,
+        "nose/nose-scale-horiz-incr.target.gz": 0.11282391002351544,
+        "nose/nose-scale-vert-incr.target.gz": 0.127041238546528,
+        "nose/nose-scale-depth-incr.target.gz": 0.22111697083015325,
+        "chin/chin-width-decr.target.gz": 0.13160614716478236,
+        "chin/chin-height-incr.target.gz": 0.07950323635608098,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.16905728753410187
+      },
+      "skin_material_index": 5,
+      "skin_asset": "young_caucasian_male",
+      "hair_class": "long",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A12",
+      "seed": 20261140,
+      "phase": "tune",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5893978506803154,
+        "muscle": 0.3730566944708369,
+        "weight": 0.46137704516092065,
+        "proportions": 0.5,
+        "height": 0.5791017062249557,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.2970686780178985,
+          "caucasian": 0.42198927669533975,
+          "african": 0.2809420452867617
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.21753492647719314,
+        "head/head-scale-vert-decr.target.gz": 0.04790747425207334,
+        "head/head-scale-depth-incr.target.gz": 0.13185265969636306,
+        "nose/nose-scale-horiz-incr.target.gz": 0.0734215179874107,
+        "nose/nose-scale-vert-incr.target.gz": 0.031189896774983517,
+        "nose/nose-scale-depth-incr.target.gz": 0.2233797348192033,
+        "chin/chin-width-incr.target.gz": 0.1914828417070778,
+        "chin/chin-height-decr.target.gz": 0.09609615914879738,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.06587192776908135
+      },
+      "skin_material_index": 0,
+      "skin_asset": "young_african_female",
+      "hair_class": "none",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A13",
+      "seed": 20261141,
+      "phase": "tune",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.6313978731610564,
+        "muscle": 0.30000184048818734,
+        "weight": 0.5454115959381445,
+        "proportions": 0.5,
+        "height": 0.4549681633123905,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.33010565821405247,
+          "caucasian": 0.4516424164961561,
+          "african": 0.21825192528979134
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.03368404910506695,
+        "head/head-scale-vert-decr.target.gz": 0.0523476292293866,
+        "head/head-scale-depth-decr.target.gz": 0.1704587185621773,
+        "nose/nose-scale-horiz-incr.target.gz": 0.2280827293059211,
+        "nose/nose-scale-vert-incr.target.gz": 0.14256763968721298,
+        "nose/nose-scale-depth-incr.target.gz": 0.08966589827775362,
+        "chin/chin-width-incr.target.gz": 0.09408129750362504,
+        "chin/chin-height-incr.target.gz": 0.06331804818732056,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.1653159976402953
+      },
+      "skin_material_index": 1,
+      "skin_asset": "young_african_male",
+      "hair_class": "short",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A14",
+      "seed": 20261142,
+      "phase": "tune",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.645258057771733,
+        "muscle": 0.2587309926350112,
+        "weight": 0.5055486580167379,
+        "proportions": 0.5,
+        "height": 0.47245043132959763,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.4632225457278121,
+          "caucasian": 0.34976166322374724,
+          "african": 0.18701579104844063
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.24761225079697682,
+        "head/head-scale-vert-incr.target.gz": 0.164047077607851,
+        "head/head-scale-depth-incr.target.gz": 0.11380716518426298,
+        "nose/nose-scale-horiz-decr.target.gz": 0.07998650875635974,
+        "nose/nose-scale-vert-decr.target.gz": 0.09418940949670962,
+        "nose/nose-scale-depth-incr.target.gz": 0.2256498057273999,
+        "chin/chin-width-incr.target.gz": 0.1197529872101829,
+        "chin/chin-height-incr.target.gz": 0.22233131561493202,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.1323847240270969
+      },
+      "skin_material_index": 2,
+      "skin_asset": "young_asian_female",
+      "hair_class": "long",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A15",
+      "seed": 20261143,
+      "phase": "tune",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.7145304379141332,
+        "muscle": 0.44084444010993307,
+        "weight": 0.6144113938005271,
+        "proportions": 0.5,
+        "height": 0.5693864775803368,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.3556774499175745,
+          "caucasian": 0.29565643622458665,
+          "african": 0.34866611385783886
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.2918716130330063,
+        "head/head-scale-vert-decr.target.gz": 0.006596427466394439,
+        "head/head-scale-depth-decr.target.gz": 0.23015171408975715,
+        "nose/nose-scale-horiz-decr.target.gz": 0.012062195553932509,
+        "nose/nose-scale-vert-incr.target.gz": 0.056977307614279826,
+        "nose/nose-scale-depth-incr.target.gz": 0.03966357058225378,
+        "chin/chin-width-incr.target.gz": 0.09319200202824196,
+        "chin/chin-height-decr.target.gz": 0.05545157254647903,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.014192183919364998
+      },
+      "skin_material_index": 3,
+      "skin_asset": "young_asian_male",
+      "hair_class": "none",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A16",
+      "seed": 20261144,
+      "phase": "tune",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5889482646352739,
+        "muscle": 0.320423376011003,
+        "weight": 0.46303567964143566,
+        "proportions": 0.5,
+        "height": 0.46624368145804673,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.20909003687876848,
+          "caucasian": 0.40052589205983646,
+          "african": 0.3903840710613951
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.12696595092298146,
+        "head/head-scale-vert-incr.target.gz": 0.1894622816604268,
+        "head/head-scale-depth-incr.target.gz": 0.09833447404000545,
+        "nose/nose-scale-horiz-decr.target.gz": 0.16267468199151291,
+        "nose/nose-scale-vert-decr.target.gz": 0.1856396033774842,
+        "nose/nose-scale-depth-incr.target.gz": 0.0899533710265748,
+        "chin/chin-width-decr.target.gz": 0.24856967951907727,
+        "chin/chin-height-incr.target.gz": 0.13831393266128134,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.197364066021118
+      },
+      "skin_material_index": 4,
+      "skin_asset": "young_caucasian_female",
+      "hair_class": "short",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A17",
+      "seed": 20261145,
+      "phase": "tune",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.5698547698417415,
+        "muscle": 0.4190850660252954,
+        "weight": 0.3709291646367975,
+        "proportions": 0.5,
+        "height": 0.5361049670922635,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.2509168746497764,
+          "caucasian": 0.3991487423889921,
+          "african": 0.34993438296123147
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.02866493375897794,
+        "head/head-scale-vert-decr.target.gz": 0.06534829248512619,
+        "head/head-scale-depth-decr.target.gz": 0.08100103867101482,
+        "nose/nose-scale-horiz-decr.target.gz": 0.0713039544389949,
+        "nose/nose-scale-vert-decr.target.gz": 0.145327104201127,
+        "nose/nose-scale-depth-incr.target.gz": 0.017580852906313504,
+        "chin/chin-width-incr.target.gz": 0.19072661346907926,
+        "chin/chin-height-decr.target.gz": 0.03498134919272661,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.07422294679853098
+      },
+      "skin_material_index": 5,
+      "skin_asset": "young_caucasian_male",
+      "hair_class": "long",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A18",
+      "seed": 20261146,
+      "phase": "test",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5692649489232136,
+        "muscle": 0.3870146958237766,
+        "weight": 0.3714755273531387,
+        "proportions": 0.5,
+        "height": 0.5830893441164499,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.364436097162805,
+          "caucasian": 0.41089213121441287,
+          "african": 0.22467177162278212
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.037648056126187546,
+        "head/head-scale-vert-incr.target.gz": 0.0016782091379616004,
+        "head/head-scale-depth-incr.target.gz": 0.08598638446119367,
+        "nose/nose-scale-horiz-incr.target.gz": 0.03856628522206873,
+        "nose/nose-scale-vert-decr.target.gz": 0.022839835865525626,
+        "nose/nose-scale-depth-decr.target.gz": 0.16260605304818732,
+        "chin/chin-width-decr.target.gz": 0.2835387470330549,
+        "chin/chin-height-incr.target.gz": 0.031266551647674334,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.18426440500733038
+      },
+      "skin_material_index": 0,
+      "skin_asset": "young_african_female",
+      "hair_class": "none",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A19",
+      "seed": 20261147,
+      "phase": "test",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.608484106692515,
+        "muscle": 0.49860868696910887,
+        "weight": 0.4832294412048167,
+        "proportions": 0.5,
+        "height": 0.5971403242693947,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.44349372505828005,
+          "caucasian": 0.2065874022098128,
+          "african": 0.34991887273190714
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.146768614305571,
+        "head/head-scale-vert-incr.target.gz": 0.1658071872708793,
+        "head/head-scale-depth-incr.target.gz": 0.0767262634256457,
+        "nose/nose-scale-horiz-incr.target.gz": 0.11942187316002795,
+        "nose/nose-scale-vert-incr.target.gz": 0.0705357769734476,
+        "nose/nose-scale-depth-decr.target.gz": 0.09423508938057673,
+        "chin/chin-width-decr.target.gz": 0.17364748267693852,
+        "chin/chin-height-decr.target.gz": 0.20774082730302856,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.06899300779258277
+      },
+      "skin_material_index": 1,
+      "skin_asset": "young_african_male",
+      "hair_class": "short",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A20",
+      "seed": 20261148,
+      "phase": "test",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5109127495673355,
+        "muscle": 0.26296925899342705,
+        "weight": 0.38749323733987884,
+        "proportions": 0.5,
+        "height": 0.5296376042417921,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.15532702557608508,
+          "caucasian": 0.4083919264971048,
+          "african": 0.43628104792681
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-decr.target.gz": 0.1476905790365526,
+        "head/head-scale-vert-decr.target.gz": 0.07044492952650441,
+        "head/head-scale-depth-decr.target.gz": 0.0037960021463253057,
+        "nose/nose-scale-horiz-decr.target.gz": 0.0860708033141544,
+        "nose/nose-scale-vert-decr.target.gz": 0.22388755373565944,
+        "nose/nose-scale-depth-incr.target.gz": 0.23188312414591472,
+        "chin/chin-width-incr.target.gz": 0.25482087115803403,
+        "chin/chin-height-decr.target.gz": 0.04868555861853474,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.14817433314667477
+      },
+      "skin_material_index": 2,
+      "skin_asset": "young_asian_female",
+      "hair_class": "long",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A21",
+      "seed": 20261149,
+      "phase": "test",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.7998103944821423,
+        "muscle": 0.4688206985015059,
+        "weight": 0.42107018442695043,
+        "proportions": 0.5,
+        "height": 0.4601217002601641,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.17832524254923793,
+          "caucasian": 0.5115590327902446,
+          "african": 0.31011572466051757
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.07476955883659131,
+        "head/head-scale-vert-decr.target.gz": 0.09541294088550813,
+        "head/head-scale-depth-incr.target.gz": 0.16891306297279518,
+        "nose/nose-scale-horiz-decr.target.gz": 0.2744307124569913,
+        "nose/nose-scale-vert-decr.target.gz": 0.03951446318591151,
+        "nose/nose-scale-depth-decr.target.gz": 0.22824227229452954,
+        "chin/chin-width-decr.target.gz": 0.277382580087624,
+        "chin/chin-height-incr.target.gz": 0.18130624676888502,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.14729218620284237
+      },
+      "skin_material_index": 3,
+      "skin_asset": "young_asian_male",
+      "hair_class": "none",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A22",
+      "seed": 20261150,
+      "phase": "test",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.7867199026666838,
+        "muscle": 0.4782237717219293,
+        "weight": 0.38247542428852466,
+        "proportions": 0.5,
+        "height": 0.5171281705139729,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.19050463716512653,
+          "caucasian": 0.5873532912284084,
+          "african": 0.22214207160646504
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.21879462117958443,
+        "head/head-scale-vert-incr.target.gz": 0.03208339201605906,
+        "head/head-scale-depth-incr.target.gz": 0.023708921913302594,
+        "nose/nose-scale-horiz-decr.target.gz": 0.10709441424751362,
+        "nose/nose-scale-vert-decr.target.gz": 0.13676900678845827,
+        "nose/nose-scale-depth-decr.target.gz": 0.23280698350256562,
+        "chin/chin-width-decr.target.gz": 0.02157371848915507,
+        "chin/chin-height-incr.target.gz": 0.24248951585848416,
+        "forehead/forehead-scale-vert-incr.target.gz": 0.14572343542909988
+      },
+      "skin_material_index": 4,
+      "skin_asset": "young_caucasian_female",
+      "hair_class": "short",
+      "glasses": false,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    },
+    {
+      "identity_id": "A23",
+      "seed": 20261151,
+      "phase": "test",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.7168101932732206,
+        "muscle": 0.492937546818379,
+        "weight": 0.6271707594711182,
+        "proportions": 0.5,
+        "height": 0.5103489055877325,
+        "cupsize": 0.5,
+        "firmness": 0.5,
+        "race": {
+          "asian": 0.6450819624281612,
+          "caucasian": 0.09003727960485026,
+          "african": 0.2648807579669887
+        }
+      },
+      "targets": {
+        "head/head-scale-horiz-incr.target.gz": 0.2141508989796172,
+        "head/head-scale-vert-decr.target.gz": 0.12726934138280577,
+        "head/head-scale-depth-incr.target.gz": 0.0074917755695969035,
+        "nose/nose-scale-horiz-decr.target.gz": 0.12861338873142783,
+        "nose/nose-scale-vert-incr.target.gz": 0.0911625874519073,
+        "nose/nose-scale-depth-incr.target.gz": 0.13361243593291977,
+        "chin/chin-width-decr.target.gz": 0.24406197461215862,
+        "chin/chin-height-decr.target.gz": 0.24817750781164521,
+        "forehead/forehead-scale-vert-decr.target.gz": 0.18308535449674715
+      },
+      "skin_material_index": 5,
+      "skin_asset": "young_caucasian_male",
+      "hair_class": "long",
+      "glasses": true,
+      "clothing": "male_casualsuit06",
+      "notes": "Morphology only uses pinned CC0 MakeHuman procedural targets. No data fitting."
+    }
+  ]
+}
