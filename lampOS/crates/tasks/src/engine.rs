@@ -5,7 +5,7 @@ use crate::{
         Closed, EngineKind, JoinedOn, JoinedSession, Launch, LaunchOutcome, Observation, Target,
         prompt_fits,
     },
-    protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
+    protocol::{Guard, MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
 };
 use serde::{Deserialize, Serialize};
@@ -2224,7 +2224,7 @@ impl<P: Persistence> Engine<P> {
             return self.reply(json!({"id":id,"observation_id":observation_id,"told":false}));
         }
         if let Some(receipt) = &self.state.last_receipt {
-            if receipt.request == *request {
+            if same_request(&receipt.request, request) {
                 if matches!(request, Request::ClaimSpeech { .. }) {
                     return Err(err(
                         "claim_uncertain",
@@ -2240,7 +2240,12 @@ impl<P: Persistence> Engine<P> {
                 ));
             }
         }
-        if guard.revision != self.revision() {
+        // A person's stop needs no fresh revision: it names its task by id
+        // and means the same whatever changed meanwhile (a running direct
+        // task's looks move the revision on every few seconds), and every
+        // outcome is read from the task as it is now. Its request id and
+        // receipt above still hold, so a retry is never a second change.
+        if guard.revision != self.revision() && !matches!(request, Request::Stop { .. }) {
             return Err(err(
                 "conflict",
                 "Tasks changed; inspect current state without silently retrying a mutation.",
@@ -2544,7 +2549,7 @@ impl<P: Persistence> Engine<P> {
             return Err(err("too_long", "The response exceeds the protocol bound."));
         }
         next.last_receipt = Some(Receipt {
-            request: request.clone(),
+            request: as_kept(request, self.revision()),
             response: response.clone(),
             at,
         });
@@ -2560,8 +2565,10 @@ impl<P: Persistence> Engine<P> {
     /// none for one not yet begun (dropped as `cancel` drops it). A direct
     /// task at work is the direct session's to stop (`stopping`, with its
     /// agent, finished by the service with [`crate::direct::stop_finish`]);
-    /// one Harness has is `remote`, nothing sent; one over or unknown,
-    /// `not_running`; one being handed over now, refused `busy`.
+    /// one Harness has on another computer is `remote`, and on the lamp's
+    /// own agent (its direct switch off) `cannot_stop`, nothing sent; one
+    /// over or unknown, `not_running`; one being handed over now, refused
+    /// `busy`.
     fn stop_without_change(&self, id: u64) -> Option<Result<Value, Error>> {
         let Some(task) = self.state.tasks.iter().find(|task| task.id == id) else {
             return Some(Ok(stop_body(id, "not_running")));
@@ -2573,6 +2580,11 @@ impl<P: Persistence> Engine<P> {
                     "busy",
                     "The task is being handed over now; ask again in a moment.",
                 )));
+            }
+            // Still being created by Harness: on the lamp's own agent,
+            // never "on your computer".
+            DispatchState::Pending if task.target_alias == crate::runtime::LAMP_TARGET => {
+                "cannot_stop"
             }
             DispatchState::Pending => "remote",
             DispatchState::NotSent | DispatchState::Cancelled | DispatchState::Invalidated => {
@@ -2597,10 +2609,16 @@ impl<P: Persistence> Engine<P> {
                     None if over => "not_running",
                     // The lamp's own agent spoken to directly, its run gone
                     // here (pruned, or from before a restart): over.
-                    None if task.target_alias == crate::runtime::LAMP_TARGET
-                        && crate::direct::lamp_for(engine_of(task)).is_some() =>
-                    {
-                        "not_running"
+                    None if task.target_alias == crate::runtime::LAMP_TARGET => {
+                        if crate::direct::lamp_for(engine_of(task)).is_some() {
+                            "not_running"
+                        } else {
+                            // The lamp's own agent with no direct session
+                            // here (its switch off): Harness has it on the
+                            // lamp, which cannot stop it. Never "on your
+                            // computer", never "finished".
+                            "cannot_stop"
+                        }
                     }
                     None => "remote",
                 }
@@ -3829,6 +3847,31 @@ fn observation_metadata(observed: &Observed) -> Value {
         "speech":observed.speech.as_ref().map(|s|json!({"claim_id":s.claim_id,"text_digest":s.text_digest,"state":s.state,"claimed":s.claimed,"finished":s.finished})),"told":observed.told,"completion":"unverified"})
 }
 
+/// `request` as its receipt keeps it, taking effect at `revision`: a
+/// stop's guard may be stale (it needs no fresh revision), so it is kept at
+/// the revision it took effect on, as every receipt's guard is.
+fn as_kept(request: &Request, revision: u64) -> Request {
+    match request {
+        Request::Stop { guard, id } => Request::Stop {
+            guard: Guard {
+                revision,
+                ..guard.clone()
+            },
+            id: *id,
+        },
+        request => request.clone(),
+    }
+}
+/// Whether `request` is the exact request `kept` was the receipt of: a
+/// stop's whatever its guard's revision ([`as_kept`]).
+fn same_request(kept: &Request, request: &Request) -> bool {
+    match (kept, request) {
+        (Request::Stop { guard: a, id: x }, Request::Stop { guard: b, id: y }) => {
+            x == y && a.store_id == b.store_id && a.request_id == b.request_id
+        }
+        _ => kept == request,
+    }
+}
 /// The `stop` op's answer for task `id`: `stop` the outcome, given at the
 /// top level and as `data` (the voice reads `data.stop`).
 fn stop_body(id: u64, stop: &str) -> Value {
@@ -4005,7 +4048,6 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::Guard;
     use std::{cell::RefCell, rc::Rc};
 
     const STORE: &str = "11111111111111111111111111111111";
@@ -4860,8 +4902,8 @@ mod tests {
         }
     }
 
-    /// A stop of a task Harness has (another computer's, or the lamp's
-    /// without its direct session): `remote`, nothing sent anywhere, the
+    /// A stop of a task Harness has on another computer: `remote`, nothing
+    /// sent anywhere, the
     /// store as it was. One unknown or already over: `not_running`.
     #[test]
     fn a_stop_of_a_harness_task_is_remote_and_of_an_ended_one_not_running() {
@@ -4982,6 +5024,125 @@ mod tests {
         crate::direct::set_test_lamp(None);
         assert_eq!(stop_word(&reply), "unconfirmed");
         assert_eq!(lamp.direct.observe(&agent).unwrap().state, "working");
+    }
+
+    /// While a direct task runs, its looks move the store's revision on, so
+    /// the guard the voice read a moment before is stale. The person's stop
+    /// still takes: a stop names its task by id and is the same whatever
+    /// changed meanwhile, so it never needs a fresh revision. Its request
+    /// id and receipt still hold: the same request again is the same answer.
+    #[test]
+    fn a_stop_with_a_stale_revision_still_stops_a_running_direct_task() {
+        let (mut engine, _) = opened();
+        let (lamp, agent) =
+            crate::direct::tests::lamp_running(lamp_agent_gateway::Engine::Openclaw);
+        let id = queued(&mut engine, 10);
+        engine.begin_launch(&clock(10)).unwrap().unwrap();
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: agent.clone(),
+                    session: None,
+                },
+                &clock(10),
+            )
+            .unwrap();
+        let stale = guard(&engine, "stop");
+        // A look at the running task: the revision moves on.
+        let job = request_read(&mut engine, id, 12);
+        let seen = lamp.direct.observe(&agent).unwrap();
+        assert_eq!(seen.state, "working");
+        engine.finish_observation(&job, seen, &clock(13)).unwrap();
+        assert_ne!(engine.revision(), stale.revision);
+        crate::direct::set_test_lamp(Some(lamp.direct.clone()));
+        let request = Request::Stop { guard: stale, id };
+        let reply = engine.handle(&request, &clock(20), false);
+        crate::direct::set_test_lamp(None);
+        let reply = reply.unwrap();
+        assert_eq!(reply["stop"], crate::direct::STOPPING, "{reply}");
+        // Another store's guard is still refused.
+        let mut other = guard(&engine, "stop-other");
+        other.store_id = "ffffffffffffffffffffffffffffffff".into();
+        assert_eq!(
+            engine
+                .handle(&Request::Stop { guard: other, id }, &clock(21), false)
+                .unwrap_err()
+                .code,
+            "bad_guard"
+        );
+    }
+
+    /// A stale stop of a task not yet begun drops it as a fresh one does,
+    /// and the same request again is the same receipt, never a second drop.
+    #[test]
+    fn a_stale_stop_before_the_task_began_is_not_started_once() {
+        let (mut engine, _) = opened();
+        let id = queued(&mut engine, 0);
+        let stale = guard(&engine, "stop");
+        prepare(&mut engine, 1);
+        assert_ne!(engine.revision(), stale.revision);
+        let request = Request::Stop { guard: stale, id };
+        let reply = engine.handle(&request, &clock(2), false).unwrap();
+        assert_eq!(stop_word(&reply), "not_started");
+        assert_eq!(dispatch(&engine, id), DispatchState::Cancelled);
+        assert_eq!(engine.handle(&request, &clock(3), false).unwrap(), reply);
+    }
+
+    /// The service's finish of a stop whose agent no turn here owns (its
+    /// run pruned, or another session's): `not_running`, the agent gone
+    /// from the reply.
+    #[test]
+    fn a_stop_finish_of_an_unknown_agent_is_not_running() {
+        crate::direct::set_test_lamp(None);
+        let mut body = stop_body(5, crate::direct::STOPPING);
+        body["agent"] = "lamp-nobody".into();
+        let reply = crate::direct::stop_finish(body, std::time::Duration::from_millis(50));
+        assert_eq!(stop_word(&reply), "not_running");
+        assert!(reply.get("agent").is_none(), "{reply}");
+    }
+
+    /// A stop while the task is being handed over (`attempting`), or its
+    /// hand-over is being checked (`uncertain`): `busy`, the store as it
+    /// was.
+    #[test]
+    fn a_stop_while_the_hand_over_is_under_way_is_busy() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 0);
+        engine.begin_launch(&clock(1)).unwrap().unwrap();
+        assert_eq!(dispatch(&engine, id), DispatchState::Attempting);
+        let revision = engine.revision();
+        assert_eq!(stop(&mut engine, id, 2).unwrap_err().code, "busy");
+        assert_eq!(engine.revision(), revision);
+        let mut recovered = Engine::open(memory, targets(), STORE, RESTART, &clock(3)).unwrap();
+        assert_eq!(dispatch(&recovered, id), DispatchState::Uncertain);
+        assert_eq!(stop(&mut recovered, id, 4).unwrap_err().code, "busy");
+        assert_eq!(dispatch(&recovered, id), DispatchState::Uncertain);
+    }
+
+    /// A task on the lamp's own agent with no direct session here (its
+    /// switch off, so Harness has it on the lamp): never "on your
+    /// computer", and never "finished" while it may be at work. It is
+    /// `cannot_stop`, nothing sent. With the direct session on and the run
+    /// gone here (from before a restart), it is over: `not_running`.
+    #[test]
+    fn a_stop_of_a_lamp_task_without_its_direct_session_cannot_stop() {
+        let (mut engine, id) = lamp_accepted(EngineKind::Openclaw, 10);
+        crate::direct::set_test_lamp(None);
+        let revision = engine.revision();
+        assert_eq!(
+            stop_word(&stop(&mut engine, id, 20).unwrap()),
+            "cannot_stop"
+        );
+        assert_eq!(engine.revision(), revision);
+        assert_eq!(dispatch(&engine, id), DispatchState::Accepted);
+        let (lamp, _turn) =
+            crate::direct::tests::lamp_running(lamp_agent_gateway::Engine::Openclaw);
+        crate::direct::set_test_lamp(Some(lamp.direct.clone()));
+        let reply = stop(&mut engine, id, 21);
+        crate::direct::set_test_lamp(None);
+        assert_eq!(stop_word(&reply.unwrap()), "not_running");
+        assert!(lamp.fake.aborted().is_empty());
     }
 
     #[test]

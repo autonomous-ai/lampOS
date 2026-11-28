@@ -794,11 +794,16 @@ fn stop_over_the_socket_says_how_it_went() {
         s.get(&prepared["id"])["task"]["dispatch"]["state"],
         "accepted"
     );
-    // Guarded as `cancel`: a stale revision is refused.
+    // A stale revision still stops (a running task's looks move it on);
+    // another store's guard is refused.
     let mut stale = s.guard();
     stale["revision"] = json!(0);
-    let refused = s.ask(json!({"op":"stop","guard":stale,"id":prepared["id"]}));
-    assert_eq!(refused["error"], "conflict", "{refused}");
+    let late = s.ask(json!({"op":"stop","guard":stale,"id":prepared["id"]}));
+    assert_eq!(late["data"]["stop"], "remote", "{late}");
+    let mut other = s.guard();
+    other["store_id"] = json!("ffffffffffffffffffffffffffffffff");
+    let refused = s.ask(json!({"op":"stop","guard":other,"id":prepared["id"]}));
+    assert_eq!(refused["error"], "bad_guard", "{refused}");
     assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1);
 }
 

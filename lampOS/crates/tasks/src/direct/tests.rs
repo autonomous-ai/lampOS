@@ -53,6 +53,8 @@ pub(crate) struct FakeState {
     /// The run ends answered with these words just as the abort comes: a
     /// stop racing the run's own end, which the end wins.
     answered_at_abort: Option<String>,
+    /// `abort` is refused (the gateway's link broke as it was asked).
+    abort_refused: bool,
 }
 
 #[derive(Clone, Default)]
@@ -198,6 +200,9 @@ impl AgentSession for Fake {
     fn abort(&mut self, run: &RunId) -> Result<(), Error> {
         let mut state = self.state();
         state.aborted.push(run.clone());
+        if state.abort_refused {
+            return Err(Error::Lost("the gateway closed the link".into()));
+        }
         if state.abort_ignored {
             return Ok(());
         }
@@ -302,6 +307,7 @@ both_engines!(
     a_stop_the_engine_never_confirms_is_unconfirmed_after_the_bound,
     a_stop_racing_the_runs_own_end_leaves_one_end,
     a_turn_stopped_before_it_is_handed_over_is_never_sent,
+    a_stop_the_gateway_refuses_leaves_a_later_abort_its_engines,
 );
 
 pub(crate) struct Started {
@@ -1213,6 +1219,48 @@ fn a_stop_the_engine_never_confirms_is_unconfirmed_after_the_bound(engine: Engin
     assert_eq!(
         lamp.direct.observe(&agent).unwrap().answer,
         "Hanoi on the 3rd."
+    );
+}
+
+/// The gateway refuses the abort: `unconfirmed` at once (well before the
+/// bound), and the turn is no longer the person's to stop. A later abort
+/// of its own (a stuck run, a cancel) ends it `Aborted`, never as the
+/// person's stop: its end is told as any other.
+fn a_stop_the_gateway_refuses_leaves_a_later_abort_its_engines(engine: Engine) {
+    let lamp = started(Fake::of(engine));
+    let agent = running_turn(&lamp, engine, "Plan my trip");
+    lamp.fake.state().abort_refused = true;
+    let began = Instant::now();
+    let said = lamp.direct.stop(&agent, Duration::from_secs(5));
+    assert_eq!(said, Stop::Unconfirmed);
+    assert!(
+        began.elapsed() < Duration::from_secs(3),
+        "{:?}",
+        began.elapsed()
+    );
+    assert_eq!(lamp.fake.state().aborted.len(), 1);
+    assert!(
+        !lamp.direct.lock().find(&agent).unwrap().stop_asked,
+        "a refused stop is no longer asked"
+    );
+    // The run then ends aborted on its own.
+    {
+        let mut state = lamp.fake.state();
+        let (progress, outcome) = state.runs.get_mut(&lamp.fake.run_of(1)).unwrap();
+        *outcome = Some(Outcome::Aborted {
+            progress: progress.clone(),
+        });
+    }
+    until("aborted", || {
+        lamp.direct.observe(&agent).unwrap().state == "stopped"
+    });
+    assert_eq!(
+        lamp.direct.lock().find(&agent).unwrap().end,
+        Some(End::Aborted)
+    );
+    assert_ne!(
+        lamp.direct.observe(&agent).unwrap().answer,
+        STOPPED_BY_PERSON
     );
 }
 

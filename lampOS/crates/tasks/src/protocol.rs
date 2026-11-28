@@ -107,9 +107,11 @@ pub enum Request {
     /// The person's "stop that task": a running direct task (the lamp's own
     /// OpenClaw or Hermes, [`crate::direct`]) aborted on its engine and
     /// ended `stopped_by_person` once the engine confirms; one not yet
-    /// begun dropped as `cancel` drops it. Guarded as `cancel` is.
-    /// Answered `{"id","stop"}`: `stopped`, `unconfirmed`, `not_started`,
-    /// `remote` or `not_running` (`docs/tasks.md`, "Stopping a task").
+    /// begun dropped as `cancel` drops it. Guarded as `cancel` is, but its
+    /// guard's revision may be stale: a stop needs only the store's id and
+    /// a fresh request id. Answered `{"id","stop"}`: `stopped`,
+    /// `unconfirmed`, `not_started`, `remote`, `cannot_stop` or
+    /// `not_running` (`docs/tasks.md`, "A person's stop of a running task").
     Stop {
         guard: Guard,
         id: u64,

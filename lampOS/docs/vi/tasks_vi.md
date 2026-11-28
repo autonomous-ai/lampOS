@@ -3809,9 +3809,16 @@ hàng kiểm tra trên đèn Hermes).
 #### Người dùng dừng một việc đang chạy (`stop`)
 
 Câu "dừng việc đó" của giọng nói là op `stop` của phần tasks:
-`{"op":"stop","guard":<guard>,"id":<id của việc>}`, được bảo vệ đúng như
-`cancel` (id của kho, revision hiện tại, một request id mới), trên socket
-request hoặc socket của giọng nói. Câu trả lời là phong bì `ok` thông thường
+`{"op":"stop","guard":<guard>,"id":<id của việc>}`, được bảo vệ như `cancel`
+(id của kho, một revision, một request id mới), trên socket request hoặc
+socket của giọng nói. Khác mọi thay đổi khác, revision của nó có thể đã cũ:
+các lần xem và tiến độ của một việc trực tiếp đang chạy đẩy revision lên vài
+giây một lần, nên guard giọng nói vừa đọc thường đã cũ khi nó dừng việc. Một
+lần dừng gọi việc bằng id và có cùng ý nghĩa dù giữa chừng có gì thay đổi, và
+mỗi kết quả bên dưới được đọc từ việc như nó đang là, nên không bao giờ bị từ
+chối `conflict`. Id của kho và request id vẫn được kiểm: guard của kho khác là
+`bad_guard`, và đúng request đó gửi lại nhận receipt của nó (giữ ở revision
+mà nó có hiệu lực), không bao giờ là thay đổi thứ hai. Câu trả lời là phong bì `ok` thông thường
 với `{"id":<id>,"stop":<kết quả>}`, có cả ở cấp ngoài cùng và trong `data`:
 
 | `stop` | Khi nào | Điều đã xảy ra |
@@ -3819,7 +3826,8 @@ với `{"id":<id>,"stop":<kết quả>}`, có cả ở cấp ngoài cùng và tr
 | `stopped` | Một việc trực tiếp (OpenClaw hoặc Hermes của chính đèn, mục này) đang chạy, hoặc còn xếp hàng trong phiên trực tiếp | Bị hủy trên gateway của nó (`chat.abort` của OpenClaw, `POST /v1/runs/{id}/stop` của Hermes) và engine đã xác nhận: lần chạy kết thúc ở trạng thái đã hủy. Việc còn xếp hàng ở đây thì bị bỏ và không bao giờ được gửi. Việc kết thúc ở `stopped` |
 | `unconfirmed` | Lệnh hủy đã được gửi, nhưng không có kết thúc nào trong `direct::STOP_CONFIRM_MOST` (30 s) | Không đánh dấu gì: việc giữ nguyên như engine của nó nói (vẫn đang chạy, hoặc bất cứ điều gì nó báo sau). Journal: `tasks: <id>: the person's stop was sent; no confirmation in <s> s, left to its engine` |
 | `not_started` | Đã chuẩn bị, hoặc đang xếp hàng chờ giao | Bị bỏ như `cancel` bỏ (`cancelled`), không bao giờ được giao; cùng request đó gửi lại nhận cùng câu trả lời |
-| `remote` | Harness đang giữ nó (máy tính khác, máy tính đã ghép đôi, một lần giao còn đang được tạo, hoặc agent của chính đèn khi công tắc trực tiếp tắt) | Không gửi gì: đèn không thể dừng nó từ đây |
+| `remote` | Harness đang giữ nó trên máy tính khác (máy tính đã ghép đôi, hoặc một lần giao tới máy đó còn đang được tạo) | Không gửi gì: đèn không thể dừng nó từ đây |
+| `cannot_stop` | Agent của chính đèn mà không có phiên trực tiếp ở đây (công tắc trực tiếp tắt, nên Harness giữ nó trên đèn), đang chạy hoặc còn đang được tạo | Không gửi gì: đèn không dừng được nó, và không bao giờ nói nó ở trên máy tính hay đã xong |
 | `not_running` | Không có việc đó, hoặc nó đã kết thúc (đã trả lời, thất bại, đã dừng, đã chuyển tiếp) | Không thay đổi gì |
 
 Một việc đang được giao ngay lúc đó (`attempting`, hoặc một lần bắt đầu đang
@@ -3827,7 +3835,10 @@ Một việc đang được giao ngay lúc đó (`attempting`, hoặc một lầ
 các kết quả ở trên.
 
 Thời gian chờ engine xác nhận bị giới hạn bởi `direct::STOP_CONFIRM_MOST`
-(30 s). Kho trả lời ngay rằng việc thuộc phiên trực tiếp (`stopping`, giọng
+(30 s). Nếu gateway từ chối lệnh hủy (kết nối bị đứt), lần dừng trả lời
+`unconfirmed` ngay và lượt đó không còn là việc người dùng dừng: một lần hủy
+tự nó về sau kết thúc là `direct::End::Aborted`, được kể như mọi kết thúc
+khác, không bao giờ như lần dừng của người dùng. Kho trả lời ngay rằng việc thuộc phiên trực tiếp (`stopping`, giọng
 nói không bao giờ thấy); sau đó owner của service giao lần dừng cho một luồng
 riêng (`direct::stop_finish`), nên kho, các request khác của nó và pump của
 phiên trực tiếp không bao giờ phải chờ. `Direct::stop` cũng gửi lệnh hủy trên
@@ -3859,11 +3870,18 @@ một phiên (`one_session.rs`) không bị động tới.
 Kiểm thử: `direct::tests::{a_person_stops_a_running_turn_and_the_kept_session_stays,
 a_stop_the_engine_never_confirms_is_unconfirmed_after_the_bound,
 a_stop_racing_the_runs_own_end_leaves_one_end,
-a_turn_stopped_before_it_is_handed_over_is_never_sent}` (mỗi cái cho cả
+a_turn_stopped_before_it_is_handed_over_is_never_sent,
+a_stop_the_gateway_refuses_leaves_a_later_abort_its_engines}` (mỗi cái cho cả
 OpenClaw và Hermes); `engine::tests::{a_stop_before_the_task_began_is_not_started,
 a_stop_of_a_harness_task_is_remote_and_of_an_ended_one_not_running,
 a_stop_of_a_running_direct_task_is_stopped_by_the_person,
-a_stop_never_confirmed_is_unconfirmed_and_the_task_runs_on}`;
+a_stop_never_confirmed_is_unconfirmed_and_the_task_runs_on,
+a_stop_with_a_stale_revision_still_stops_a_running_direct_task,
+a_stale_stop_before_the_task_began_is_not_started_once,
+a_stop_finish_of_an_unknown_agent_is_not_running,
+a_stop_while_the_hand_over_is_under_way_is_busy,
+a_stop_of_a_lamp_task_without_its_direct_session_cannot_stop}`;
+`runtime::tests::only_a_stop_waits_past_the_usual_request_deadline`;
 `now::tests::a_task_the_person_stopped_says_why`;
 `works::tests::a_task_the_person_stopped_is_over_with_its_reason`;
 `tests/runtime.rs::stop_over_the_socket_says_how_it_went`.

@@ -50,6 +50,17 @@ pub const CLIENT_DEADLINE: Duration = Duration::from_millis(1200);
 /// confirmation, and a little more for its reply.
 pub const STOP_REQUEST_DEADLINE: Duration =
     Duration::from_secs(crate::direct::STOP_CONFIRM_MOST.as_secs() + 2);
+/// How long the request socket waits on the owner for `request`'s answer:
+/// a person's stop waits for its engine's confirmation
+/// ([`STOP_REQUEST_DEADLINE`]); every other op its usual
+/// [`REQUEST_DEADLINE`].
+fn request_bound(request: &Request) -> Duration {
+    if matches!(request, Request::Stop { .. }) {
+        STOP_REQUEST_DEADLINE
+    } else {
+        REQUEST_DEADLINE
+    }
+}
 pub const STALE_AFTER: Duration = Duration::from_millis(1500);
 /// How often the part says how it is on `diagnostics` while nothing changes
 /// ([`Config::report_every`] on a lamp).
@@ -5152,13 +5163,7 @@ fn serve_client(mut stream: UnixStream, accepted: Instant, route: Route, owner: 
         Ok(line) => match Request::parse(&line) {
             Ok(request) => {
                 let (tx, rx) = mpsc::sync_channel(1);
-                // A person's stop waits for its engine's confirmation.
-                let bound = if matches!(request, Request::Stop { .. }) {
-                    STOP_REQUEST_DEADLINE
-                } else {
-                    REQUEST_DEADLINE
-                };
-                let deadline = accepted + bound;
+                let deadline = accepted + request_bound(&request);
                 write_by = deadline + (CLIENT_DEADLINE - REQUEST_DEADLINE);
                 match owner.try_send(Work {
                     request,
@@ -6693,6 +6698,31 @@ mod tests {
     }
 
     use super::*;
+
+    /// A person's stop waits on the owner up to its own bound; every other
+    /// op keeps the usual 1.1 s, so no slow op holds a client 32 s.
+    #[test]
+    fn only_a_stop_waits_past_the_usual_request_deadline() {
+        assert_eq!(REQUEST_DEADLINE, Duration::from_millis(1100));
+        assert!(STOP_REQUEST_DEADLINE > crate::direct::STOP_CONFIRM_MOST);
+        let guard = crate::protocol::Guard {
+            store_id: "s".into(),
+            revision: 0,
+            request_id: "r".into(),
+        };
+        let stop = Request::Stop {
+            guard: guard.clone(),
+            id: 1,
+        };
+        assert_eq!(request_bound(&stop), STOP_REQUEST_DEADLINE);
+        for other in [
+            Request::Cancel { guard, id: 1 },
+            Request::TasksNow {},
+            Request::parse(br#"{"op":"status"}"#).unwrap(),
+        ] {
+            assert_eq!(request_bound(&other), REQUEST_DEADLINE, "{}", other.name());
+        }
+    }
     use std::os::unix::fs::symlink;
 
     /// #8105: lamp-update, root in its own unit, may read the lamp's
