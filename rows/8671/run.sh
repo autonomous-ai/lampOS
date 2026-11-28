@@ -21,7 +21,7 @@
 # no pattern kills; never opens a DB file; log lines counted, never printed; no sound on the Mac;
 # tar with COPYFILE_DISABLE=1 --exclude='._*'.
 set -u
-zmodload zsh/datetime
+zmodload zsh/datetime 2>/dev/null   # optional: the wait loop uses date +%s
 HERE=${0:A:h}; KR=/root/el-8671/kit; K=/root/el-8671
 EXPECT_HOST=lamp-75c9
 REPO=autonomous-ai/lampOS; PR=8671; HEAD=cf7dacac6dd32a1e791919300e19912470ce8c68; SRC=lampos-arm64-$HEAD
@@ -177,11 +177,11 @@ go() {
   if grep -q '^TRIGGERED' $RES/trigger.txt || lamp "test -s $K/reset-start.txt && echo yes" 2>/dev/null | grep -q yes; then triggered=1
   else echo "TRIGGER NOT OK: putting back" | tee -a $RES/go.txt; on_exit; return 1; fi
   echo "RESET STARTED $(date +%T): waiting up to $WAIT_S s for the lamp" | tee -a $RES/go.txt
-  local t0=$EPOCHSECONDS st
+  local t0=$(date +%s) st
   [[ -n ${LAMP_HOST_AFTER:-} ]] && HOST=$LAMP_HOST_AFTER
-  while (( EPOCHSECONDS - t0 < WAIT_S )); do
+  while (( $(date +%s) - t0 < WAIT_S )); do
     st=$(lamp "cat $K/after/status.txt 2>/dev/null" 2>/dev/null)
-    if [[ $st == *SNAP\ 0* ]]; then echo "back after $(( EPOCHSECONDS - t0 )) s; the recorder: $(print -r -- $st | awk '{print $1}' | tr '\n' ' ')" | tee -a $RES/go.txt; break; fi
+    if [[ $st == *SNAP\ 0* ]]; then echo "back after $(( $(date +%s) - t0 )) s; the recorder: $(print -r -- $st | awk '{print $1}' | tr '\n' ' ')" | tee -a $RES/go.txt; break; fi
     sleep 10
   done
   if [[ $st != *SNAP\ 0* ]]; then
