@@ -31,6 +31,8 @@ use std::{
 const STORE: &str = "0123456789abcdef0123456789abcdef";
 const WAIT: Duration = Duration::from_secs(5);
 const ABOUT: &str = "Fixed the tokenizer's end index / all 118 tests pass";
+/// A line of what the agent is doing, as a beat tells it.
+const DOING: &str = "Running the tokenizer tests after fixing its end index";
 /// Two runs of the tasks part: each counts changes from nothing.
 const RUN_A: u64 = 1_791_964_000_000;
 const RUN_B: u64 = 1_791_965_000_000;
@@ -589,6 +591,14 @@ fn still_alone_beats_a_task_at_work_at_most_most_times_with_no_decision() {
     assert!(still_on(Some("still")) && !progress_on(Some("still")));
     assert!(still_on(Some("on,still")) && progress_on(Some("on,still")));
     assert!(!still_on(Some("on")) && !still_on(None) && !still_on(Some("STILL")));
+    // Only `on`, `still` or both: any other word turns neither on.
+    for value in ["on,off", "still,off", "on,still,x", "on,", ",still"] {
+        assert!(
+            !progress_on(Some(value)) && !still_on(Some(value)),
+            "{value:?}"
+        );
+    }
+    assert!(still_on(Some(" still , on ")) && progress_on(Some(" still , on ")));
     let mut place = Place::new("still");
     let still = Still {
         first: ms(300),
@@ -615,12 +625,14 @@ fn still_alone_beats_a_task_at_work_at_most_most_times_with_no_decision() {
     // The progress line changed since: the next beat tells what the agent
     // is doing, from its line, in a short sentence.
     place.words("working", 2);
+    // A line of what the agent is doing: a beat tells it.
+    place.snapshot.lock().unwrap().about = DOING.into();
     place.work_for(AgentState::Working, 2, None);
     let second = offered(&mut news, WAIT).expect("beat 1");
     assert!(handed.elapsed() >= ms(1_000), "{:?}", handed.elapsed());
     assert_eq!(second.key, format!("{STORE}:3:progress-{RUN_A}-2-b1"));
     assert_ne!(second.note, first.note);
-    for part in [ABOUT, "what it is doing now", "do not say it is finished"] {
+    for part in [DOING, "what it is doing now", "do not say it is finished"] {
         assert!(
             second.note.contains(part),
             "{part:?} not in {}",

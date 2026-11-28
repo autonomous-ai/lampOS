@@ -10621,64 +10621,97 @@ takes it: the coordinator, the model and the sound are not in these tests.
 With `LAMP_PROGRESS_NEWS=still` (on in the product unit) or `on,still`,
 during a long task the lamp says briefly that it is still on it. No
 policy decision is asked: the same progress thread reads `tasks/status`
-(without `on`, it subscribes to no `policy/decisions`).
+(without `on`, it subscribes to no `policy/decisions`). The value is read
+exactly: words other than `on` and `still` (`on,off`) turn nothing on.
 
 - **When.** Each task shown `working` is counted from its hand-over: when
   the voice first saw it at work. Its `working_s` is not used, since it
   counts from the ask, before the yes (lamp-ee17 27 Nov: beat 0 came about
-  20 s after the hand-over, not 30 s). Beat
-  `n` (from 0) is due `FIRST + n × EVERY` after it, while `n < MOST`:
+  20 s after the hand-over, not 30 s). Beat 0 is due `FIRST` after it;
+  then the gaps grow, `EVERY`, then a third of `EVERY` longer each time
+  (`beat_after`: 30 s, then gaps of 90, 120 and 150 s by default, beats at
+  30, 120, 240 and 390 s), so the lamp does not tick like a clock. Each
+  beat after the first comes 0, 1 or 2 thirtieths of `EVERY` later by the
+  task's number (0, 3 or 6 s by default), so two tasks' beats seldom fall
+  together. At most `MOST` beats a task:
   `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 to 3600),
-  `LAMP_PROGRESS_STILL_EVERY_S` (60, 10 to 3600) and
+  `LAMP_PROGRESS_STILL_EVERY_S` (90, 10 to 3600) and
   `LAMP_PROGRESS_STILL_MOST` (4, 1 to 20); a value out of range or not a
   whole number is its default, with a journal line. A beat not said within
   10 s of its time (`BEAT_LATE`, or `EVERY` if shorter) is dropped, never
   said late or twice: on lamp-ee17 (27 Nov) one held 12 s was said 4 s
   before its task's result, and cut. A slot already past when looked at
   is skipped.
+- **One count a task.** A task's hand-over, its next beat and its change
+  count are kept for as long as `tasks/status` lists it (same store and
+  run), also while it asks the person or reads as not at work for a tick:
+  back at work it is not handed over again, and its beats stay at most
+  `MOST` in all; slots that passed meanwhile are skipped. Gone from
+  `tasks/status`, or a new run, it is forgotten.
 - **What.** When the task's change count rose since its last beat (since
   it was first seen, for beat 0) and `get_progress` gives a line of the
   agent still working that reads as what it is doing (`reads_as_progress`:
-  a capital first letter, no backticks, `**`, `#`, links or new lines;
-  OpenClaw gives none while it works, then the tail of its answer), the beat is the progress note
-  (`note_progress`, Task news' `progress` words, no signs, the time since
-  the hand-over) with one more instruction: one short sentence on what it
-  is doing now, no URLs, raw arguments or file paths, never that it is
-  finished. Otherwise one of Task news' `still_0` to `still_3` words
-  (built in, and in `skills/task-news/skill.toml`), said as they are
-  ("Say only these words, once"): the first, then the second and third in
-  turn, the last only last. The choice is `ProgressReader::beat_note`.
+  it begins with a plan, "I'll", "I will", "I'm", "I am" or "Let me", or
+  a capitalised word of doing such as "Searching" or "Reading", and has
+  no backticks, `**`, `#`, links, new lines, `:`, `=`, `/`, `\`, `{` or
+  "exec"), the beat is the progress note (`note_progress`, Task news'
+  `progress` words, no signs, the time since the hand-over) with one more
+  instruction: one short sentence on what it is doing now, no URLs, raw
+  arguments or file paths, never that it is finished. Answer prose ("Here
+  are the three laptops I found …") and a tool's line ("running exec:
+  command=…") are never told: OpenClaw gives no line while it works, then
+  the tail of its answer. Otherwise one of Task news' `still_0` to
+  `still_3` words (built in, and in `skills/task-news/skill.toml`), said
+  as they are ("Say only these words, once"): the first, then the second
+  and third in turn, the last only last. The choice is `beat_words`.
   Defaults: "Still on it, I'll tell you when it's ready.",
   "Still working on that, hang on.", "Taking a bit longer, I'm still on
   it.", "This one's a long one. I'll tell you as soon as it's done."
 - **Never over anyone.** Told under the progress news' gates (someone
-  there or heard within 120 s, the room not busy, no reply or turn open),
-  always after 15 s with nothing said by or to the lamp, even with
-  `LAMP_TASK_NEWS_AT_PAUSE=on`. Like all progress, never a skill's to
-  tell, never an "Excuse me" short line, never told again.
+  there: a face, or speech heard within 15 s; the room not busy, no reply
+  or turn open), always after 15 s with nothing said by or to the lamp,
+  even with `LAMP_TASK_NEWS_AT_PAUSE=on`. With nobody there a beat stays
+  held (the owner's call, #8783's presence gate) and is dropped once
+  `BEAT_LATE` is past. Like all progress, never a skill's to tell, never
+  an "Excuse me" short line, never told again.
+- **A note and a beat never back to back.** Once a beat of a task is
+  told, a policy note of that task waiting is let go for 15 s
+  (`QUIET_US`), and once a policy note of it is told, a beat of it
+  (journaled as `dropped: ..., just told`): with `on,still` the two are
+  never said back to back. A second policy note, as before, the task's
+  next beat (spaced by `beat_after`) and another task's line are not let
+  go for it.
+- **Two tasks at work at once.** A beat waits for 15 s of quiet after the
+  lamp's last words, longer than the 10 s it is kept: a second task's beat
+  due just after the first's is dropped, not said late. One "still on it"
+  line a window is enough for a lamp that should seem alive, not report
+  on each task; the other task's later beats still come when they fall
+  apart (`beat_timelines`, "two tasks at work at once").
 - **Stops** once the task is not at work on `tasks/status` (finished,
   stopped, asking, gone) or its own news waits: a beat queued then is
   withdrawn. A change of the progress line does not withdraw a beat.
 - **Key** `<store>:<task>:progress-<run>-<change>-b<n>`, kept as told.
-  Every gap between beats is `EVERY`; no back-off.
 - **Journal**, never the words: `lamp-voice: task news still beat offered:
   task N bK at S s, fixed` or `..., about C chars` (S whole seconds since
   the hand-over, C the length of the agent's line); `... held: task N
   bK, REASON` (the first gate shut, as for `task news held`, once a reason:
   `speech_not_paused` while not quiet, `nobody_there`, `room_busy`, …);
   `... told: task N bK`; `... dropped: task N bK, slot passed` (not said
-  within `BEAT_LATE` of its time, or a slot past before it was looked at) or
+  within `BEAT_LATE` of its time, or a slot past before it was looked at),
   `, task settled` (not at work, moved off `tasks/status`, or its own news
-  waits).
+  waits) or `, just told` (a line of its task's progress told within 15 s).
 
 Shown in `task_news::tests` (`beats_come_at_first_then_every_at_most_most_in_other_words`,
 `a_beat_counts_from_when_the_task_is_first_seen_at_work`,
+`a_task_back_at_work_after_asking_keeps_its_count_and_clock`,
 `no_beat_once_the_task_settles_or_its_news_waits_or_its_slot_passed`,
-`the_beats_settings_parse_and_bad_values_fall_back`), on a bus in
+`a_tasks_progress_is_told_once_a_quiet_window`,
+`the_beats_settings_parse_and_bad_values_fall_back`, `beat_timelines`,
+`an_agent_line_like_answer_text_is_no_news`), on a bus in
 `still_alone_beats_a_task_at_work_at_most_most_times_with_no_decision`
 (`crates/voice/tests/it/progress_news.rs`), and in the coordinator's loop
-in `a_still_working_beat_waits_for_no_conversation_even_at_pause`. Not run
-on a lamp.
+in `a_still_working_beat_waits_for_no_conversation_even_at_pause` (a face
+there; the beat told, 15 s after the answer). Not run on a lamp.
 
 ### Playing progress news on lamp-4ace
 

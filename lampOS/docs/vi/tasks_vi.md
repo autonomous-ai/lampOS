@@ -5446,33 +5446,81 @@ it landed`); và một câu ngắn được kể.
 ### Nhịp "vẫn đang làm" (`LAMP_PROGRESS_NEWS=still`)
 
 Với `LAMP_PROGRESS_NEWS=still` (bật trong unit sản phẩm) hoặc `on,still`, khi
-một việc chạy lâu, đèn nói một câu ngắn cố định rằng nó vẫn đang làm, không
-hỏi Policy và không lấy gì từ phần tasks. Mỗi việc đang `working` trên
-`tasks/status` được tính từ lúc giao: lúc giọng nói thấy nó đang làm lần đầu.
-Không dùng `working_s` của nó, vì số đó tính từ lúc hỏi, trước câu đồng ý
-(lamp-ee17 ngày 27/11: nhịp 0 đến khoảng 20 s sau lúc giao, không phải 30 s). Nhịp `n` (từ 0)
-đến hạn sau `FIRST + n × EVERY`, khi `n < MOST`:
-`LAMP_PROGRESS_STILL_FIRST_S` (30, 1 đến 3600),
-`LAMP_PROGRESS_STILL_EVERY_S` (60, 10 đến 3600), `LAMP_PROGRESS_STILL_MOST`
-(4, 1 đến 20); giá trị sai thì dùng mặc định, có một dòng nhật ký. Mỗi nhịp
-không được nói trong 10 s sau thời điểm của nó (`BEAT_LATE`) thì bị bỏ, không bao
-giờ nói muộn hay nói hai lần.
-Nếu số lần đổi của dòng tiến độ tăng từ nhịp trước và `get_progress` cho một
-dòng đọc như việc agent đang làm (`reads_as_progress`: chữ đầu viết hoa, không
-có backtick, `**`, `#`, liên kết hay xuống dòng; OpenClaw không cho dòng nào
-khi đang làm, rồi đuôi câu trả lời), nhịp là ghi chú tiến độ (`note_progress`) thêm một yêu cầu:
-một câu ngắn nói agent đang làm gì, không đọc URL, tham số thô hay đường dẫn
-tệp, không nói đã xong. Nếu không, lời là `still_0` đến `still_3` của Task
-news (sẵn trong mã và trong `skills/task-news/skill.toml`), mỗi lần một câu
-khác, câu cuối chỉ ở cuối.
-Không bao giờ nói đè lên ai: luôn chờ 15 s không ai nói với hay bởi đèn, kể
-cả với `LAMP_TASK_NEWS_AT_PAUSE=on`, cùng các cổng của tin tiến độ; không qua
-kỹ năng, không có câu "Excuse me". Dừng khi việc không còn `working` hoặc tin
-của chính nó đang chờ. Khoá `<store>:<task>:progress-<run>-<change>-b<n>`.
-Nhật ký, không bao giờ lời nói: `lamp-voice: task news still beat offered:
-task N bK at S s, fixed` (hoặc `, about C chars`), `... held: task N bK, REASON`, `... told: task N bK`,
-`... dropped: task N bK, slot passed` hoặc `, task settled`. Chi tiết:
-[tasks.md](../tasks.md#still-working-beats).
+một việc chạy lâu, đèn nói một câu ngắn rằng nó vẫn đang làm: kể việc agent
+đang làm khi có một dòng tiến độ phù hợp, nếu không thì một câu cố định. Không
+hỏi Policy: cùng luồng tiến độ đọc `tasks/status` (không có `on` thì không
+đăng ký `policy/decisions`). Giá trị được đọc chính xác: một từ khác `on` và
+`still` (`on,off`) thì không bật gì.
+
+- **Khi nào.** Mỗi việc đang `working` được tính từ lúc giao: lúc giọng nói
+  thấy nó đang làm lần đầu. Không dùng `working_s` của nó, vì số đó tính từ
+  lúc hỏi, trước câu đồng ý (lamp-ee17 ngày 27/11: nhịp 0 đến khoảng 20 s sau
+  lúc giao, không phải 30 s). Nhịp 0 đến hạn sau `FIRST`; rồi các khoảng cách
+  dài dần, `EVERY`, rồi mỗi lần dài thêm một phần ba `EVERY` (`beat_after`:
+  30 s, rồi khoảng 90, 120 và 150 s theo mặc định, các nhịp ở 30, 120, 240 và
+  390 s), để đèn không gõ đều như đồng hồ. Mỗi nhịp sau nhịp đầu đến muộn
+  thêm 0, 1 hoặc 2 phần ba mươi `EVERY` theo số của việc (0, 3 hoặc 6 s theo
+  mặc định), nên nhịp của hai việc ít khi trùng nhau. Nhiều nhất `MOST` nhịp
+  mỗi việc: `LAMP_PROGRESS_STILL_FIRST_S` (30, 1 đến 3600),
+  `LAMP_PROGRESS_STILL_EVERY_S` (90, 10 đến 3600), `LAMP_PROGRESS_STILL_MOST`
+  (4, 1 đến 20); giá trị ngoài khoảng hay không phải số nguyên thì dùng mặc
+  định, có một dòng nhật ký. Nhịp không được nói trong 10 s sau thời điểm của
+  nó (`BEAT_LATE`, hoặc `EVERY` nếu ngắn hơn) thì bị bỏ, không bao giờ nói
+  muộn hay nói hai lần: trên lamp-ee17 (27/11) một nhịp bị giữ 12 s đã được
+  nói 4 s trước kết quả của việc, và bị cắt. Một chỗ đã qua khi được xem thì
+  bị bỏ qua.
+- **Một bộ đếm mỗi việc.** Lúc giao, nhịp kế tiếp và số lần đổi của một việc
+  được giữ chừng nào `tasks/status` còn liệt kê nó (cùng store và run), cả
+  khi nó hỏi người dùng hay trông như không làm trong một tick: khi làm lại,
+  nó không được tính là giao lại, và tổng số nhịp vẫn nhiều nhất `MOST`; các
+  chỗ đã qua trong lúc đó bị bỏ qua. Khi không còn trên `tasks/status`, hay
+  sang run mới, nó bị quên.
+- **Nói gì.** Nếu số lần đổi của việc tăng từ nhịp trước (từ lúc thấy lần
+  đầu, với nhịp 0) và `get_progress` cho một dòng của agent vẫn đang làm,
+  đọc như việc nó đang làm (`reads_as_progress`: bắt đầu bằng một dự định,
+  "I'll", "I will", "I'm", "I am" hay "Let me", hoặc một từ chỉ việc đang làm
+  viết hoa như "Searching" hay "Reading", và không có backtick, `**`, `#`,
+  liên kết, xuống dòng, `:`, `=`, `/`, `\`, `{` hay "exec"), nhịp là ghi chú
+  tiến độ (`note_progress`, lời `progress` của Task news, không có dấu hiệu,
+  thời gian từ lúc giao) thêm một yêu cầu: một câu ngắn nói agent đang làm
+  gì, không đọc URL, tham số thô hay đường dẫn tệp, không bao giờ nói đã
+  xong. Văn câu trả lời ("Here are the three laptops I found …") và dòng của
+  một công cụ ("running exec: command=…") không bao giờ được nói: OpenClaw
+  không cho dòng nào khi đang làm, rồi đuôi câu trả lời. Nếu không, lời là
+  một trong `still_0` đến `still_3` của Task news (sẵn trong mã và trong
+  `skills/task-news/skill.toml`), nói đúng nguyên văn ("Say only these
+  words, once"): câu đầu, rồi câu thứ hai và thứ ba lần lượt, câu cuối chỉ
+  ở cuối. Nơi chọn là `beat_words`.
+- **Không bao giờ nói đè lên ai.** Theo các cổng của tin tiến độ (có người ở
+  đó: một khuôn mặt, hay tiếng nói nghe trong 15 s; phòng không bận, không
+  có câu trả lời hay lượt nào đang mở), luôn sau 15 s không ai nói với hay
+  bởi đèn, kể cả với `LAMP_TASK_NEWS_AT_PAUSE=on`. Không có ai ở đó thì nhịp
+  vẫn bị giữ (quyết định của chủ sản phẩm, cổng hiện diện của #8783) và bị
+  bỏ khi quá `BEAT_LATE`. Như mọi tin tiến độ, không qua kỹ năng, không có
+  câu "Excuse me", không bao giờ kể lại.
+- **Ghi chú và nhịp không bao giờ liền nhau.** Khi một nhịp của một việc đã
+  được nói, ghi chú của Policy về cùng việc đang chờ bị bỏ trong 15 s
+  (`QUIET_US`), và khi một ghi chú của Policy về việc đó đã được nói, một
+  nhịp của nó bị bỏ (nhật ký ghi `dropped: ..., just told`): với `on,still`
+  hai dòng không bao giờ nói liền nhau. Ghi chú thứ hai của Policy, như
+  trước, nhịp kế tiếp của việc (cách nhau theo `beat_after`) và dòng của
+  việc khác không bị bỏ vì nó.
+- **Hai việc cùng làm.** Một nhịp chờ 15 s yên lặng sau lời cuối của đèn,
+  lâu hơn 10 s nó được giữ: nhịp của việc thứ hai đến hạn ngay sau nhịp của
+  việc thứ nhất bị bỏ, không nói muộn. Mỗi cửa sổ một câu "vẫn đang làm" là
+  đủ cho một chiếc đèn trông như vật sống, không báo cáo từng việc; các nhịp
+  sau của việc kia vẫn đến khi chúng cách xa nhau (`beat_timelines`, "two
+  tasks at work at once").
+- **Dừng** khi việc không còn `working` trên `tasks/status` (xong, dừng,
+  đang hỏi, mất) hoặc tin của chính nó đang chờ: nhịp đã xếp hàng khi đó bị
+  rút lại. Dòng tiến độ đổi không rút lại một nhịp.
+- **Khoá** `<store>:<task>:progress-<run>-<change>-b<n>`, được giữ là đã kể.
+- **Nhật ký**, không bao giờ lời nói: `lamp-voice: task news still beat
+  offered: task N bK at S s, fixed` (hoặc `, about C chars`), `... held: task
+  N bK, REASON`, `... told: task N bK`, `... dropped: task N bK, slot
+  passed`, `, task settled` hoặc `, just told`.
+
+Test và chi tiết: [tasks.md](../tasks.md#still-working-beats).
 
 ## Đóng harness của chính đèn khi việc xong, chờ kể tin tối đa một phút (#6530)
 

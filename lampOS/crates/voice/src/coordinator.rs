@@ -6260,6 +6260,9 @@ thread_local! {
     /// hold, as `TEST_CAMERA_FOLLOWS_EYES`: the fixture plays no three
     /// unanswered lines.
     static TEST_ROOM_BUSY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's face at the lamp for news that waits for someone
+    /// there, as `TEST_ROOM_BUSY`: the fixture keeps no presence file.
+    static TEST_FACE_THERE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_OWN_LINE_OVER_TALK=on`, as `TEST_ROOM_BUSY`.
     static TEST_OWN_LINE_OVER_TALK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_VOICE_TONE=on`, as `TEST_CAMERA_FOLLOWS_EYES`.
@@ -15228,6 +15231,8 @@ fn conversation_with_gate_inner(
                     let present = presence
                         .as_ref()
                         .is_some_and(|presence| presence.present(clock));
+                    #[cfg(test)]
+                    let present = present || TEST_FACE_THERE.with(std::cell::Cell::get);
                     // A sign-in's news, which the person just asked for and
                     // may be typing in silence, needs no one seen or heard.
                     let there =

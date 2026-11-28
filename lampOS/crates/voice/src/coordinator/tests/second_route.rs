@@ -4848,13 +4848,17 @@ fn a_still_working_beat_waits_for_no_conversation_even_at_pause() {
         });
         TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
         TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+        // A face there: a beat waits for someone there (#8783).
+        TEST_FACE_THERE.with(|there| there.set(true));
         let run = run(Script {
             second: false,
             only: true,
             written: Written::Said(12),
-            mute_at_frame: Some(800),
+            mute_at_frame: Some(2_500),
+            limit: Duration::from_secs(40),
             ..Script::question(Live::Answer(12))
         });
+        TEST_FACE_THERE.with(|there| there.set(false));
         TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
         TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
         run
@@ -4870,7 +4874,9 @@ fn a_still_working_beat_waits_for_no_conversation_even_at_pause() {
     );
     let run = told(Some(0));
     run.assert_clean();
-    for news in run.events("task_news") {
+    let news = run.events("task_news");
+    assert_eq!(news.len(), 1, "the beat is told: {}", run.summary());
+    for news in news {
         assert!(
             news["since_turn_ms"].as_u64().unwrap() >= crate::task_news::QUIET_US / 1_000,
             "{}",
