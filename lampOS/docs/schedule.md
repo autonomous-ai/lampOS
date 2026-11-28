@@ -761,8 +761,10 @@ than passing null; unknown or null fields are refused before IPC.
 **A move by voice (#8840).** On lamp-52e6 on 27 Nov the lamp couldn't
 move a daily 4 PM reminder to 4:30; asked again, it set the new one and
 said it couldn't cancel the old one. Why its cancel failed is not known:
-neither journal was kept (52e6's journal lives in memory, and the lamp
-restarted since). `move_reminder` does both halves in lamp-actions, in
+its journal had rotated out (52e6's journald keeps about 20 MB, about
+2 h). The ROW on 28 Nov at 14:22 found one cause: a cancel said back to the
+lamp ("Actually, cancel that.") was held by the second route's hearing rule
+(`Heeding::holds_call`, #1712), which now holds only the sets. `move_reminder` does both halves in lamp-actions, in
 that order, so a move never depends on the model chaining a cancel and a
 set. With `LAMP_POLICY_HOLDS_ACTIONS=on` (off in the product), the Policy
 holds it as a set: it runs on a reply to the lamp ("4:30" to the lamp's
