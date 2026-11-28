@@ -3036,6 +3036,11 @@ pub fn serve(
         {
             crate::history_privacy::start(root);
         }
+        // The app's removal of a person reaches the account's history too
+        // (the Reviewer-lead's HOLD on #8125), read on `memory/forgot`.
+        if let Some(root) = files.bus_root.as_deref() {
+            crate::history_forget::watch_removals(root, socket);
+        }
         crate::history_send::start_from_environment(
             &config.llm_base_url,
             config.llm_key.expose(),

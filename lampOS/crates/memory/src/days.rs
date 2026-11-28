@@ -1664,16 +1664,27 @@ impl Days {
     /// later remembered by the same name takes those lines over
     /// (reviewer-three's P2 on #3213); the lines stay, as they did before
     /// the speakers table. The removed entries, then the removed rules.
+    ///
+    /// Their whole history on the account goes too (#7771, the
+    /// Reviewer-lead's HOLD on #8125): one row kept for it
+    /// ([`crate::history_unsent::keep`]) in the same transaction, as a known
+    /// person's [`Self::forget_all`] keeps, but always: lamp-cloud never
+    /// asks, and the voice reads it on `memory/forgot` or at its next start.
+    /// Their rules' scope has no saved turn, so nothing more.
     pub fn forget_person(&mut self, person: &Person) -> Result<(u64, u64)> {
         let rules = person
             .rules()
             .ok_or_else(|| Error::new("bad_person", "the person has no rules scope"))?;
         let tx = self.db.transaction()?;
-        let removed = empty(&tx, Some(person), &mut Vec::new())?;
+        let mut gone = Vec::new();
+        let removed = empty(&tx, Some(person), &mut gone)?;
         let ruled = empty(&tx, Some(&rules), &mut Vec::new())?;
         tx.execute("DELETE FROM speakers WHERE speaker=?1", [person.as_str()])?;
         crate::service_records::mark_forgot(&tx, Some(person), self.now)?;
+        let unsent =
+            crate::history_unsent::keep(&tx, true, &self.epoch, &gone, Some(person.as_str()))?;
         tx.commit()?;
+        self.unsent = crate::history_unsent::joined(self.unsent, unsent);
         self.forget_set_aside()?;
         Ok((removed, ruled))
     }

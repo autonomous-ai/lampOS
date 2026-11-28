@@ -231,7 +231,8 @@ the app (lamp-cloud's `faces.rs`) and one asked by voice
 
 ## Forgets reach the account's history (`LAMP_HISTORY_FORGET`)
 
-With `LAMP_HISTORY_FORGET=on` (off unless set, in no unit; #7771), what a
+With `LAMP_HISTORY_FORGET=on` (off unless set; on in the product unit, always
+with `LAMP_HISTORY_SEND`; #7771), what a
 forget removes on the lamp is deleted from the conversation history the
 account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
 - **What memory says:** with `--memory-days`, the answer to `forget`,
@@ -338,8 +339,12 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   not handed, a page not read, a rest let go or lost to the memory's
   restart) is read again: at the second route's start
   (`history_forget::recover_at_start`, the worker's first job, before any
-  forget handed after), and after the next job when one was not handed or
-  could not all be queued. It is read oldest first,
+  forget handed after), after the next job when one was not handed or
+  could not all be queued, and as soon as a forget sent whole gets no answer
+  read (the voice stopped waiting, the memory still at it:
+  `history_forget::unanswered`), again every 5 s until the memory answers,
+  so its delete follows the memory's late answer, never only the next start
+  (the first builder's call on #8125, item 2). It is read oldest first,
   `{"op":"history_unsent","after":N}`, at most 900 rows a page and 64 pages
   at once; each page's ids are held from the save, written to the queue,
   and only then said done up to the page's last row. A page not written is
@@ -363,8 +368,18 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   keeps no history). A 400 is let go. No answer, 5xx and any other status
   keep the call, tried again after 5 s, doubling to 15 minutes. The journal
   says counts only.
-- **Not covered yet:** the app's removal of a person (`forget_person`, asked
-  by lamp-cloud) and a forget on the Live route.
+- **The app's removal of a person** (`forget_person`, asked by lamp-cloud on
+  the forget socket, the Reviewer-lead's HOLD on #8125): it never passes the
+  voice, so the memory always keeps that person's whole history for the
+  account, one `history_unsent` row in the removal's own transaction (field
+  or not; removed again before the voice took it, still one row), and
+  tells `memory/forgot`. With the switch on, a thread of the second route's
+  worker reads that topic (`history_forget::watch_removals`, subscriber
+  `history_removals`, once at each subscribe too) and has the worker read
+  what the memory kept, as at a start: `{"all":true,"person":<their p- id>}`
+  is queued and sent like a known person's forget everything. Their rules'
+  scope has no saved turn. One missed on the bus is read at the next start.
+- **Not covered yet:** a forget on the Live route.
 - **Tests:** `history_forget`'s (among them
   `two_forgets_in_a_row_each_send_their_own_rest`,
   `a_stale_rest_is_never_sent_for_another_forget`,
@@ -377,6 +392,7 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   `second_provider::net::history`'s (a fake server, among them
   `a_forget_lost_to_a_restart_reaches_the_server_after_start`,
   `a_forget_while_the_server_is_down_reaches_it_after_a_restart`,
+  `a_person_removed_in_the_app_is_deleted_from_the_account`,
   `nothing_is_sent_while_the_switch_is_closed_and_the_lamps_history_goes_first`),
   `history_forget`'s `a_reset_deletes_the_lamps_whole_history`,
   `a_waiting_forget_holds_the_turns_it_could_reach` and
@@ -384,7 +400,8 @@ account keeps too (the lamp's cloud API, `POST …/history/turns/delete`).
   `a_turn_said_just_before_the_switch_closes_is_sent_only_after_it_opens`,
   `a_turn_waits_while_its_scopes_forget_has_not_reached_the_account` and
   `a_post_in_flight_when_a_forget_naming_no_ids_came_is_deleted_after`,
-  `history_unsent`'s (a real store, reopened), and `days_protocol`'s
+  `history_unsent`'s (a real store, reopened, among them
+  `the_apps_removal_of_a_person_keeps_their_whole_history_across_a_restart`), and `days_protocol`'s
   `a_forget_names_the_exchanges_it_removed_by_scope_and_id` and
   `each_forgets_rest_is_kept_under_its_own_token`.
 
@@ -439,6 +456,10 @@ socket is refused before the eyes forget anything.
   the person's `p-` id, as a `forget_all` of that id is
   ([below](#forgets-told-on-the-bus-memoryforgot)). Its rules scope went in
   the same request and is not told apart. A refused one is not told.
+- **The account's history:** the same transaction keeps the person's whole
+  history for the account (`history_unsent`), and with
+  `LAMP_HISTORY_FORGET=on` the voice deletes it there
+  ([above](#forgets-reach-the-accounts-history-lamp_history_forget)).
 - **Not done here:** the household's `room_sounds` consent is not removed,
   and `memory/rules` is not published again.
 - **Tests:** `tests/forget_person.rs` (a real Days server and the legacy

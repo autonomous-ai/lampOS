@@ -324,6 +324,12 @@ pub trait Effects {
     fn agent_manager(&mut self) -> Option<String> {
         agent_manager_unit(&fs::read_to_string(PASSWD).ok()?)
     }
+    /// Before the wipe, while the lamp's keys are still on it: with the
+    /// voice's `LAMP_HISTORY_FORGET=on`, the lamp's whole history deleted on
+    /// the account, bounded ([`crate::history_forget`]); `resumed`, a reset
+    /// finished at boot, first waits for the network, at most
+    /// [`crate::history_forget::NETWORK_WITHIN`]. By default nothing.
+    fn forget_history(&mut self, _resumed: bool) {}
 }
 
 /// The product's skills folder (`lamp_update::product_skills::FOLDER`).
@@ -1397,6 +1403,32 @@ impl Effects for System {
     fn forget_agents(&mut self) -> io::Result<usize> {
         forget_agents(Path::new("/"))
     }
+    fn forget_history(&mut self, resumed: bool) {
+        use crate::history_forget as history;
+        let argv = history::ENVIRONMENT_ARGV.map(str::to_owned);
+        let environment = self.read(&argv).unwrap_or_default();
+        // At boot setup starts before Wi-Fi and DNS: a resumed reset waits
+        // for them, bounded; any other reset runs with the lamp up.
+        let network = || {
+            let started = std::time::Instant::now();
+            !resumed
+                || history::network_within(
+                    history::NETWORK_WITHIN,
+                    history::NETWORK_AGAIN,
+                    history::relay_reached,
+                    std::thread::sleep,
+                    || started.elapsed(),
+                )
+        };
+        let outcome = history::before_wipe_after(
+            &environment,
+            Path::new(history::SECOND_CONFIG),
+            history::WITHIN,
+            network,
+            history::post,
+        );
+        eprintln!("lamp-setup: reset: {}", outcome.said());
+    }
 }
 
 /// `argv` run and killed with its children once `most` has passed
@@ -1944,7 +1976,7 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
         }
     };
     steps.push(Step::Stopped);
-    if let Err(error) = finish(plan, effects, &mut steps) {
+    if let Err(error) = finish(plan, effects, &mut steps, false) {
         // The journal and the missing marker bring the lamp back into setup,
         // which finishes the wipe; a lamp left dark here would wait for a hand.
         reboot(plan, effects, &mut steps);
@@ -2057,7 +2089,7 @@ pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> 
     match fs::symlink_metadata(&plan.journal) {
         Ok(_) => {
             let again = stop_agents(plan, effects)?;
-            finish(plan, effects, &mut steps)?;
+            finish(plan, effects, &mut steps, true)?;
             if !again.is_empty() {
                 let mut argv = vec![plan.stop[0].clone(), "start".into()];
                 argv.extend(again);
@@ -2124,7 +2156,17 @@ fn consent_held(path: &Path) -> Option<(lamp_msgs::consent::Held, &'static str)>
     }
 }
 
-fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
+/// The wipe; `resumed`: a reset finished at boot ([`resume`]).
+fn finish(
+    plan: &Plan,
+    effects: &mut impl Effects,
+    steps: &mut Vec<Step>,
+    resumed: bool,
+) -> io::Result<()> {
+    // The account's history first, while the lamp's keys are on it (the
+    // first builder's ruling on #8125): bounded, and the wipe goes on
+    // whatever it came to.
+    effects.forget_history(resumed);
     // Before the plan's wipes (#7868, the first builder, 02:02): OpenClaw's
     // check of the cut joins a running gateway through OpenClaw's wrapper,
     // which exits without lamp-cloud's forwarder token, wiped below.
