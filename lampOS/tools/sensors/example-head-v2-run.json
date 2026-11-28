@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "manifest_sha256": "31e11e931cc9bac7cb1c95040ec682caf9aaeb96fbe15614057fa38e270f9637",
+  "sensor": "head",
+  "build_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "producer_binary_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "evidence": "replay",
+  "location": "local",
+  "predictions": [
+    {
+      "case_id": "head01",
+      "clock_id": "capture-example",
+      "output": "facing",
+      "input_end_us": 1900000,
+      "ready_us": null,
+      "replay_elapsed_us": 10000,
+      "subject_face_id": "track01",
+      "eyes_epoch": "eyes-example",
+      "added_wait_us": 0,
+      "held_line": false,
+      "safety_violation": false
+    }
+  ]
+}

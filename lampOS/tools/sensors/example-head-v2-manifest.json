@@ -1,0 +1,60 @@
+{
+  "version": 2,
+  "rubric_id": "sensor-team-2026-11-27-v2",
+  "collection_id": "invented-v2-example",
+  "frozen_unix_s": 1000,
+  "sessions": [
+    {
+      "id": "dev01",
+      "split": "development",
+      "started_unix_s": 2000,
+      "consent": true,
+      "retention": "keep_all",
+      "inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "readme_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "data_origin": "invented",
+      "clock_id": "capture-example",
+      "clock_verified": false,
+      "sync_error_us": 1000,
+      "recording_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "trials": [
+    {
+      "id": "trial01",
+      "session_id": "dev01",
+      "speaker_id": "person01",
+      "source": "person",
+      "start_us": 1000000,
+      "end_us": 2000000,
+      "recipient": "lamp",
+      "script_id": "script01",
+      "look_target": "screen",
+      "head_target": "lamp",
+      "shoulders_target": "lamp",
+      "bearing_deg": 0,
+      "distance_mm": 600,
+      "light": "daylight",
+      "noise": "quiet",
+      "visible_faces": [
+        "track01"
+      ],
+      "subject_face_id": "track01",
+      "subject_visible": true,
+      "eyes_epoch": "eyes-example",
+      "overlap": false,
+      "first_use": true,
+      "condition": "normal"
+    }
+  ],
+  "cases": [
+    {
+      "id": "head01",
+      "sensor": "head",
+      "trial_id": "trial01",
+      "expected": "facing",
+      "fault": false,
+      "opportunity_us": 1800000
+    }
+  ]
+}

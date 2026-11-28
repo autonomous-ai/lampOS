@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "source_commit": "f2d57a11a0754c9d2649f3c903e6679ffc241275",
+  "review_pr": 8673,
+  "rule": "26-Nov hey/hi/hello Lamp",
+  "default_groups": 58,
+  "default_scenes": 421,
+  "default_played_lines": 689,
+  "default_scored_lines": 666,
+  "named_only_excluded": [
+    "handover"
+  ],
+  "october_mode": false,
+  "renderer": "macOS say; pin rendered bytes on the recording Mac before A1",
+  "cue_groups_require_mac": [
+    "quiet-voices",
+    "delivery-2",
+    "pauses"
+  ],
+  "source_sha256": {
+    "voiceset.py": "d7b3b021bb7db7bc5be60a2af97e0835ba9598fe12f4ce489613e2e5978da445",
+    "scenario.py": "9689b461815bac4d5b625ea81e47d02eacfcc549077bc39a92df0a368a7d193e",
+    "make_noise.py": "8b8d78acdc0d7fa654049dd40bc4d87c604dc5769dc0308b3897837b0767fdae",
+    "el-say.sh": "f78a89b2651fed4228aa215206f751f906d230998489602c736c7f1a676f73ba",
+    "stop-lines.sh": "2980041a86110ba9a000f3ee46865410c12997fc4baaf101bd07ff056af02460",
+    "lamp_ssh": "dbacb05484de6d99c876c8393adfe4271377ee280fb5eea97a469d51c08f657b",
+    "README.md": "5d024850c24244429c05ed7b79cff245961ec4fbfee8ff6a7981bfb99778f845"
+  },
+  "limits": [
+    "No audio or hardware was exercised by this review.",
+    "Run identity must additionally pin actual rendered WAVs, voice/rate settings and noise-bed bytes.",
+    "Use measured speech-end/playback markers for latency; a decision-to-audio field is not acoustic latency."
+  ]
+}

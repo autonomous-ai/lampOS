@@ -1,0 +1,475 @@
+{
+  "format": "vision_recipe_v1",
+  "rubric_id": "vision-public-synthetic-20261128-v1",
+  "authority": "https://github.com/autonomous-ai/lampOS/issues/8964#issuecomment-7237307291",
+  "supplementary_authority": "https://github.com/autonomous-ai/lampOS/issues/8964#issuecomment-7237344737",
+  "state": "recipe_frozen_assets_not_yet_sealed",
+  "seed": 20261128,
+  "max_dataset_bytes_exclusive": 5000000000,
+  "retention": "keep_all",
+  "qualification_claim": "dataset_specific_only",
+  "monday_footage": "later_external_test_not_a_prerequisite_for_this_recipe",
+  "assets": {
+    "manifest_required_before_fit": true,
+    "calibration_counts_as_fitting": true,
+    "train_allowed_licenses": [
+      "CC0-1.0",
+      "CC-BY-4.0",
+      "own_render_with_all_input_rights_recorded"
+    ],
+    "test_only_sources": [
+      "Pointing04"
+    ],
+    "unknown_rights_training_allowed": false,
+    "shared_source_roles_across_models": true
+  },
+  "synthetic": {
+    "identity_groups": {
+      "train": [
+        "A00",
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "A10",
+        "A11"
+      ],
+      "tune": [
+        "A12",
+        "A13",
+        "A14",
+        "A15",
+        "A16",
+        "A17"
+      ],
+      "test": [
+        "A18",
+        "A19",
+        "A20",
+        "A21",
+        "A22",
+        "A23"
+      ]
+    },
+    "identity_seed_rule": "20261128 + numeric avatar suffix; freeze morph, mesh, material, accessories and voice family hashes before fitting",
+    "conditions": {
+      "distance_m": [
+        0.5,
+        1,
+        1.5
+      ],
+      "light": [
+        "day",
+        "warm_dim"
+      ],
+      "skin_materials": 6,
+      "hair_classes": [
+        "none",
+        "short",
+        "long"
+      ],
+      "glasses": [
+        false,
+        true
+      ],
+      "balance_rule": "Each six-avatar block contains all six skin materials, each hair class twice and glasses three times; mapping is frozen in the asset manifest"
+    },
+    "camera": {
+      "kind": "declared_proxy_not_measured_lamp_intrinsics",
+      "rgb_width": 320,
+      "rgb_height": 240,
+      "horizontal_fov_deg": 70,
+      "principal_point_px": [
+        159.5,
+        119.5
+      ],
+      "pixel_aspect": 1,
+      "distortion": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "axes": "x right, y up, z into scene",
+      "subject_azimuth_deg_by_avatar_parity": [
+        -15,
+        15
+      ],
+      "subject_elevation_deg": 10,
+      "distance_basis": "optical center to face origin",
+      "subject_pose_basis": "face-to-camera ray, not rig joint Euler angles"
+    },
+    "lighting": {
+      "day": {
+        "sun_energy": 3,
+        "sun_rgb": [
+          1,
+          0.95,
+          0.9
+        ],
+        "world_strength": 0.3
+      },
+      "warm_dim": {
+        "sun_energy": 0.5,
+        "sun_rgb": [
+          1,
+          0.65,
+          0.35
+        ],
+        "world_strength": 0.08
+      },
+      "sun_toward_subject_camera_vector": [
+        1,
+        -1,
+        2
+      ],
+      "exposure": 0,
+      "view_transform": "Standard",
+      "interpretation": "Blender scene controls, not measured physical lux"
+    }
+  },
+  "head": {
+    "poses_facing_deg": [
+      [
+        0,
+        0
+      ],
+      [
+        -30,
+        0
+      ],
+      [
+        30,
+        0
+      ],
+      [
+        -55,
+        0
+      ],
+      [
+        55,
+        0
+      ],
+      [
+        0,
+        -19
+      ],
+      [
+        0,
+        24
+      ],
+      [
+        -45,
+        -15
+      ],
+      [
+        45,
+        20
+      ]
+    ],
+    "poses_away_deg": [
+      [
+        -65,
+        0
+      ],
+      [
+        65,
+        0
+      ],
+      [
+        -85,
+        0
+      ],
+      [
+        85,
+        0
+      ],
+      [
+        0,
+        -25
+      ],
+      [
+        0,
+        30
+      ],
+      [
+        -70,
+        -15
+      ],
+      [
+        70,
+        20
+      ],
+      [
+        0,
+        -45
+      ]
+    ],
+    "shoulder_yaw_deg": [
+      0,
+      75
+    ],
+    "gold": {
+      "yaw_abs_max_deg": 60,
+      "pitch_min_deg": -20,
+      "pitch_max_deg": 25,
+      "edges_inclusive": true,
+      "pitch_positive": "up"
+    },
+    "case_id": "head/<avatar>/<distance-index>/<light-index>/<pose-index>/<shoulder-index>",
+    "order": [
+      "avatar",
+      "distance-index",
+      "light-index",
+      "pose-index",
+      "shoulder-index"
+    ],
+    "counts": {
+      "train": 2592,
+      "tune": 1296,
+      "test": 1296,
+      "test_facing": 648,
+      "test_away": 648,
+      "test_each_distance_light_class": 108
+    },
+    "bars": {
+      "class_correct_min": 616,
+      "class_denominator": 648,
+      "cell_class_correct_min": 103,
+      "cell_class_denominator": 108
+    },
+    "boundary_diagnostic_poses_deg": [
+      [
+        -59.5,
+        0
+      ],
+      [
+        -60,
+        0
+      ],
+      [
+        -60.5,
+        0
+      ],
+      [
+        59.5,
+        0
+      ],
+      [
+        60,
+        0
+      ],
+      [
+        60.5,
+        0
+      ],
+      [
+        0,
+        -19.5
+      ],
+      [
+        0,
+        -20
+      ],
+      [
+        0,
+        -20.5
+      ],
+      [
+        0,
+        24.5
+      ],
+      [
+        0,
+        25
+      ],
+      [
+        0,
+        25.5
+      ]
+    ],
+    "boundary_diagnostic_rule": "All 24 avatars, distance 1.0, day, shoulder yaw 0; 288 additional rows, separate from primary",
+    "head_only_not_joint": true,
+    "required_comparisons": [
+      "frozen_tract_control",
+      "neural_candidate_fp32",
+      "same_candidate_npu_int8",
+      "opencv_solvepnp_existing_mesh",
+      "opencv_solvepnp_declared_zoo_landmarks"
+    ]
+  },
+  "speaking": {
+    "case_id": "speak/<split>/<distance-index>/<light-index>/<type>/<repeat>",
+    "type_order": ["slot0_two", "slot0_three", "slot1_two", "slot1_three", "slot2_three", "no_visible_two", "no_visible_three"],
+    "case_order": ["split", "distance-index", "light-index", "type-order", "repeat"],
+    "avatar_assignment": "Within each split, number rows from zero in case order. Visible slot j uses role avatars[(row+j) mod role-size]; an offscreen source uses the next avatar after the visible slots. Distinct avatars within a scene; no split crossing.",
+    "layout_azimuth_deg": {"two": [-15,15], "three": [-20,0,20]},
+    "mouth_control": "Every even repeat has one silent visible distractor with a different, independently timed viseme sequence; odd repeats leave non-speakers idle. No random seed or text/voice family crosses splits.",
+    "duration_us": 2400000,
+    "video_fps": 25,
+    "video_frames": 60,
+    "audio_rate_hz": 16000,
+    "audio_samples": 38400,
+    "canonical_media": "lossless RGB video plus PCM; direct encoder output is retained original",
+    "conditions_per_split": 6,
+    "per_cell_by_split": {
+      "train": {
+        "slot0_two": 6,
+        "slot0_three": 6,
+        "slot1_two": 6,
+        "slot1_three": 6,
+        "slot2_three": 8,
+        "no_visible_two": 4,
+        "no_visible_three": 4
+      },
+      "tune": {
+        "slot0_two": 3,
+        "slot0_three": 3,
+        "slot1_two": 3,
+        "slot1_three": 3,
+        "slot2_three": 4,
+        "no_visible_two": 2,
+        "no_visible_three": 2
+      },
+      "test": {
+        "slot0_two": 12,
+        "slot0_three": 12,
+        "slot1_two": 12,
+        "slot1_three": 12,
+        "slot2_three": 16,
+        "no_visible_two": 8,
+        "no_visible_three": 8
+      }
+    },
+    "counts": {
+      "train": 240,
+      "tune": 120,
+      "test": 480,
+      "test_visible": 384,
+      "test_no_visible": 96,
+      "test_two_faces": 192,
+      "test_three_faces": 288
+    },
+    "bars": {
+      "test_correct_min": 456,
+      "test_denominator": 480,
+      "cell_correct_min": 76,
+      "cell_denominator": 80,
+      "visible_recall_min_correct": 365,
+      "visible_denominator": 384,
+      "face_pick_precision_min": 0.95
+    },
+    "slots": "left-to-right in the image, with pose/layout/permutation frozen before prediction",
+    "source_roles": "avatar identities, voice families, utterance families, animation/take variants and all crops inherit one split",
+    "source_audio": "own TTS with exact voice/model terms and hashes; one source per primary episode",
+    "offscreen_controls": "Visible non-speakers may move their mouths independently; silence or missing input is not no_visible gold",
+    "label_basis": "known emitting avatar and visible identities, with source-sample/viseme/renderer timestamps; scripted rather than human mouth truth",
+    "required_comparisons": [
+      "frozen_tract_or_equivalent_fp32_control",
+      "light_asd_npu",
+      "mouth_motion_audio_energy_baseline"
+    ]
+  },
+  "public": {
+    "ami": {
+      "role": "commercially_usable_source_subject_to_publisher_asset_licence",
+      "known_exposed_groups": [
+        "ES2002",
+        "IS1000"
+      ],
+      "known_exposed_role": "diagnostic_only_for_this_version",
+      "split_unit": "connected components of participant identity plus recording session family; a/b/c/d and all cameras/channels/crops remain together",
+      "split_rule": "SHA256 UTF-8(rubric_id + newline + lexicographically smallest full participant-or-session ID in component), first 8 hex as u32 mod 10: 0..5 train, 6..7 tune, 8..9 test",
+      "before_media_selection": "freeze full component map and selected canonical rows before model outputs",
+      "component_ids": "Use canonical participant/<publisher-id> and session/<a-b-c-d-family> identifiers. Entire components touching ES2002 or IS1000 are diagnostic-only, excluded before hash partitioning.",
+      "candidate_windows": "2.4-second windows at starts 3*k seconds, integer k>=1; exact original PTS/sample boundaries retained. Canonical key is meeting/camera/target-participant/start-us/end-us; select one camera observation per underlying episode.",
+      "label_rule": "Within the whole window, exactly one annotated lexical speaker covers >=1.0 seconds. A is that target. Q is another source, with no target vocal event during the window plus 0.5-second guards. Ambiguous or malformed annotations are retained as unavailable or diagnostics before predictions.",
+      "selection": "sort eligible source intervals by SHA256(rubric_id + newline + canonical source key); no overlapping windows; min 120 target-speaking and 120 other-speaking planned test cases; retain missing inputs",
+      "audio": "one predeclared room/mixed microphone shared by all targets; never use target headset as classifier input",
+      "labels": "annotation proxy unless independently verified audible/visible truth; single-face A/Q is not multi-face selection",
+      "test_camera_geometry": "unknown unless measured; no invented desk distances"
+    },
+    "pointing04": {
+      "role": "test_only",
+      "known_exposure": "all 15 subjects previously evaluated; reused diagnostic, never new unseen holdout",
+      "model_fitting_allowed": false,
+      "quantization_calibration_allowed": false,
+      "threshold_sign_crop_fitting_allowed": false,
+      "report": "all 2790 planned images and per-subject/class results; frozen reference cone and exact prior crop protocol; do not mix with synthetic denominators"
+    }
+  },
+  "conversion": {
+    "calibration": {
+      "source_split": "train",
+      "distinct_model_input_tensors": 300,
+      "selection": "50 hashed input tensors per distance/light cell from rendered training sources; AMI additions remain train-only and separately enumerated",
+      "frozen_before_conversion": true,
+      "source_case_and_tensor_hashes_required": true
+    },
+    "input_contract": [
+      "source model and graph hashes",
+      "shape and axes",
+      "dtype, channel order and layout",
+      "range, normalization and resize/crop algorithm",
+      "context length and causal lookahead",
+      "quantization scale and zero point",
+      "output names/order/dequantization",
+      "compiler version/options and actual backend"
+    ],
+    "paired_inputs": true,
+    "tensor_metrics": [
+      "nonfinite_count",
+      "shape_mismatch_count",
+      "max_abs_error",
+      "mean_abs_error",
+      "p95_abs_error",
+      "rmse"
+    ],
+    "eyes": {
+      "detection": "one-to-one gold box match at IoU >=0.5; >=95% recall and precision; planned no-face specificity >=95%; CPU/NPU paired matching and flips reported",
+      "mesh": "six pre-mapped anatomical anchors; all visible-anchor 2D errors <=0.05 gold face-box diagonal on >=95% planned faces; unknown/missing fails; all-478 CPU/NPU drift separate",
+      "blendshapes": "paired coefficients in [0,1], max absolute drift <=0.05 on same inputs and missing/nonfinite count zero; downstream mouth/facing task bars still apply; coefficient parity is not emotion truth"
+    },
+    "eyes_negative_frames": {
+      "train": 144,
+      "tune": 72,
+      "test": 144,
+      "rule": "own empty-desk/object renders, same role-specific scene families; test specificity >=137/144"
+    },
+    "acceptance": "every candidate meets its own labelled-set bar; gains/losses and CPU disagreements are explicit, no claim of exact parity when decisions change; randomized tensors are smoke controls only"
+  },
+  "timing": {
+    "lead_runs_board": true,
+    "device_changes_by_reviewer": false,
+    "fresh_pipeline_target_fps_min": 10,
+    "p95_full_frame_service_us_max": 100000,
+    "speaking_p95_fresh_decision_work_us_max": 40000,
+    "speaking_capture_to_publication_us_max": 350000,
+    "stale_source_age_us_max": 500000,
+    "cold_runs": 1,
+    "excluded_declared_warmup_frames": 10,
+    "warm_measured_frames_min": 300,
+    "sustained_seconds_min": 300,
+    "report": [
+      "model load",
+      "first usable output including context fill",
+      "queue wait",
+      "decode/detect/mesh/blendshape/feature/inference/postprocess/publication",
+      "full decision p50/p95/max",
+      "new decisions per second",
+      "missed deadlines and dropped/repeated frames",
+      "thermal/load/frequency and actual NPU execution",
+      "CPU fallback and failure receipts",
+      "same-input CPU control and unrelated voice impact"
+    ],
+    "context_frame_amortization_is_latency": false,
+    "replay_ready_us": null,
+    "smoke_network_result_is_model_result": false
+  }
+}
