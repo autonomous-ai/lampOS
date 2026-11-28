@@ -1305,7 +1305,19 @@ conversation beyond its exchanges, and for how long:
   or the observation pass's previous): the asker's own, marked theirs, and
   the room's, told as the room's. **The room's talk note can be found by
   anyone in the room, an unplaced voice included**; that is intended
-  ([switches.md](switches.md)). Another person's is never told.
+  ([switches.md](switches.md)). Another person's is never told. A
+  recall's talk notes are told only while the whole answer, its partial
+  span's note included, fits the 4,096
+  bytes of one tool answer (`lamp_gemini::MAX_TOOL_JSON_BYTES`, less the
+  64 bytes `records_recalled` leaves), counted with the note a partial
+  span is marked with after them (`remember::told_bytes`): the first note
+  past that room, and every note after it (the room's after theirs), is
+  left out whole, so what is told keeps the order asked, and the journal
+  counts them (`remember::talk_fitting`); the recall's own entries are
+  never left out. Records are sized against the same count. When everything fits, the ask and the
+  answer are as before. On lamp-06c1 (25 Nov req 437, 26 Nov S8 req 146)
+  6 entries and 2 notes passed 4,096 bytes, and the whole recall was told
+  as the memory not answering.
 - **What removes it:** `forget_everything` (and the app's forget of the
   person, `forget_person`/`forget_all`); a targeted forget of one of its
   source exchanges, or of a kept thing or an observation from the same
@@ -2249,7 +2261,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     accents kept, as the ranked search's) and have three letters or more,
     or a digit. If one of them is not among the words heard, compared
     lower-cased and without accents (đ as d), the heard line is kept
-    instead: without its lead-in ("please remember that", "remember",
+    instead (a number key word counts as heard when every number the
+    model names is among the heard line's, in the fold C81 uses,
+    `remember::numbers`: "441" is heard in "four four one", #8570 S8
+    req 147): without its lead-in ("please remember that", "remember",
     "keep in mind", "hãy nhớ là", "nhớ rằng" …), as "They said: my favourite tea is
     jasmine", cut to the store's 300 bytes. The model's answer then says
     `"kept"` with that text and asks it to say it back.
@@ -2431,7 +2446,17 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     that turn's "Forgotten." (`heard::done_backs_a_forget`: a `forget`
     status with `forgotten` and `already`), so `LAMP_ACTION_CLAIM_CHECKED`
     does not hold it and ask again (S13 req 467); a keep is never backed by
-    it. And before round 1 of a line that is only a yes, with no offer
+    it. With `LAMP_MEMORY_DONE_IN_PLACE=on`
+    (dark, #8570 S8), an exchange between that answered the done request's
+    own line in its place, that request's answer cut (a held line's
+    "request N's words, cut short by it, are answered in its place"), does
+    not end it: its own line, or its person's words, are the done request's
+    own line in the same words (`Thread::answered_between_but_in_place`),
+    unless the lamp's answer before the yes ended in a question
+    (`Thread::lamp_asked_by_its_end`): then the yes answers that.
+    On lamp-06c1 on 26 Nov (reqs 141-144) "Lily visits on Saturday after
+    all." was changed in 141, 142 answered it, and "Yes. Please keep that."
+    was told nothing was waiting and asked again. And before round 1 of a line that is only a yes, with no offer
     waiting and nothing asked in the lamp's answer before it, the model is
     told the same, whatever it then calls (after a done forget, "Yes.
     Please forget it." counts as that yes: only a yes once its forget
