@@ -84,16 +84,43 @@ impl Hours {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LimitsFile {
-    during: Hours,
+    during: LimitsHours,
     light_channel_max: Option<u16>,
     volume_raw_max: Option<u8>,
 }
 
+/// `[limits] during`: fixed local hours, or `"quiet"`, the person's quiet
+/// hours (#8866, `crate::quiet`), while they are on.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LimitsHours {
+    Word(String),
+    Fixed(Hours),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Limits {
+    /// The fixed hours; with `follows_quiet`, the old night's, 21:00 to
+    /// 06:00, which only name the limits until the window is heard.
     pub during: Window,
+    /// `during = "quiet"` (#8866): the ceilings hold while the person's
+    /// quiet hours are on and the local time is inside them
+    /// (`crate::quiet::night`), and not at all while they are off.
+    pub follows_quiet: bool,
     pub light_channel_max: Option<u16>,
     pub volume_raw_max: Option<u8>,
+}
+
+impl Limits {
+    /// The hours the ceilings hold in, with the quiet window `quiet`:
+    /// fixed ones always, the window's only while it is on.
+    pub fn window(&self, quiet: &lamp_msgs::QuietWindow) -> Option<Window> {
+        if self.follows_quiet {
+            crate::quiet::night(quiet)
+        } else {
+            Some(self.during)
+        }
+    }
 }
 
 impl LimitsFile {
@@ -111,8 +138,22 @@ impl LimitsFile {
                     .into(),
             );
         }
+        let (during, follows_quiet) = match self.during {
+            LimitsHours::Fixed(hours) => (hours.checked()?, false),
+            LimitsHours::Word(word) if word == crate::quiet::LIMITS_WORD => {
+                let night = crate::quiet::night(&lamp_msgs::QuietWindow::default())
+                    .expect("the default quiet window is on");
+                (night, true)
+            }
+            LimitsHours::Word(word) => {
+                return Err(format!(
+                    "limits during {word:?}: {{ from, to }} or \"quiet\", the person's quiet hours"
+                ));
+            }
+        };
         Ok(Limits {
-            during: self.during.checked()?,
+            during,
+            follows_quiet,
             light_channel_max: self.light_channel_max,
             volume_raw_max: self.volume_raw_max,
         })

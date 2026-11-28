@@ -144,6 +144,9 @@ pub struct Real {
     /// `LAMP_PRIVACY_LIGHT=on` on a lamp with a slide (#8696,
     /// `crate::privacy_light`).
     pub privacy_light: Option<crate::privacy_light::Place>,
+    /// The person's quiet hours from the app, kept by lamp-actions, with
+    /// `LAMP_QUIET_HOURS=on` (#8866, `crate::quiet`).
+    pub quiet_hours: bool,
     /// The owner's dev monitor, with `LAMP_APP_MONITOR=on` (#5883,
     /// `crate::monitor`).
     pub monitor: Option<crate::monitor::Place>,
@@ -458,6 +461,28 @@ impl Real {
 
     /// One call on `lamp-actions`' socket: its answer, `ok` or not.
     fn actions(&self, name: &str, args: Value) -> Result<Value, String> {
+        let answer = self.ask_actions(&json!({"op": "call", "name": name, "args": args}))?;
+        if answer["ok"] == true {
+            Ok(answer)
+        } else {
+            Err(answer["error"].as_str().unwrap_or("not done").to_owned())
+        }
+    }
+
+    /// One op of the quiet hours (#8866) on the same socket: its answer
+    /// when `ok`, else why, an Actions from before them named
+    /// (`crate::quiet::refusal`).
+    fn quiet_op(&self, line: &Value) -> Result<Value, String> {
+        let answer = self.ask_actions(line)?;
+        if answer["ok"] == true {
+            Ok(answer)
+        } else {
+            Err(crate::quiet::refusal(&answer))
+        }
+    }
+
+    /// One line on `lamp-actions`' socket, and its one-line answer.
+    fn ask_actions(&self, request: &Value) -> Result<Value, String> {
         let gone = || "the lamp's actions are not running".to_owned();
         let mut stream = UnixStream::connect(&self.places.actions).map_err(|_| gone())?;
         stream
@@ -466,20 +491,14 @@ impl Real {
         stream
             .set_write_timeout(Some(ACTIONS_WAIT))
             .map_err(|_| gone())?;
-        let mut line = json!({"op": "call", "name": name, "args": args}).to_string();
+        let mut line = request.to_string();
         line.push('\n');
         stream.write_all(line.as_bytes()).map_err(|_| gone())?;
         let mut answer = String::new();
         BufReader::new(stream)
             .read_line(&mut answer)
             .map_err(|_| "the lamp's actions did not answer".to_owned())?;
-        let answer: Value = serde_json::from_str(&answer)
-            .map_err(|_| "the lamp's actions said nonsense".to_owned())?;
-        if answer["ok"] == true {
-            Ok(answer)
-        } else {
-            Err(answer["error"].as_str().unwrap_or("not done").to_owned())
-        }
+        serde_json::from_str(&answer).map_err(|_| "the lamp's actions said nonsense".to_owned())
     }
 
     fn level(answer: &Value) -> Result<Volume, String> {
@@ -916,6 +935,18 @@ impl Lamp for Real {
         self.privacy_light.clone()
     }
 
+    fn quiet_hours(&self) -> bool {
+        self.quiet_hours
+    }
+
+    fn quiet(&mut self) -> Result<Value, String> {
+        self.quiet_op(&json!({"op": "quiet_get"}))
+    }
+
+    fn set_quiet(&mut self, window: &lamp_msgs::QuietWindow) -> Result<Value, String> {
+        self.quiet_op(&crate::quiet::put_line(window))
+    }
+
     fn monitor(&self) -> Option<crate::monitor::Place> {
         self.monitor.clone()
     }
@@ -1213,6 +1244,7 @@ mod tests {
             consent: None,
             desk_noticing: None,
             privacy_light: None,
+            quiet_hours: false,
             monitor: None,
             devices: None,
             apps: None,
@@ -1249,6 +1281,119 @@ mod tests {
         assert_eq!(reset_of(&pins), Some("none"));
         std::fs::write(&pins, "[1]").unwrap();
         assert_eq!(reset_of(&pins), None);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #8866: `quiet.get` and `quiet.set` go to `lamp-actions`' socket as
+    /// its own ops, `quiet_get` and `quiet_put` (a stand-in here that keeps
+    /// the window as Actions does), never as calls; the reply is the window
+    /// it answers. An Actions from before them, which answers an unknown
+    /// line as a call it can't do, is named so.
+    #[test]
+    fn the_quiet_hours_are_asked_of_lamp_actions_by_their_own_ops() {
+        let (places, root) = places("quiet");
+        let listener = UnixListener::bind(&places.actions).unwrap();
+        let serving = std::thread::spawn(move || {
+            let mut asked = Vec::new();
+            let mut kept = json!({"on": true, "start": "21:00", "end": "06:00"});
+            for turn in 0..4 {
+                let (stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                asked.push(request.clone());
+                let answer = if turn == 3 {
+                    // An Actions from before #8866.
+                    json!({"ok": false, "error": "I can't do that."})
+                } else {
+                    if request["op"] == "quiet_put" {
+                        kept = json!({"on": request["on"], "start": request["start"], "end": request["end"]});
+                    }
+                    let mut answer = kept.clone();
+                    answer["ok"] = json!(true);
+                    answer
+                };
+                let mut stream = stream;
+                stream.write_all(format!("{answer}\n").as_bytes()).unwrap();
+            }
+            asked
+        });
+        let mut lamp = Real {
+            places: places.clone(),
+            bus: None,
+            device_id: "d-42".into(),
+            build: "812+460a1a1aa2b3".into(),
+            wifi: Wifi::default(),
+            ring: Ring::default(),
+            texts: Texts::default(),
+            reports: None,
+            skills: None,
+            changes: None,
+            photos: None,
+            faces: None,
+            schedule: None,
+            update_page: false,
+            update_checks: Default::default(),
+            restart: None,
+            guard: None,
+            harness_sign_in: None,
+            make_skill: None,
+            write_skill: None,
+            share: None,
+            services: None,
+            control: None,
+            consent: None,
+            desk_noticing: None,
+            privacy_light: None,
+            quiet_hours: true,
+            monitor: None,
+            devices: None,
+            apps: None,
+            upload: None,
+            attachments: None,
+            shutdown: None,
+        };
+        use crate::answer::answer;
+        assert_eq!(
+            answer(&mut lamp, "quiet.get", &json!({})),
+            Ok(Some(json!({"on": true, "start": "21:00", "end": "06:00"})))
+        );
+        let late = json!({"on": false, "start": "22:30", "end": "07:15"});
+        assert_eq!(
+            answer(&mut lamp, "quiet.set", &late),
+            Ok(Some(late.clone()))
+        );
+        // Refused here: Actions is never asked.
+        assert_eq!(
+            answer(
+                &mut lamp,
+                "quiet.set",
+                &json!({"on": false, "start": "22:30"})
+            ),
+            Err(crate::quiet::SHAPE.to_owned())
+        );
+        assert_eq!(answer(&mut lamp, "quiet.get", &json!({})), Ok(Some(late)));
+        assert_eq!(
+            answer(&mut lamp, "quiet.get", &json!({})),
+            Err(crate::quiet::OLD_ACTIONS.to_owned())
+        );
+        let asked = serving.join().unwrap();
+        assert_eq!(
+            asked,
+            [
+                json!({"op": "quiet_get"}),
+                json!({"op": "quiet_put", "on": false, "start": "22:30", "end": "07:15"}),
+                json!({"op": "quiet_get"}),
+                json!({"op": "quiet_get"}),
+            ]
+        );
+        std::fs::remove_file(&places.actions).unwrap();
+        assert_eq!(
+            answer(&mut lamp, "quiet.get", &json!({})),
+            Err("the lamp's actions are not running".into())
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -1304,6 +1449,7 @@ mod tests {
             consent: None,
             desk_noticing: None,
             privacy_light: None,
+            quiet_hours: false,
             monitor: None,
             devices: None,
             apps: None,
@@ -1404,6 +1550,7 @@ mod tests {
             consent: None,
             desk_noticing: None,
             privacy_light: None,
+            quiet_hours: false,
             monitor: None,
             devices: None,
             apps: None,
@@ -1517,6 +1664,7 @@ mod tests {
             consent: None,
             desk_noticing: None,
             privacy_light: None,
+            quiet_hours: false,
             monitor: None,
             devices: None,
             apps: None,

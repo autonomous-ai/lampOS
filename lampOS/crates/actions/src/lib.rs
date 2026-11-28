@@ -27,6 +27,7 @@ pub mod caps;
 pub mod caps_service;
 pub mod kept_volume;
 pub mod light;
+pub mod quiet;
 pub mod schedule;
 pub mod server;
 pub mod sound;

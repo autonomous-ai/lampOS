@@ -759,6 +759,7 @@ const BUS_TOPICS: &[&str] = &[
     "name/rising",
     "output/caps",
     "policy/decisions",
+    "quiet/window",
     "account/state",
     "reports/request",
     "reports/state",

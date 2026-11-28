@@ -414,6 +414,39 @@ silence or malformed input cannot remove an admitted restriction. Its startup
 stays dark until a valid snapshot arrives. See [Bedtime and Morning](bedtime-morning.md)
 for the skill, switches and the unperformed physical check.
 
+### The person's quiet hours (#8866)
+
+Beside the caps, on the same socket and only while they are on, Actions
+keeps the person's quiet hours, set from the app (`quiet.get`, `quiet.set`
+through lamp-cloud, [cloud.md](cloud.md), "Quiet hours from the app";
+`crate::quiet`). Two more private ops, separate from `call` as the caps'
+are:
+
+- `{"op":"quiet_get"}`: answers `{"ok":true,"on","start","end"}`, the
+  window kept, `start` and `end` as `HH:MM` in local time.
+- `{"op":"quiet_put","on":bool,"start":"HH:MM","end":"HH:MM"}`: all three
+  keys and no other, 24-hour times that differ (a window may cross
+  midnight). It is written, then answered as `quiet_get` is. Refused with
+  code `bad_arguments` and nothing changed: another key, a key missing, a
+  wrong type or a time not `HH:MM` (`quiet_put takes {"on": bool,
+  "start": "HH:MM", "end": "HH:MM"}`), or the same start and end (`quiet
+  hours need a start and an end that differ`). A write that fails is code
+  `storage` (`the quiet hours could not be kept`), the old window kept.
+
+The window is the file `quiet-window` in the caps folder, one JSON line
+(`{"end":"06:00","on":true,"start":"21:00"}`), written, synced and renamed
+into place as `kept-volume` is, so it survives a restart and an update; the
+product reset wipes the folder. No file, or one that can't be read, is on,
+21:00 to 06:00, the lamp's old fixed night. It is apart from the caps'
+store, so a store held back or failed neither loses nor blocks it.
+
+Actions says it on `quiet/window` (`lamp_msgs::QuietWindow`, Latest, no
+lifespan) each second with `output/caps`, and at once after a put. Actions
+caps nothing by it itself: Skills reads it and holds Bedtime's night caps to
+it ([bedtime-morning.md](bedtime-morning.md), "Quiet hours"). With the caps
+off the two ops answer `unavailable`, as the caps' do; an Actions from
+before #8866 answers them as a call it can't do.
+
 ## Not shown
 
 The 2026-10-14 Mac x86_64 checks passed 33 Actions tests, including 14 new

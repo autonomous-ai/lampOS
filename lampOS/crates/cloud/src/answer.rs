@@ -290,6 +290,22 @@ pub trait Lamp {
         None
     }
 
+    /// Whether the person's quiet hours are taken from the app (#8866,
+    /// `LAMP_QUIET_HOURS=on`, `crate::quiet`).
+    fn quiet_hours(&self) -> bool {
+        false
+    }
+
+    /// The quiet window `lamp-actions` keeps (`quiet_get`): its answer.
+    fn quiet(&mut self) -> Result<Value, String> {
+        Err(not_here(crate::quiet::KINDS[0]))
+    }
+
+    /// Asks `lamp-actions` to keep `window` (`quiet_put`): its answer.
+    fn set_quiet(&mut self, _window: &lamp_msgs::QuietWindow) -> Result<Value, String> {
+        Err(not_here(crate::quiet::KINDS[1]))
+    }
+
     /// The person's own services linked from the app (`LAMP_SERVICES=on`,
     /// Queue #4710, `crate::services`): there only with the switch.
     fn services(&self) -> Option<std::sync::Arc<crate::services::Services>> {
@@ -434,7 +450,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 92] = [
+pub const KINDS: [(&str, Switch); 94] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -460,6 +476,9 @@ pub const KINDS: [(&str, Switch); 92] = [
     // while lamp-seen is switched on (`LAMP_SEEN_ACTIVITY=on`).
     (crate::consent::DESK_KINDS[0], DESK),
     (crate::consent::DESK_KINDS[1], DESK),
+    // The person's quiet hours (#8866): with their switch alone.
+    (crate::quiet::KINDS[0], QUIET),
+    (crate::quiet::KINDS[1], QUIET),
     ("skills.list", |lamp| lamp.skills().is_some()),
     ("skills.remove", |lamp| lamp.skills().is_some()),
     // Off, on and the camera's yes with the page (#4099), so `can` tells an
@@ -563,6 +582,7 @@ pub const KINDS: [(&str, Switch); 92] = [
 ];
 
 const PRIVACY_LIGHT: Switch = |lamp| lamp.privacy_light().is_some();
+const QUIET: Switch = |lamp| lamp.quiet_hours();
 const CONSENT: Switch = |lamp| lamp.consent().is_some();
 const DESK: Switch = |lamp| lamp.desk_noticing().is_some();
 const HARNESS_SIGN_IN: Switch = |lamp| lamp.harness_sign_in().is_some();
@@ -782,6 +802,17 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The privacy light's look (#8696): both through root's helper,
         // which takes them from this process alone; the reply is the look
         // the file then says, red when it says none.
+        // The person's quiet hours (#8866): kept by lamp-actions; a set is
+        // checked whole first, and the reply is the window then kept.
+        kind if crate::quiet::KINDS.contains(&kind) && on(lamp, kind) => {
+            let answer = if kind == crate::quiet::KINDS[0] {
+                lamp.quiet()?
+            } else {
+                let window = crate::quiet::asked(data)?;
+                lamp.set_quiet(&window)?
+            };
+            crate::quiet::reply(&answer).map(Some)
+        }
         kind if crate::privacy_light::KINDS.contains(&kind) && on(lamp, kind) => {
             let place = lamp.privacy_light().ok_or_else(|| not_here(kind))?;
             if kind == crate::privacy_light::KINDS[0] {
@@ -1251,6 +1282,11 @@ pub mod tests {
         pub desk_noticing: Option<crate::consent::Place>,
         /// The privacy light's look (#8696), with its switch.
         pub privacy_light: Option<crate::privacy_light::Place>,
+        /// The person's quiet hours (#8866): the switch, and the window a
+        /// stand-in Actions keeps (none: the default) and the sets it took.
+        pub quiet_hours: bool,
+        pub quiet_kept: Option<lamp_msgs::QuietWindow>,
+        pub quiet_sets: usize,
         /// What `onboarding` says, and the switch's file (#5812).
         pub onboarding: Option<u64>,
         pub onboarding_done: Option<std::path::PathBuf>,
@@ -1403,6 +1439,20 @@ pub mod tests {
         fn privacy_light(&self) -> Option<crate::privacy_light::Place> {
             self.privacy_light.clone()
         }
+        fn quiet_hours(&self) -> bool {
+            self.quiet_hours
+        }
+        fn quiet(&mut self) -> Result<Value, String> {
+            let kept = self.quiet_kept.unwrap_or_default();
+            let mut answer = crate::quiet::put_line(&kept);
+            answer["ok"] = json!(true);
+            Ok(answer)
+        }
+        fn set_quiet(&mut self, window: &lamp_msgs::QuietWindow) -> Result<Value, String> {
+            self.quiet_sets += 1;
+            self.quiet_kept = Some(*window);
+            self.quiet()
+        }
         fn update_events(&self) -> Option<std::path::PathBuf> {
             self.update_events.clone()
         }
@@ -1540,6 +1590,80 @@ pub mod tests {
             }
         });
         lines
+    }
+
+    /// #8866: the quiet hours, get and set through lamp-actions (a
+    /// stand-in here): the old night with none kept, a set read back,
+    /// every refusal made before Actions is asked, and neither kind
+    /// answered or in `can` without the switch.
+    #[test]
+    fn quiet_get_and_set_answer_the_window_kept() {
+        let mut off = lamp();
+        for kind in crate::quiet::KINDS {
+            assert!(!can(&off).contains(&kind));
+            assert_eq!(answer(&mut off, kind, &json!({})), Err(not_here(kind)));
+        }
+        assert_eq!(off.quiet_sets, 0);
+        let mut lamp = Fake {
+            quiet_hours: true,
+            ..lamp()
+        };
+        let can_now = can(&lamp);
+        assert!(
+            crate::quiet::KINDS
+                .iter()
+                .all(|kind| can_now.contains(kind))
+        );
+        assert_eq!(
+            answer(&mut lamp, "quiet.get", &json!({})),
+            Ok(Some(json!({"on": true, "start": "21:00", "end": "06:00"})))
+        );
+        let late = json!({"on": true, "start": "22:00", "end": "07:00"});
+        assert_eq!(
+            answer(&mut lamp, "quiet.set", &late),
+            Ok(Some(late.clone()))
+        );
+        assert_eq!(
+            answer(&mut lamp, "quiet.get", &Value::Null),
+            Ok(Some(late.clone()))
+        );
+        let off_late = json!({"on": false, "start": "22:00", "end": "07:00"});
+        assert_eq!(
+            answer(&mut lamp, "quiet.set", &off_late),
+            Ok(Some(off_late.clone()))
+        );
+        assert_eq!(lamp.quiet_sets, 2);
+        for (data, error) in [
+            (json!({"on": true, "start": "22:00"}), crate::quiet::SHAPE),
+            (
+                json!({"on": "no", "start": "22:00", "end": "07:00"}),
+                crate::quiet::SHAPE,
+            ),
+            (
+                json!({"on": true, "start": "25:00", "end": "07:00"}),
+                crate::quiet::SHAPE,
+            ),
+            (
+                json!({"on": true, "start": "22:00", "end": "07:00", "x": 1}),
+                crate::quiet::SHAPE,
+            ),
+            (Value::Null, crate::quiet::SHAPE),
+            (
+                json!({"on": true, "start": "07:00", "end": "07:00"}),
+                crate::quiet::SAME,
+            ),
+        ] {
+            assert_eq!(
+                answer(&mut lamp, "quiet.set", &data),
+                Err(error.to_owned()),
+                "{data}"
+            );
+        }
+        assert_eq!(lamp.quiet_sets, 2, "no refused set reached Actions");
+        assert_eq!(
+            answer(&mut lamp, "quiet.get", &json!({})),
+            Ok(Some(off_late))
+        );
     }
 
     /// #8696: the privacy light's look, get and set both through root's
@@ -2749,6 +2873,12 @@ pub mod tests {
                     })
                 },
                 &crate::privacy_light::KINDS,
+            ),
+            (
+                // The person's quiet hours (#8866): their switch alone.
+                "quiet hours",
+                |f| f.quiet_hours = true,
+                &crate::quiet::KINDS,
             ),
             (
                 // lamp-control's admin socket there: a path that is.
