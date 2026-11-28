@@ -3764,10 +3764,120 @@ cả hai người viết.
   `Uncovered::Reminder`, không bao giờ giữ thành task hằng ngày), và sau
   đánh giá đúng, mỗi lần DeepSeek sửa cũng phải qua `quick_reaction`, lần
   sửa không phải phản ứng nhanh chuyển sang dạng giữa (hai P2 của
-  Reviewer-lead trên #7764). Đèn không có agent nào (`missing` của
-  #7375): "this lamp has no agent set up to make it"; chưa biết agent (chưa
-  đọc được targets của lamp-tasks, hoặc engine không có lần chạy make):
-  không đánh giá, của DeepSeek như trước. Câu trả lời `cannot:`
+  Reviewer-lead trên #7764).
+  **Theo dõi dữ liệu bên ngoài là task theo đồng hồ, không bao giờ là nhắc
+  việc (#8079).** Trên lamp-9adf (20/11) "Lamp, if Bitcoin goes under
+  ninety thousand dollars, tell me right away." bị đặt trên topic
+  `price/bitcoin` mà đèn không có, rồi được trả lời `cannot:` là nhắc việc
+  và bị từ chối là bộ hẹn giờ của đèn. Quy tắc theo dõi là của chính dạng
+  giữa, có hiệu lực mỗi khi `LAMP_MAKE_NO_CANNOT` bật
+  (`make_no_cannot::watch_taught`; bật trong sản phẩm), bất kể công tắc
+  phản ứng, công tắc mà sản phẩm không đặt (lead đọc trên #8079): lần gọi
+  thêm được nói về việc theo dõi (`make_no_cannot::WATCH`, sau câu từ chối
+  nhắc việc khi phản ứng bật, sau phần grants khi không, kèm một câu trả
+  lời đầy đủ cho "if it starts raining in Hanoi, tell me"): điều chỉ
+  internet biết, không có topic nào của đèn (giá, thời tiết, một trang
+  web, một con số trên dịch vụ), chạy trên đồng hồ riêng của lamp-skills
+  mỗi khoảng, `clock/local`, `known`, `true`, `cooldown = "90m"` (không bao
+  giờ dưới 90 phút, `made_skill::LEAST_WATCH_SECS`: 16 lần chạy một ngày
+  vẫn dưới mức `task::PER_SKILL` của lamp-skills là 20 lần chạy task cho
+  mỗi skill trong 24 giờ, có mức sàn 72 phút; việc theo dõi 15 phút sẽ
+  dùng hết 20 lần trong năm giờ rồi dừng cả ngày), không `rearm`,
+  `during` hay `days`, có `net` trong grants; task duy nhất kiểm tra điều
+  kiện mỗi lần chạy và chỉ nói khi điều kiện đúng. Mô hình phán theo
+  nghĩa; đèn không giữ danh sách từ nào (các câu trả lời mẫu chỉ cấp
+  `net`: task do trigger khởi động nói qua câu told của đèn, #8651). Hai
+  lần sửa theo cấu trúc đi kèm: trigger trên topic không bộ phận nào của
+  đèn mang (`made_skill::topic_lamp_lacks`) bị từ chối với các dòng của
+  phép kiểm và `WATCH_REPAIR`, có điều kiện bằng lời để mô hình phán: nếu
+  chỉ internet mới biết được, nó chạy theo đồng hồ, việc kiểm tra nằm
+  trong task, không bao giờ `cannot:`; còn không (cảm biến hay thiết bị
+  đèn không có, "tell me when my phone battery is low", `phone/battery`)
+  thì trả lời `needs:` như trước, nên không giữ việc theo dõi theo đồng hồ
+  cho điều không lần chạy nào kiểm được, và người nghe chính dòng của phép
+  kiểm; và `cannot:` nhắc việc sau một trigger như thế của
+  chính mô hình được hỏi lại một lần như việc theo dõi (nhật ký: `the
+  model's cannot was a reminder after its trigger on what the lamp has no
+  topic for: asked again as a watch on the clock`), chỉ bị từ chối là bộ
+  hẹn giờ của đèn khi lại trả lời như vậy. `cannot:` nhắc việc không có
+  trigger như thế trước nó ("remind me at 5 pm to call the bakery") vẫn là
+  bộ hẹn giờ của đèn y như trước. Việc theo dõi theo đồng hồ được nói
+  "Every 90 minutes, …"; chỉ được nói (và giữ) với cùng công tắc
+  `LAMP_MAKE_NO_CANNOT` (`made_skill::watch_here` chính là
+  `make_no_cannot::watch_taught`; trên đường chỉ có `LAMP_TASK_NET`, trigger
+  đồng hồ mỗi khoảng vẫn bị từ chối như trước), chỉ cho task của agent đèn
+  làm ở đây (`made_skill::clock_watch`), và chỉ khi có `net` trong grants
+  (`watch_said`): bản nháp DeepSeek hỏi đồng hồ đều đặn, hay task theo
+  đồng hồ không có `net` ("every 2 hours remind me to stretch", chỉ
+  `speak`), không phải việc theo dõi và được đọc y như trước: bị từ chối
+  vì không phải giờ hằng ngày, hoặc, khi `LAMP_MADE_SKILL_LOOSE` bật như
+  sản phẩm chạy, được giữ và nói bằng lời chung ("When its moment comes,
+  …", `plainly_as`), không bao giờ "Every 2 hours"
+  (`a_clock_trigger_limited_or_held_is_no_watch`: trigger có `during`,
+  `days`, `rearm`, `for`, `when`, `absent_for` hay `wait` không bao giờ
+  được nói "Every 90 minutes"). Brief mà mọi task của agent chạy
+  (`make_no_cannot::SCRIPT`, `scripts/agent.py`) giờ kết thúc "…, or, when
+  the task is only for when something holds and it doesn't now, answer
+  only a dash (-), never words", và câu đó không nói gì (lời như "No rain
+  now." sẽ bị đọc là điều kiện đúng). **Nói một lần cho tới khi điều
+  kiện thôi đúng (#8089, P2 của một người đọc trong HOLD):** lamp-skills
+  đọc câu trả lời của lần chạy là có lời, im lặng (chỉ một gạch hoặc
+  không có gì) hay lỗi (`task::ran`). Chỉ việc theo dõi được làm để nói
+  khi điều kiện đúng mới được nói một lần (must-check của người đọc thứ
+  hai trên #8089): mô hình phân biệt theo nghĩa giữa việc theo dõi ("if
+  Bitcoin goes under 90k, tell me") và báo cáo đều đặn ("every 2 hours,
+  tell me the headlines", ví dụ thứ hai trong prompt,
+  `make_no_cannot::REPORT_EXAMPLE`), và chỉ viết dòng `tell:
+  once_while_holding` cho việc theo dõi (`make_no_cannot::tells_once`);
+  trên việc theo dõi theo đồng hồ, đèn giữ nó trong bước task, `task = {
+  task, run, tell = "once_while_holding" }` (`make_no_cannot::TELL_ONCE`;
+  trên trigger khác thì bỏ đi và ghi nhật ký), nói lại là ", telling you
+  once each time it holds", và lamp-skills không nhận `tell` nào khác
+  (`task::TELL_ONCE_WHILE_HOLDING`, `TaskStep::tell_once`). Báo cáo không
+  có `tell` và nói lời của mọi lần chạy, nói lại là "Every 2 hours, …".
+  Với lần chạy của việc theo dõi có đánh dấu mà không ai hỏi bằng giọng
+  nói lúc đó, lamp-skills giữ một dấu đã nói theo skill và sha256 của thư
+  mục trong `task-watch-told.json` của
+  `--state-dir` (`task::watch_tells`): lần chạy đầu tiên điều kiện đúng
+  được nói, và chỉ được đánh dấu khi việc nói đã kết thúc là Told
+  (`watch_told`, sau khi kết quả của `tell_its_run` đọc ra Told,
+  `answer_news`; P2 của lần đọc thứ hai trên #8079): lần nói không có ai
+  trong một giờ bị bỏ không nói, và lần nói bị mất khi khởi động lại chưa
+  từng bắt đầu, nên cả hai đều không đánh dấu và lần chạy điều kiện đúng
+  tiếp theo nói lại (nhật ký `its watch holds, but its telling ended …:
+  not marked, said again next time`); khi còn dấu, lần chạy điều kiện
+  đúng không nói gì
+  (nhật ký `its watch still holds, told already: not said again`); lần
+  chạy im lặng xoá dấu, nên chỉ nói lại khi điều kiện đã thôi đúng rồi
+  đúng lại; lần chạy lỗi không đổi gì; việc theo dõi làm lại bắt đầu không
+  có dấu. Trạng thái là của đèn, không phải của agent, vốn không giữ gì
+  giữa các lần chạy. **Lời từ chối không có mạng một lần một ngày:** trên
+  đèn mà agent không tới được internet, `NO_NET_SAID` được nói nhiều nhất
+  một lần cho mỗi skill trong 24 giờ với lần chạy không ai hỏi bằng giọng
+  nói (`task::refusal_said_today`, giữ trong `task-refusals-said.json`);
+  lần chạy vừa được hỏi bằng giọng nói luôn được trả lời. Khi
+  `LAMP_MADE_SKILL_LOOSE` bật, như sản phẩm chạy, không `most_a_day` hay
+  `[budget]` nào giới hạn nó, và mức sàn 90 phút giữ nó trong
+  `task::PER_SKILL` cả ngày (test `a_made_watch_fits_the_task_runs_a_day`
+  của lamp-skills giữ hai số này khớp nhau). Mọi skill dùng chung
+  `task::ALL_SKILLS`, 100 lần chạy task trong 24 giờ: khoảng sáu việc theo
+  dõi, mỗi cái 16 lần một ngày, đã lấp đầy nó nếu không có gì khác, và lần
+  chạy vượt quá không được giao, chỉ có một dòng nhật ký. Test:
+  `a_watch_tells_once_until_it_stops_holding`,
+  `only_a_watch_made_to_speak_when_it_holds_is_told_once`,
+  `a_task_is_told_once_only_with_the_lamps_own_tell`,
+  `only_a_watch_the_model_marked_is_told_once`,
+  `with_the_switch_a_report_every_while_keeps_no_tell_once`,
+  `a_no_net_refusal_is_said_once_a_day_unless_asked_by_voice`,
+  `with_reactions_on_a_watch_on_outside_data_is_told_on_the_clock`,
+  `a_reminder_after_a_trigger_on_what_no_topic_carries_is_asked_again_as_a_watch`,
+  `a_reminder_with_no_watch_before_it_is_still_the_lamps_timer`,
+  `with_the_switch_a_price_watch_runs_on_the_clock_as_one_task_never_a_reminder`
+  và `with_the_switch_a_one_off_reminder_is_still_the_lamps_timer`.
+  Đèn không có agent nào (`missing` của #7375): "this lamp has no agent
+  set up to make it"; chưa biết agent (chưa đọc được targets của
+  lamp-tasks, hoặc engine không có lần chạy make): không đánh giá, của
+  DeepSeek như trước. Câu trả lời `cannot:`
   (nhắc việc một lần là bộ hẹn giờ của đèn, không bao giờ là make), dòng
   internet và make dịch vụ liên kết giữ tuyến của chúng. Hai guard: một
   `[[while]]` trên `voice/state` hoặc `room/activity` đọc như trên được nói

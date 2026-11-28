@@ -6295,7 +6295,18 @@ fn code_held(
     let run = match task {
         toml::Value::String(run) => Some(run.as_str()),
         toml::Value::Table(task) => {
-            if task.keys().any(|key| key != "task" && key != "run") {
+            // Beside them only the lamp's own `tell` of a watch made to
+            // speak when something holds (`crate::make_no_cannot::TELL_ONCE`,
+            // #8089), as lamp-skills takes it.
+            let tell_ok = |key: &String| {
+                key == "tell"
+                    && task.get("tell").and_then(toml::Value::as_str)
+                        == Some(crate::make_no_cannot::TELL_ONCE)
+            };
+            if task
+                .keys()
+                .any(|key| key != "task" && key != "run" && !tell_ok(key))
+            {
                 return Err(scripts_not_held(
                     "a task step with a key other than task and run",
                 ));
@@ -7247,7 +7258,7 @@ fn general_said(table: &toml::Table, steps: &[toml::Value]) -> String {
     } else {
         Vec::new()
     };
-    let trigger = match trigger_plainly(table.get("trigger")) {
+    let trigger = match trigger_plainly(table.get("trigger"), watch_said(table)) {
         _ if !asks.is_empty() => format!("When {}", asks_plainly(&asks)),
         Ok((said, _)) => said,
         Err(_) => GENERAL_TRIGGER.to_owned(),
@@ -7397,7 +7408,7 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
         Vec::new()
     };
     let asked_only = !asks.is_empty() && !table.contains_key("trigger");
-    let (mut said, trigger) = match trigger_plainly(table.get("trigger")) {
+    let (mut said, trigger) = match trigger_plainly(table.get("trigger"), watch_said(table)) {
         _ if asked_only => (format!("When {}", asks_plainly(&asks)), &no_trigger),
         Ok((mut said, trigger)) if !asks.is_empty() => {
             said.push_str(&format!(", or when {}", asks_plainly(&asks)));
@@ -7486,7 +7497,10 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
     if let Some(guards) = &guards {
         said.push_str(guards);
     }
-    if let Some(cooldown) = trigger.get("cooldown") {
+    // A clock watch's cooldown is its every while, already said first
+    // ([`clock_watch`]).
+    let watched = watch_said(table) && clock_watch(trigger).is_some();
+    if let Some(cooldown) = trigger.get("cooldown").filter(|_| !watched) {
         match cooldown.as_str().and_then(duration) {
             Some((1, unit)) => said.push_str(&format!(", at most once {}", one(unit))),
             Some((count, unit)) => {
@@ -7601,9 +7615,17 @@ fn task_plainly(step: &toml::Value) -> Option<String> {
     // `do.task` is read back.
     let agents = crate::make_no_cannot::agent_tasks_made()
         && task.get("run").and_then(toml::Value::as_str) == Some(crate::make_no_cannot::RUN);
+    // A watch made to speak when something holds says so (#8089).
+    let once = if task.get("tell").and_then(toml::Value::as_str)
+        == Some(crate::make_no_cannot::TELL_ONCE)
+    {
+        ", telling you once each time it holds"
+    } else {
+        ""
+    };
     task_words_plain(words).then(|| {
         if agents {
-            format!("hands one task to the lamp's agent: “{words}”")
+            format!("hands one task to the lamp's agent: “{words}”{once}")
         } else {
             format!("runs its own code to “{words}”")
         }
@@ -8021,8 +8043,12 @@ const KNOWN_WHENS: [&str; 3] = ["appears", "present", "changes"];
 /// comes into view (after none, or none for a while), someone at the desk
 /// gets up, and a time of day, each day or on named days of the week; each
 /// with its `for`, `rearm`, `during` and `cooldown` (said after the steps)
-/// as lamp-skills counts them for that topic.
-fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Table), String> {
+/// as lamp-skills counts them for that topic. A clock trigger every while
+/// is a watch on outside data only with `watch` ([`watch_said`], #8079).
+fn trigger_plainly(
+    trigger: Option<&toml::Value>,
+    watch: bool,
+) -> Result<(String, &toml::Table), String> {
     // The keys a trigger said may have; any other is named.
     let unknown = |trigger: &toml::Table| {
         let known = [
@@ -8135,6 +8161,12 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         // minute; on its `days` alone when it names them (#6066, as
         // lamp-skills reads them, [`weekdays`]); never a window's while.
         (lasting, absent) if topic.0 == Some(CLOCK_TOPIC) => {
+            // A watch on outside data, polled on the clock ([`clock_watch`],
+            // #8079): every while, for the lamp's agent's task granted
+            // `net` alone (`watch`, [`watch_said`]).
+            if let Some(every) = clock_watch(trigger).filter(|_| watch) {
+                return Ok((format!("Every {every}"), trigger));
+            }
             let at = (topic.1 == Some("known")
                 && topic.2 == Some(toml::Value::Boolean(true))
                 && lasting.is_none()
@@ -8264,6 +8296,134 @@ fn trigger_plainly(trigger: Option<&toml::Value>) -> Result<(String, &toml::Tabl
         said.push_str(&format!(", between {from} and {to}"));
     }
     Ok((said, trigger))
+}
+
+/// The least while a clock watch ([`clock_watch`]) runs again: 90 minutes,
+/// so a watch runs at most 16 times a day and stays under lamp-skills' cap
+/// of 20 task runs per skill in any 24 hours (`lamp_skills::task::PER_SKILL`,
+/// which this crate can't see; its floor is 72 minutes). A 15-minute watch
+/// would hand over its 20 in five hours and then stop for the day unsaid.
+pub const LEAST_WATCH_SECS: u64 = 90 * 60;
+
+/// lamp-skills' most task runs per skill in any 24 hours
+/// (`lamp_skills::task::PER_SKILL`), written here since lamp-skills depends
+/// on this crate; its own test holds [`LEAST_WATCH_SECS`] to the real one.
+#[cfg(test)]
+const TASK_RUNS_A_DAY: u64 = 20;
+
+/// A watch on outside data on lamp-skills' own clock (#8079, lamp-9adf, 20
+/// Nov: "if Bitcoin goes under ninety thousand dollars, tell me right away"
+/// was put on a topic `price/bitcoin` the lamp doesn't have, then refused
+/// as a reminder): known local time held, `cooldown` its every while of at
+/// least [`LEAST_WATCH_SECS`], no `rearm`, `during`, `days`, `for`, `when`
+/// or `absent_for`, so lamp-skills runs it again each time its cooldown
+/// ends; its one task (the lamp's agent's, granted `net`) checks the
+/// condition and speaks only when it holds. The while said after "Every"
+/// ("90 minutes", "2 hours"); none for any other trigger.
+fn clock_watch(trigger: &toml::Table) -> Option<String> {
+    let held = trigger.get("topic").and_then(toml::Value::as_str) == Some(CLOCK_TOPIC)
+        && trigger.get("field").and_then(toml::Value::as_str) == Some("known")
+        && trigger.get("equals") == Some(&toml::Value::Boolean(true))
+        && [
+            "rearm",
+            "during",
+            "days",
+            "for",
+            "when",
+            "absent_for",
+            "wait",
+        ]
+        .iter()
+        .all(|key| !trigger.contains_key(*key));
+    let cooldown = trigger.get("cooldown")?.as_str()?;
+    if !held || whole_ms(cooldown)? < LEAST_WATCH_SECS * 1_000 {
+        return None;
+    }
+    Some(match duration(cooldown)? {
+        (1, unit) => unit.to_owned(),
+        (count, unit) => format!("{count} {unit}s"),
+    })
+}
+
+/// Whether the skill whose `skill.toml` is `text` is a clock watch
+/// ([`clock_watch`]), whatever this process's switches: the middle form's
+/// own read of a model's block (`crate::make_no_cannot::told_once`, which
+/// keeps the `tell` for a clock watch alone). lamp-skills never reads this:
+/// it tells a watch once by the task's own `tell`
+/// (`lamp_skills::task::TaskStep::tell_once`, `watch_tells`, #8089).
+pub fn is_clock_watch(text: &str) -> bool {
+    toml::from_str::<toml::Table>(text).is_ok_and(|table| {
+        table
+            .get("trigger")
+            .and_then(toml::Value::as_table)
+            .and_then(clock_watch)
+            .is_some()
+    })
+}
+
+/// Whether a clock watch ([`clock_watch`]) may be said here: only with the
+/// middle form's own switch, `LAMP_MAKE_NO_CANNOT`
+/// ([`crate::make_no_cannot::watch_taught`], the same gate as its prompt
+/// and repairs; never the net-only path's, the review's P2 on #8079), and,
+/// while a model's answer is kept, only when its code is the lamp's own
+/// agent script ([`AGENT_SCRIPT`]): a DeepSeek draft polling on the clock
+/// is a repeating reminder, the lamp's own timer, and stays refused.
+fn watch_here() -> bool {
+    crate::make_no_cannot::watch_taught() && AGENT_SCRIPT.with(|ours| ours.get()).unwrap_or(true)
+}
+
+/// Whether `table`, a made skill's, grants `net`
+/// (`crate::skill_task_yes::NET`).
+fn net_granted(table: &toml::Table) -> bool {
+    table
+        .get("grants")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|grants| {
+            grants
+                .iter()
+                .any(|grant| grant.as_str() == Some(crate::skill_task_yes::NET.0))
+        })
+}
+
+/// Whether `table`, a made skill's, does one task for the lamp's agent and
+/// nothing else: one `do` step, a `task` running the lamp's own
+/// [`crate::make_no_cannot::RUN`]. Read from the table alone, so a
+/// read-back outside a keep (where [`AGENT_SCRIPT`] is unset) agrees with
+/// the keep: a code skill of the model's own on the clock is never read as
+/// a watch (the second read's P3 on #8079).
+fn agent_task_alone(table: &toml::Table) -> bool {
+    table
+        .get("do")
+        .and_then(toml::Value::as_array)
+        .is_some_and(|steps| {
+            matches!(
+                steps.as_slice(),
+                [step] if step
+                    .get("task")
+                    .and_then(|task| task.get("run"))
+                    .and_then(toml::Value::as_str)
+                    == Some(crate::make_no_cannot::RUN)
+            )
+        })
+}
+
+/// Whether `table`'s clock trigger may be said and kept as a watch on
+/// outside data ([`clock_watch`]): said here at all ([`watch_here`]),
+/// one task for the lamp's agent ([`agent_task_alone`]) and granted `net`
+/// ([`net_granted`]), as a watch checks what only the internet tells. A
+/// clock task every while without `net` ("every 2 hours remind me to
+/// stretch") is a repeating reminder, the lamp's own timer, refused as
+/// before (the review's P2 on #8079).
+fn watch_said(table: &toml::Table) -> bool {
+    watch_here() && agent_task_alone(table) && net_granted(table)
+}
+
+/// Whether `topic` is one no part of the lamp carries (#7357, [`unread`]):
+/// neither one it has ([`lamp_has`]) nor a real one it can't start on yet
+/// ([`topic_cant_yet`]). The middle form reads a trigger on one as a watch
+/// on outside data (`crate::make_no_cannot`, #8079).
+pub(crate) fn topic_lamp_lacks(topic: &str) -> bool {
+    topic_cant_yet(topic).is_none() && !lamp_has(topic)
 }
 
 /// A `during` of one minute, `{ from = "22:00", to = "22:01" }`: its
@@ -15909,6 +16069,72 @@ light = { colour = "green", level = 3, for = "20s" }
         }
         assert!(lamp_has(lamp_msgs::Hand::TOPIC));
         assert!(!lamp_has("phone/battery"));
+    }
+
+    /// #8079: a clock watch every [`LEAST_WATCH_SECS`] runs fewer times a
+    /// day than lamp-skills' task runs per skill ([`TASK_RUNS_A_DAY`],
+    /// `lamp_skills::task::PER_SKILL`), so it never stops for the day; one
+    /// more often than that is no watch.
+    #[test]
+    fn a_clock_watch_fits_the_task_runs_a_day() {
+        const DAY_SECS: u64 = 24 * 60 * 60;
+        assert_eq!(LEAST_WATCH_SECS, 90 * 60);
+        assert_eq!(DAY_SECS.div_ceil(LEAST_WATCH_SECS), 16);
+        assert!(DAY_SECS.div_ceil(LEAST_WATCH_SECS) <= TASK_RUNS_A_DAY);
+        let watch = |cooldown: &str| {
+            let trigger: toml::Table = toml::from_str(&format!(
+                "topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                 cooldown = \"{cooldown}\""
+            ))
+            .unwrap();
+            clock_watch(&trigger)
+        };
+        assert_eq!(watch("90m").as_deref(), Some("90 minutes"));
+        for cooldown in ["15m", "72m", "89m", "1h"] {
+            assert_eq!(watch(cooldown), None, "{cooldown}");
+        }
+    }
+
+    /// #8089 (Twelve's P3 on the HOLD): a clock trigger with any key that
+    /// limits or holds it (`during`, `days`, `rearm`, `for`, `when`,
+    /// `absent_for`, `wait`) is no watch, so it is never said "Every 90
+    /// minutes" while it runs only some hours or days, and the middle form
+    /// keeps no `tell` for it ([`is_clock_watch`]; lamp-skills tells once by
+    /// the task's `tell` alone).
+    #[test]
+    fn a_clock_trigger_limited_or_held_is_no_watch() {
+        let base = "topic = \"clock/local\"\nfield = \"known\"\nequals = true\n\
+                    cooldown = \"90m\"\n";
+        let skill = |trigger: &str| {
+            format!("[permissions]\ntopics = [\"clock/local\"]\n\n[trigger]\n{trigger}")
+        };
+        // The trigger as it is read back with the watch said
+        // ([`trigger_plainly`]'s `watch`), the shape alone judged.
+        let said = |trigger: &str| {
+            let table: toml::Table = toml::from_str(&skill(trigger)).unwrap();
+            trigger_plainly(table.get("trigger"), true)
+                .ok()
+                .map(|(said, _)| said)
+        };
+        assert_eq!(said(base).as_deref(), Some("Every 90 minutes"));
+        assert!(is_clock_watch(&skill(base)));
+        for extra in [
+            "during = { from = \"09:00\", to = \"17:00\" }",
+            "days = [\"mon\", \"fri\"]",
+            "rearm = \"ends\"",
+            "for = \"5m\"",
+            "when = \"appears\"",
+            "absent_for = \"5m\"",
+            "wait = \"10m\"",
+        ] {
+            let trigger = format!("{base}{extra}\n");
+            assert!(!is_clock_watch(&skill(&trigger)), "{extra}");
+            assert_ne!(
+                said(&trigger).as_deref(),
+                Some("Every 90 minutes"),
+                "{extra}"
+            );
+        }
     }
 
     /// #7357: every topic `lamp_msgs` names (each `TOPIC` const and
