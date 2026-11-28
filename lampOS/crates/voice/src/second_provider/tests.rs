@@ -16727,6 +16727,108 @@ async fn with_simple_call_after_a_stop_the_window_runs_from_its_own_line() {
     );
 }
 
+/// A room line said `after_s` after a hand or head stop, in the second
+/// route with `LAMP_SIMPLE_CALL` and the rule wired as the product wires it
+/// (Reviewer-three's regression on #8892): an answer sent to play 40 s past
+/// the stop, the stop delivered as the authority with no owner
+/// (`Engine::stop_through`, as the worker's guard calls it), then the line,
+/// told of the stop on its Start or not. Its sound is dated by its own read
+/// time, so no real wait is needed. How many chats were asked, and the
+/// route's and the rule's ends of the lamp's words read just after the stop,
+/// with the time the stop was delivered.
+async fn room_line_after_a_hand_stop(
+    after_s: u64,
+    told: bool,
+) -> (usize, u64, Option<Duration>, u64) {
+    const S: u64 = 1_000_000;
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("The meeting with our colleagues is tomorrow.".into())].into()),
+        chats: Mutex::new(vec![vec![text("Okay."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let rule = Arc::new(Mutex::new(super::worker::Heeding::new(
+        true, false, None, None,
+    )));
+    {
+        let mut rule = rule.lock().unwrap();
+        rule.as_the_only_voice(false, true, false);
+        rule.hearing_only_said_to_me();
+        rule.taking_simple_calls();
+    }
+    let judge = rule.clone();
+    let forward = rule.clone();
+    let mut engine = built
+        .taking_simple_calls()
+        .telling_what_it_did(Arc::new(move |did| forward.lock().unwrap().lamp_did(did)))
+        .heeding(Arc::new(move |request, said, heard, from, lead| {
+            judge
+                .lock()
+                .unwrap()
+                .heed_led(request, said, heard, from, lead)
+        }));
+    let stopped_at = lamp_ipc::monotonic_us();
+    let sent_until = stopped_at + 40 * S;
+    engine
+        .shared
+        .said_until_us
+        .store(sent_until, Ordering::Relaxed);
+    rule.lock().unwrap().lamp_did(Did::Said(1, sent_until));
+    // The stop, as the authority with no owner delivers it.
+    engine.stop_through(1);
+    let delivered = lamp_ipc::monotonic_us();
+    let route_until = engine.shared.said_until_us.load(Ordering::Relaxed);
+    // Read 1 s on: ended by the stop, they ended at least 1 s before.
+    let rule_ended = rule.lock().unwrap().said_ended_ago(delivered + S);
+    let began = stopped_at + after_s * S;
+    engine.submit(start_marked(2, false, told, false));
+    engine.submit(ProviderInput::Audio {
+        request: 2,
+        privacy_generation: 1,
+        sequence: 1,
+        read_completed_at_us: began,
+        samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+    });
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+    let asked = script.asked.lock().unwrap().len();
+    (asked, route_until, rule_ended, delivered)
+}
+
+/// `LAMP_SIMPLE_CALL` (Reviewer-three's P2 on #8892): a hand or head stop
+/// ends the lamp's words when it is delivered, in the route and in the rule,
+/// never when a later line begins. With an answer sent to play 40 s past
+/// the stop, the first room line 21 s after it, with no name, is held,
+/// whether its Start is told of the stop or not (`LAMP_STOP_TOLD` keeps a
+/// stop for 120 s: capped at that line's start, it began a fresh 20 s and
+/// was answered); one 5 s after the stop is still answered.
+#[tokio::test]
+async fn with_simple_call_a_hand_stop_ends_the_lamps_words_when_it_is_delivered() {
+    let _thread = thread_held();
+    for told in [false, true] {
+        let (asked, route_until, rule_ended, delivered) =
+            room_line_after_a_hand_stop(21, told).await;
+        assert!(
+            route_until <= delivered,
+            "told {told}: the route's end at the stop, not 40 s on: {route_until} > {delivered}"
+        );
+        assert!(
+            rule_ended.is_some_and(|ago| ago >= Duration::from_secs(1)),
+            "told {told}: the rule's end at the stop, read 1 s on: {rule_ended:?}"
+        );
+        assert_eq!(
+            asked, 0,
+            "told {told}: the room line 21 s after the stop is held"
+        );
+        let (asked, _, _, _) = room_line_after_a_hand_stop(5, told).await;
+        assert_eq!(
+            asked, 1,
+            "told {told}: a line 5 s after the stop is answered"
+        );
+    }
+}
+
 /// lamp-06c1, 30 Oct 15:53:43 (#4710): "Okay, I'll stop there." was
 /// written but never heard. It was rendered only after the cut, whole,
 /// before any of it played, and the voice was slow; 5 s later a wordless
