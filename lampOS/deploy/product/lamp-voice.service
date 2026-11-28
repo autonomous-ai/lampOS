@@ -425,6 +425,9 @@ Environment=LAMP_TASKS_NAMED_ONLY=on
 # LAMP_TASKS_AFTER_NEWS: new work asked right after the lamp's news is handed over in code, not left to the model (#8701).
 # Its why and rules are its row in docs/switches.md.
 Environment=LAMP_TASKS_AFTER_NEWS=on
+# LAMP_TASKS_BEHIND: work behind earlier work is said so at its hand-over, and a repeat joins it (#8966).
+# Its why and rules are its row in docs/switches.md.
+Environment=LAMP_TASKS_BEHIND=on
 # LAMP_TASKS_CORRECT: its why and rules are its row in docs/switches.md (#2838, #6857).
 Environment=LAMP_TASKS_CORRECT=on
 # LAMP_TASKS_SIGN_IN: its why and rules are its row in docs/switches.md (#5198, #1676).

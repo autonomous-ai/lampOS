@@ -4050,7 +4050,8 @@ chạy thì không có câu này: lamp-tasks chạy từng việc một (OpenCla
 "waiting for the task before it to end", `LAMP_TASKS_OPENCLAW_DIRECT=on`;
 hàng đợi của phiên duy nhất sau lượt đang chạy, `LAMP_TASKS_ONE_SESSION=on`),
 nên agent đang bận chứ không phải đang khởi động, và câu đó sẽ sai (P2 của
-Jarvis trên #8510). Các id được giữ để không nói lần hai chỉ là 8 id mới
+Jarvis trên #8510); với `LAMP_TASKS_BEHIND=on`, việc đó được nói ngay trong
+câu trả lời của lần giao (mục #8966 bên dưới). Các id được giữ để không nói lần hai chỉ là 8 id mới
 nhất (`hand_wait::SAID_KEPT`). OpenClaw direct đưa lượt vào hàng đợi ngay
 lúc giao, nên bản ghi đọc `working` ngay, trong khi gateway khởi động lạnh
 chưa nhận lượt (watch đọc `starting`); trường `waiting` của bản ghi
@@ -4073,6 +4074,45 @@ socket của nó) ghi `lamp-voice: tasks: work N: no line: no say service`. Mộ
 câu bị dịch vụ say từ chối ghi `lamp-voice: tasks: work N after 20 s: no
 line: the say service refused: <why>`, và một câu đã bắt đầu mà không nói
 xong, hoặc bị bỏ, ghi `... the line not said: <outcome>`.
+
+## Việc chờ sau việc trước, và cùng một lời nhờ lần nữa (#8966, tắt trừ khi `LAMP_TASKS_BEHIND=on`)
+
+Trên lamp-52e6, việc 85 chạy 695 s; việc 86, được giao trong lúc đó, chờ
+sau nó mà không có câu nào (`work 86 after 20 s: no line: behind earlier
+work`), và cùng lời nhờ nói lại tạo ra việc 87. Với `LAMP_TASKS_BEHIND=on`
+(bật trong `lamp-voice.service` của sản phẩm, chỉ chuyển cho worker của
+tuyến thứ hai):
+
+- **Nói ngay trong hơi của lần giao.** Sau câu "có", `confirm_agent_task`
+  đọc `{"op":"work_list","limit":10}` một lần trên socket request, giới hạn
+  bởi `agent_tasks::OPEN_WORK_DEADLINE` (300 ms). Nếu trong bản ghi có việc
+  khác chưa xong và bắt đầu cùng lúc hoặc trước việc này (cùng quy tắc câu
+  20 s dùng cho `behind earlier work`), câu trả lời có `behind`, nhãn của
+  việc sớm nhất như vậy (lời của chính người dùng, được trích và không tin
+  cậy), và `next` thêm rằng model nói một lần, trong cùng câu trả lời, là
+  sẽ làm việc này sau việc kia ("I'll get to that after the research I'm
+  doing."). Không có việc nào phía trước, lần đọc bị từ chối hoặc không có
+  trả lời, hoặc là brief của một skill được làm: câu trả lời như trước.
+  Journal ghi `lamp-voice: tasks: request N: work A behind work B: told in
+  the hand-over (#8966)`. Câu 20 s ở trên vẫn im lặng cho việc như vậy.
+- **Lời nhờ lặp lại nhập vào việc đang chờ.** Một `start_agent_task` trong
+  lúc việc giọng nói giao gần nhất vẫn chờ (`queued`, hoặc `working` với
+  `waiting`), đọc một lần từ cùng `work_list` và giới hạn đó, mà task là
+  cùng một lời nhờ với `words` của việc đó (`agent_tasks::same_ask`: viết
+  thường, bỏ dấu câu, gộp khoảng trắng, bỏ "hey lamp", "lamp", "please",
+  "can you", "could you"; rồi so bằng nhau), thì không chuẩn bị gì. Câu trả
+  lời là `already_waiting` cùng `work_id`, `label` của việc và `behind` nếu
+  có, và một `next` bảo model nói là việc đã đang chờ và không gọi
+  `confirm_agent_task`. Journal ghi `lamp-voice: tasks: request N: the same
+  ask as waiting work A: nothing prepared (#8966)`. Một lời nhờ nói khác đi,
+  hoặc sau khi việc đã được nhận, là việc mới, như trước. Chưa giao gì: không
+  đọc gì.
+
+Khi tắt, cả hai câu trả lời như trước và không đọc gì thêm. Test:
+`agent_tasks::tests::work_handed_over_behind_earlier_work_is_said_so_in_the_hand_over`,
+`agent_tasks::tests::the_hand_over_is_as_before_with_nothing_ahead_unread_or_the_switch_off`,
+`agent_tasks::tests::a_repeat_of_waiting_work_joins_it_and_is_not_queued_twice`,
+`agent_tasks::tests::the_same_ask_is_the_same_words_without_fillers`.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
