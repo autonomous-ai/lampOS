@@ -115,7 +115,19 @@ comes.
   fails give way to the lamp's own for 10 minutes (`GIVE_WAY_FOR`), so a
   busy or failing `lamp-phonon` costs at most two lines their whole bound;
   one journal line, "Phonon on the lamp failed two lines in a row (<why>);
-  the lamp's own voice for the next 600 s, then it again". A line kept
+  the lamp's own voice for the next 600 s, then it again". Only a
+  `lamp-phonon` that answered counts here: a refusal, no first sound in
+  time, a stall or a break mid-answer. One not up yet, its socket not there
+  or the connection refused, counts as no failure: `lamp-phonon` and the
+  voice start together and Phonon loads its model (about 1.7 s on a lamp)
+  before it serves, so the lines in those seconds are said in the lamp's
+  own voice, no while of giving way starts, and the first line once it
+  serves is Phonon's. Such a line costs no wait (the connection fails at
+  once); one journal line, "Phonon on the lamp is not up yet; the lamp's
+  own voice says its lines for now, counted as no failure" (first time
+  only). A fixed line warmed in that time is tried again every 5 s
+  (`NOT_UP_EVERY`) for two minutes, then a minute later and twice as long
+  each time, at most hourly, as any other line not warmed yet. A line kept
   in Phonon's voice already still plays it in that time; past it Phonon is
   asked again, and a line it says starts the count over. A long say line
   rendered piece by piece as it plays stays in the lamp's voice from the

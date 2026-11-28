@@ -86,6 +86,29 @@ pub(crate) const WARM_EVERY: Duration = Duration::from_secs(60);
 /// (`own-keys.md`); a say line is rarer and kept, so it tries again.
 pub(crate) const GIVE_WAY_FOR: Duration = Duration::from_secs(600);
 pub(crate) const WARM_EVERY_MOST: Duration = Duration::from_secs(3_600);
+/// How soon the warming tries again while Phonon on the lamp is not up
+/// ([`NOT_UP`]): `lamp-phonon` starts with the voice and serves once its
+/// model is loaded (about 1.7 s on a lamp), so its fixed lines are warmed
+/// in its voice seconds later, not after [`WARM_EVERY`]'s minute and
+/// doubling.
+pub(crate) const NOT_UP_EVERY: Duration = Duration::from_secs(5);
+/// The tries at [`NOT_UP_EVERY`] before the warming waits as for any other
+/// failure ([`WARM_EVERY`], doubling): two minutes, so a `lamp-phonon` still
+/// fetching its model or stopped is asked at most once a minute, then less
+/// often, after that.
+pub(crate) const NOT_UP_TRIES: u32 = 24;
+
+/// Why Phonon on the lamp did not say a line: `lamp-phonon` is not up, its
+/// socket not there yet or the connection refused (it starts with the
+/// voice and loads its model first). The lamp's own voice says the line for
+/// now; it is no failure of Phonon's ([`Strikes`]), and the next line asks
+/// it again.
+const NOT_UP: &str = "Phonon on the lamp is not up yet";
+
+/// Why a warm line is not done yet: said in the lamp's own voice while
+/// Phonon is not up ([`NOT_UP`]), tried again after [`NOT_UP_EVERY`].
+const WARM_NOT_UP: &str =
+    "said in the lamp's own voice while Phonon on the lamp is not up yet, asked again in seconds";
 
 /// Why a line that rendered empty or too long is not played.
 const REFUSED: &str = "not in the speech cache, and rendered empty or too long";
@@ -115,13 +138,18 @@ enum SaidIn {
     /// or Phonon (#8754) only: it failed this line, or is giving way
     /// ([`Strikes`]); it is asked again later.
     LampsForNow,
+    /// The lamp's own voice for now, as [`Self::LampsForNow`], for Phonon
+    /// not up yet ([`NOT_UP`]): no failure, and asked again in seconds.
+    NotUp,
 }
 
 /// The failures in a row of the person's own Gemini voice (#8762's review)
 /// or of Phonon on the lamp (#8754): two in a row give way to the lamp's
 /// own voice for [`GIVE_WAY_FOR`], as the reply path gives way to it after
 /// a piece fails twice, so a slow, busy or failing voice costs at most two
-/// lines their whole bound.
+/// lines their whole bound. Only a voice that answered fails a line here
+/// (a refusal, a stall, a failure mid-answer): Phonon not up yet
+/// ([`NOT_UP`]) fails at once, costs a line no wait, and is no failure.
 struct Strikes {
     give_way_for: Duration,
     /// The voice in front, as the journal names it.
@@ -129,6 +157,9 @@ struct Strikes {
     /// Failures since the last line theirs said, and until when theirs
     /// gives way.
     state: Mutex<(u8, Option<std::time::Instant>)>,
+    /// A line said in the lamp's voice while theirs was not up was
+    /// journalled: once a process.
+    told_not_up: std::sync::atomic::AtomicBool,
 }
 
 impl Strikes {
@@ -137,6 +168,21 @@ impl Strikes {
             give_way_for,
             named,
             state: Mutex::new((0, None)),
+            told_not_up: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    /// Theirs is not up yet ([`NOT_UP`]): no failure, the count as it was,
+    /// journalled once.
+    fn not_up(&self) {
+        if !self
+            .told_not_up
+            .swap(true, std::sync::atomic::Ordering::Relaxed)
+        {
+            eprintln!(
+                "lamp-voice: the speech cache: {} is not up yet; the lamp's own voice says its lines for now, counted as no failure, and it is asked again with the next line (first time only, LAMP_OWN_KEYS)",
+                self.named
+            );
         }
     }
 
@@ -304,12 +350,12 @@ impl TtsCache {
     /// [`Self::falling_back_to`] for the person's own Gemini voice (#8762)
     /// or Phonon on the lamp (#8754), `named` in the journal, as the reply
     /// path gives way: a line it fails for any reason (a failure, or Phonon
-    /// not serving yet or stopped) is said in the lamp's own voice, never
-    /// left unsaid, and kept, if at all, under the lamp's key; the next line
-    /// asks it again, until `lost` says it was refused. Two lines in a row
-    /// it fails give way to the lamp's for [`GIVE_WAY_FOR`] ([`Strikes`],
+    /// not up yet or stopped) is said in the lamp's own voice, never left
+    /// unsaid, and kept, if at all, under the lamp's key; the next line asks
+    /// it again, until `lost` says it was refused. Two lines in a row it
+    /// fails give way to the lamp's for [`GIVE_WAY_FOR`] ([`Strikes`],
     /// #8762's review), so a slow voice never makes every line wait its
-    /// bound.
+    /// bound; Phonon not up yet ([`NOT_UP`]) counts as no failure.
     pub fn giving_way_to(mut self, lamps: TtsCache, lost: Lost, named: &'static str) -> Self {
         self.lamps = Some(Box::new(Lamps {
             cache: lamps,
@@ -472,7 +518,8 @@ impl TtsCache {
     /// for any line it fails too, and for every line while it gives way
     /// after two failures in a row ([`Strikes`]), apart from a line
     /// `theirs_kept` finds kept in its voice already; a line Phonon never
-    /// says ([`NOT_ENGLISH`]) is the lamp's, and no failure. A line the
+    /// says ([`NOT_ENGLISH`]) is the lamp's, and no failure, as is a line
+    /// while Phonon is not up yet ([`NOT_UP`]). A line the
     /// person's voice was refused for is said again in the lamp's, and
     /// kept, if at all, under the lamp's key only: the voice in front has
     /// no fallback of its own, so it never hands back the lamp's voice to
@@ -509,6 +556,12 @@ impl TtsCache {
             }
             Err(_) if (lamps.lost)() => lamps_say(SaidIn::Lamps),
             Err(why) if why == REFUSED || why.ends_with(NOT_ENGLISH) => lamps_say(SaidIn::Lamps),
+            // Phonon not up yet (starting with the voice): no strike, so a
+            // restart's first seconds never give way for GIVE_WAY_FOR.
+            Err(why) if why.ends_with(NOT_UP) => {
+                strikes.not_up();
+                lamps_say(SaidIn::NotUp)
+            }
             Err(why) => {
                 strikes.failed(&why);
                 lamps_say(SaidIn::LampsForNow)
@@ -743,6 +796,7 @@ impl TtsCache {
             .map(|line| match self.samples_said(line) {
                 Err(why) if why == REFUSED => Ok(()),
                 Ok((_, SaidIn::LampsForNow)) => Err(FOR_NOW.to_owned()),
+                Ok((_, SaidIn::NotUp)) => Err(WARM_NOT_UP.to_owned()),
                 other => other.map(drop),
             })
             .fold(Ok(()), Result::and)
@@ -1083,8 +1137,8 @@ fn render_gemini(
 
 /// `text` rendered whole by Phonon on the lamp (#8754), `lamp-phonon` at
 /// `socket` in `voice`, within [`render_within`], on a runtime of its own;
-/// an error when it is not serving (the model still being fetched, the
-/// service stopped) or fails.
+/// an error when it is not up ([`NOT_UP`]: the model still being loaded or
+/// fetched, the service stopped) or fails.
 fn render_phonon(
     socket: &Path,
     voice: lamp_msgs::phonon::Voice,
@@ -1098,12 +1152,18 @@ fn render_phonon(
         .map_err(|why| why.to_string())?;
     runtime.block_on(async {
         let whole = async {
-            let mut speech = PhononTts::new(socket, voice).speak(text).await?;
+            let mut speech = PhononTts::new(socket, voice)
+                .speak(text)
+                .await
+                .map_err(|why| match PhononTts::not_up(&why) {
+                    true => NOT_UP.to_owned(),
+                    false => why.to_string(),
+                })?;
             let mut samples = Vec::new();
             while let Some(packet) = speech.next().await {
-                samples.extend_from_slice(&packet?);
+                samples.extend_from_slice(&packet.map_err(|why| why.to_string())?);
             }
-            Ok::<_, crate::second_provider::net::Error>(samples)
+            Ok::<_, String>(samples)
         };
         whole_within(text, whole).await
     })
@@ -1129,18 +1189,49 @@ fn made_from_environment() -> Option<Arc<TtsCache>> {
         .spawn(move || {
             let lines = warming.warm_lines();
             let mut told = false;
-            let mut every = WARM_EVERY;
+            let mut again = WarmAgain::default();
             while let Err(why) = warming.warm(&lines) {
                 if !told {
-                    eprintln!("lamp-voice: the speech cache's lines are not rendered yet, tried again after a minute, then less often, at most hourly: {why}");
+                    eprintln!("lamp-voice: the speech cache's lines are not rendered yet, tried again after a minute, then less often, at most hourly (in seconds while Phonon on the lamp is starting): {why}");
                     told = true;
                 }
-                std::thread::sleep(every);
-                every = (every * 2).min(WARM_EVERY_MOST);
+                std::thread::sleep(again.after(&why));
             }
             eprintln!("lamp-voice: the speech cache holds its {} line(s)", lines.len());
         });
     Some(cache)
+}
+
+/// The warming's wait before its next try ([`made_from_environment`]):
+/// [`WARM_EVERY`], twice as long after each failure up to
+/// [`WARM_EVERY_MOST`]; while Phonon on the lamp is not up
+/// ([`WARM_NOT_UP`]), [`NOT_UP_EVERY`] for [`NOT_UP_TRIES`] tries, which
+/// leave the doubling where it was.
+struct WarmAgain {
+    every: Duration,
+    not_up_tries: u32,
+}
+
+impl Default for WarmAgain {
+    fn default() -> Self {
+        Self {
+            every: WARM_EVERY,
+            not_up_tries: NOT_UP_TRIES,
+        }
+    }
+}
+
+impl WarmAgain {
+    /// The wait after a try that failed with `why`.
+    fn after(&mut self, why: &str) -> Duration {
+        if why == WARM_NOT_UP && self.not_up_tries > 0 {
+            self.not_up_tries -= 1;
+            return NOT_UP_EVERY;
+        }
+        let wait = self.every;
+        self.every = (self.every * 2).min(WARM_EVERY_MOST);
+        wait
+    }
 }
 
 /// Called with the status a speech service refused the person's own key
@@ -2023,8 +2114,8 @@ mod tests {
 
     /// The lamp's own voice says `[1; 2_400]`, the person's ElevenLabs
     /// voice `[3; 2_400]`, Phonon `[2; 2_400]` when `serving`, else fails
-    /// as a `lamp-phonon` not serving yet does; each asking is kept in the
-    /// returned list.
+    /// as a `lamp-phonon` that answered but sent no sound in time does;
+    /// each asking is kept in the returned list.
     fn phonon_stand_ins(serving: bool) -> (Renderers, Asked) {
         phonon_stand_ins_with(Arc::new(move |_: &str| serving))
     }
@@ -2087,7 +2178,7 @@ mod tests {
                 if serves(text) {
                     Ok(vec![2; 2_400])
                 } else {
-                    Err("the lamp's voice's connection".into())
+                    Err("the lamp's voice's answer timed out".into())
                 }
             })
         });
@@ -2737,7 +2828,10 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let socket = dir.join("p.sock");
         let freya = lamp_msgs::phonon::voice("Freya").unwrap();
-        assert!(render_phonon(&socket, freya, "Hello.").is_err());
+        assert_eq!(
+            render_phonon(&socket, freya, "Hello."),
+            Err(NOT_UP.to_owned())
+        );
         let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
         let served = std::thread::spawn(move || {
             let (connection, _) = listener.accept().unwrap();
@@ -2761,5 +2855,97 @@ mod tests {
             ("ok, to the voice, by say.sock", "Freya")
         );
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// A test lamp's restart: `lamp-voice` and `lamp-phonon` start
+    /// together, and Phonon loads its model for about 1.7 s before its
+    /// socket is there. The speech cache's lines in that time found no
+    /// service; two of them counted as two failures in a row, and every
+    /// say line for the next [`GIVE_WAY_FOR`] went to the lamp's own voice.
+    /// A Phonon not up yet (no socket, or a connection refused) is said in
+    /// the lamp's own voice for now, counts as no failure and starts no
+    /// give-way: the first line once it serves is Phonon's.
+    #[test]
+    fn a_phonon_not_up_yet_at_start_is_no_failure_and_its_lines_come_back_once_it_serves() {
+        use std::io::{BufRead, BufReader};
+        let dir = std::env::temp_dir().join(format!("pnu{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("p.sock");
+        let cache_dir = scratch("phonon_not_up_yet");
+        let (mut renderers, asked) = phonon_stand_ins(true);
+        let at = socket.clone();
+        renderers.phonon = Box::new(move |voice: lamp_msgs::phonon::Voice| -> Render {
+            let at = at.clone();
+            Box::new(move |text: &str| render_phonon(&at, voice, text))
+        });
+        let freya = lamp_msgs::phonon::voice("Freya");
+        let cache = voiced(
+            route("phonon-not-up"),
+            freya,
+            &cache_dir,
+            renderers,
+            &|cache| cache,
+        );
+        // No socket yet: the model is loading.
+        for line in ["One.", "Two.", "Three."] {
+            assert_eq!(cache.render_once(line).unwrap(), vec![1; 2_400], "{line}");
+        }
+        // A socket left by a service that stopped: the connection refused.
+        drop(std::os::unix::net::UnixListener::bind(&socket).unwrap());
+        assert_eq!(cache.render_once("Four.").unwrap(), vec![1; 2_400]);
+        assert_eq!(asked.lock().unwrap().len(), 4, "the lamp's own said each");
+        // A fixed line is not warmed in Phonon's voice yet, and the warming
+        // asks again in seconds, not after its minute and doubling.
+        assert_eq!(
+            cache.warm(&[lamp_msgs::GOING_TO_SLEEP]),
+            Err(WARM_NOT_UP.to_owned())
+        );
+        assert_eq!(WarmAgain::default().after(WARM_NOT_UP), NOT_UP_EVERY);
+        let _ = fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (connection, _) = listener.accept().unwrap();
+                let mut reader = BufReader::new(connection);
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                let mut connection = reader.into_inner();
+                connection
+                    .write_all(&lamp_msgs::phonon::frame(&[2; 2_400]))
+                    .unwrap();
+                connection.write_all(&lamp_msgs::phonon::END).unwrap();
+            }
+        });
+        assert_eq!(
+            cache.render_once("Five.").unwrap(),
+            vec![2; 2_400],
+            "Phonon is asked, not given way to"
+        );
+        assert_eq!(
+            cache.samples(lamp_msgs::GOING_TO_SLEEP).unwrap(),
+            vec![2; 2_400],
+            "a fixed line is kept in Phonon's voice"
+        );
+        served.join().unwrap();
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The warming's wait: in seconds while Phonon is not up, for
+    /// [`NOT_UP_TRIES`] tries, which leave the minute-and-doubling where it
+    /// was; any other failure waits a minute, then twice as long, at most
+    /// an hour.
+    #[test]
+    fn the_warming_asks_a_phonon_not_up_again_in_seconds_then_as_before() {
+        let mut again = WarmAgain::default();
+        for _ in 0..NOT_UP_TRIES {
+            assert_eq!(again.after(WARM_NOT_UP), NOT_UP_EVERY);
+        }
+        assert_eq!(again.after(WARM_NOT_UP), WARM_EVERY);
+        assert_eq!(again.after(FOR_NOW), WARM_EVERY * 2);
+        let mut again = WarmAgain::default();
+        let waits: Vec<_> = (0..8).map(|_| again.after(FOR_NOW).as_secs()).collect();
+        assert_eq!(waits, [60, 120, 240, 480, 960, 1_920, 3_600, 3_600]);
+        assert_eq!(again.after(WARM_NOT_UP), NOT_UP_EVERY, "tries left");
     }
 }

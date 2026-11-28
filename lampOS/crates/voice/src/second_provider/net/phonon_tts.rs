@@ -29,6 +29,12 @@ pub const STALL: Duration = Duration::from_secs(4);
 /// service's first sound took 158 to 475 ms on a lamp (`docs/phonon.md`).
 pub const FIRST_WITHIN: Duration = Duration::from_millis(1_500);
 
+/// The step a sentence fails at when `lamp-phonon` is not up: its socket
+/// not there yet (the service still loading its model, or not started), or
+/// a connection refused (a socket left by a service that stopped). Told
+/// apart by [`PhononTts::not_up`] from a failure of a service that answered.
+const NOT_UP: &str = "the lamp's voice's socket";
+
 /// The service, at its socket, in the person's chosen voice.
 #[derive(Clone, Debug)]
 pub struct PhononTts {
@@ -54,6 +60,14 @@ impl PhononTts {
             voice: voice.name,
             turn: Arc::new(Mutex::new(())),
         }
+    }
+
+    /// Whether `why` is a `lamp-phonon` that is not up ([`NOT_UP`]): no
+    /// socket, or a connection refused, at once and before any request.
+    /// Every other failure is of a service that answered: a refusal, no
+    /// first sound within [`FIRST_WITHIN`], a stall or a break mid-answer.
+    pub fn not_up(why: &Error) -> bool {
+        *why == Error::Transport(NOT_UP)
     }
 
     /// The voice's name, for the journal.
@@ -86,7 +100,7 @@ impl PhononTts {
         let text = without_tags(text);
         let mut connection = UnixStream::connect(&self.socket)
             .await
-            .map_err(|_| Error::Transport("the lamp's voice's connection"))?;
+            .map_err(not_connected)?;
         connection
             .write_all(request(text.trim(), self.voice).as_bytes())
             .await
@@ -145,6 +159,17 @@ impl Reader {
         }
         let take = self.held.len().min(PACKET_SAMPLES);
         Ok(Some(self.held.drain(..take).collect()))
+    }
+}
+
+/// Why the service's socket took no connection: not up ([`NOT_UP`]) when
+/// it is not there or refused, else the connection's own failure.
+fn not_connected(why: std::io::Error) -> Error {
+    match why.kind() {
+        std::io::ErrorKind::NotFound | std::io::ErrorKind::ConnectionRefused => {
+            Error::Transport(NOT_UP)
+        }
+        _ => Error::Transport("the lamp's voice's connection"),
     }
 }
 
@@ -244,20 +269,27 @@ mod tests {
 
     /// No service, or one that fails before its first sound, is an error
     /// before any speech, so the lamp's own voice can say the sentence.
+    /// No socket, or a connection refused, is a service not up; a failure
+    /// it answered with is not.
     #[tokio::test]
     async fn no_service_or_a_failure_is_an_error_before_any_speech() {
         let folder = Folder::new();
         let tts = PhononTts::new(folder.0.join("none.sock"), freya());
-        assert!(matches!(
-            tts.speak("Hello.").await.err(),
-            Some(Error::Transport(_))
-        ));
+        let none = tts.speak("Hello.").await.err().unwrap();
+        assert!(PhononTts::not_up(&none), "{none}");
+        let stale = folder.0.join("stale.sock");
+        drop(std::os::unix::net::UnixListener::bind(&stale).unwrap());
+        let refused = PhononTts::new(&stale, freya())
+            .speak("Hello.")
+            .await
+            .err()
+            .unwrap();
+        assert!(PhononTts::not_up(&refused), "{refused}");
         let (_folder, path, _task) = service(vec![], Some(FAIL)).await;
         let tts = PhononTts::new(&path, freya());
-        assert!(matches!(
-            tts.speak("Hello.").await.err(),
-            Some(Error::Protocol(_))
-        ));
+        let failed = tts.speak("Hello.").await.err().unwrap();
+        assert!(matches!(failed, Error::Protocol(_)));
+        assert!(!PhononTts::not_up(&failed));
     }
 
     /// A service that takes the request and sends no sound (busy with
