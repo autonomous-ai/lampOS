@@ -557,6 +557,41 @@ async fn with_simple_call_a_name_is_answered_in_a_held_place_only_when_its_line_
     }
 }
 
+/// `LAMP_SIMPLE_CALL` with no rule installed to judge a kept line (the
+/// Reviewer-lead's P3 on #8892: a judge dropped by a builder that came too
+/// late would let kept names pass again): it fails closed. "Lamp.", then a
+/// line held as not shown said by it, answers nothing and tells no words.
+#[tokio::test(start_paused = true)]
+async fn with_simple_call_and_no_judge_a_kept_name_is_never_answered_in_a_held_place() {
+    let played = script(&["Lamp.", "I need a gift for my sister."]);
+    let judged = Judged::default();
+    let (engine, now) = lamp_said(
+        &played,
+        true,
+        &judged,
+        Some(Joined::Not(
+            "no voice check, and no one face was seen speaking both".to_owned(),
+        )),
+        &Kept::default(),
+    );
+    let said: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let seen = said.clone();
+    let mut engine = engine
+        .taking_simple_calls()
+        .telling_what_it_did(Arc::new(move |did| {
+            if let Did::Said(request, _) = did {
+                seen.lock().unwrap().push(request);
+            }
+        }));
+    say_the_name(&mut engine, false, true);
+    say_after(&mut engine, &now, Duration::from_millis(2_000)).await;
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let asked = asked(&played);
+    assert!(asked.is_empty(), "nothing answered: {asked:?}");
+    let said = said.lock().unwrap().clone();
+    assert!(said.is_empty(), "no words told, no window: {said:?}");
+}
+
 /// El's P2: the coordinator's call whose words are not back when the next
 /// line begins is kept running for them, its newer owner's authority
 /// retiring it first or not, and the line is said by it once they come
