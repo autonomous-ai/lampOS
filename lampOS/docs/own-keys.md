@@ -460,8 +460,25 @@ yet run on a lamp.
   that one goes with an answer only. Any other failure (a 429, a
   5xx, no sound within the render's bound) says that line in the lamp's
   own voice, never left unsaid, and the next line asks the person's voice
-  again. A line not kept in the person's voice yet plays the lamp's kept
-  one, as for ElevenLabs. The app's voice preview in a named voice (#7485)
+  again. As the reply path gives way after a piece fails twice, two lines
+  in a row the person's voice fails give way to the lamp's own for 10
+  minutes (`GIVE_WAY_FOR`), so a slow Google costs at most two lines their
+  whole bound (5 s for a short line), never every line; one journal line,
+  "the person's own Gemini voice failed two lines in a row (<why>); the
+  lamp's own voice for the next 600 s, then theirs again". A line kept in
+  their voice already still plays theirs in that time, and past it theirs
+  is asked again; a line theirs says starts the count over. Unlike the
+  reply path, which keeps the lamp's voice until the voice restarts, the
+  cache tries again, because the lines it keeps are the fixed ones said
+  for days (#8762's review, P3 2). A line said in the lamp's voice in the
+  person's place is never kept under their key: a fixed line is kept under
+  the lamp's key only, and the warming counts it not done, so it is warmed
+  in their voice on a later try (after a minute, then less often, at most
+  hourly), never left the lamp's for the run (P3 3); an offline reminder's
+  clip (#8708) is not kept at all, and is rendered in their voice again
+  after the clips' backoff, so a reminder never rings offline in the
+  lamp's voice under their key (P3 1). A line not kept in the person's
+  voice yet plays the lamp's kept one, as for ElevenLabs. The app's voice preview in a named voice (#7485)
   always uses the lamp's own key, never the person's.
 
 **Tests:** `crates/setup/src/keys.rs`
@@ -491,8 +508,12 @@ yet run on a lamp.
 (`a_say_line_and_a_fixed_line_are_said_in_the_persons_gemini_voice_while_one_is_kept`,
 `a_refused_gemini_voice_says_its_line_in_the_lamps_own_and_keeps_it_as_the_lamps`,
 `a_gemini_voice_failing_a_line_says_that_line_in_the_lamps_own_and_asks_theirs_again`,
+`two_gemini_failures_in_a_row_give_say_lines_to_the_lamps_own_for_a_while`,
+`a_warm_line_gemini_failed_is_kept_as_the_lamps_and_warmed_in_theirs_again`,
 `the_persons_gemini_render_asks_google_with_their_key_and_voice_and_reads_a_refusal`, and the pin
 `the_lamps_voice_and_the_persons_elevenlabs_voice_render_as_before`),
+`crates/voice/src/ring_clips.rs`
+(`a_clip_the_persons_gemini_voice_failed_is_not_kept_as_theirs`),
 `crates/voice/src/second_provider/probe.rs`
 (`an_own_gemini_voice_key_is_never_sent_to_the_relay`) and
 `crates/voice/src/second_provider/worker.rs`
@@ -862,9 +883,10 @@ start; the folder stays root's alone, 0700, each file 0600.
   code: `works` then `tools` or `no_tools`. `checked.<service>` still says
   the first line alone. A key kept before #8735 has no second line.
 - **`keys.get`:** `in_use` is `{"model": service | null, "agent": "own" |
-  "relay", "agent_why": code | null}`. `own` only when the in-use model key's
+  "relay", "agent_why": code | null, "voice": service | null}`, `voice` the
+  own voice kept, one at a time. `own` only when the in-use model key's
   tool check passed; otherwise `relay`, `agent_why` one of `no_model_key`,
-  `tts_only` (an ElevenLabs key and no model key), `no_tool_calls`, `refused`
+  `tts_only` (an own voice and no model key), `no_tool_calls`, `refused`
   (the last `keys.set` for that service was refused) or `unchecked` (kept
   before the tool check: set it again). Each `offers[]` entry adds `agent`:
   `false` for Deepgram and ElevenLabs and for a kept model key whose tool
