@@ -23487,3 +23487,60 @@ fn the_reach_map_on_holds_a_look_at_the_maps_edge_and_the_shadow_does_not() {
         "the refusing mode held the head far inside the edge: {refused} against {edge}"
     );
 }
+
+/// #8928's must-fix 1: with `LAMP_BODY_REACH_MAP=on` and a map whose edge sits just past where the lamp stands, a safety move (the
+/// owner's pause folding a standing lamp, a stop from the head) and a hand held on the head play exactly as with no map: not one goal
+/// differs, whatever the map says of the poses on the way.
+#[test]
+fn the_reach_map_on_never_holds_a_pause_fold_a_stop_or_a_hand() {
+    // A map whose pitch run ends 30 counts below the stand's pitch: inside at rest, the 48 count margin puts the stand just outside.
+    let tight = flat_map((1_500.0, f64::from(HOME[0]) + 10.0));
+    let goals_of = |reach_map: Option<&'static crate::reach_map::ReachMap>, what: u8| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(34));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let time = clock.time.clone();
+        let seen_at = clock.time.clone();
+        let mut seen: Vec<(Duration, [u16; 3], [u16; 2])> = Vec::new();
+        let report = run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                reach_map,
+                reach_refuse: true,
+                ..gesture_limits()
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            None,
+            || Some((Mood::Resting, 0)),
+            move || {
+                let now = time.get();
+                let late = now >= Duration::from_secs(14);
+                Asked {
+                    // 0: the owner's pause at 14 s (folds the standing lamp); 1: the lamp asked to stop standing at 14 s; 2: a hand
+                    // held on the head from 14 s (`--hold-from`).
+                    paused: what == 0 && late,
+                    stand_share: (what == 1 && late).then_some(0.0),
+                    held_by_test: what == 2 && late,
+                    ..Asked::default()
+                }
+            },
+            |glimpse| seen.push((seen_at.get(), glimpse.goals, glimpse.arm_goals)),
+        );
+        assert!(
+            seen.iter().any(|step| step.0 > Duration::from_secs(15)),
+            "{what}: the run ended early: {report:?}"
+        );
+        seen
+    };
+    for what in 0..3u8 {
+        let off = goals_of(None, what);
+        let on = goals_of(Some(tight), what);
+        assert_eq!(
+            on.iter().map(|s| (s.1, s.2)).collect::<Vec<_>>(),
+            off.iter().map(|s| (s.1, s.2)).collect::<Vec<_>>(),
+            "case {what}: the map held something it must not"
+        );
+    }
+}

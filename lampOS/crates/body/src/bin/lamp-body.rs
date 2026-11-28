@@ -177,7 +177,7 @@ fn reach_map_shadow_of(
     };
     let Some(standing) = arguments.standing.as_ref() else {
         eprintln!(
-            "lamp-body: LAMP_BODY_REACH_MAP=shadow but this lamp has no --stand: the map is not read"
+            "lamp-body: LAMP_BODY_REACH_MAP={word} but this lamp has no --stand: the map is not read"
         );
         return None;
     };
@@ -202,7 +202,7 @@ fn reach_map_shadow_of(
             eprintln!(
                 "lamp-body: LAMP_BODY_REACH_MAP={word}: the map {path} is read; poses outside it are said, {}",
                 if on {
-                    "and the goals that would leave it are held"
+                    "and a goal that would leave it holds the whole pose"
                 } else {
                     "nothing is held"
                 }
