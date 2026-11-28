@@ -9,5 +9,9 @@ f72783a945e732570745d0959931a6677c10414907977d3f4d438ad01891e19b  ./r1/plays-r1.
 89c816e2680d4212cf1501a0b26d172944d86e0eea9f8e6e25f6fc76dbddd014  ./session-1/README.md
 14739738fa8ff18d1fda259b48b4c4014a34ad56fd6e5099e8673a08533fc059  ./session-1/SHA256SUMS
 ca2dfb1f27cf75d81167cf0342f5ac533999318204b1374e6b9a8908dfcaca68  ./session-1/SHA256SUMS.lamp
+014f5accfaf5126eed4ef126029322e7a97215cce9904e670e4e08fed1569e59  ./session-1/lamp-sound-per-clip.tsv
 b655f7b98772dff96b1cfb847fa18eec616b78289ec9d8389a34d90f1b45cc71  ./session-1/lamp-speech-session-1.tsv
+b6c9da245268a79dd86934929a5eb1eb4f4a56113c37657b78b777867d6c87cc  ./session-1/overlap-recipe/README.md
+238db1df88f13d2228f5e8c9dc9effc247d1ef2d2bb313e87cac75cbf025fd5d  ./session-1/overlap-recipe/lampcut.py
+d0d0ab13b3f5236f1049bafc00a783105155c861b368bbfd080402428ce1a8f2  ./session-1/overlap-recipe/overlap.py
 6e77621b0a56cd5ad512492cd014fd96348e68fdb3daacf258d12617b5b5fa7c  ./session-1/plays.tsv
