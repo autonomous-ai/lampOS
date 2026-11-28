@@ -15093,6 +15093,17 @@ async fn a_piece_folded_into_the_next_by_its_sound_keeps_the_chain() {
     );
 }
 
+/// The judge of kept lines is set only before anything else holds the
+/// engine's shared state (the Reviewer-lead's P3 on #8892): set too late, it
+/// fails loudly, never dropped silently.
+#[tokio::test]
+#[should_panic(expected = "judging_kept_lines")]
+async fn the_judge_of_kept_lines_set_too_late_fails_loudly() {
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let _held = engine.shared.clone();
+    let _ = engine.judging_kept_lines(Arc::new(|_, _, _| true));
+}
+
 /// `LAMP_SIMPLE_CALL`: words cut short from a line the one rule let out are
 /// still answered in the place of a held line that cut them (#1712), as
 /// before: only words whose own line the rule never let out are not.
