@@ -1,0 +1,45 @@
+# path:line (at the PR head cf7dacac6d, under lampOS/)	the exact piece the kit or the judge matches
+crates/setup/src/reset.rs:2182	eprintln!("lamp-setup: reset: emptied {homes} entries of the engines' homes");
+crates/setup/src/reset.rs:2194	eprintln!("lamp-setup: reset: emptied {logs} log entries");
+crates/setup/src/reset.rs:2060	"lamp-setup: reset: started in place, no reboot: {}",
+crates/setup/src/reset/logs.rs:146	"reset: a log could not be emptied: {}: {error}",
+crates/setup/src/reset/logs.rs:34	pub const LOG_FOLDERS: [&str; 2] = ["/var/log", "/var/log.hdd"];
+crates/setup/src/reset/logs.rs:37	pub const COPY_JOURNAL: &str = "/var/log.hdd/journal";
+crates/setup/src/reset/logs.rs:40	pub const TEXT_LOGS: [&str; 4] = ["syslog", "user.log", "kern.log", "auth.log"];
+crates/setup/src/reset/logs.rs:57	LogStep::Truncate(path) => write!(f, "truncate {}", path.display()),
+crates/setup/src/reset/engine_homes.rs:18	pub const ENGINE_HOMES: &str = lamp_update::agent_ns::wrapper::HOMES;
+crates/update/src/agent_ns/wrapper.rs:82	pub const HOMES: &str = "/var/lib/lampos-agents";
+crates/setup/src/main.rs:194	return Err(format!("{command} runs only with --dry-run").into());
+crates/setup/src/main.rs:1109	argv.push(std::env::current_exe()?.to_string_lossy().into_owned());
+crates/setup/src/main.rs:1111	"reset-now".to_owned(),
+crates/setup/fixtures/reset-plan-product.json:83	"--unit=lamp-setup-wipe",
+crates/setup/fixtures/reset-plan-product.json:47	"/var/lib/lampOS/voice/marked",
+crates/setup/fixtures/reset-plan-product.json:48	"/var/lib/lampOS/voice/history-marks.json",
+crates/setup/fixtures/reset-plan-product.json:42	"/var/lib/lampOS/voice/schedule-delivery",
+crates/voice/src/ring_clips.rs:55	pub const DIR: &str = "/var/lib/lampOS/voice/schedule-delivery/ring-clips";
+crates/voice/src/marked.rs:285	pub const DEFAULT_MARKS: &str = "/var/lib/lampOS/voice/marked";
+crates/voice/src/history_send.rs:99	pub const MARKS_FILE: &str = "/var/lib/lampOS/voice/history-marks.json";
+crates/voice/src/history_forget.rs:67	pub const FILE: &str = "/var/lib/lampOS/voice/history-forget.json";
+crates/voice/src/history_forget.rs:493	ever_sent_at(&[Path::new(FILE), Path::new(crate::history_send::MARKS_FILE)])
+crates/setup/src/reset.rs:2015	&["/usr/bin/journalctl", "--vacuum-time=1s"],
+crates/setup/src/reset.rs:1384	"/run/lampos-voice",
+crates/setup/tests/it/reset.rs:1509	("/var/lib/lampOS/voice/tts-cache", "the system's own lines"),
+crates/setup/tests/it/reset.rs:1516	"#8125's account delete fallback",
+crates/update/src/install.rs:811	"07bc294005f1f8a3868eabbafc6c2fef1a4c5119d172124316f7d6eb3ed64360", // #7771: the ring clips under schedule-delivery, the plan at its 64
+deploy/product/lamp-setup-reset.service:17	ExecStart=/opt/lampOS/setup/current/lamp-setup watch-reset --plan /etc/lampOS/setup/reset-plan.json --bus-root /run/lampos-bus --enable
+deploy/factory/steps.sh:648	"$SYSTEMD_RUN" --no-block --collect --unit=lamp-setup-wipe --property=Type=oneshot \
+crates/setup/src/reset.rs:1451	#[serde(rename_all = "snake_case", tag = "step", content = "path")]
+crates/setup/src/reset.rs:1468	EngineHomesEmptied,
+crates/voice/src/ring_clips.rs:63	pub const OLD_DIR: &str = "/var/lib/lampOS/voice/ring-clips";
+crates/voice/src/ring_clips.rs:468	format!("lamp-voice: the old offline ring clips folder was removed ({removed} files)")
+crates/voice/src/ring_clips.rs:471	"lamp-voice: the old offline ring clips folder was left: not empty \
+crates/voice/src/ring_clips.rs:451	"lamp-voice: the old offline ring clips folder was left: unreadable ({error})"
+crates/voice/src/ring_clips.rs:462	if (kind.is_file() || kind.is_symlink()) && fs::remove_file(&path).is_ok() {
+crates/voice/src/ring_clips.rs:480	eprintln!("{line}");
+crates/voice/src/ring_clips.rs:136	format!("{store_id}-{id}")
+crates/voice/src/coordinator.rs:3550	crate::ring_clips::remove_old_dir_at_start();
+crates/voice/src/coordinator.rs:10363	json!({"status":"listening_ready","seconds":lifetime.seconds()})
+crates/voice/src/bus_out.rs:977	"(muted by the restart guard after a fault, not by choice)",
+crates/voice/src/offline_rings.rs:42	pub const ENVIRONMENT: &str = "LAMP_OFFLINE_RINGS";
+crates/voice/src/offline_rings.rs:191	value == Some("on")
+crates/setup/tests/it/reset.rs:1501	"removed at the voice's start",
