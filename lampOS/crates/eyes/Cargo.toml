@@ -24,6 +24,11 @@ path = "src/bin/seems_measure.rs"
 name = "glance_replay"
 test = true
 
+# Offline dedicated-model measurements; never enabled by a product process.
+[[example]]
+name = "head_pose_compare"
+test = true
+
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true
