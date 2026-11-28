@@ -8904,7 +8904,8 @@ pub(crate) struct Heeding {
     /// ([`crate::second_provider::Did::Said`]), on the monotonic clock. With
     /// `LAMP_SIMPLE_CALL` a stop, or a line begun over them, ends them where
     /// it cut them, never later than when it is told
-    /// ([`crate::second_provider::Did::Stopped`], [`Self::hear`]).
+    /// ([`crate::second_provider::Did::Stopped`], [`Self::hear`]), a hand or
+    /// head stop as it is delivered ([`crate::second_provider::Did::WentQuiet`]).
     said_until_us: Option<u64>,
     /// The request judged last, and what the Policy's gate is told of it
     /// ([`Self::policy_turn`]).
@@ -12519,6 +12520,17 @@ impl Heeding {
                     self.said_until_free_us = before.said_until_free_us;
                     self.carrying = before.carrying;
                     self.carry_window = before.carry_window;
+                }
+            }
+            // `LAMP_SIMPLE_CALL`: quiet by `at_us`, the authority holding no
+            // owner (a hand or head stop delivered, the mute, a gap, or a
+            // turn over): the lamp's words end there at the latest, never
+            // moved on, so a later line never starts a fresh 20 s
+            // (Reviewer-three's P2 on #8892). Nothing else changes: a turn
+            // over is no stop.
+            crate::second_provider::Did::WentQuiet(at_us) => {
+                if self.simple_call {
+                    self.said_until_us = self.said_until_us.map(|until_us| until_us.min(at_us));
                 }
             }
             // `LAMP_SAME_SPEAKER_CARRIES`: a stop ends the conversation
