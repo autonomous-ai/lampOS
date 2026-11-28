@@ -396,8 +396,12 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
         // the model and told by its answer, never a word list.
         let declined = if waiting.asks.code && !answer_forced(waiting) {
             " If they decline or put it off, call make_skill with that approve_id and answer \
-             \"no\": it is dropped. If they change this skill, don't call it. Until their yes, \
-             never say it is on or how to start it."
+             \"no\": it is dropped. If they change this skill or add to it (a number, its name, \
+             another step), call make_skill with that approve_id, answer \"change\" and \
+             request: the ask as it is now, whole, their change in it, never the change \
+             alone; it is made again with it, their latest word winning. A change \
+             is never a no: only a line that means stop declines it. Until their yes, never say \
+             it is on or how to start it."
         } else {
             " If they decline, wait or change it, don't call it: it stays off."
         };
@@ -2242,7 +2246,7 @@ mod tests {
         let note = waiting_note(11, now).unwrap();
         assert!(!note.contains("was cut"), "{note}");
         assert!(
-            note.contains("If they change this skill, don't call it"),
+            note.contains("A change is never a no") && note.contains("answer \"change\""),
             "{note}"
         );
         for words in new_ask {

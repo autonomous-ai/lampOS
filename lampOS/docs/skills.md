@@ -5136,7 +5136,7 @@ gone ([switches.md](switches.md)). What happens:
     to say only "Alright, I won't make it."
     (`make_skill_local::WONT_MAKE_NEXT`), asking nothing. The make looks
     for a no once, when the skill is written, and in the same lock marks
-    itself finishing (`OneAsk::dropped_or_finishing`): a no after that,
+    itself finishing (`OneAsk::settled`): a no after that,
     while the manage helper puts it on (which can take seconds) or its
     line is said, is told it is too late to stop, that they'll hear in a
     moment and can ask to remove it then
@@ -5149,7 +5149,121 @@ gone ([switches.md](switches.md)). What happens:
     the same way: the note has the model call a decline or a wait as
     `answer: "no"`, which drops it with the same line, and never say it is
     on or how to start it before the yes; a skill's writes, on already,
-    still call nothing on a decline. The `request` parameter says never to
+    still call nothing on a decline.
+
+    **A change said while it is made changes it, never cancels it**
+    (#7912, lamp-9adf, 19 Nov, both runs: "…remind me to take a break
+    after forty five minutes", then "make it fifty", was answered
+    "Alright, I won't make it." and nothing was made). Both notes (the
+    make under way's, and a voice make's code waiting for its yes) tell
+    the model that a line that changes the skill or adds to it (a number,
+    its name, another step) is `answer: "change"` with `request`, the ask
+    as it is now, whole, with their change in it, never the change alone,
+    merged by the model (#7936's ROW on lamp-9adf, 20 Nov 01:15: "every
+    thirty minutes…", then "make it forty five minutes", was made again
+    from the first ask with the model's words of the change after it, and
+    both DeepSeek and the agent kept `cooldown = "30m"`). Only the notes
+    say so, never `request`'s own parameter, and the change has no
+    argument of its own beside `answer`'s `change`: `make_skill`'s
+    parameters are held to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of
+    `lamp_gemini::MAX_TOOL_JSON_BYTES`' 4,096; 3,746 with the product's
+    switches on). And the notes say that a change is never a no: only a line that
+    means stop declines it. Whether a line is a change, a no or about
+    something else is the model's judgment, never a word list; code
+    applies it (`make_skill_local::making_changed`). A change counts only
+    from whoever asked for the make (their person in the memory scope,
+    kept with the ask, `AskedBy`; a make that waited its turn keeps the
+    one read at its ask) or the lamp's owner, the queue's cancel rule
+    (Heron's HOLD 1 on #7936): anyone else's, or a line no one known said,
+    changes nothing, never enters the make's heard line, and is told only
+    whoever asked can change it (`"error": "not_theirs"`); of a skill made
+    a moment ago, that they can ask for one of their own. A line that is
+    the asker's only by their face alone in view
+    (`LAMP_PERSON_SCOPE_ONE_FACE_READS`) is no line of theirs to act on
+    (`services::acting_person`, the owner's own rule; a waiting make's
+    cancel reads it too). The same rule holds for a no to a make under
+    way: a guest's "never mind" never drops the owner's make, told it is
+    still being made (`NOT_THEIRS_NO_NEXT`). A change that
+    would make the ask longer than `made_skill::MOST_REQUEST_BYTES` changes
+    nothing and is told so at once (`"error": "too_long"`), never
+    "changed" and then "too long". Under way, the change is held for the
+    make: at its last look (`OneAsk::settled`) the skill written first is
+    let go as a declined one is (`forget_unput`, never said) and the ask
+    made again, in the same make, from all three, in order: the first
+    request whole, labelled its earlier wording
+    (`make_skill_local::EARLIER_WORDING`), so a wrong merge or a `request`
+    that gives only the change never loses its trigger or steps (Twelve's
+    and Heron's HOLD on #7936 at bdd4728407); the model's `request` for the
+    newest change, if it gave one (`AS_NOW`); and the person's latest word,
+    said to win over any earlier wording wherever they differ
+    (`LATEST_WORD_WINS`): each change's heard line in order, or the model's
+    words of it when no line was heard, so the statement is never dropped.
+    How they differ is the maker's to read, never code's. The change's
+    heard line goes after the first (a write is held to both); a later no or
+    change still finds it under way. The change's turn is told it is taken
+    (`"changed": true`, `CHANGED_NEXT`), never that it won't be made. A
+    change after "never mind", while the make is still under way, takes
+    the make back: it is made, with the change. One past the last look is
+    told it is almost done and the change can be asked once it is ready
+    (`FINISHING_CHANGE_NEXT`). A voice make's code waiting for its yes,
+    changed by its make's id or the wait's own: with `LAMP_MAKE_QUEUE` the
+    remake first takes the queue's slot from the make that waits
+    (`make_queue::retake`, HOLD 2), so a make queued behind it never starts
+    beside the remake and the one yes wait is never shared; while another
+    make holds the slot nothing changes (`"error": "busy"`). Then the wait
+    is dropped, its package (never on) forgotten, and the change's turn is
+    told at once, as under way (`CHANGED_NEXT`, HOLD 3); the remake runs
+    off the turn (`second_provider::worker::run_remade`), held to whoever
+    asked first, its line said through the say service as a make that
+    waited its turn's is, which frees the slot. A remake that fails with
+    no line of its own (the part not running, a brief refused, the judge's
+    unclear ask with `LAMP_MAKE_NO_ASKS`) says why, "I couldn't make it
+    with your change: …", whatever the person said since, as a queued
+    make's failure is; one dropped by their later no says nothing
+    (`run_remade_with`). A make changed under way whose turn was then cut
+    says its line through the say service too, a failure as well, whatever
+    the person said since: the change's own line is no going on from it
+    (`make_skill_local::take_changed_here`; #7936's ROW on lamp-9adf at
+    09ede55c76, "make it seven thirty instead", its remake's failure never
+    said). A make done and on is told its change is `change_skill`'s
+    (#8008, `made_change`): that skill by its name, the change in their
+    words, changed in place under its name, never a new make of the whole
+    ask beside it (`made_change_next`); its record stands until that make
+    begins on the thread (`made_skill::ChangeAs`, read in `OneAsk::begin_in`),
+    so a model that calls nothing keeps "already made" and the yes asked
+    again in place. One with code of its own whose yes wait is gone was
+    never put on: told it waits for their yes again, made again with the
+    change and read back, never "made". That is where #7912's change meets
+    #8008's: `make_skill`'s `approve_id` branch is read first, so `answer:
+    "change"` with a make's id is a make under way's or one waiting for its
+    yes, and a change to a skill already made is `change_skill`'s call,
+    run as `make_skill`'s with `change`. A line
+    about something else leaves the make alone. "change" on a wait that is
+    no voice make's (a skill's task, a remove, a record let go) reads as
+    unclear, never as a no. Tests:
+    `a_change_said_while_made_makes_it_with_the_change`,
+    `a_change_while_made_is_remade_from_the_whole_ask_the_latest_word_winning`,
+    `a_remake_is_made_from_the_merged_ask_the_latest_word_said_to_win`,
+    `a_change_only_request_keeps_the_first_ask_the_latest_word_winning`,
+    `a_change_to_a_make_waiting_for_its_yes_makes_it_again`,
+    `a_change_counts_only_from_its_asker_or_the_owner`,
+    `a_face_only_line_never_changes_the_askers_make`,
+    `a_change_after_a_waiting_yes_is_told_before_it_is_made_again`,
+    `make_queue_runs::a_remake_that_fails_says_its_line`,
+    `made_line::a_change_mid_make_whose_remake_fails_is_said_after_the_cut`,
+    `a_change_to_a_wait_of_no_make_reads_as_unclear`,
+    `a_change_past_the_longest_ask_is_told_at_once`,
+    `make_queue::tests::a_remake_after_a_waiting_yes_keeps_the_slot`,
+    `never_mind_said_while_made_ends_it`,
+    `a_change_said_while_made_is_made_with_it_never_declined` (failed
+    first, on lamp-voice before the fix),
+    `a_never_mind_said_while_made_still_ends_it`,
+    `a_change_to_a_skill_made_a_moment_ago_is_change_skills`,
+    `a_change_skill_told_but_not_called_keeps_the_already_made_guard`,
+    `a_change_to_a_code_skill_whose_yes_wait_is_gone_is_told_it_waits_again`,
+    `an_unrelated_line_while_made_leaves_the_make_alone`.
+
+    The `request` parameter says never to
     call it for an ask the person takes back in the same line ("make a
     skill that waters my plants. Actually, never mind."). Only a make
     still under way is told so: one ended (waiting for its yes, failed or
@@ -5937,8 +6051,8 @@ does the rest:
   remove takes it with the skill.
 
 A change adds nothing to `make_skill`'s parameters, which the product holds
-to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of the link's 4,096, #8002; 3,737
-with the product's switches on, as before #8008): its own function's
+to `PRODUCT_MOST_PARAMETERS_BYTES` (3,750 of the link's 4,096, #8002; 3,746
+with the product's switches on, #7912's `change` answer in, as before #8008): its own function's
 parameters are 233 bytes and its description 277, within the link's
 bounds by themselves, and the product's own functions are 51 (55 with
 the route's 4, within `second_provider::MAX_TOOLS`' 64).
