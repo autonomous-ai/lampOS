@@ -2629,13 +2629,18 @@ report counts. It is held to what the generator promises the clips:
   reach is refused with it in the words (`farther than 250, this lamp's yaw
   reach (--reach)`). The built-in clips keep to 150 and are unchanged.
   A lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`) but its moves are admitted to 150, and only on such a lamp (`Limits::yaw_unset`) is the base held to no less than those 150 whatever is laid over the look (`gesture_yaw_reach`), so an accepted move of 150 is played whole, as before; a lamp started with a `--reach` keeps its yaw as configured, even under 150.
-  With `LAMP_BODY_REACH_MAP=shadow` (#7513; off, never in a product unit) the body reads the lamp's own reach map
+  With `LAMP_BODY_REACH_MAP=shadow` (#7513; `on` in the product unit since its switch-on) the body reads the lamp's own reach map
   (`tools/reach`, `reach_map.rs`; `LAMP_BODY_REACH_MAP_FILE`, default `/var/lib/lampos-body/reach-map.json`, root's and read
   only) and, at full height, says once per change in its journal when the pose it is about to write is outside it, 48 counts
   in (back inside only 8 counts farther in). `shadow` holds nothing and changes no goal; `LAMP_BODY_REACH_MAP=on` also holds the whole pose where it was last written when a goal would put it outside (the map answers per pose, the other joints at their goals; a lamp already outside passes only goals no farther from the safe poses; nothing is held for a safety move, a fold, the way up or a hand). However the hold ends, back inside, a safety move such as a guard's sit-down, or a hand, it lets go eased: the pitch, shoulder and elbow go from where they were held by at most a clip's own step (`GESTURE_STEP`) in each 20 ms step, never the whole way at once; a joint a hand or a stall holds takes its goal as asked.
   With `LAMP_BODY_APP_REACH=on` (the person, 14:04 on 10 Nov, for the dev lamps
-  75c9 and a63e until the hardware team signs the numbers) a move may instead
-  take each joint 90% of its hardware range from the pose, on each side
+  75c9 and a63e first; on in the product since #7513's switch-on, the first builder's
+  "on by default once one guard has landed": the body takes it only with the lamp's
+  reach map read and holding, `LAMP_BODY_REACH_MAP=on` and `moves::app_reach_enabled`,
+  else one journal line at start and today's reach for every joint, and only for the
+  joints the map holds, the shoulder, the elbow and the head's pitch, `body::app_reach_mapped`;
+  the head's roll and the base's yaw keep today's reach until the map covers them) a move may instead
+  take each of those joints 90% of its hardware range from the pose, on each side
   (`moves::Reach::of_hardware`, `body::app_reach_of`): the head's pitch, roll
   and the base's yaw from the servos' own stored ranges, read at start (it
   turns `LAMP_BODY_OWN_RANGES` on), the shoulder and the elbow from the arm's

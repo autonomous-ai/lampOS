@@ -2756,6 +2756,44 @@ fn the_product_turns_task_no_yes_on_in_the_four_units_that_read_it() {
     }
 }
 
+/// #7513's switch-on (the first builder on #7814: the app's reach on by
+/// default once one guard has landed): `LAMP_BODY_APP_REACH=on` in the
+/// product's lamp-body and lamp-control (the door reads it too) and
+/// `LAMP_BODY_REACH_MAP=on` in lamp-body alone, each named in no other unit.
+/// Fails before this pull request: no unit set either.
+#[test]
+fn the_product_turns_the_app_reach_and_the_reach_map_on() {
+    let wanted = [
+        // `lamp_body::body::APP_REACH` and `lamp_body::reach_map::REACH_MAP`, spelled out: lamp-update does not depend on the body.
+        (
+            "LAMP_BODY_APP_REACH",
+            &["lamp-body.service", "lamp-control.service"][..],
+        ),
+        ("LAMP_BODY_REACH_MAP", &["lamp-body.service"][..]),
+    ];
+    for (name, owners) in wanted {
+        let line = format!("Environment={name}=on");
+        for (unit, text) in install::PRODUCT {
+            let on = section(text, "Service")
+                .iter()
+                .filter(|set| **set == line)
+                .count();
+            let mentioned = text
+                .lines()
+                .filter(|set| !set.starts_with('#') && set.contains(name))
+                .count();
+            assert_eq!(on, usize::from(owners.contains(unit)), "{unit}: {line}");
+            assert_eq!(mentioned, on, "{unit}: {name}");
+        }
+        for owner in owners {
+            assert!(
+                install::PRODUCT.iter().any(|(unit, _)| unit == owner),
+                "{owner} is not a product unit"
+            );
+        }
+    }
+}
+
 /// #8708 with #8632: `LAMP_OFFLINE_RINGS` is on in the product only in
 /// lamp-voice, once. Its readers are the voice (`coordinator`, its speech
 /// cache) and the voice's Schedule consumer (`reminders::consumer`,

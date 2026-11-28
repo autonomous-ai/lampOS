@@ -1443,17 +1443,21 @@ pub struct Limits {
     /// a move on it is admitted to `moves::YAW_REACH_DEFAULT` (`gesture_yaw_reach`).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub yaw_unset: bool,
-    /// `LAMP_BODY_APP_REACH=on`: a move's reach of each joint is 90% of the
-    /// hardware's ([`APP_REACH`]); needs `own_ranges`. Off: as before.
+    /// `LAMP_BODY_APP_REACH=on` with the lamp's reach map read and holding (`reach_refuse`;
+    /// [`crate::moves::app_reach_enabled`]): a move's reach of the shoulder, the elbow and the
+    /// head's pitch is 90% of the hardware's ([`APP_REACH`], [`app_reach_mapped`]), the roll's and
+    /// the yaw's today's until the map covers them; needs `own_ranges`. Off: as before.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub app_reach: bool,
     /// `LAMP_BODY_REACH_MAP=shadow` (#7513): the lamp's own reach map, read at start; the body only says when the pose it is about to
     /// write is outside it ([`crate::reach_map::Shadow`]). Nothing is held. `None` is the body as before.
     #[serde(skip)]
     pub reach_map: Option<&'static crate::reach_map::ReachMap>,
-    /// `LAMP_BODY_REACH_MAP=on` (#7513): with the map, a goal that would put the pose outside it (the other joints at their goals) is
-    /// held where its joint was last written: refuse-only, never a goal the body would not have written, never held from a pose that
-    /// is already outside (the lamp is not trapped). Off: the map only says ([`Limits::reach_map`], shadow).
+    /// `LAMP_BODY_REACH_MAP=on` (#7513): with the map, a goal that would put the pose outside it (every joint at its own goal) holds
+    /// the WHOLE pose where it was last written ([`crate::reach_map::ReachMap::refused`]): refuse-only, never a goal the body would not
+    /// have written, no joint frozen while the others go on; from a pose already outside only a goal no farther from the safe poses
+    /// passes (the lamp is not trapped); nothing is held for a safety move or a hand, and a hold lets go eased (`reach_release`). It is
+    /// also what lets the app's wide reach in ([`crate::moves::app_reach_enabled`]). Off: the map only says ([`Limits::reach_map`], shadow).
     #[serde(skip)]
     pub reach_refuse: bool,
     /// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501), with its bounds; `None`
@@ -2565,6 +2569,24 @@ pub fn app_reach_of(
             reach.low[index] = today.low[index];
             reach.high[index] = today.high[index];
         }
+    }
+    reach
+}
+
+/// [`app_reach_of`] for the joints the lamp's reach map covers (#7513): the shoulder, the elbow and
+/// the head's pitch take 90% of the hardware's range; the head's roll and the base's yaw, which the
+/// map does not hold yet, keep today's reach (`yaw_reach` for the base) until it does.
+pub fn app_reach_mapped(
+    ranges: &[(u16, u16); 5],
+    home: Option<[u16; 3]>,
+    standing: Option<Standing>,
+    yaw_reach: u16,
+) -> crate::moves::Reach {
+    let mut reach = app_reach_of(ranges, home, standing, yaw_reach);
+    let today = crate::moves::Reach::today(yaw_reach);
+    for index in [1, 2] {
+        reach.low[index] = today.low[index];
+        reach.high[index] = today.high[index];
     }
     reach
 }
@@ -6093,7 +6115,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         bus.windows = ranges.map(own_window);
         bus.ranges = ranges;
         if limits.app_reach {
-            report.app_reach = Some(app_reach_of(
+            report.app_reach = Some(app_reach_mapped(
                 &ranges,
                 home,
                 standing,
@@ -9623,7 +9645,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 );
             }
             if let Some(refused) = held {
-                // Only the joints the pure rule put back: `refused` never moves a joint to a goal it was not asked or last written.
+                // The whole pose the pure rule put back (or the goals as asked): `refused` never moves a joint to a goal it was not
+                // asked or last written, and never holds one joint while the others go on.
                 let put_back = [
                     refused.pitch as u16,
                     refused.shoulder as u16,

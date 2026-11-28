@@ -65,6 +65,10 @@ Environment=LAMP_BODY_PRESENCE=on
 # A lamp with no --gaze of its own (every product lamp until it is measured with a face) looks with the product
 # camera's 760,555 instead of running with gaze off, so it turns to a face that calls it from a side desk (#8344, body.md).
 Environment=LAMP_BODY_GAZE_DEFAULT=on
+# The lamp's own reach map holds a pose that would leave it (#7513's switch-on, docs/switches.md; no map file: one line, the body as before).
+Environment=LAMP_BODY_REACH_MAP=on
+# A computer's move takes 90% of the hardware's range on the joints the map holds, only under it (#7513's switch-on; the same line in lamp-control).
+Environment=LAMP_BODY_APP_REACH=on
 EnvironmentFile=/etc/lampOS/body/lamp.env
 # --speed 300, Tuning::SPEED_CAP (24 Oct; energy level 1, Tuning::ENERGY_SPEED_CAP is 800 for LAMP_BODY_ENERGY levels): Expression's offsets, the mood poses and gaze moves reach the head at this
 # rate, with the software acceleration six times it (720 -> 1800 counts/s^2); leans keep their 1.5 s and the arm's stand

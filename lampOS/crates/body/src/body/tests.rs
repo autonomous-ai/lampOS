@@ -5894,9 +5894,11 @@ fn leaned(seen: &[Step], name: &str, rested: u16, pick: &dyn Fn(&Step) -> u16) -
 
 /// The person, 14:04 on 10 Nov: a move may take each joint 90% of its hardware range from the
 /// pose; on 75c9 the base 1,072 down and 1,127 up (its range 820..3,268 from the pose's 2,015),
-/// where the 22 degrees of `--reach` held it to 250. A sway of 1,000 either way is played whole.
+/// where the 22 degrees of `--reach` held it to 250. Since #7513's switch-on the wide reach is
+/// only for the joints the reach map holds; the base's yaw is not one yet, so a sway of 1,000 is
+/// dropped whole, as a lamp without the switch drops it, until the map covers the yaw (PR 2).
 #[test]
-fn with_the_app_reach_a_yaw_sway_of_a_thousand_counts_is_played_whole() {
+fn with_the_app_reach_a_yaw_sway_of_a_thousand_counts_is_dropped_until_the_map_covers_the_yaw() {
     static SWAY: Clip = Clip {
         name: "sway",
         step_ms: 1_000,
@@ -5923,7 +5925,7 @@ fn with_the_app_reach_a_yaw_sway_of_a_thousand_counts_is_played_whole() {
     assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
     assert_eq!(
         (report.gestures, report.gestures_dropped),
-        (1, 0),
+        (1, 1),
         "{report:?}"
     );
     let rested = seen
@@ -5932,20 +5934,15 @@ fn with_the_app_reach_a_yaw_sway_of_a_thousand_counts_is_played_whole() {
         .unwrap()
         .2[2];
     let (under, over) = leaned(&seen, "sway", rested, &|step| step.2[2]);
-    assert!(
-        under >= 990 && over >= 990,
-        "swayed {under} under and {over} over: cut short"
-    );
-    assert!(
-        under <= 1_010 && over <= 1_010,
-        "swayed {under} under and {over} over: past what was asked"
-    );
+    assert_eq!((under, over), (0, 0), "the base swayed under the app reach with no map over its yaw");
 }
 
 /// The head's roll: a lamp whose `--reach` roll is 1 does not tilt in a gesture (its round head
-/// turns about its own axis, which nobody sees); an app's move may roll it, 90% of the range.
+/// turns about its own axis, which nobody sees); an app's move could roll it 90% of the range.
+/// Since #7513's switch-on the roll keeps today's reach until the map covers it (PR 2): a roll of
+/// 900 is dropped whole.
 #[test]
-fn with_the_app_reach_a_roll_of_nine_hundred_counts_is_played_whole() {
+fn with_the_app_reach_a_roll_of_nine_hundred_counts_is_dropped_until_the_map_covers_the_roll() {
     let lean = lean_clip!("roll", 1, 900);
     let (report, _, seen) = gesture_run_app(
         lean,
@@ -5957,7 +5954,7 @@ fn with_the_app_reach_a_roll_of_nine_hundred_counts_is_played_whole() {
     );
     assert_eq!(
         (report.gestures, report.gestures_dropped),
-        (1, 0),
+        (1, 1),
         "{report:?}"
     );
     let rested = seen
@@ -5966,7 +5963,7 @@ fn with_the_app_reach_a_roll_of_nine_hundred_counts_is_played_whole() {
         .unwrap()
         .2[1];
     let (_, over) = leaned(&seen, "roll", rested, &|step| step.2[1]);
-    assert!(over >= 890, "rolled {over} of 900");
+    assert_eq!(over, 0, "the head rolled {over} under the app reach with no map over its roll");
 }
 
 /// The head's pitch up: the floor (1,670, a lamp-4ace servo's own limit) held it to 230 counts from
@@ -6078,10 +6075,13 @@ fn with_the_switch_on_and_the_ranges_unread_a_move_past_todays_reach_is_dropped_
     );
 }
 
+/// Since #7513's switch-on the base's yaw keeps today's reach until the map covers it (PR 2): the
+/// 90-degree sway below, played whole before, is dropped whole and the base does not move. The frames
+/// are kept as they were, for PR 2 to play again.
 /// A one-sided 90-degree sway as the SDK's `move_poses` makes it at a 0.4 share (50 ms frames,
 /// 1,024 counts of yaw out, held, and back; 9.3 s), as run 3 asked it of lamp-75c9 (15:34).
 #[test]
-fn with_the_app_reach_a_ninety_degree_one_sided_sway_at_50_ms_is_played() {
+fn with_the_app_reach_a_ninety_degree_sway_is_dropped_until_the_map_covers_the_yaw() {
     let mut frames = vec![[0i16; 5]];
     let ease = |from: f32, to: f32, steps: usize, frames: &mut Vec<[i16; 5]>| {
         for step in 1..=steps {
@@ -6108,23 +6108,20 @@ fn with_the_app_reach_a_ninety_degree_one_sided_sway_at_50_ms_is_played() {
         None,
         Some(LAMP_75C9_RANGES),
     );
-    let most = seen
-        .iter()
-        .filter(|step| step.1 == Some("ninety"))
-        .map(|step| step.2[2])
-        .max()
-        .unwrap_or(0);
     let rested = seen
         .iter()
         .rfind(|step| step.0 < Duration::from_secs(8))
         .unwrap()
         .2[2];
-    assert_eq!(report.gestures_dropped, 0, "{report:?}");
-    assert!(
-        most > rested + 900,
-        "the base went {} counts",
-        most.saturating_sub(rested)
-    );
+    // Every step from the move's start on: the base's goal never leaves the rest.
+    let most = seen
+        .iter()
+        .filter(|step| step.0 >= Duration::from_secs(8))
+        .map(|step| step.2[2])
+        .max()
+        .unwrap();
+    assert_eq!(report.gestures_dropped, 1, "{report:?}");
+    assert!(most <= rested + 2, "the base went {} counts", most.saturating_sub(rested));
 }
 
 /// Lead, 16:21 on 10 Nov, run 4 on lamp-75c9: YAW80R and YAW80L were taken ("starts: yaw offsets
@@ -6134,11 +6131,12 @@ fn with_the_app_reach_a_ninety_degree_one_sided_sway_at_50_ms_is_played() {
 #[test]
 fn a_move_over_a_resting_lamp_wakes_a_base_that_has_gone_to_sleep() {
     let mut frames = vec![[0i16; 5]];
+    // Since #7513's switch-on the yaw keeps today's reach (250) under the app reach: the move stays inside it.
     for step in 1..=40 {
-        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+        frames.push([0, 0, (step * 6) as i16, 0, 0]);
     }
     for step in (0..40).rev() {
-        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+        frames.push([0, 0, (step * 6) as i16, 0, 0]);
     }
     let clip: &'static Clip = Box::leak(Box::new(Clip {
         name: "wide",
@@ -6172,7 +6170,7 @@ fn a_move_over_a_resting_lamp_wakes_a_base_that_has_gone_to_sleep() {
         .max()
         .unwrap_or(0);
     assert!(
-        most > rested + 600,
+        most > rested + 200,
         "the second move took the base's goal {} counts from {rested}",
         most.saturating_sub(rested)
     );
@@ -6187,11 +6185,12 @@ fn a_move_over_a_resting_lamp_wakes_a_base_that_has_gone_to_sleep() {
 #[test]
 fn a_move_turns_the_base_over_a_rest_glance_that_does_not() {
     let mut frames = vec![[0i16; 5]];
+    // Since #7513's switch-on the yaw keeps today's reach (250) under the app reach: the move stays inside it.
     for step in 1..=34 {
-        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+        frames.push([0, 0, (step * 7) as i16, 0, 0]);
     }
     for step in (0..34).rev() {
-        frames.push([0, 0, (step * 20) as i16, 0, 0]);
+        frames.push([0, 0, (step * 7) as i16, 0, 0]);
     }
     let clip: &'static Clip = Box::leak(Box::new(Clip {
         name: "wide",
@@ -6224,7 +6223,7 @@ fn a_move_turns_the_base_over_a_rest_glance_that_does_not() {
         .max()
         .unwrap_or(0);
     assert!(
-        most > rested + 600,
+        most > rested + 200,
         "over a glance the base's goal went {} counts from {rested}",
         most.saturating_sub(rested)
     );
@@ -6245,6 +6244,34 @@ fn an_uncalibrated_head_joint_keeps_todays_reach_under_the_app_reach() {
     assert_eq!(reach.high[0], today.high[0], "{reach:?}");
     // The calibrated roll (897..3153 from a pose of 2048) is 90% of its room on each side.
     assert_eq!((reach.low[1], reach.high[1]), (1_035, 994), "{reach:?}");
+}
+
+/// #7513's switch-on: the app's reach for the joints the lamp's map holds only. On 75c9's ranges the
+/// shoulder, the elbow and the pitch take 90% of the hardware's room; the roll and the yaw keep
+/// today's reach until the map covers them.
+#[test]
+fn the_mapped_app_reach_keeps_todays_roll_and_yaw() {
+    let wide = app_reach_of(&LAMP_75C9_RANGES, None, None, 150);
+    let mapped = app_reach_mapped(&LAMP_75C9_RANGES, None, None, 150);
+    let today = crate::moves::Reach::today(150);
+    for joint in [1, 2] {
+        assert_eq!((mapped.low[joint], mapped.high[joint]), (today.low[joint], today.high[joint]), "{mapped:?}");
+        assert_ne!((wide.low[joint], wide.high[joint]), (today.low[joint], today.high[joint]), "{wide:?}");
+    }
+    for joint in [0, 3, 4] {
+        assert_eq!((mapped.low[joint], mapped.high[joint]), (wide.low[joint], wide.high[joint]), "{mapped:?}");
+    }
+}
+
+/// #7513's switch-on: the switch alone takes nothing; the body takes the app's reach only with the
+/// lamp's reach map read and holding.
+#[test]
+fn the_app_reach_needs_the_reach_map_on() {
+    use crate::moves::app_reach_enabled;
+    assert!(app_reach_enabled(Some("on"), true));
+    assert!(!app_reach_enabled(Some("on"), false));
+    assert!(!app_reach_enabled(Some("off"), true));
+    assert!(!app_reach_enabled(None, true));
 }
 
 /// The same on a body: with the base's servo storing the whole turn, a sway of 1,000 counts (played
@@ -23376,11 +23403,15 @@ fn the_reach_map_shadow_changes_no_goal() {
 }
 
 #[test]
-fn the_product_unit_never_turns_the_reach_map_shadow_on() {
+fn the_product_unit_turns_the_reach_map_on() {
     let unit = include_str!("../../../../deploy/product/lamp-body.service");
-    assert!(
-        !unit.contains("LAMP_BODY_REACH_MAP"),
-        "a product unit must not set the reach map"
+    assert_eq!(
+        unit
+            .lines()
+            .filter(|line| line.contains("LAMP_BODY_REACH_MAP"))
+            .collect::<Vec<_>>(),
+        ["Environment=LAMP_BODY_REACH_MAP=on"],
+        "the product unit sets the reach map on, in one line with no comment naming it"
     );
     let census = include_str!("../../../../docs/switches.md");
     let row = census
@@ -23388,10 +23419,10 @@ fn the_product_unit_never_turns_the_reach_map_shadow_on() {
         .find(|line| line.starts_with("| `lamp-body` LAMP_BODY_REACH_MAP"))
         .expect("docs/switches.md lists LAMP_BODY_REACH_MAP");
     assert!(
-        row.contains("`shadow` or `on`; off."),
-        "the census says it is off: {row}"
+        row.contains("`shadow` or `on`; off unless set, on in the product"),
+        "the census says it is on in the product: {row}"
     );
-    assert!(row.contains("off in the product"));
+    assert!(!row.contains("off in the product"), "{row}");
 }
 
 /// A map of one run for every shoulder and elbow: the head's pitch may be `run` (counts), 48 in from each end under the shadow's margin.
