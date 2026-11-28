@@ -1388,6 +1388,11 @@ pub struct Limits {
     /// and the other ([`clips::CALLED`]) and lets it go. At most once in
     /// ten seconds. Off: a call is not taken.
     pub look_at_name: bool,
+    /// Under [`Limits::look_at_name`] (#8971 piece 3): a call heard while
+    /// it is folded is still being listened to once it has stood, so the
+    /// gaze turns it to whoever called, and does not lapse while it rises.
+    /// Off: listening for a call lasts two seconds from the call, as before.
+    pub called_looks_once_up: bool,
     /// Who may ask for a gesture over whom (#940): a gesture asked while
     /// another plays ends it if asked at a higher [`Priority`], easing out
     /// as a dropped gesture does, and is dropped otherwise, naming who
@@ -1636,6 +1641,7 @@ impl Limits {
         refused_let_go: false,
         rest_glance: false,
         look_at_name: false,
+        called_looks_once_up: false,
         arbitration: false,
         gesture_pause: false,
         own_ranges: false,

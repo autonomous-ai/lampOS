@@ -10749,6 +10749,73 @@ fn called_with_nobody_in_view_it_rises_and_glances_once() {
     assert_eq!(seen.last().unwrap().3, 2_015);
 }
 
+/// Called while folded, by someone a little to one side (#8971 piece 3):
+/// once it has stood it is still listening, and the gaze turns it to them
+/// within two seconds of standing. Today the two seconds of listening a
+/// call gives run out while it rises, so it never turns.
+#[test]
+fn called_while_folded_once_up_it_turns_to_whoever_called() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(16));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        look_at_name: true,
+        called_looks_once_up: true,
+        ..Limits::folded_with(Tuning {
+            reach: [100, 15, 30, 150],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let seen_from = Rc::new(Cell::new((f32::from(HOME[2]), f32::from(HOME[0]))));
+    let mut eyes = face_at(seen_from.clone(), &clock.time, (120.0, -60.0));
+    let time = clock.time.clone();
+    let mut called = false;
+    let watched = clock.time.clone();
+    let mut steps: Vec<(Duration, f32, u16)> = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 30)),
+        Some(Looking::new([342, 200], [250, 120]).unwrap()),
+        || Some((Mood::Resting, 0)),
+        move || {
+            let call = !called && time.get() >= Duration::from_secs(1);
+            called |= call;
+            Asked {
+                seen: eyes(),
+                called: call,
+                ..Asked::default()
+            }
+        },
+        |glimpse| {
+            seen_from.set((
+                f32::from(glimpse.positions[2]),
+                f32::from(glimpse.positions[0]),
+            ));
+            steps.push((watched.get(), glimpse.stand, glimpse.goals[2]));
+        },
+    );
+    assert_eq!(report.calls, 1, "{report:?}");
+    let up = steps
+        .iter()
+        .find(|step| step.1 >= 1.0)
+        .expect("it stood")
+        .0;
+    let turned = steps
+        .iter()
+        .find(|step| step.2 >= 2_015 + 60)
+        .map(|step| step.0);
+    assert!(
+        turned.is_some_and(|at| at <= up + Duration::from_secs(2)),
+        "stood at {up:?}, turned to the caller at {turned:?}"
+    );
+}
+
 /// Called with somebody in view: no glance; the gaze has them. Called
 /// while it speaks: nothing.
 #[test]
