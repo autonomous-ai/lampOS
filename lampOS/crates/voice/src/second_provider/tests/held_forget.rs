@@ -2849,6 +2849,7 @@ fn taken_said(
             one_face,
             near: None,
             offered_alone: false,
+            face_yes: false,
         });
     }
     take_held_forget(

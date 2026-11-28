@@ -1598,8 +1598,18 @@ căn phòng. Chỉ lệnh quên theo điều nó nói tới hoặc theo id mà `
 tới phạm vi của họ: một câu «forget that» trống, hoặc bất kỳ lệnh quên nào mà
 ký ức sẽ chạy như «điều được lưu gần nhất» (ký ức cũ, công tắc tắt), chỉ là của
 căn phòng, vì sau lần `recall` của căn phòng trên câu như vậy nó sẽ lấy mất
-điều họ lưu gần nhất (P2 của Thirteen trên #5022). **Việc quên cần thấy miệng đang nói** (người phụ trách ký ức, 16:49 trên
-#5385: «tạm thời chưa cho xóa nếu ko detect đc mở miệng»), không có ngoại lệ:
+điều họ lưu gần nhất (P2 của Thirteen trên #5022). **Một lệnh quên hay một lệnh sửa chạy theo lời «có» của người dùng; không dùng tới miệng**
+(quy tắc của người phụ trách ký ức, 14:33 ngày 25/11 trên #8570: «we remove the
+mouth opening from forget stuffs too, its been show that the mouth moving
+detection is not trustable … a confirmation is enough for user to know if
+their memory is remove», và 14:11 ngày 27/11 trên #8654: «mouth moving is not
+used anymore and not affect forget or correction in memory … switch on yes
+in production, do it now»). Trong sản phẩm, đó là
+`LAMP_ONE_FACE_FORGETS_ON_YES` (bên dưới), bật từ #8654: một lệnh sửa, «forget
+that», «forget everything» và «forget my face» nói trên câu như vậy được giữ
+và hỏi lại một lần, và lời «có» rõ ràng của họ chạy chúng. Quy tắc cũ (16:49
+trên #5385: «tạm thời chưa cho xóa nếu ko detect đc mở miệng») chỉ còn khi
+công tắc ấy tắt, và khi đó không có ngoại lệ:
 một lệnh quên trên câu như vậy, của họ vì chỉ có mặt họ trong
 khung hình hoặc được gọi tên muộn trên một câu nhận là của căn phòng
 (`ScopeLease::reached_by_one_face`), không được hỏi tới ký ức nào, của họ hay
@@ -1626,7 +1636,97 @@ quên theo id chỉ đi tới phạm vi mà danh sách của nó đã cho thấy
 phiên này, và một id đã hiện ở cả hai thì không quên gì và mô hình hỏi là
 cái nào (`remember::by_where_shown`; P2 thứ hai của Thirteen trên #5022). Và **một
 lời «có» nói trên câu như vậy không bao giờ chạy một lệnh quên đang giữ**
-(`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói. Rủi ro còn lại:
+(`ScopeLease::by_one_face`): lời «có» vẫn cần thấy mặt họ nói.
+**Với `LAMP_ONE_FACE_FORGETS_ON_YES` (bật trong sản phẩm từ #8654, lời của
+chủ bộ nhớ lúc 14:11 ngày 27/11; trong mã mặc định tắt; #8570, phán quyết của
+chủ bộ nhớ lúc 14:33 ngày 25/11: nhận diện miệng mấp máy không đáng tin, một
+lời xác nhận cho người dùng biết điều gì bị xoá, và phạm vi là một người
+dùng), miệng không còn chặn lệnh quên hay lệnh sửa trên tuyến thứ hai, và bản
+sao riêng của giọng nói về việc mắt thấy ai nói (`LAMP_EYES_SPEAKING`, tắt
+trong sản phẩm từ #8791) cũng vậy: không cần `forget_sight` để giữ hay để
+chạy.** Trên một câu là
+của họ vì chỉ mặt họ trong khung, không thấy miệng nói, và câu không được
+mang tiếp, không phải tên mắt giữ (sticky), không bị giữ vì khoảng trống hay
+bị thu hẹp (`ScopeLease::in_view_by_one_face`): một câu «forget that» trần
+sau lần lưu mới của họ, ở bất kỳ câu nào sau đó của họ trong cùng phiên và
+trong 60 giây (`remember::HELD_FORGET_FOR`; row 8654 L2: mô hình hỏi lại
+bằng lời rồi gọi lệnh quên trần khi họ nói «có»), được giữ như lệnh quên đúng
+id vừa lưu (`second_provider::face_kept_id`: xem `ONE_FACE_KEPT`, lần lưu
+một mặt mới nhất của phiên, mà không lấy đi, hoặc nếu không có thì xem dấu
+riêng của tuyến thứ hai, `HeldForgets::kept`, do `mark_kept_by_face` đặt từ id
+được báo của một lần lưu thường trên câu chỉ có mặt họ trong khung hình, và
+mọi lệnh bộ nhớ trừ lệnh quên trần, kể cả trong chính lượt của lần lưu, đều xóa nó như dấu của tuyến bộ
+nhớ; row 8654 L2 ở 2c7cdd0d21 trên lamp-06c1: một lệnh quên trần ngay sau lần
+lưu không thấy dấu của tuyến bộ nhớ và bị từ chối. Một lệnh quên là trần khi không có
+`source_id` và hoặc không có `about`, hoặc `about` là trần theo đúng cách `ask_once_forget` đọc (`second_provider::bare_forget`,
+`remember::pick_forget` cho `Last`), nên `about` là `""`, `[]` hay một đoán
+không được nghe cũng là trần (row 8654 L2 ở 6c76c3257f: `about` 0 từ của mô
+hình bị bỏ qua không một dòng nhật ký). Khi công tắc bật, một lệnh quên bất kỳ
+hay một lệnh sửa không được giữ ghi vào nhật ký bước kiểm tra nào đã bỏ nó,
+chỉ bằng từ máy: `face-hold: refused: no_scope | not_heard |
+gap_held | not_one_face | named | not_bare | everything_refused | no_mark |
+other_person | not_later | too_old | no_id | one_waits | stale (<call>)`;
+`face-hold: own_mark` khi dấu riêng giữ nó; và một lệnh đang giữ bị bỏ vì
+câu trả lời của đèn không hỏi gì (row 8654 L4) cũng ghi `face-hold: dropped:
+no_ask | unfinished (<call>)`, và một lệnh mà câu sau bỏ trong
+`take_held_forget` ghi `face-hold: dropped: unfinished (<call>)` khi nó chưa
+từng được hỏi (lượt của nó bị cắt trước câu hỏi, row 8654 L4 trên lamp-06c1,
+18:47 ngày 26/11) hoặc `face-hold: dropped: on_line (<call>)` với mọi lý do
+bỏ khác ở đó; một lệnh quên trần mô hình gọi
+trên câu chỉ là một lời «có» (`remember::heard::only_a_yes`), có một câu ở
+giữa nó và lần lưu (câu hỏi bằng lời của mô hình), là lời đồng ý của họ và
+chạy ngay như lệnh quên đúng id ấy, không hỏi lần hai, nhưng chỉ khi câu
+trả lời cuối của đèn sau lần lưu hỏi về việc quên
+(`remember::asks_about_forgetting` trên `Shared::lamp_said`), câu nó trả lời
+không nêu điều gì (`remember::named_subject`), và không lượt nào giữa lần lưu
+và lời «có» gọi gì (điều phải sửa của Reviewer-lead và P2 của El trên #8654:
+«Want the forecast too?» hay «Forget my dentist note.» được trả lời bằng lời,
+rồi «Yes.», thì vẫn giữ); nếu không thì giữ chờ và
+hỏi: `second_provider::agreed_on_face_yes`; id
+có nhờ `LAMP_MEMORY_REPLACES`; các lệnh của tuyến thứ hai chạy trong chính
+tiến trình worker của nó, nên dấu và lần xem là của cùng một tiến trình), và
+`forget_everything`, `forget_my_face` cùng một lệnh sửa (`remember` có
+`replaces`) cũng được giữ đúng như đã gọi
+(`second_provider::hold_on_face_yes`). Không gì chạy trên câu hỏi; mô hình
+được bảo hỏi một lần bằng các ghi chú giữ chờ sẵn có (`held_forget_told`,
+`FORGET_EVERYTHING_ASKS`), hoặc với lệnh sửa là `HELD_CORRECTION_ASKS`, không
+bao giờ nêu điều cũ; vòng của một lệnh sửa đang giữ không còn được kèm ghi chú
+lưu lặng lẽ của `LAMP_KEEP_QUIETLY` («đừng bao giờ hỏi có nên lưu không»), và
+câu hỏi của nó được nói như của một lần lưu mang tiếp (`Quiet::held_keep`;
+row 8654 L4: 2 trên 2 lần không hỏi gì và bị bỏ). Đèn vẫn không tự nói câu hỏi
+nào: lệnh giữ mà câu trả lời không hỏi gì thì bị bỏ (`settle_held_forget`). Lời «có» rõ ràng của họ trong 60 giây ở một câu sau cũng
+là của họ vì chỉ mặt họ trong khung chạy đúng lệnh ấy trong phạm vi của họ
+(`take_held_forget`, `HeldForget::face_yes`). Lớp bảo vệ chỉ còn là phép thử
+một mặt của phạm vi (`ScopeLease::in_view_by_one_face`): mặt quen của họ là mặt
+duy nhất trong khung, câu không bị thu hẹp vì một giọng khác, và không được mang
+tiếp, sticky hay giữ vì khoảng trống. Bước kiểm tra riêng của giọng «không mặt
+nào khác được thấy nói lời có» trong `take_held_forget` đọc bản sao của giọng về
+việc mắt thấy ai nói, mà từ #8791 không gì đặt nữa, nên nó không còn tác dụng
+(P3 của Reviewer-lead trên #8654). **Rủi ro đã chấp nhận** (quy tắc của chủ bộ
+nhớ ngày 25/11, nhắc lại 27/11 lúc 14:11: «mouth moving is not used anymore and
+not affect forget or correction in memory»): khi chỉ mặt chủ trong khung và
+không nghe giọng nào khác, một người ngoài khung hình, hay TV, nói lệnh quên
+hoặc lệnh sửa rồi nói «có» thì quên hoặc đổi bộ nhớ của chủ; «quên mọi thứ» cần
+hai câu như vậy.
+Một `set_role` hay `end_role` trên câu như vậy, trong phòng riêng, chạy ngay
+trên lượt ấy, không giữ chờ hay hỏi, không dùng miệng (các quyết định của chủ bộ nhớ ngày 27/11
+trên #8654, «yes-alone rule cover this too, like forgets and corrections» và
+«Run on the request»; `second_provider::role_on_request`). Lần chạy giữ chờ đánh dấu nó đã được đồng ý
+(`ScopeLease::mark_held_yes`, `mark_forget_agreed`), nên chỉ lệnh ấy qua được
+lệnh từ chối một mặt và bước kiểm tra lệnh sửa của tuyến bộ nhớ. Một lệnh sửa
+mà lời «có» đã chạy nhưng không lưu được (bộ nhớ báo lỗi hoặc `remembered:
+false`, hoặc tuyến bộ nhớ từ chối) không bao giờ được báo là đã lưu: mô hình
+được báo ghi chú «chưa làm» sẵn có, `seen_yes::NOT_KEPT` (P2 của Reviewer-lead
+trên #8654). Một lệnh lời «có» đã đồng ý và chạy ngay không bao giờ bị đưa vào
+giữ chờ, và khi một lệnh giữ chờ đã chạy ở một câu «có» thì không gì trên câu
+ấy bị giữ và hỏi lại. Tuyến provider không có giữ chờ và chỉ trả
+`ONE_FACE_JUST_KEPT` («khi thấy bạn nói») khi công tắc tắt hoặc không phải câu
+như vậy; khi bật, ở đó, nó hỏi điều nào (`ONE_FACE_BARE_FORGET`). Khi
+`LAMP_PRIVATE_ROOM` bật, lời «có» cho một lệnh quên có tên chạy theo nhánh
+phòng riêng trước, nên công tắc này không thêm gì cho lệnh quên có tên ở đó. Câu được mang tiếp, câu sticky hay giữ vì khoảng trống,
+một mặt thứ hai, lời «có» của người khác, một lời «không», lời «có» muộn và
+lượt viết vẫn như cũ, và lời «có» trên câu được mang tiếp không bao giờ thả một
+lệnh giữ như vậy. Rủi ro còn lại:
 một giọng ngoài khung hình khi họ ngồi một mình trong khung, không có dấu giọng
 để phân biệt, có thể được lưu vào ký ức của họ, và lệnh `forget` một mục của
 giọng ấy có thể xoá trong đó tối đa tám điều khớp (một `forget {about}` quên
@@ -1653,7 +1753,10 @@ câu như vậy** (`ScopeLease::forgets_need_mouth`): không `forget_everything`
 mà riêng quy tắc ghi nhớ cho chạm tới phạm vi của họ
 (`ScopeLease::reached_by_one_face`); mô hình được báo là không quên gì và hãy
 nhờ họ nhìn vào đèn nói lại. Câu ấy không giữ lệnh quên nào chờ lời «có», và
-lời yêu cầu của nó không tính là yêu cầu ngay trước (`forget_asker`).
+lời yêu cầu của nó không tính là yêu cầu ngay trước (`forget_asker`). Đó là
+khi `LAMP_ONE_FACE_FORGETS_ON_YES` tắt; khi bật (sản phẩm, từ #8654), một lệnh
+quên bất kỳ hay một lệnh sửa trên câu như vậy được giữ chờ lời «có» của họ và
+chạy theo lời ấy, không dùng tới miệng (ở trên).
 **Trừ lệnh quên gọi tên một điều đã giữ: đèn hỏi lại một lần** (quyết định về
 cái giá của PM trên #5627, sau khi 9 trên 9 lệnh quên của chính người chủ bị
 từ chối trên lamp-c0a4): ở đường thứ hai, một `forget` mà câu nghe được (hoặc
@@ -1671,7 +1774,9 @@ vòng 30 giây thì gọi `forget`, không nêu gì khác, và chỉ lời gọi
 again for their yes», nên trên stable lời «có» không chạy gì). Chỉ lời «có» của họ ở câu sau trong vòng 30 giây
 (`remember::ONE_FACE_FORGET_YES_FOR`), của cùng người trong cùng phiên, khi
 thấy mặt họ nói, hoặc trong phòng riêng (`LAMP_PRIVATE_ROOM`) trên một câu là
-của họ vì mặt họ một mình trong khung, mới chạy đúng lệnh quên theo id ấy
+của họ vì mặt họ một mình trong khung, hoặc với `LAMP_ONE_FACE_FORGETS_ON_YES`
+trên một câu là của họ vì chỉ mặt họ trong khung, không mặt nào được thấy nói
+và câu không được mang tiếp, mới chạy đúng lệnh quên theo id ấy
 trong phạm vi của họ (`ScopeLease::mark_forget_agreed`, không bao giờ
 `forget_last`). **Câu ấy có phải lời «có» hay không do mô hình phán đoán, không
 có danh sách từ «có»** (quy tắc ngày 13/11 của chủ sản phẩm; phán quyết của
@@ -1783,7 +1888,7 @@ id thì bộ so khớp lời sửa bị bỏ qua, nên điều mới được gi
 gì bị thay; `keep_rule`, `list_rules` và `forget_rule` bị từ chối;
 `set_role` và `end_role` cũng bị từ chối, cả trong
 `remember::role_for_guarded` (lần đọc riêng tư trên #5385), nên một vị khách
-ngoài khung hình không bỏ hay thay được vai của người chủ;
+ngoài khung hình không bỏ hay thay được vai của người chủ (Với `LAMP_ONE_FACE_FORGETS_ON_YES`, theo các quyết định của chủ bộ nhớ ngày 27/11 trên #8654 («yes-alone rule cover this too, like forgets and corrections», 17:34; rồi «Run on the request», 17:5x): một `set_role` hay `end_role` trên một câu nói là của họ vì chỉ mặt họ trong khung, không thấy miệng nói (`ScopeLease::in_view_by_one_face`: không mang tiếp, không sticky, không bị thu hẹp, không trả lời lời đã thấy nói), không dùng miệng, không bị giữ vì khoảng trống, và `LAMP_PRIVATE_ROOM` bật, thì chạy ngay trên chính lượt ấy: không giữ chờ, không hỏi, không thêm câu chữ mới (`second_provider::role_on_request`, đánh dấu lease bằng `ScopeLease::mark_held_yes`, nên chỉ lệnh ấy qua được `one_face_refused` và `remember::role_for_guarded`). Có mặt thứ hai trong khung, một mặt khác được thấy nói, câu mang tiếp, hay phòng riêng tắt: vẫn bị từ chối như trước. Công tắc tắt: giống hệt như trước.);
 `cancel_reminder` và `snooze_reminder` bị từ chối trừ khi
 `LAMP_ONE_FACE_REMINDERS` bật (điều chấp nhận ngày 4/11); và câu ấy không có
 chủ dịch vụ (`services::owner_of`), nên không `service_read` nào chạy cho nó,

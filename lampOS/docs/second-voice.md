@@ -7377,7 +7377,7 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   Known risk, accepted by the memory owner on 4 Nov: a voice not seen saying
   it, with the person's face alone in view, hears their reminders and may
   cancel or snooze them ([schedule.md](schedule.md), [switches.md](switches.md)).
-- **A one-face line is read as its person's; its forgets need the mouth**
+- **A one-face line is read as its person's; its forgets need the mouth only with `LAMP_ONE_FACE_FORGETS_ON_YES` off**
   (`LAMP_PERSON_SCOPE_ONE_FACE_READS=on`, on in the product since 10 Nov, #5522; with
   `LAMP_PERSON_SCOPE_ONE_FACE` acted on, `Engine::reading_by_one_face`). A
   line the one-face rule takes is not narrowed at admission
@@ -7396,7 +7396,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   the subject in their words, never the kept text (the Reviewer-lead's P2
   on #6673). Their
   yes on a later line within 30 s, the same session's same person
-  (`keep_asker`), seen saying it or in the private room on a one-face line,
+  (`keep_asker`), seen saying it or in the private room on a one-face line
+  (or, with `LAMP_ONE_FACE_FORGETS_ON_YES`, on a line theirs by their face
+  alone in view, `ScopeLease::in_view_by_one_face`, no face seen speaking
+  it),
   judged by the model with no yes word list (its `forget` on that line,
   naming nothing else, `agree_held_forget`; the first builder's ruling on
   leg (e) of #7960's ROW) runs that forget by id, exactly as held, in
@@ -7415,10 +7418,63 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   answered "Okay, I'll keep it." (`remember::KEPT_IT_LINE`) with no model
   round, in the owner's language only from its clip rendered ahead
   (`kept_line_clip`), else the model is told it is kept (#8185). A
-  privacy switch change drops the held question (`Engine::privacy`). So are a correction
-  (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
-  `end_role` (the privacy read on #5385, also in
-  `remember::role_for_guarded`), and
+  privacy switch change drops the held question (`Engine::privacy`).
+  With `LAMP_ONE_FACE_FORGETS_ON_YES` (#8570; on in the product since
+  #8654, the memory owner's call of 27 Nov 14:11 that the mouth is not used
+  for a forget or a correction), before
+  `ask_once_forget`, `hold_on_face_yes` holds for one yes, on a line theirs
+  by their face alone in view (`ScopeLease::in_view_by_one_face`), with or
+  without the voice's own copy of the eyes' speaking (`forget_sight`, off
+  in the product since #8791): `forget_everything` (unless these words ask for
+  less), `forget_my_face`, a correction (`remember` with `replaces`) and a
+  bare forget after their one-face keep, on a later line of theirs in the
+  session within 60 s, as the forget of the kept id
+  (`face_kept_id`: the memory route's `ONE_FACE_KEPT` mark, or else the
+  second route's own, `HeldForgets::kept`, set by `mark_kept_by_face` from a
+  plain keep's told id on a line by their face alone in view and ended by
+  any memory call but a bare forget, the keep's own request included, as
+  the memory route's mark is; row 8654 L2 at 2c7cdd0d21). A
+  forget is bare with no `source_id` and either no `about` or one bare as
+  `ask_once_forget` reads it (`bare_forget`,
+  `remember::pick_forget`: an `about` of `""`, `[]` or a guess not heard is
+  bare; row 8654 L2 at 6c76c3257f). With the switch on, a forget of any kind
+  or a correction not held journals which check let it go, in machine words
+  only (`face-hold: refused: no_scope | not_heard | gap_held |
+  not_one_face | named | not_bare | everything_refused | no_mark |
+  other_person | not_later | too_old | no_id | one_waits | stale (<call>)`),
+  `face-hold: own_mark` when the own mark held it, and `face-hold: dropped:
+  no_ask | unfinished (<call>)` when a hold is dropped for an answer that
+  asked nothing (row 8654 L4), and `face-hold: dropped: unfinished | on_line
+  (<call>)` when a later line drops it in `take_held_forget`, `unfinished`
+  for one never asked (its turn cut before the ask). Each is told the held notes in use or
+  `remember::HELD_CORRECTION_ASKS` (`HeldForget::face_yes`); a held
+  correction's round drops the quiet note and its ask is said
+  (`Quiet::held_keep`). A bare forget called on a line that is only a yes
+  (`remember::heard::only_a_yes`), a line after the keep's next one, theirs
+  by their face alone in view, runs at once as the forget of the kept id,
+  marked agreed, and is not asked again (`agreed_on_face_yes`), only when
+  the lamp's last answer after the keep asked about forgetting
+  (`remember::asks_about_forgetting`, `Shared::lamp_said`), the line it
+  answered named nothing (`HeldForgets::prior`, `remember::named_subject`)
+  and no request between the keep and the yes called anything
+  (`HeldForgets::called`); otherwise it is held and asked. In
+  `take_held_forget` (`YesLine`), their plain yes within 60 s on such a
+  line, no other face seen speaking it, runs it with no `forget_sight`
+  needed, its person the line's own
+  (`keep_asker`); a carried, sticky or gap-held yes line drops it as unseen,
+  and `LAMP_KEEP_QUIETLY_ONE_FACE`'s carried keep yes never lets it go. The
+  held run marks it (`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so
+  that call alone passes `one_face_refused` and the memory route's
+  correction check. A `set_role` or `end_role` on such a line, the mouth
+  not used, not gap-held and `LAMP_PRIVATE_ROOM` on, runs on the
+  request with no hold, no question and no new words: `role_on_request`
+  marks the lease (`ScopeLease::mark_held_yes`) before `one_face_refused`,
+  and `remember::role_for_guarded` lets that call by (the memory owner's
+  calls of 27 Nov on #8654: "yes-alone rule cover this too, like forgets
+  and corrections", 17:34; "Run on the request", 17:5x). Otherwise
+  refused, as before: a correction (`remember` with `replaces`),
+  `keep_rule`, `list_rules`, `set_role` and `end_role` (the privacy read
+  on #5385, also in `remember::role_for_guarded`), and
   `cancel_reminder` / `snooze_reminder` unless `LAMP_ONE_FACE_REMINDERS` is
   on, and the line has no services owner outside the private room
   (`services::owner_of`). The memory owner, 16:49 on

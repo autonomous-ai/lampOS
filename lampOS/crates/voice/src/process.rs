@@ -3541,6 +3541,8 @@ fn second_route_worker_environment(
         crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
         // A quiet keep theirs on their one face in view, no mouth (17 Nov).
         crate::keep_quietly::ONE_FACE_ENVIRONMENT,
+        // A one-face forget or correction runs on the yes, no mouth (#8570).
+        crate::second_provider::ONE_FACE_FORGETS_ON_YES_ENVIRONMENT,
         // A one-face line's reminder reads are its person's (lamp-29e7).
         crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
         // Read by the second worker for the reply's owner-by-default (#3884).
@@ -3967,6 +3969,7 @@ mod tests {
             crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT,
             crate::second_provider::NAME_ONE_FACE_ENVIRONMENT,
             crate::keep_quietly::ONE_FACE_ENVIRONMENT,
+            crate::second_provider::ONE_FACE_FORGETS_ON_YES_ENVIRONMENT,
             crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT,
             crate::person::BY_DEFAULT_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
@@ -5291,6 +5294,7 @@ mod tests {
                     || name == crate::second_provider::PERSON_SCOPE_ONE_FACE_READS_ENVIRONMENT
                     || name == crate::second_provider::NAME_ONE_FACE_ENVIRONMENT
                     || name == crate::keep_quietly::ONE_FACE_ENVIRONMENT
+                    || name == crate::second_provider::ONE_FACE_FORGETS_ON_YES_ENVIRONMENT
                     || name == crate::tools::schedule_whose::ONE_FACE_ENVIRONMENT
                     || name == crate::person::BY_DEFAULT_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
@@ -5563,6 +5567,7 @@ mod tests {
                     "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_NUDGE_CLAIM_CHECKED=on",
                     "LAMP_ONE_AS_LAMP=on",
+                    "LAMP_ONE_FACE_FORGETS_ON_YES=on",
                     "LAMP_ONE_FACE_REMINDERS=on",
                     "LAMP_ONE_REPLY_WINDOW=on",
                     "LAMP_OPENS_FURTHER=on",

@@ -159,6 +159,24 @@ pub fn held_forget_told(name: &str) -> serde_json::Value {
     })
 }
 
+/// What the model is told of a correction (a `remember` with `replaces`)
+/// held for the person's yes on a line theirs by their face alone in view
+/// (`LAMP_ONE_FACE_FORGETS_ON_YES`, #8570): nothing changed yet, ask once
+/// whether to remember it the new way, never saying what was kept before
+/// (the speaker's mouth was not seen, #6673). Its example is an offer to
+/// keep (`asks_about_keeping`), which keeps the hold for their yes
+/// (`second_provider::settle_held_forget`). A new note, told only with the
+/// switch on: no note of the lamp's before it asks about a correction.
+pub fn held_correction_told() -> serde_json::Value {
+    serde_json::json!({
+        "remembered": false,
+        "held": HELD_CORRECTION_ASKS,
+    })
+}
+
+/// [`held_correction_told`]'s words.
+pub const HELD_CORRECTION_ASKS: &str = "Not changed yet: this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should remember it this new way (for example \"Shall I remember that instead?\"), and then stop. Do not say what was kept before. A plain yes from them within a minute changes it; do not call remember again for their yes.";
+
 /// What the model is told of a carried line's `remember`
 /// (`LAMP_CONVERSATION_CARRIED_SAVES`, `ScopeLease::saves_carried`): the
 /// lamp could not see who said it, so nothing is kept yet. It is held, in
@@ -8538,6 +8556,19 @@ pub fn days_from_environment() -> bool {
 
 static DAYS_MODE: OnceLock<bool> = OnceLock::new();
 static DAYS: OnceLock<Option<DaysClient>> = OnceLock::new();
+
+/// Days memory at `socket` for this test process, with `replaces` on as in
+/// the product (`LAMP_MEMORY_REPLACES`), so a keep is told its id. Once
+/// per process: a test calling it runs in a child process of its own.
+#[cfg(test)]
+pub(crate) fn days_for_test(socket: &Path) -> bool {
+    let _ = DAYS_MODE.set(true);
+    let Ok(client) = DaysClient::new(socket.to_path_buf()) else {
+        return false;
+    };
+    client.replaces.store(true, Ordering::Release);
+    DAYS.set(Some(client)).is_ok()
+}
 static FORGET_THREAD: AtomicBool = AtomicBool::new(false);
 /// The requests whose forget was done ([`forgetting_reply`]): at most
 /// [`FORGOTTEN_REPLIES`], the oldest let go first.
@@ -13630,7 +13661,8 @@ impl DaysClient {
     /// written. Nor is anything set or ended on a line its person's only by
     /// their face alone in view (`ScopeLease::forgets_need_mouth`), as the
     /// runners refuse it too (`ONE_FACE_REFUSED`; the privacy read on
-    /// #5385). A set needs a short name ([`role::name_like`]), heard as one
+    /// #5385), unless the second route ran it on the request there with
+    /// `LAMP_ONE_FACE_FORGETS_ON_YES` (`ScopeLease::held_yes_agreed`). A set needs a short name ([`role::name_like`]), heard as one
     /// in the line ([`role::heard_sets`]). Done, the held role changes at
     /// once; an end the memory did not write keeps it and says so.
     fn role_for_guarded(
@@ -13643,7 +13675,15 @@ impl DaysClient {
         if !scope_current(lease) {
             return (gone(), false);
         }
-        if lease.is_some_and(crate::memory_scope::ScopeLease::forgets_need_mouth) {
+        // But a set or end the second route ran on the request, their face
+        // alone in view (`LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's
+        // calls of 27 Nov on #8654, `second_provider::role_on_request`).
+        if lease.is_some_and(|lease| {
+            lease.forgets_need_mouth()
+                && !(crate::second_provider::one_face_forgets_on_yes()
+                    && lease.held_yes_agreed(&call.name, &call.args)
+                    && !lease.sticky_held())
+        }) {
             eprintln!(
                 "lamp-voice provider: a {} on a line whose mouth was not seen was not run (LAMP_MEMORY_ROLE)",
                 call.name
@@ -21641,6 +21681,24 @@ mod tests {
         speaker: &str,
         kept: Option<&str>,
     ) -> Vec<Value> {
+        sent_on_forget_everything(name, room, speaker, kept)
+            .into_iter()
+            .filter(|request| {
+                ["service_records_forget", "service_contacts_forget"]
+                    .contains(&request["op"].as_str().unwrap_or(""))
+            })
+            .collect()
+    }
+
+    /// Every ask a confirmed forget everything by `speaker` sent the memory
+    /// ([`services_forgotten_on_forget_everything_kept`]), its `forget_all`
+    /// first.
+    fn sent_on_forget_everything(
+        name: &str,
+        room: bool,
+        speaker: &str,
+        kept: Option<&str>,
+    ) -> Vec<Value> {
         let dir = std::env::temp_dir().join(format!("lamp-remember-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -21683,12 +21741,7 @@ mod tests {
         let _ = std::fs::remove_file(&socket);
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(read[0]["op"], "forget_all", "{read:?}");
-        read.into_iter()
-            .filter(|request| {
-                ["service_records_forget", "service_contacts_forget"]
-                    .contains(&request["op"].as_str().unwrap_or(""))
-            })
-            .collect()
+        read
     }
 
     /// #6334, the switch-on row on lamp-06c1 (11 Nov): in the private room
@@ -21760,6 +21813,40 @@ mod tests {
             sent.is_empty(),
             "nothing of the owner's forgotten: {sent:?}"
         );
+    }
+
+    /// The first builder's condition on #8570's S1a/S1b (25 Nov), after
+    /// lamp-06c1's 11 Nov loss: a known person who is not the owner, their
+    /// forget everything said yes to in the private room or out of it,
+    /// sends no forget of any kind for the owner's ids (the typed name's and
+    /// the face's): every ask naming a person names the guest alone.
+    #[test]
+    fn a_known_non_owners_forget_everything_sends_no_forget_for_the_owners_id() {
+        const GUEST: &str = "p-0123456789abcdef";
+        let owners = [
+            crate::known_faces::memory_person("Owner Example"),
+            crate::known_faces::memory_person("Owner"),
+        ];
+        for room in [true, false] {
+            let sent = sent_on_forget_everything(
+                &format!("forget-all-non-owner-{room}"),
+                room,
+                GUEST,
+                Some("Owner"),
+            );
+            for request in &sent {
+                let person = request["person"].as_str();
+                assert!(
+                    person.is_none_or(|person| !owners.iter().any(|owner| owner == person)),
+                    "room {room}: an ask for the owner's id: {request}"
+                );
+            }
+            assert!(
+                sent.iter()
+                    .any(|request| request["op"] == "forget_all" && request["person"] == GUEST),
+                "room {room}: the guest's own forget_all: {sent:?}"
+            );
+        }
     }
 
     /// Outside the private room the services' owner id is the speaker's
@@ -33110,6 +33197,66 @@ mod tests {
             served.join().unwrap(),
             [
                 json!({"op":"role_set_session","person":person,"name":"Harry Potter","session":format!("{}-1", client.prefix),"generation":2})
+            ]
+        );
+        role::forgot(Some(&person));
+        role::set_on_for_test(false);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The memory owner's calls on #8654, 27 Nov ("yes-alone rule cover this
+    /// too, like forgets and corrections", 17:34; "Run on the request",
+    /// 17:5x): with `LAMP_ONE_FACE_FORGETS_ON_YES`, a role set or end the
+    /// second route marked as run on a line theirs by their face alone in
+    /// view (`ScopeLease::mark_held_yes`) is written; one not marked, or with
+    /// the switch off, is refused as before and reaches no memory.
+    #[test]
+    fn with_the_face_switch_a_marked_one_face_role_is_set_and_ended() {
+        let _one = crate::provider_worker::tests::one_thread();
+        role::set_on_for_test(true);
+        let (socket, served) = memory("role-face-yes", 2, role_memory);
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let name = "Olivia Role Face Yes";
+        let person = person_id(name);
+        adopt_role_fixture(&client, &person);
+        let lone = role_lease(907, crate::memory_scope::ScopeSnapshot::of(name));
+        let lease = lone.lease();
+        assert!(lease.read_by_one_face());
+        assert!(lease.forgets_need_mouth());
+        let set = call(role::SET_ROLE, json!({"name":"Harry Potter"}));
+        let end = call(role::END_ROLE, json!({}));
+        let agreed = crate::second_provider::one_face_forget_yes_for_test();
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(true));
+        heard_now("You are Harry Potter now");
+        let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::one_face_told(), "not marked: refused");
+        lease.mark_held_yes(&agreed, &set.name, &set.args);
+        let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::set_told("Harry Potter"));
+        assert_eq!(role::cached(&person).as_deref(), Some("Harry Potter"));
+        heard_now("Be yourself again");
+        let (told, _) = client.role_for_guarded(&end, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::one_face_told(), "the set's mark is no end's");
+        lease.mark_held_yes(&agreed, &end.name, &end.args);
+        let (told, _) = client.role_for_guarded(&end, FIRST_READ, Some(&person), Some(&lease));
+        assert_eq!(told, role::ended_told());
+        assert_eq!(role::cached(&person), None);
+        // The switch off: a marked line is refused as stock.
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(Some(false));
+        let off = role_lease(908, crate::memory_scope::ScopeSnapshot::of(name));
+        let off_lease = off.lease();
+        assert!(off_lease.read_by_one_face());
+        off_lease.mark_held_yes(&agreed, &set.name, &set.args);
+        heard_now("You are Harry Potter now");
+        let (told, _) = client.role_for_guarded(&set, FIRST_READ, Some(&person), Some(&off_lease));
+        assert_eq!(told, role::one_face_told(), "off: refused");
+        crate::second_provider::set_one_face_forgets_on_yes_for_test(None);
+        assert_eq!(
+            served.join().unwrap(),
+            [
+                json!({"op":"role_set_session","person":person,"name":"Harry Potter","session":format!("{}-1", client.prefix),"generation":2}),
+                json!({"op":"role_end_session","person":person,"session":format!("{}-1", client.prefix),"generation":2}),
             ]
         );
         role::forgot(Some(&person));

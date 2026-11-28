@@ -897,9 +897,19 @@ about or by the id recall gave reaches their scope: a bare "forget that",
 or any forget the memory would run as "the last kept thing" (the legacy
 memory, a switch off), is the room's only, since after the room's recall
 on such a line it would take their last kept thing (Thirteen's P2 on
-#5022). **Forgetting needs the mouth seen speaking** (the memory owner, 16:49 on
-#5385: "tạm thời chưa cho xóa nếu ko detect đc mở miệng", no deleting while
-an open mouth is not detected), with no exception: a forget on such a
+#5022). **A forget or a correction runs on the person's yes; the mouth is
+not used** (the memory owner's rule, 25 Nov 14:33 on #8570: "we remove the
+mouth opening from forget stuffs too, its been show that the mouth moving
+detection is not trustable … a confirmation is enough for user to know if
+their memory is remove", and 27 Nov 14:11 on #8654: "mouth moving is not
+used anymore and not affect forget or correction in memory … switch on yes
+in production, do it now"). In the product this is
+`LAMP_ONE_FACE_FORGETS_ON_YES` (below), on since #8654: a correction,
+"forget that", "forget everything" and "forget my face" said on such a line
+are held and asked once, and their plain yes runs them. The older rule
+(16:49 on #5385, "tạm thời chưa cho xóa nếu ko detect đc mở miệng", no
+deleting while an open mouth is not detected) holds only with that switch
+off, and then with no exception: a forget on such a
 line, theirs by their face alone in view or named late on a line admitted
 as the room's (`ScopeLease::reached_by_one_face`), is asked of no memory,
 theirs or the room's (`tools::run_call_with_scope`), with only
@@ -920,6 +930,96 @@ room's `forget_last`, and the room's Wi-Fi name went (#5608, Jarvis's P2s).
 A guest off camera or a TV saying "forget that" beside her silent face
 forgets nothing. Said with their mouth read speaking, the line is theirs and
 the forget runs in their scope as any of theirs.
+**With `LAMP_ONE_FACE_FORGETS_ON_YES` (on in the product since #8654, the
+memory owner's call of 27 Nov 14:11; off by default in code; #8570, the
+memory owner's ruling of 25 Nov 14:33: mouth-moving detection is not
+trustable, a confirmation tells the person what is removed, and the scope
+is single-user), the mouth no longer gates a forget or a correction on the
+second route, and neither does the voice's own copy of the eyes' speaking
+(`LAMP_EYES_SPEAKING`, off in the product since #8791): no `forget_sight`
+is needed to hold or to run.** On a line theirs by their own face alone in view, the mouth
+not seen and the line not carried, sticky, gap-held or narrowed
+(`ScopeLease::in_view_by_one_face`), a bare "forget that" after their plain new
+keep, on any later line of theirs in the same session within 60 s
+(`remember::HELD_FORGET_FOR`; row 8654 L2: the model asked "forget that"
+back in words and called the bare forget on their yes), is held as the
+forget of that kept id (`second_provider::face_kept_id`: a peek at
+`ONE_FACE_KEPT`, the session's latest one-face keep, which keeps the id
+`LAMP_MEMORY_REPLACES` tells, or else at the second route's own mark,
+`HeldForgets::kept`, set by `mark_kept_by_face` from a plain keep's told id on a
+line by their face alone in view and ended by any memory call but a bare forget, the keep's own request
+included, as the memory route's mark is; row 8654 L2 at 2c7cdd0d21 on
+lamp-06c1: a bare forget right after a keep found no memory-route mark and was
+refused. A forget is bare with no `source_id` and either no
+`about` or one bare as `ask_once_forget` reads it (`second_provider::bare_forget`,
+`remember::pick_forget` giving `Last`), so
+an `about` of `""`, `[]` or a guess not heard is bare too (row 8654 L2 at
+6c76c3257f: the model's `about` of 0 words was let go with no line). With the
+switch on, a forget of any kind or a correction the hold does not take says
+which check let it go, in machine words only: `face-hold: refused:
+no_scope | not_heard | gap_held | not_one_face | named | not_bare |
+everything_refused | no_mark | other_person | not_later | too_old | no_id |
+one_waits | stale (<call>)`; `face-hold: own_mark` when the second route's
+own mark held it; and a held call dropped because the lamp's answer asked
+nothing (row 8654 L4) also says `face-hold: dropped: no_ask | unfinished
+(<call>)`, and one a later line drops in `take_held_forget` says
+`face-hold: dropped: unfinished (<call>)` when it was never asked (its turn
+cut before the ask, row 8654 L4 on lamp-06c1, 26 Nov 18:47) or
+`face-hold: dropped: on_line (<call>)` for any other drop there; a bare forget the model calls on a line
+that is only a yes (`remember::heard::only_a_yes`), with a line between it
+and the keep (the model's own ask in words), is their agreement and runs at
+once as the forget of that id, never asked a second time, but only when
+the lamp's last answer after the keep asked about forgetting
+(`remember::asks_about_forgetting` on `Shared::lamp_said`), the line it
+answered named nothing (`remember::named_subject`), and no request between
+the keep and the yes called anything (the Reviewer-lead's must-fix and El's
+P2 on #8654: "Want the forecast too?" or "Forget my dentist note." answered
+in words, then "Yes.", keeps it); otherwise it is held and asked: `second_provider::agreed_on_face_yes`; the second route's calls run in its own
+worker's process, so the mark and the peek are the same process's), and so
+are `forget_everything`, `forget_my_face` and a correction (a `remember`
+with `replaces`), each as called (`second_provider::hold_on_face_yes`).
+Nothing runs on the asking line; the model is told to ask once, by the held
+notes already in use (`held_forget_told`, `FORGET_EVERYTHING_ASKS`) or, for
+a correction, `HELD_CORRECTION_ASKS`, which never names the old fact; a
+held correction's round is no longer told `LAMP_KEEP_QUIETLY`'s quiet note
+("never ask whether you should"), and its ask is said as a carried keep's is
+(`Quiet::held_keep`; row 8654 L4: 2 of 2 asked nothing and were dropped).
+The lamp still says no ask of its own: a hold whose answer asks nothing is
+dropped (`settle_held_forget`). Their
+plain yes within 60 s on a later line theirs by their face alone in view
+runs exactly that call in their scope (`take_held_forget`,
+`HeldForget::face_yes`). The guard is the scope's one-face test alone
+(`ScopeLease::in_view_by_one_face`): their known face the only face in
+view, the line not narrowed by another voice, and not carried, sticky or
+gap-held. The voice's own "no other face seen speaking the yes" check in
+`take_held_forget` reads the voice's copy of the eyes' speaking, which
+nothing sets since #8791, so it no longer acts (the Reviewer-lead's P3 on
+#8654). **The accepted risk** (the memory owner's rule of 25 Nov, restated
+27 Nov 14:11: "mouth moving is not used anymore and not affect forget or
+correction in memory"): with only the owner's face in view and no other
+voice heard, someone off camera, or a TV, who says the forget or the
+correction and then "yes" forgets or changes the owner's memory; "forget
+everything" takes two such lines. A `set_role` or `end_role` on
+such a line, in the private room, runs on the request with no hold or
+question, the mouth not used (the memory owner's calls of 27 Nov on #8654,
+"yes-alone rule cover this too, like forgets and corrections" and "Run on
+the request"; `second_provider::role_on_request`). Its held run marks it agreed
+(`ScopeLease::mark_held_yes`, `mark_forget_agreed`), so it alone passes the
+one-face refusal and the memory route's correction check. A correction
+their yes ran that did not keep (the memory's error or `remembered: false`,
+or the memory route's refusal) is never told as kept: the model is told the
+existing "not done" note, `seen_yes::NOT_KEPT` (the Reviewer-lead's P2 on
+#8654). A call their yes agreed to and runs at once is never put to the
+hold, and once a held call ran on a yes line nothing on that line is held
+and asked again. The provider
+route has no hold and answers `ONE_FACE_JUST_KEPT` ("when I can see you say
+it") only with the switch off or off such a line; with it on, there, it asks
+which (`ONE_FACE_BARE_FORGET`). With `LAMP_PRIVATE_ROOM` on, a named forget's
+yes runs by the private room's branch first, so this switch adds nothing to
+a named forget there. A carried line,
+a sticky or gap-held line, a second face, another's yes, a no, a late yes
+and a written turn are as before, and a carried line's yes never lets such
+a hold go.
 **A forget is never said done unless one ran and removed something**
 (C88, B-G23; `LAMP_ACTION_CLAIM_CHECKED`, on in the product). On lamp-06c1
 (10 Nov, build 11091, request 30) "Lamp, forget that." with her face still
@@ -1009,7 +1109,10 @@ such a line** (`ScopeLease::forgets_need_mouth`): not `forget_everything`,
 `forget` the keep's rule alone lets reach their scope
 (`ScopeLease::reached_by_one_face`); the model is told nothing was
 forgotten and to ask them to say it again looking at the lamp. It holds no
-forget for a yes and its ask is no ask just before (`forget_asker`).
+forget for a yes and its ask is no ask just before (`forget_asker`). That is with
+`LAMP_ONE_FACE_FORGETS_ON_YES` off; on (the product since #8654), a forget
+of any kind or a correction on such a line is held for their yes and runs
+on it, the mouth not used (above).
 **Except a named forget of one kept thing, which is asked about once** (the
 PM's cost ruling on #5627, after 9 of 9 of the owner's own forgets were
 refused on lamp-c0a4): on the second route, a `forget` whose heard line (or
@@ -1029,7 +1132,9 @@ again for their yes", so on stable a yes ran nothing).
 Only their yes on a later line within 30 s
 (`remember::ONE_FACE_FORGET_YES_FOR`), from the same session's same person,
 with their face seen saying it, or in the private room
-(`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
+(`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, or
+with `LAMP_ONE_FACE_FORGETS_ON_YES` on a line theirs by their face alone in
+view, no face seen speaking it and the line not carried, runs
 exactly that forget by id in their scope (`ScopeLease::mark_forget_agreed`,
 never `forget_last`). The held forget carries the subject's words
 (`about`); once the by-id forget is confirmed, that person's own exchanges
@@ -1171,7 +1276,9 @@ privacy read on #5592): a `remember` that corrects a kept thing by id
 (`replaces`, `remember::corrects`) is refused like a forget, and without an
 id the plain correction matcher is skipped, so the keep is kept plainly and
 nothing is replaced; `keep_rule`, `list_rules` and `forget_rule` are refused;
-`set_role` and `end_role` are refused too, leaving the held role unchanged;
+`set_role` and `end_role` are refused too, leaving the held role unchanged
+(but see `LAMP_ONE_FACE_FORGETS_ON_YES` above: in the private room they run on
+the request);
 `cancel_reminder` and `snooze_reminder` are refused unless
 `LAMP_ONE_FACE_REMINDERS` is on (the 4 Nov acceptance); and the line has no
 services owner (`services::owner_of`), so no `service_read` runs for it,
@@ -3144,7 +3251,7 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   `set_role` and `end_role` are in `ONE_FACE_REFUSED`, refused by both
   runners and again by `remember::role_for_guarded`, so a guest off camera
   with the owner's face silent in view ends or replaces no role; seen
-  speaking, they run as theirs. A role asked by someone not
+  speaking, they run as theirs. With `LAMP_ONE_FACE_FORGETS_ON_YES`, the memory owner's calls of 27 Nov on #8654 ("yes-alone rule cover this too, like forgets and corrections", 17:34; then "Run on the request", 17:5x): a `set_role` or `end_role` on a spoken line theirs by their own face alone in view, the mouth not seen (`ScopeLease::in_view_by_one_face`: not carried, sticky, narrowed or answering words seen said), the mouth not used, not held by a face's gap, and `LAMP_PRIVATE_ROOM` on, runs on the request itself: no hold, no question and no new words (`second_provider::role_on_request`, which marks the lease, `ScopeLease::mark_held_yes`, so that call alone passes `one_face_refused` and `remember::role_for_guarded`). A second face in view, another face seen speaking, a carried line or the private room off: refused as before. Off: byte for byte as before. A role asked by someone not
   placed is told for that conversation only and never written; an unplaced
   `end_role` changes no one's kept role. An end the memory did not write
   keeps the role held and tells the model it failed, so it never says
