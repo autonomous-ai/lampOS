@@ -10,8 +10,9 @@ An app's folder, as a developer keeps it:
       skills/gym-tips/SKILL.md, skill.toml, ...
 
 `app.json` holds the manifest's own fields (name, title, version,
-min_build, runtime, grants, net, logs, npu, phrases, triggers, settings,
-skills, assets). `name` may be left out (the folder's), and so may `skills`
+min_build, runtime, grants, net, logs, npu, tools, phrases, triggers,
+settings, skills, assets). `tools` names the app's tools file: `tools.json`
+beside `app.json` (packed only when named) or a `.json` file under src/. `name` may be left out (the folder's), and so may `skills`
 and `assets` (the folders under skills/ and the WAV files under assets/).
 `pack` adds `format`, `kind` and `files` and writes the tar the Store
 takes: `lamp-skill.json` first, then every file as `NAME/path`, sorted,
@@ -74,10 +75,12 @@ ASSET_WINDOW = 240
 # The manifest's fields, in the order `pack` writes them.
 FIELDS = (
     "format", "kind", "name", "title", "version", "min_build", "runtime", "grants", "net", "logs",
-    "npu", "phrases", "triggers", "settings", "skills", "assets", "files",
+    "npu", "tools", "phrases", "triggers", "settings", "skills", "assets", "files",
 )
 REQUIRED = ("format", "kind", "name", "title", "version", "min_build", "runtime", "grants", "triggers", "files")
 TOPS = ("src", "assets", "skills")
+# The one tools file an app may keep at its folder's top (`app_package::TOOLS_AT_TOP`), only when `tools` names it.
+TOOLS_AT_TOP = "tools.json"
 
 _APP_NAME = re.compile(r"^[a-z][a-z0-9-]{0,23}$")
 _SKILL_NAME = re.compile(r"^[a-z0-9-]{1,64}$")
@@ -197,6 +200,17 @@ def _setting(setting: object) -> str | None:
     return None
 
 
+def tools_path_ok(path: object) -> bool:
+    """A manifest's `tools` path as `app_package::tools_path_ok` takes it:
+    `tools.json`, or a `.json` file under src/, each part plain."""
+    if not isinstance(path, str):
+        return False
+    parts = path.split("/")
+    if len(parts) > MOST_DEPTH or not all(_PART.match(p) and not p.startswith(".") for p in parts):
+        return False
+    return path == TOOLS_AT_TOP or (path.startswith("src/") and path.endswith(".json") and len(path) > len("src/.json"))
+
+
 def manifest_errors(manifest: object) -> list[str]:
     """The manifest's own rules, as `app_package::check_manifest` holds them
     (no files): each line is one refusal."""
@@ -211,6 +225,9 @@ def manifest_errors(manifest: object) -> list[str]:
             say(f"no {missing!r}")
     if errors:
         return errors
+    # null is absent, as the reader's Option takes it.
+    if manifest.get("tools") is not None and not tools_path_ok(manifest["tools"]):
+        say(f"tools {manifest['tools']!r} is not {TOOLS_AT_TOP} or a .json file under src/ inside the app's folder")
     if manifest["format"] != FORMAT:
         say(f"format {manifest['format']} is not an app's ({FORMAT})")
     if manifest["kind"] != KIND:
@@ -291,14 +308,17 @@ def manifest_errors(manifest: object) -> list[str]:
     return errors
 
 
-def path_errors(path: str) -> str | None:
+def path_errors(path: str, tools: object = None) -> str | None:
     """A file's path inside the app's folder: 2 to 8 parts of
-    [A-Za-z0-9._-], none beginning with a dot, under src/, assets/ or skills/."""
+    [A-Za-z0-9._-], none beginning with a dot, under src/, assets/ or skills/;
+    or `tools.json` at the top when the manifest's `tools` names it."""
     parts = path.split("/")
     if len(path.encode()) > MOST_PATH_BYTES or len(parts) > MOST_DEPTH:
         return f"{path}: more than {MOST_DEPTH} parts or {MOST_PATH_BYTES} bytes"
     if not all(_PART.match(p) and not p.startswith(".") for p in parts):
         return f"{path}: a path's parts are letters, digits, -, _ and ., none beginning with a dot"
+    if path == TOOLS_AT_TOP and tools == TOOLS_AT_TOP:
+        return None
     if parts[0] not in TOPS or len(parts) < 2:
         return f"{path}: an app's files are under src/, assets/ and skills/"
     return None
@@ -333,9 +353,13 @@ def _content(manifest: dict[str, Any], files: dict[str, bytes], report: Report) 
     manifest's own rules: paths, sizes, entry module, assets, skills."""
     if len(files) > MOST_FILES or sum(map(len, files.values())) > MOST_BYTES:
         report.errors.append(f"more than {MOST_FILES} files or {MOST_BYTES} bytes: too big for an app")
+    tools = manifest.get("tools")
     for path in files:
-        if why := path_errors(path):
+        if why := path_errors(path, tools):
             report.errors.append(why)
+    # The reader does not judge the tools file: lamp-control reads it as the app runs, and a missing one leaves no tools.
+    if tools_path_ok(tools) and tools not in files:
+        report.warnings.append(f"{tools}: named as the app's tools and not in it: the app installs with no tools")
     runtime = manifest.get("runtime")
     if isinstance(runtime, dict) and isinstance(runtime.get("entry"), str):
         module = runtime["entry"].replace(".", "/")
@@ -375,12 +399,19 @@ def _content(manifest: dict[str, Any], files: dict[str, bytes], report: Report) 
         report.warnings.extend(f"skills/{name}: {line}" for line in skill.warnings)
 
 
-def _folder_files(folder: Path, report: Report) -> dict[str, bytes]:
-    """The folder's src/, assets/ and skills/ files by path, hidden files and
-    Python's caches left out; anything else beside them is a warning."""
+def _folder_files(folder: Path, report: Report, tools: object = None) -> dict[str, bytes]:
+    """The folder's src/, assets/ and skills/ files by path, and `tools.json`
+    when the manifest's `tools` names it, hidden files and Python's caches
+    left out; anything else beside them is a warning."""
     files: dict[str, bytes] = {}
     for top in sorted(folder.iterdir()):
         if top.name.startswith(".") or top.name == SOURCE:
+            continue
+        if top.name == TOOLS_AT_TOP and tools == TOOLS_AT_TOP:
+            if top.is_symlink() or not top.is_file():
+                report.errors.append(f"{TOOLS_AT_TOP}: a link or a folder: an app is plain files and folders")
+            else:
+                files[TOOLS_AT_TOP] = top.read_bytes()
             continue
         if top.name not in TOPS:
             report.warnings.append(f"{top.name}: not packed: an app's files are src/, assets/ and skills/")
@@ -413,7 +444,7 @@ def _from_folder(folder: Path, report: Report) -> tuple[dict[str, Any] | None, d
     for key, value in (("format", FORMAT), ("kind", KIND)):
         if source.get(key, value) != value:
             report.errors.append(f"{SOURCE}: {key} is {value!r} for an app")
-    files = _folder_files(folder, report)
+    files = _folder_files(folder, report, source.get("tools"))
     manifest: dict[str, Any] = {"format": FORMAT, "kind": KIND, "name": folder.name, **source}
     if manifest["name"] != folder.name:
         report.warnings.append(f"{SOURCE} names {manifest['name']!r}; the package's folder takes that name, not {folder.name!r}")

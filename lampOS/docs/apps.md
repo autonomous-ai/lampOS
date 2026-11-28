@@ -149,8 +149,10 @@ The Python SDK checks and packs an app, and submits it to the Store
 `lamp app status`, `lamp app request-public`, `lamp app studio`; the JS SDK's
 `submitApp`, `submissions`, `requestPublic`). The developer's folder holds
 `app.json` (the manifest above without `format`, `kind` and `files`) beside
-`src/`, `assets/` and `skills/`; `pack` adds those three and writes the tar
-unsigned, and the Store signs it at approval. The SDK READMEs' "Publish your
+`src/`, `assets/` and `skills/`, and `tools.json` at its top when `tools`
+names it (packed only then; the check holds `tools` to the reader's path rule
+and lets that file in at the top as the reader does, and leaves its contents
+to lamp-control); `pack` adds `format`, `kind` and `files` and writes the tar unsigned, and the Store signs it at approval. The SDK READMEs' "Publish your
 app" has the commands and the Store's refusals. Staged: tested against a fake
 Store only until 20 Nov; **live on production** since then (#7415): the CLI's
 default hosts are production's
