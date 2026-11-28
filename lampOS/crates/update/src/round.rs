@@ -471,6 +471,9 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         apply_failed: false,
         asked_now: false,
         gave_way: false,
+        adds_only: false,
+        adds_sequence: None,
+        started_added: false,
         lines: Vec::new(),
     };
     if !config.apply {
@@ -561,7 +564,18 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     // run by the updater it had, so the first one of the new updater, after
     // its own switch, finds the lamp up to date. A switching round starts
     // it with the parts it added (`start_added`).
-    if let Outcome::UpToDate(sequence) = outcome {
+    // An up-to-date round's pass that added units (#7018) started them and
+    // looked at lamp-control already. One that found no quiet moment, or was
+    // held, changed nothing and ran on the build the lamp runs: lamp-control
+    // is looked at as in any up-to-date round.
+    let up_to_date = match outcome {
+        Outcome::UpToDate(sequence) => Some(sequence),
+        Outcome::NotQuiet(_) if run.adds_only => run.adds_sequence,
+        _ => None,
+    };
+    if let Some(sequence) = up_to_date
+        && !run.started_added
+    {
         run.start_added(&[], sequence);
     }
     // sysstat's kept files (#7254), as the boot run removes them: a lamp
@@ -645,6 +659,16 @@ struct Run<'r, 'w> {
     /// moment to give way ([`Self::give_way`]), once.
     asked_now: bool,
     gave_way: bool,
+    /// This round only adds the product units the lamp's running build
+    /// carries and the updater that switched to it did not (#7018,
+    /// [`Self::installed_adds`]): the build stays the lamp's, `installed`
+    /// and `previous` as they are, and a pass put back refuses nothing.
+    adds_only: bool,
+    /// The build whose units this round's pass adds ([`Self::adds_only`]),
+    /// the one the lamp runs.
+    adds_sequence: Option<u64>,
+    /// [`Self::start_added`] ran this round.
+    started_added: bool,
     /// What this round said, kept for [`Self::keep_lines`] (#6266 5b): at most
     /// [`MOST_LINES`] lines of [`MOST_LINE`] characters.
     lines: Vec<String>,
@@ -864,17 +888,23 @@ impl Run<'_, '_> {
     /// lamp and holds about the last 40 minutes, and is empty after a reboot.
     /// A round that did nothing (up to date, unreachable, nothing published,
     /// not quiet, a refusal said again) keeps only its end, as before: they
-    /// come every round and say the same.
+    /// come every round and say the same. An up-to-date round's pass that
+    /// adds units (#7018) keeps its lines though it ends up to date: it
+    /// changed the lamp, or took back what it changed. Not a pass the room
+    /// held (`NotQuiet`): it changed nothing, and would say the same every
+    /// round until the room is quiet.
     fn keep_lines(&self, outcome: &Outcome) {
-        if matches!(
-            outcome,
-            Outcome::Switched(_)
-                | Outcome::Held { .. }
-                | Outcome::SelfSwitched { .. }
-                | Outcome::Climbs { .. }
-                | Outcome::RolledBack { .. }
-                | Outcome::Failed(_)
-        ) && !self.lines.is_empty()
+        if ((self.adds_only && !matches!(outcome, Outcome::NotQuiet(_)))
+            || matches!(
+                outcome,
+                Outcome::Switched(_)
+                    | Outcome::Held { .. }
+                    | Outcome::SelfSwitched { .. }
+                    | Outcome::Climbs { .. }
+                    | Outcome::RolledBack { .. }
+                    | Outcome::Failed(_)
+            ))
+            && !self.lines.is_empty()
         {
             // A failure that comes every round the same way (15 minutes
             // apart) is kept once: the lines only when they differ from the
@@ -949,8 +979,12 @@ impl Run<'_, '_> {
             if let Some(placing) = &placing {
                 record_skills(&mut state, &placing.steps);
             }
-            state.installed = Some(build);
-            state.cut_short = None;
+            // This updater has looked at the units the build adds (#7018).
+            state.adds_looked(build.sequence, self.config.running.as_deref());
+            if !self.adds_only {
+                state.installed = Some(build);
+                state.cut_short = None;
+            }
             return match self.records.save_state(&state) {
                 Ok(()) => Outcome::UpToDate(manifest.sequence),
                 Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
@@ -997,10 +1031,14 @@ impl Run<'_, '_> {
             Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
         }
         (self.world.phase)("fetching");
-        if let Err(outcome) = self.install(&mut state, &manifest, &changes) {
-            return outcome;
-        }
-        if let Err(outcome) = self.skills_still_load(&manifest, &changes, placing.as_ref()) {
+        let fetched = self
+            .install(&mut state, &manifest, &changes)
+            .and_then(|()| self.skills_still_load(&manifest, &changes, placing.as_ref()));
+        if let Err(outcome) = fetched {
+            // The build the lamp runs is never refused for its additions.
+            if self.adds_only {
+                return self.not_added_now(manifest.sequence, &outcome.to_string());
+            }
             return outcome;
         }
         (self.world.phase)("switching");
@@ -1061,6 +1099,7 @@ impl Run<'_, '_> {
         record_skills(state, &steps);
         state.installed = Some(build.clone());
         state.cut_short = None;
+        state.adds_looked(build.sequence, self.config.running.as_deref());
         match self.records.save_state(state) {
             Ok(()) => Outcome::UpToDate(build.sequence),
             Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
@@ -1115,14 +1154,16 @@ impl Run<'_, '_> {
             )));
         }
         self.seen = Some(manifest.clone());
-        if let Some(installed) = &state.installed {
-            if manifest.sequence == installed.sequence {
-                return Err(Outcome::UpToDate(manifest.sequence));
+        if let Some(installed) = state.installed.as_ref().map(|build| build.sequence) {
+            // The build the lamp runs: only what it adds that the updater
+            // which switched to it did not (#7018).
+            if manifest.sequence == installed {
+                return self.installed_adds(state, manifest);
             }
-            if manifest.sequence < installed.sequence {
+            if manifest.sequence < installed {
                 return Err(Outcome::Refused(format!(
-                    "build {} is older than build {}, which the lamp runs",
-                    manifest.sequence, installed.sequence
+                    "build {} is older than build {installed}, which the lamp runs",
+                    manifest.sequence
                 )));
             }
         }
@@ -1203,6 +1244,7 @@ impl Run<'_, '_> {
             &taken,
             &touched,
             &forced,
+            false,
         )
         .map_err(Outcome::Refused)?;
         if manifest.settings.is_empty() {
@@ -1241,6 +1283,112 @@ impl Run<'_, '_> {
         let placing = self.product_skills(state, &manifest, &installed, &carried)?;
         self.retained_units(&manifest, &installed, &companions, &carried, &changes);
         Ok((manifest, changes, placing))
+    }
+
+    /// An up-to-date round's additions (#7018): the product units the build
+    /// the lamp runs carries and the lamp lacks, which the updater that
+    /// switched to it did not add (an older one, before `own` switched to
+    /// this one). Under a round's adding rules ([`Self::adding_units`]),
+    /// once per installed build and updater folder ([`State::adds_seen`]:
+    /// the build's own updater looks once though the one that switched to
+    /// it looked, #8400), and never for a
+    /// build refused here. Nothing the lamp has is rewritten: only units
+    /// are added, with a part new to the lamp, and the build stays the
+    /// lamp's. `UpToDate` when there is nothing to add, or when what would
+    /// add them cannot be had this round; the next round looks again.
+    fn installed_adds(
+        &mut self,
+        state: &mut State,
+        manifest: Manifest,
+    ) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
+        let sequence = manifest.sequence;
+        let up_to_date = Outcome::UpToDate(sequence);
+        if state.refusal(sequence).is_some()
+            || state.adds_seen(sequence, self.config.running.as_deref())
+        {
+            return Err(up_to_date);
+        }
+        let read = installed_units(self.config).and_then(|installed| {
+            installed_companions(self.config).map(|companions| (installed, companions))
+        });
+        let (installed, companions) = match read {
+            Ok(read) => read,
+            Err(error) => {
+                let why = format!("the units cannot be read: {error}");
+                return Err(self.not_added_now(sequence, &why));
+            }
+        };
+        let adding = match self.adding_units(&manifest, &installed, &companions) {
+            Ok(adding) => adding,
+            Err(outcome) => return Err(self.not_added_now(sequence, &outcome.to_string())),
+        };
+        if adding.is_empty() {
+            return Err(up_to_date);
+        }
+        self.placings.clear();
+        self.fetching.clear();
+        self.setting_writes.clear();
+        self.image_writes.clear();
+        let planned = plan(
+            self.config,
+            &manifest,
+            &installed,
+            &companions,
+            &BTreeMap::new(),
+            &adding,
+            &[],
+            &[],
+            &[],
+            true,
+        );
+        let (changes, rollback_order) = match planned {
+            Ok(planned) => planned,
+            Err(why) => {
+                // The build's own units: the same at every round, so tried
+                // once, as a pass put back is.
+                self.say(&format!(
+                    "the units build {sequence} adds are not added: {why}; they are tried again with the next build"
+                ));
+                if self.config.apply {
+                    state.adds_looked(sequence, self.config.running.as_deref());
+                    if let Err(error) = self.records.save_state(state) {
+                        self.say(&format!("the state cannot be written: {error}"));
+                    }
+                }
+                return Err(up_to_date);
+            }
+        };
+        self.adds_only = true;
+        self.adds_sequence = Some(sequence);
+        self.rollback_order = Some(rollback_order);
+        self.fetching = to_fetch(self.config, &changes, &self.placings);
+        if let Err(outcome) = self.room(&changes) {
+            return Err(self.not_added_now(sequence, &outcome.to_string()));
+        }
+        let added: Vec<&str> = changes
+            .iter()
+            .filter(|change| change.added.is_some())
+            .map(|change| change.unit.as_str())
+            .collect();
+        if self.config.apply && !added.is_empty() {
+            let line = format!(
+                "build {sequence}, which the lamp runs, adds {}: the updater that switched to it did not carry them (#7018)",
+                added.join(", ")
+            );
+            self.say(&line);
+        }
+        Ok((manifest, changes, None))
+    }
+
+    /// An up-to-date round's additions (#7018) that cannot be had this
+    /// round, for a reason not of the build's units (the channel, the disk):
+    /// said, and the round is up to date. Not counted as tried: the next
+    /// round looks again.
+    fn not_added_now(&mut self, sequence: u64, why: &str) -> Outcome {
+        self.say(&format!(
+            "the units build {sequence} adds are not added this round: {why}; the next round tries again"
+        ));
+        Outcome::UpToDate(sequence)
     }
 
     /// Say which unit text a new product round deliberately keeps (#5061).
@@ -2953,12 +3101,16 @@ impl Run<'_, '_> {
             exit_notes: self.exit_notes.clone(),
             aside: self.aside.clone(),
             refusing: None,
+            adds_only: self.adds_only,
         };
-        if let Err(error) = self
-            .records
-            .keep_previous(&previous)
-            .and_then(|()| self.records.save_journal(&journal))
-        {
+        // An up-to-date round's additions keep the units from before the
+        // last switch as they are: they are still the way back by hand.
+        let kept = if self.adds_only {
+            Ok(())
+        } else {
+            self.records.keep_previous(&previous)
+        };
+        if let Err(error) = kept.and_then(|()| self.records.save_journal(&journal)) {
             return Outcome::Failed(format!("the journal cannot be written: {error}"));
         }
         // The factory's acceleration drop-in out of the way of the build's
@@ -3046,7 +3198,9 @@ impl Run<'_, '_> {
                 self.skills_back.len()
             ));
         }
-        self.say(&format!("switching to build {}", build.sequence));
+        if !self.adds_only {
+            self.say(&format!("switching to build {}", build.sequence));
+        }
         // The voice is stopped first when a part it reads restarts before it:
         // a clean stop, with Controls still up, so no build's voice arms its
         // restart guard. Restarted after its prerequisites, it starts the new
@@ -3147,9 +3301,14 @@ impl Run<'_, '_> {
             return self.put_back(state, &build, &backs, Some(&unit), why, told);
         }
         record_skills(state, &steps);
-        state.previous = state.installed.replace(build.clone());
-        // A finished switch ends any count of cut-shorts (#6266).
-        state.cut_short = None;
+        // This updater has looked at the units the build adds (#7018). An
+        // up-to-date round's additions leave the build the lamp's.
+        state.adds_looked(build.sequence, self.config.running.as_deref());
+        if !self.adds_only {
+            state.previous = state.installed.replace(build.clone());
+            // A finished switch ends any count of cut-shorts (#6266).
+            state.cut_short = None;
+        }
         if !self.placings.is_empty() {
             let mut before = state.models.clone();
             for placing in &self.placings {
@@ -3175,6 +3334,9 @@ impl Run<'_, '_> {
         self.start_recover_if_on();
         self.start_added(&backs, build.sequence);
         self.prune(state);
+        if self.adds_only {
+            return Outcome::UpToDate(build.sequence);
+        }
         match held {
             Some(why) => {
                 self.say(&format!("build {} kept; held: {why}", build.sequence));
@@ -3292,6 +3454,7 @@ impl Run<'_, '_> {
     /// until the lamp's next start, through any number of updates. Started
     /// once, on the same terms; one still off by its own switch exits again.
     fn start_added(&mut self, backs: &[Back], sequence: u64) {
+        self.started_added = true;
         let read = |back: &Back| {
             let path = format!("{}/{}", added::UNITS, back.unit);
             let text = fs::read_to_string(self.config.on(&path)).ok()?;
@@ -3478,16 +3641,42 @@ impl Run<'_, '_> {
     ) -> Outcome {
         // `told` carries a unit's own last journal line: it is said, never
         // kept in the log (the log keeps `why` alone, as the refusal does).
-        self.say_apart(
-            &format!("putting build {} back: {why}{told}", build.sequence),
-            &format!("putting build {} back: {why}", build.sequence),
-        );
+        let added: Vec<&str> = backs
+            .iter()
+            .filter(|back| back.added.is_some())
+            .map(|back| back.unit.as_str())
+            .collect();
+        let added = if added.is_empty() {
+            "what it added".to_owned()
+        } else {
+            added.join(", ")
+        };
+        if self.adds_only {
+            let line = |why: &str| {
+                format!(
+                    "{added}, added to build {sequence}, was taken away: {why}; build {sequence} is kept, and its units are tried again with the next build",
+                    sequence = build.sequence
+                )
+            };
+            let said = line(format!("{why}{told}").as_str());
+            self.say_apart(&said, &line(why.as_str()));
+        } else {
+            self.say_apart(
+                &format!("putting build {} back: {why}{told}", build.sequence),
+                &format!("putting build {} back: {why}", build.sequence),
+            );
+        }
         // A fault of the build is written into the journal before anything
         // is put back, so a start after a cut in the put-back, or before the
         // state below is written, refuses the build as this one would have,
         // and does not take it for a cut-short (#6266; Thirteen's P3 on
         // #6416). A cut-short leaves the journal unmarked: tried again.
-        if !cut_short && let Err(error) = self.records.mark_journal_refusing(&why) {
+        // An up-to-date round's additions refuse nothing (#7018): the build
+        // is the lamp's.
+        if !cut_short
+            && !self.adds_only
+            && let Err(error) = self.records.mark_journal_refusing(&why)
+        {
             self.say(&format!(
                 "the journal cannot be marked with why build {} is put back: {error}",
                 build.sequence
@@ -3495,6 +3684,17 @@ impl Run<'_, '_> {
         }
         let (after, old, files_back) = self.restore(backs, failed);
         self.settings_now(state);
+        if !files_back && self.adds_only {
+            // An up-to-date round's additions (#7018) not all taken away: no
+            // build was being brought, so none is rolled back. The journal
+            // stays for the next start to take them away again, and
+            // `adds_tried` is not set until it has.
+            let why = after.as_ref().err().unwrap_or(&why);
+            return Outcome::Failed(format!(
+                "{added} could not all be taken away: {why}; build {} is kept",
+                build.sequence
+            ));
+        }
         if !files_back {
             // Not all is as it was: the journal stays, marked as above, for
             // the next start to try again, and nothing is pruned that a path
@@ -3506,7 +3706,11 @@ impl Run<'_, '_> {
                 told: Told { new: told, old },
             };
         }
-        if !cut_short {
+        if self.adds_only {
+            // Tried once for this build, well or not; the next build tries
+            // again (#7018).
+            state.adds_looked(build.sequence, self.config.running.as_deref());
+        } else if !cut_short {
             let kind = refusal_kind(&why, failed);
             state.refuse_as(
                 build,
@@ -3551,6 +3755,10 @@ impl Run<'_, '_> {
             if let Some(builds) = self.config.on(link).parent() {
                 let _ = fs::remove_dir(builds);
             }
+        }
+        // The build the lamp runs, kept (#7018).
+        if self.adds_only {
+            return Outcome::UpToDate(build.sequence);
         }
         Outcome::RolledBack {
             sequence: build.sequence,
@@ -3720,10 +3928,14 @@ impl Run<'_, '_> {
         let why = journal.refusing.clone().unwrap_or_else(|| {
             "the switch was cut short (lamp-update stopped, or the lamp lost power)".to_owned()
         });
-        self.say(&format!(
-            "putting build {} back: {why}",
-            journal.build.sequence
-        ));
+        // An up-to-date round's additions (#7018) say their own line.
+        self.adds_only = journal.adds_only;
+        if !self.adds_only {
+            self.say(&format!(
+                "putting build {} back: {why}",
+                journal.build.sequence
+            ));
+        }
         self.model_backs = journal.models.clone();
         self.exit_notes = journal.exit_notes.clone();
         self.aside = journal.aside.clone();
@@ -4414,7 +4626,11 @@ fn wants_of(
         .collect()
 }
 
-/// Step 4: what changes, unit by unit, in the order of a switch.
+/// Step 4: what changes, unit by unit, in the order of a switch. With
+/// `adds_only` (an up-to-date round's additions, #7018), only the units
+/// `adding` adds: no installed part, and none of its companions, is
+/// looked at, so a unit the lamp has, as the owner may have edited it, is
+/// never written.
 #[allow(clippy::too_many_arguments)]
 fn plan(
     config: &Config,
@@ -4426,6 +4642,7 @@ fn plan(
     models: &[Model],
     touched: &[String],
     forced: &[String],
+    adds_only: bool,
 ) -> Result<(Vec<Change>, Vec<String>), String> {
     let files: BTreeMap<&str, &manifest::File> = manifest
         .files
@@ -4433,7 +4650,7 @@ fn plan(
         .map(|file| (file.name.as_str(), file))
         .collect();
     let mut changes: Vec<Change> = Vec::new();
-    for part in installed {
+    for part in installed.iter().filter(|_| !adds_only) {
         let Some(binary) = files.get(part.program.binary.as_str()) else {
             continue;
         };
@@ -4531,7 +4748,7 @@ fn plan(
     }
     // A part's templates, sockets and timers the build changes, written
     // with the rest. Their part's folder is named, and none is made.
-    for (name, before) in companions {
+    for (name, before) in companions.iter().filter(|_| !adds_only) {
         let (Some(after), Some(owner)) = (carried.get(name), owner(installed, companions, name))
         else {
             continue;
