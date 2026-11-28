@@ -221,6 +221,16 @@ impl Definition {
                     .into(),
             );
         }
+        // The walk Lamp leads by voice's steps are the code's (#8871,
+        // `walk_v2`): a file naming them has no words for them.
+        if super::walk_v2::STEPS
+            .iter()
+            .any(|step| self.order.contains(step) || self.steps.contains_key(step))
+        {
+            return Err(
+                "[onboarding] try_skill and make_skill are the walk's own, not the file's".into(),
+            );
+        }
         if !(1..=31_536_000).contains(&self.reoffer_after_s) {
             return Err("[onboarding] reoffer_after_s is 1 to 31536000".into());
         }

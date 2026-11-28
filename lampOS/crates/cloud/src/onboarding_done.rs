@@ -51,9 +51,38 @@ pub fn kept_in() -> Option<PathBuf> {
         .clone()
 }
 
+/// What `system.info`'s `onboarding_walk_version` says while the walk Lamp
+/// leads by voice is on (#8871).
+pub const WALK_VERSION: u32 = 2;
+
 /// The reply's `data`.
 pub fn data(at: u64) -> Value {
     json!({ "at": at })
+}
+
+/// The reply's `data` for the walk Lamp leads by voice (#8871): [`data`]
+/// with each walk step's outcome added (`steps`, step id to `done`,
+/// `later`, `skipped` or `not_available`), only for the steps in `walk`
+/// that ended. No names and no words. With `walk` empty (the voice's switch
+/// off), [`data`] itself, so an app reads the same shape as before.
+pub fn data_with_steps(
+    at: u64,
+    walk: &[String],
+    ended: &[lamp_msgs::OnboardingStepEnded],
+) -> Value {
+    let mut told = data(at);
+    if walk.is_empty() {
+        return told;
+    }
+    let steps: serde_json::Map<String, Value> = walk
+        .iter()
+        .filter_map(|step| {
+            let outcome = ended.iter().rev().find(|ended| &ended.step == step)?;
+            Some((step.clone(), json!(outcome.outcome)))
+        })
+        .collect();
+    told["steps"] = Value::Object(steps);
+    told
 }
 
 /// What was told of the walk's end: the date acked (from [`FILE`] at the
@@ -119,6 +148,31 @@ impl Done {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #8871: with the walk's switch off the data is exactly `{"at"}`, as an
+    /// app before it reads; with it on, only `steps` is added.
+    #[test]
+    fn the_walks_outcomes_only_add_a_field() {
+        let ended = vec![
+            lamp_msgs::OnboardingStepEnded {
+                step: "touch".into(),
+                outcome: "later".into(),
+                at: 3,
+            },
+            lamp_msgs::OnboardingStepEnded {
+                step: "make_skill".into(),
+                outcome: "done".into(),
+                at: 4,
+            },
+        ];
+        assert_eq!(data(9), json!({"at": 9}));
+        assert_eq!(data_with_steps(9, &[], &ended), json!({"at": 9}));
+        let walk = ["touch", "try_skill", "make_skill"].map(String::from);
+        assert_eq!(
+            data_with_steps(9, &walk, &ended),
+            json!({"at": 9, "steps": {"touch": "later", "make_skill": "done"}})
+        );
+    }
 
     #[test]
     fn a_date_is_due_until_acked_and_again_after_a_loss() {

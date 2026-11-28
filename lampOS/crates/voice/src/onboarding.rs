@@ -26,6 +26,12 @@ pub(crate) mod near;
 pub(crate) mod privacy;
 pub mod skill;
 pub(crate) mod storage;
+pub(crate) mod walk_v2;
+
+/// How long the walk's first line waits after its step is on the heartbeat
+/// (#8871): lamp-cloud looks once a second (`onboarding_done::EVERY`), so
+/// the app hears the step asked before Lamp speaks.
+const ASKED_LEAD_US: u64 = 1_500_000;
 #[cfg(test)]
 pub(crate) use legacy_words::*;
 #[cfg(test)]
@@ -207,6 +213,14 @@ pub enum Step {
     RoomSounds,
     FaceExpressions,
     Preferences,
+    /// The walk's own, with `LAMP_ONBOARDING_WALK_V2` on (#8871): a skill
+    /// tried by voice ("turn blue"), done when a light call ran from the
+    /// person's own line. Never in the skill file: its words are in code
+    /// ([`walk_v2`]), and an older build refuses a new step there.
+    TrySkill,
+    /// The walk's own as [`Step::TrySkill`]: a skill made by voice, done
+    /// when `make_skill` made one from the person's own line.
+    MakeSkill,
 }
 
 impl Step {
@@ -225,6 +239,8 @@ impl Step {
             Step::RoomSounds => ROOM_SOUNDS,
             Step::FaceExpressions => FACE_EXPRESSIONS,
             Step::Preferences => "preferences",
+            Step::TrySkill => walk_v2::TRY_SKILL,
+            Step::MakeSkill => walk_v2::MAKE_SKILL,
         }
     }
 
@@ -239,6 +255,8 @@ impl Step {
             "room_sounds" => Some(Self::RoomSounds),
             "face_expressions" => Some(Self::FaceExpressions),
             "preferences" => Some(Self::Preferences),
+            walk_v2::TRY_SKILL => Some(Self::TrySkill),
+            walk_v2::MAKE_SKILL => Some(Self::MakeSkill),
             _ => None,
         }
     }
@@ -261,7 +279,9 @@ impl Step {
             "where" | "sit" | "sitting" | "seat" | "where_i_sit" => Some(Self::WhereYouSit),
             "who" | "name" | "my_name" | "who_i_am" => Some(Self::WhoYouAre),
             "pet" | "head" => Some(Self::Touch),
-            "voice" | "sound" | "how_i_sound" => Some(Self::HowYouSound),
+            "voice" | "sound" | "how_i_sound" | "call_lamp" => Some(Self::HowYouSound),
+            "try" | "try_a_skill" => Some(Self::TrySkill),
+            "make" | "make_a_skill" | "teach" | "teach_lamp" => Some(Self::MakeSkill),
             _ => None,
         })
     }
@@ -274,7 +294,12 @@ impl Step {
     fn available(self) -> bool {
         matches!(
             self,
-            Step::WhereYouSit | Step::WhoYouAre | Step::Touch | Step::Preferences
+            Step::WhereYouSit
+                | Step::WhoYouAre
+                | Step::Touch
+                | Step::Preferences
+                | Step::TrySkill
+                | Step::MakeSkill
         )
     }
 
@@ -286,7 +311,10 @@ impl Step {
             | Step::Touch
             | Step::Privacy
             | Step::HowYouSound
-            | Step::GivingWay => outcome == Outcome::Skipped,
+            | Step::GivingWay
+            // Done only by a call that ran from the person's line (#8871).
+            | Step::TrySkill
+            | Step::MakeSkill => outcome == Outcome::Skipped,
             _ => outcome != Outcome::NotAvailable,
         }
     }
@@ -296,7 +324,12 @@ impl Step {
     fn says_its_skip(self) -> bool {
         matches!(
             self,
-            Step::WhereYouSit | Step::Touch | Step::HowYouSound | Step::GivingWay
+            Step::WhereYouSit
+                | Step::Touch
+                | Step::HowYouSound
+                | Step::GivingWay
+                | Step::TrySkill
+                | Step::MakeSkill
         )
     }
 
@@ -1191,6 +1224,22 @@ pub struct Onboarding {
     nudge: bool,
     /// [`FIRST_TRIES_ENVIRONMENT`].
     first_tries: bool,
+    /// The walk Lamp leads by voice ([`walk_v2`], `LAMP_ONBOARDING_WALK_V2`,
+    /// #8871): try and make a skill after how you sound, Wi-Fi counted as
+    /// step one, the state lines and the done line of what was learned.
+    walk_v2: bool,
+    /// A skill may be made by voice (`LAMP_MAKE_SKILL=on`): "make a skill"
+    /// is offered only then.
+    make_on: bool,
+    /// The state lines last set ([`walk_v2::set_state`]), by what they say.
+    state_key: Option<(Step, usize, usize)>,
+    /// The walk step told to the app as asked (#8871), with when in Unix
+    /// ms ([`lamp_msgs::OnboardingPending::asking`]), and since when the
+    /// walk's first line is held for it ([`ASKED_LEAD_US`]).
+    asked_told: Option<(Step, u64)>,
+    asked_held_us: Option<u64>,
+    /// Whether the walk's first ask was held for the app once already.
+    asked_lead_done: bool,
     /// [`harness_line::ENVIRONMENT`] (#5488).
     harness_line: bool,
     /// The tasks part's request socket (`LAMP_TASKS_DIR`) the read below
@@ -1643,6 +1692,10 @@ impl Onboarding {
         walk.eyes = lamp_bus::Bus::from_environment().ok();
         walk.nudge = std::env::var(NUDGE_ENVIRONMENT).as_deref() == Ok("on");
         walk.first_tries = std::env::var(FIRST_TRIES_ENVIRONMENT).as_deref() == Ok("on");
+        walk.make_on = std::env::var(crate::made_skill::ENVIRONMENT).as_deref() == Ok("on");
+        if walk_v2::on() {
+            walk.set_walk_v2();
+        }
         walk.harness_line = std::env::var(harness_line::ENVIRONMENT).as_deref() == Ok("on");
         if walk.harness_line {
             walk.harness_socket = harness_line::socket_from_environment();
@@ -1696,6 +1749,15 @@ impl Onboarding {
     #[cfg(test)]
     pub(crate) fn with_storage(file: PathBuf, storage: storage::Client) -> Self {
         Self::with_definition(file, storage, skill::fixture())
+    }
+
+    /// The walk Lamp leads by voice ([`walk_v2`]): its two steps and their
+    /// words put in the order this voice snapshot holds; the file is as it is.
+    pub(crate) fn set_walk_v2(&mut self) {
+        let mut definition = (*self.definition).clone();
+        walk_v2::extend(&mut definition);
+        self.definition = Arc::new(definition);
+        self.walk_v2 = true;
     }
 
     pub(crate) fn with_definition(
@@ -1765,6 +1827,12 @@ impl Onboarding {
             body_heard: false,
             nudge: false,
             first_tries: false,
+            walk_v2: false,
+            make_on: false,
+            state_key: None,
+            asked_told: None,
+            asked_held_us: None,
+            asked_lead_done: false,
             harness_line: false,
             harness_socket: None,
             harness_read: None,
@@ -2165,6 +2233,15 @@ impl Onboarding {
     /// its line; the walk's intro also says how many steps there are.
     fn counted_note(&self, step: Step, note: String, intro: bool) -> String {
         match self.step_count(step) {
+            // Wi-Fi is step one, done (#8871).
+            Some((at, of)) if self.walk_v2 => in_language::with_counter(
+                &note,
+                in_language::Counter::Wifi {
+                    at: at + 1,
+                    of: of + 1,
+                    intro,
+                },
+            ),
             Some((at, of)) => {
                 in_language::with_counter(&note, in_language::Counter::Step { at, of, intro })
             }
@@ -2180,6 +2257,7 @@ impl Onboarding {
             Step::FaceExpressions => self.face_ask,
             Step::GivingWay => self.giving_way_available(),
             Step::Touch => (self.available)(step) && self.touches.is_some(),
+            Step::MakeSkill => (self.available)(step) && self.make_on,
             _ => (self.available)(step),
         }
     }
@@ -2751,7 +2829,31 @@ impl Onboarding {
         pending.walk = self.pet_response_until_us.is_none() && self.under_way().unwrap_or(true);
         pending.walk_id = self.committed.walk_id;
         pending.steps_ended = self.steps_ended();
+        // The walk Lamp leads by voice (#8871): its steps, for the app,
+        // and the one asked while the walk is under way.
+        if self.walk_v2 {
+            pending.walk_steps = self.walk_steps();
+            pending.asking = self
+                .asked_told
+                .filter(|_| self.under_way() == Some(true))
+                .map(|(step, at)| lamp_msgs::OnboardingStepAsked {
+                    step: step.name().to_owned(),
+                    at,
+                });
+        }
         pending
+    }
+
+    /// The walk's steps as the app counts them after Wi-Fi (#8871): the
+    /// order's walk steps this lamp offers.
+    fn walk_steps(&self) -> Vec<String> {
+        self.definition
+            .order
+            .iter()
+            .copied()
+            .filter(|step| walk_v2::WALK.contains(step) && self.step_available(*step))
+            .map(|step| step.name().to_owned())
+            .collect()
     }
 
     /// The walk's four steps that ended, as committed, in the order they
@@ -2763,29 +2865,42 @@ impl Onboarding {
         if self.committed.walk_id.is_none() {
             return Vec::new();
         }
-        let mut ended: Vec<_> = [
-            Step::WhereYouSit,
-            Step::WhoYouAre,
-            Step::Touch,
-            Step::HowYouSound,
-        ]
-        .into_iter()
-        .filter_map(|step| {
-            let kept = self
-                .committed
-                .steps
-                .get(step.name())
-                .filter(|kept| kept.outcome != Outcome::Later)?;
-            Some(lamp_msgs::OnboardingStepEnded {
-                step: step.name().to_owned(),
-                outcome: serde_json::to_value(kept.outcome)
-                    .ok()?
-                    .as_str()?
-                    .to_owned(),
-                at: kept.ended_at_unix_ms?,
+        // The walk Lamp leads by voice (#8871): its six steps, and a step
+        // left for later told as `later`, which the app shows so.
+        let steps: Vec<Step> = if self.walk_v2 {
+            self.definition
+                .order
+                .iter()
+                .copied()
+                .filter(|step| walk_v2::WALK.contains(step))
+                .collect()
+        } else {
+            vec![
+                Step::WhereYouSit,
+                Step::WhoYouAre,
+                Step::Touch,
+                Step::HowYouSound,
+            ]
+        };
+        let walk_v2 = self.walk_v2;
+        let mut ended: Vec<_> = steps
+            .into_iter()
+            .filter_map(|step| {
+                let kept = self
+                    .committed
+                    .steps
+                    .get(step.name())
+                    .filter(|kept| walk_v2 || kept.outcome != Outcome::Later)?;
+                Some(lamp_msgs::OnboardingStepEnded {
+                    step: step.name().to_owned(),
+                    outcome: serde_json::to_value(kept.outcome)
+                        .ok()?
+                        .as_str()?
+                        .to_owned(),
+                    at: kept.ended_at_unix_ms?,
+                })
             })
-        })
-        .collect();
+            .collect();
         ended.sort_by_key(|ended| ended.at);
         ended
     }
@@ -3623,6 +3738,9 @@ impl Onboarding {
         face: Option<Framing>,
         still: bool,
     ) -> Option<String> {
+        if self.walk_v2 {
+            self.publish_state();
+        }
         // "Preferences"' hello: once the model has answered the quiet hours
         // (its words came), or [`HELLO_WAIT_US`] after them if it says
         // nothing, owed while that step is still led.
@@ -3671,6 +3789,31 @@ impl Onboarding {
         let said = in_language::said(note.clone(), self.language);
         self.untranslated = self.language.is_some() && said == note;
         Some(said)
+    }
+
+    /// The state lines for where the walk stands now (#8871), set for the
+    /// second route's worker as they change: the step led, else the next
+    /// one, while the walk is under way; none once it is over.
+    fn publish_state(&mut self) {
+        let step = self
+            .led
+            .as_ref()
+            .map(|led| led.step)
+            .or_else(|| self.next_step())
+            .filter(|step| walk_v2::WALK.contains(step))
+            .filter(|_| self.under_way() == Some(true));
+        let key = step.and_then(|step| {
+            let offered = self.walk_steps();
+            let at = offered.iter().position(|name| name == step.name())?;
+            Some((step, at + 2, offered.len() + 1))
+        });
+        if key == self.state_key {
+            return;
+        }
+        self.state_key = key;
+        walk_v2::set_state(
+            key.map(|(step, at, of)| walk_v2::state_lines(step, at, of, self.language)),
+        );
     }
 
     fn tick_led(
@@ -3787,6 +3930,25 @@ impl Onboarding {
         if !self.step_available(step) {
             self.finish(step, Outcome::NotAvailable, None, now_us);
             return None;
+        }
+        // The walk Lamp leads by voice (#8871): the app is told the step
+        // asked, and the walk's first line waits until it can have been
+        // (lamp-9adf, 16492: the phone sat on "updating" 16 s while Lamp
+        // spoke): the step on the heartbeat, which publishes a change at
+        // once, the walk's id committed with it, then lamp-cloud's look.
+        if self.walk_v2 && walk_v2::WALK.contains(&step) {
+            if self.asked_told.is_none_or(|(told, _)| told != step) {
+                self.asked_told = Some((step, unix_ms()));
+            }
+            if !self.asked_lead_done {
+                let since = *self.asked_held_us.get_or_insert(now_us);
+                if now_us.saturating_sub(since) < ASKED_LEAD_US || self.committed.walk_id.is_none()
+                {
+                    self.save();
+                    return None;
+                }
+                self.asked_lead_done = true;
+            }
         }
         // A face saved before "who you are" was asked (#3640): done by it,
         // not asked for a name the lamp has just kept.
@@ -4019,7 +4181,16 @@ impl Onboarding {
             );
             self.records
                 .push(json!({"kind":"onboarding_face_asked","at_us":now_us}));
-            return Some(skill::FACE_ASK.to_owned());
+            // The owner's shorter face question with the walk Lamp leads
+            // by voice (#8871).
+            return Some(
+                if self.walk_v2 {
+                    walk_v2::FACE_ASK
+                } else {
+                    skill::FACE_ASK
+                }
+                .to_owned(),
+            );
         }
         if step == Step::WhoYouAre
             && quiet_us >= START_QUIET_US
@@ -4056,6 +4227,47 @@ impl Onboarding {
                 "name_kept":false,"at_us":now_us}));
             self.finish(step, Outcome::Done, None, now_us);
             self.name_only(face_only, told);
+            return None;
+        }
+        // The walk Lamp leads by voice (#8871): one reminder after a quiet
+        // ask, then the give-up asks once more, then it is later, said so.
+        if walk_v2::STEPS.contains(&step) {
+            if !led.words
+                && led.guided_us == Some(asked_us)
+                && can_speak
+                && quiet_us >= walk_v2::REMIND_QUIET_US
+                && now_us.saturating_sub(asked_us) >= walk_v2::REMIND_QUIET_US
+                && let Some(line) = walk_v2::remind(step)
+            {
+                led.guided_us = Some(now_us);
+                self.records
+                    .push(json!({"kind":"onboarding_guide","step":step.name(),"at_us":now_us}));
+                return Some(line.to_owned());
+            }
+            // A make takes up to its own bound before it answers.
+            let give_up = STEP_GIVE_UP_US
+                + if step == Step::MakeSkill {
+                    crate::make_skill_local::longest_make().as_micros() as u64
+                } else {
+                    0
+                };
+            let since = asked_us.max(led.lamp_said_us.unwrap_or(0));
+            if now_us.saturating_sub(since) >= give_up && quiet_us >= TIMED_OUT_QUIET_US {
+                let again = led.asked_again == 0 && !led.words;
+                self.records.push(json!({"kind":"onboarding_stopped",
+                    "why":"no conversation","step":step.name(),
+                    "asked_again":again,"at_us":now_us}));
+                if again {
+                    self.led = Some(Led {
+                        step,
+                        asked_again: 1,
+                        ..Led::default()
+                    });
+                } else {
+                    self.finish(step, Outcome::Later, None, now_us);
+                    self.owed = Some(self.later_line(step));
+                }
+            }
             return None;
         }
         if step != Step::WhereYouSit {
@@ -4570,6 +4782,14 @@ impl Onboarding {
         } else {
             outcome
         };
+        // The walk Lamp leads by voice (#8871): a step tried that didn't
+        // work is offered again as one nobody tried, and the app shows it
+        // as later. Mapped here alone.
+        let outcome = if self.walk_v2 && outcome == Outcome::Failed && walk_v2::again_later(step) {
+            Outcome::Later
+        } else {
+            outcome
+        };
         let at_unix_s = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_secs());
@@ -4651,7 +4871,12 @@ impl Onboarding {
             || (step != Step::Preferences && !ended_before && (last || ended_the_walk))
         {
             // Kept without a name: the name is the one known when it is said.
-            self.closing = Some(self.preferences_done().to_owned());
+            // The walk Lamp leads by voice says what it learned (#8871).
+            self.closing = Some(if self.walk_v2 {
+                walk_v2::done_line()
+            } else {
+                self.preferences_done().to_owned()
+            });
             // Dated once per setup, for the app, once the closing finished
             // (`Progress::done_at_unix_ms`, #6353).
             if self.desired.done_at_unix_ms.is_none() {
@@ -5237,6 +5462,36 @@ impl Onboarding {
                 .led
                 .as_ref()
                 .is_some_and(|led| led.step == step && led.asked_us.is_some());
+            // The walk Lamp leads by voice (#8871): "try a skill" and "make a
+            // skill" end done only by a call the worker saw run from the
+            // person's own line, and only while led; the walk says the end.
+            if led && outcome == Outcome::Done && walk_v2::STEPS.contains(&step) {
+                let by = told.get("by").and_then(Value::as_str);
+                let line = match step {
+                    Step::TrySkill if by.is_some_and(walk_v2::is_light_call) => {
+                        Some(walk_v2::TRY_DONE.to_owned())
+                    }
+                    Step::MakeSkill if by == Some(crate::made_skill::MAKE) => walk_v2::read_back(
+                        told.get("made").and_then(Value::as_str).unwrap_or_default(),
+                        told.get("does").and_then(Value::as_str).unwrap_or_default(),
+                        self.language,
+                    ),
+                    _ => None,
+                };
+                if let Some(line) = line {
+                    eprintln!(
+                        "lamp-voice: onboarding: {} done by {}",
+                        step.name(),
+                        by.unwrap_or_default()
+                    );
+                    self.records.push(
+                        json!({"kind":"onboarding_heard","step":step.name(),"by":by,"at_us":now_us}),
+                    );
+                    self.finish(step, Outcome::Done, None, now_us);
+                    self.owed_after = self.owed.replace(line);
+                    continue;
+                }
+            }
             // A face `remember_my_face` saved (#3740) is no report of the
             // model's: its nudge record says so, and the walk's record names
             // the face save as what ended the step (the Reviewer-lead's P3s on
@@ -6444,7 +6699,14 @@ pub(crate) fn installed_order() -> Option<&'static [Step]> {
         .get_or_init(|| {
             skill::read_installed(Path::new(crate::skill_words::INSTALLED))
                 .ok()
-                .map(|definition| definition.order)
+                // The walk Lamp leads by voice (#8871): the runner's order.
+                .map(|definition| {
+                    if walk_v2::on() {
+                        walk_v2::with_steps(&definition.order)
+                    } else {
+                        definition.order
+                    }
+                })
         })
         .as_deref()
 }
@@ -14450,6 +14712,369 @@ mod tests {
                 assert_eq!(room.outcome(Step::FaceExpressions), Some(outcome));
             }
         }
+    }
+
+    /// #8871: the walk Lamp leads by voice, its switch on: the shipped
+    /// skill's order with try and make a skill after how you sound, the
+    /// file as it is.
+    fn walk_v2_room(name: &str) -> Room {
+        let mut room = Room::new(name);
+        room.walk.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        room.walk.make_on = true;
+        room.walk.set_walk_v2();
+        room
+    }
+
+    /// The walk's first four steps ended `outcome`, kept as committed.
+    fn walked_to_try(room: &mut Room, outcome: Outcome) {
+        let now = unix_ms() / 1_000;
+        for step in [
+            Step::WhereYouSit,
+            Step::WhoYouAre,
+            Step::Touch,
+            Step::HowYouSound,
+        ] {
+            room.walk.desired.steps.insert(
+                step.name().into(),
+                Kept {
+                    outcome,
+                    at_unix_s: now,
+                    framing: None,
+                    offered_at_unix_s: None,
+                    later_offers: 0,
+                    ended_at_unix_ms: Some(unix_ms()),
+                },
+            );
+        }
+        // How you sound done is its sentence part's, which asked.
+        room.walk.desired.sentence_prompts = 1;
+        room.walk.desired.walk_id = Some(1);
+        room.walk.save();
+        room.walk.drain_storage_for_test(room.at);
+    }
+
+    fn v2_order(room: &Room) -> Vec<Step> {
+        room.walk.definition.order.clone()
+    }
+
+    #[test]
+    fn the_walk_v2_puts_try_and_make_a_skill_after_how_you_sound_in_memory_only() {
+        let room = walk_v2_room("v2-order");
+        assert_eq!(
+            room.walk.definition.order,
+            [
+                Step::WhereYouSit,
+                Step::WhoYouAre,
+                Step::Touch,
+                Step::HowYouSound,
+                Step::TrySkill,
+                Step::MakeSkill
+            ]
+        );
+        // The shipped file is unchanged: an older build still loads it.
+        let shipped = skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap();
+        assert_eq!(shipped.order.len(), 4);
+        assert!(!shipped.steps.contains_key(&Step::TrySkill));
+        // The model may only skip them.
+        for step in walk_v2::STEPS {
+            assert!(step.reportable(Outcome::Skipped));
+            assert!(!step.reportable(Outcome::Done));
+            assert!(!step.reportable(Outcome::Failed));
+        }
+    }
+
+    /// A light call from the person's line ends "try a skill", said "See?
+    /// Just ask.", then "make a skill" is asked; the skill
+    /// made is read back, and the done line says what was learned.
+    #[test]
+    fn a_light_call_and_a_skill_made_from_their_lines_end_the_walk_read_back() {
+        let mut room = walk_v2_room("v2-walk");
+        room.walk.desired.owner = Some("Mia".into());
+        walked_to_try(&mut room, Outcome::Done);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
+        let order = v2_order(&room);
+        // A lamp's own turn's light is no try.
+        walk_v2::tool_ran(
+            &room.walk.file,
+            Some(&order),
+            "light_colour",
+            false,
+            &mut json!({"ok": true}),
+        );
+        room.walk.heard_line("Make it blue.");
+        walk_v2::tool_ran(
+            &room.walk.file,
+            Some(&order),
+            "light_colour",
+            true,
+            &mut json!({"ok": true}),
+        );
+        let notes = room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(notes, [walk_v2::TRY_DONE, walk_v2::MAKE_FIRST], "{notes:?}");
+        assert_eq!(room.outcome(Step::TrySkill), Some(Outcome::Done));
+        room.walk.heard_line("Remind me to stand every hour.");
+        let mut made = json!({"made": "stand-up-hourly", "on": true,
+            "description": "Tells you to stand up every hour.", "next": "I made it."});
+        walk_v2::tool_ran(
+            &room.walk.file,
+            Some(&order),
+            crate::made_skill::MAKE,
+            true,
+            &mut made,
+        );
+        assert_eq!(made["next"], walk_v2::MAKE_READ_BACK_NEXT);
+        let notes = room.wait(8 * S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            notes,
+            [
+                "(Say only this, nothing before or after it: \"I made stand up hourly: it tells you to stand up every hour. Change it any time in the app.\")",
+                "(Say only this, nothing before or after it: \"All set, Mia! Thanks for your patience. Find more skills in the Store, in the app.\")",
+            ],
+            "{notes:?}"
+        );
+        assert_eq!(room.outcome(Step::MakeSkill), Some(Outcome::Done));
+        assert_eq!(room.walk.under_way(), Some(false));
+        // The app hears every step's outcome, and the walk's steps.
+        let pending = room.walk.pending();
+        let ended: Vec<_> = pending
+            .steps_ended
+            .iter()
+            .map(|e| e.step.as_str())
+            .collect();
+        assert!(
+            ended.contains(&"try_skill") && ended.contains(&"make_skill"),
+            "{ended:?}"
+        );
+        // No touch pads nor near-call evidence in this room: not offered.
+        assert_eq!(
+            pending.walk_steps,
+            ["where_you_sit", "who_you_are", "try_skill", "make_skill"]
+        );
+    }
+
+    /// Evidence while another step is led, or a model's own done, ends
+    /// nothing: only the walk's evidence while the step is asked.
+    #[test]
+    fn a_light_call_before_try_a_skill_or_a_models_done_ends_nothing() {
+        let mut room = walk_v2_room("v2-not-led");
+        walked_to_try(&mut room, Outcome::Done);
+        let order = v2_order(&room);
+        walk_v2::tool_ran(
+            &room.walk.file,
+            Some(&order),
+            "light_colour",
+            true,
+            &mut json!({"ok": true}),
+        );
+        room.walk.drain_storage_for_test(room.at);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
+        assert_eq!(room.outcome(Step::TrySkill), None);
+        let call = ToolCall {
+            id: "c".into(),
+            name: STEP.into(),
+            args: json!({"step": "try_skill", "outcome": "done"}),
+        };
+        let (answer, _) = run_in(&room.walk.file, &call, Some(&order));
+        assert!(
+            answer.get("error").is_some() || answer["ok"] == true,
+            "{answer}"
+        );
+        room.walk.apply_mailbox("{\"outcome\":\"done\"}\n", room.at);
+        room.wait(2 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::TrySkill), None);
+        // A skip is the model's to report, said in the walk's words.
+        report(&room.walk, "try_skill", "skipped");
+        let notes = room.wait(5 * S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::TrySkill), Some(Outcome::Skipped));
+        assert!(
+            notes[0].contains("Okay, we'll skip trying a skill for now."),
+            "{notes:?}"
+        );
+    }
+
+    /// Silence: one simpler reminder after 10 s of quiet, asked once more
+    /// after the give-up, then later, said so; the done line drops what
+    /// wasn't learned.
+    #[test]
+    fn a_silent_try_is_reminded_once_then_left_for_later() {
+        let mut room = walk_v2_room("v2-silent");
+        walked_to_try(&mut room, Outcome::Skipped);
+        assert_eq!(room.wait(4 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_FIRST]);
+        assert_eq!(room.wait(11 * S, Some(NEAR_MIDDLE)), [walk_v2::TRY_REMIND]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), NONE);
+        let notes = room.wait(STEP_GIVE_UP_US + 25 * S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            notes,
+            [walk_v2::TRY_FIRST, walk_v2::TRY_REMIND],
+            "{notes:?}"
+        );
+        let notes = room.wait(STEP_GIVE_UP_US + 25 * S, Some(NEAR_MIDDLE));
+        assert_eq!(notes[0], room.walk.later_line(Step::TrySkill), "{notes:?}");
+        assert_eq!(notes[1], walk_v2::MAKE_FIRST, "{notes:?}");
+        assert_eq!(room.outcome(Step::TrySkill), Some(Outcome::Later));
+        // In the heartbeat a later step says so, for the app.
+        let pending = room.walk.pending();
+        assert!(
+            pending
+                .steps_ended
+                .iter()
+                .any(|e| e.step == "try_skill" && e.outcome == "later"),
+            "{:?}",
+            pending.steps_ended
+        );
+        // Make a skill skipped: the done line knows nothing it didn't learn.
+        report(&room.walk, "make_skill", "skipped");
+        let notes = room.wait(6 * S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            notes.last().map(String::as_str),
+            Some(
+                "(Say only this, nothing before or after it: \"All set! Thanks for your patience. Find more skills in the Store, in the app.\")"
+            ),
+            "{notes:?}"
+        );
+    }
+
+    /// The owner's rule: with the walk Lamp leads by voice, a step tried
+    /// and not done is offered again as one nobody tried; without it,
+    /// failed as before.
+    #[test]
+    fn with_the_walk_v2_a_failed_step_is_kept_for_later_only_with_its_switch() {
+        for v2 in [false, true] {
+            let mut room = if v2 {
+                walk_v2_room("v2-failed")
+            } else {
+                Room::new("v1-failed")
+            };
+            room.walk
+                .finish(Step::Touch, Outcome::Failed, None, room.at);
+            room.walk
+                .finish(Step::WhereYouSit, Outcome::Failed, None, room.at);
+            room.walk.save();
+            room.walk.drain_storage_for_test(room.at);
+            assert_eq!(
+                room.outcome(Step::Touch),
+                Some(if v2 { Outcome::Later } else { Outcome::Failed })
+            );
+            assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Failed));
+        }
+    }
+
+    /// Wi-Fi is step one (#8871): the first ask is "Step 2 of n:", the last
+    /// "Step n of n, the last one:", and the state lines count from the
+    /// real state.
+    #[test]
+    fn the_walk_v2_counts_wifi_as_step_one_and_tells_where_it_stands() {
+        let mut room = walk_v2_room("v2-counted");
+        room.walk.counted = true;
+        room.walk.set_near_available(true);
+        // No Controls on this walk's bus: touch is not offered.
+        assert_eq!(room.walk.step_count(Step::MakeSkill), Some((5, 5)));
+        let opener = "(Say only this, nothing before or after it: \"Hi! Let's get to know each other. It takes a few minutes, but it helps me work well for you. We have six steps. Wi-Fi is done. Now step two: sit where you usually do and look at me, so I always know where to find you.\")";
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [opener]);
+        let said = in_language::said(
+            opener.to_owned(),
+            Some(crate::language::Language::Vietnamese),
+        );
+        assert_eq!(
+            said,
+            "(Say only this, nothing before or after it: \"Chào bạn! Mình làm quen nhau nhé. Mất vài phút thôi, nhưng giúp mình hiểu bạn hơn. Mình có sáu bước. Wi-Fi xong rồi. Giờ là bước hai: bạn ngồi chỗ quen thuộc và nhìn mình nhé, để mình luôn biết tìm bạn ở đâu.\")"
+        );
+        // The last step says it is the last.
+        let last = in_language::with_counter(
+            walk_v2::MAKE_FIRST,
+            in_language::Counter::Wifi {
+                at: 6,
+                of: 6,
+                intro: false,
+            },
+        );
+        assert!(
+            last.contains("\"Step 6 of 6, the last one: teach me something you'd like"),
+            "{last}"
+        );
+        assert!(
+            in_language::said(last, Some(crate::language::Language::French))
+                .contains("\"Étape 6 sur 6, la dernière : apprenez-moi"),
+        );
+        // Asked mid-step, the walk's own line from where it is.
+        assert_eq!(
+            walk_v2::state_words("Which step are we on?").as_deref(),
+            Some("We're on step 2 of 6, Where you sit: sit where you usually do and look at me.")
+        );
+        assert_eq!(
+            walk_v2::state_words("Is setup done?").as_deref(),
+            Some(
+                "Almost! Wi-Fi's done, and we're at step 2 of 6, Where you sit: sit where you usually do and look at me."
+            )
+        );
+        assert_eq!(
+            walk_v2::state_words("How many more?").as_deref(),
+            Some(
+                "Five more, about three minutes. Right now, Where you sit: sit where you usually do and look at me."
+            )
+        );
+        // Nobody there: the step is dropped, and the state still says it.
+        room.wait(GONE_US + S, None);
+        assert_eq!(
+            walk_v2::state_words("What were we doing?").as_deref(),
+            Some("We're on step 2 of 6, Where you sit: sit where you usually do and look at me.")
+        );
+        walk_v2::set_state(None);
+    }
+
+    /// lamp-9adf, 16492: the app is told the step asked before the walk's
+    /// first line, which waits for it ([`ASKED_LEAD_US`]); later steps are
+    /// told as they are asked, with no wait.
+    #[test]
+    fn the_app_is_told_the_first_step_before_lamp_says_it() {
+        let mut room = walk_v2_room("v2-asked");
+        let mut told_at = None;
+        let mut said_at = None;
+        while room.at < 4 * S && said_at.is_none() {
+            let notes = room.wait(S / 4, Some(NEAR_MIDDLE));
+            let pending = room.walk.pending();
+            if told_at.is_none()
+                && pending.walk_id.is_some()
+                && pending
+                    .asking
+                    .as_ref()
+                    .is_some_and(|asked| asked.step == "where_you_sit")
+            {
+                told_at = Some(room.at);
+            }
+            if !notes.is_empty() {
+                said_at = Some(room.at);
+            }
+        }
+        let (told_at, said_at) = (told_at.unwrap(), said_at.unwrap());
+        assert!(
+            said_at >= told_at + ASKED_LEAD_US - S / 4,
+            "told {told_at}, said {said_at}"
+        );
+        // The heartbeat a lamp-cloud reads says it, beside the walk's steps.
+        let pending = room.walk.pending();
+        let wire = serde_json::to_value(&pending).unwrap();
+        assert_eq!(wire["asking"]["step"], "where_you_sit");
+        assert!(wire["walk_steps"].is_array());
+        // Switch off: no `asking`.
+        let mut off = Room::new("v2-asked-off");
+        off.wait(4 * S, Some(NEAR_MIDDLE));
+        assert!(off.walk.pending().asking.is_none());
+    }
+
+    /// With the switch off nothing changes: no new steps, no state lines,
+    /// the heartbeat as before.
+    #[test]
+    fn with_the_walk_v2_off_the_walk_is_as_before() {
+        let mut room = Room::new("v2-off");
+        room.walk.definition =
+            Arc::new(skill::parse(include_str!("../../../skills/onboarding/skill.toml")).unwrap());
+        walk_v2::set_state(None);
+        room.wait(4 * S, Some(NEAR_MIDDLE));
+        assert!(!room.walk.definition.order.contains(&Step::TrySkill));
+        assert_eq!(walk_v2::state(), None);
+        assert!(room.walk.pending().walk_steps.is_empty());
     }
 }
 

@@ -56,11 +56,30 @@ pub struct OnboardingPending {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub walk_id: Option<u64>,
     /// The walk's steps that ended this walk, of `where_you_sit`,
-    /// `who_you_are`, `touch` and `how_you_sound` only, in the order they
-    /// ended. lamp-cloud tells the app each once (`onboarding.step`).
+    /// `who_you_are`, `touch` and `how_you_sound` only (and `try_skill` and
+    /// `make_skill` with `walk_steps`), in the order they ended. lamp-cloud tells the app each once (`onboarding.step`).
     /// Empty from an older voice.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub steps_ended: Vec<OnboardingStepEnded>,
+    /// The walk Lamp leads by voice (#8871, `LAMP_ONBOARDING_WALK_V2` on in
+    /// the voice): its steps after Wi-Fi, in order, the ones this lamp
+    /// offers. With it, `steps_ended` holds them all and a step left for
+    /// later says `later`. Empty with the switch off, and from an older voice.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub walk_steps: Vec<String>,
+    /// The walk step Lamp is asking now, or about to ask, and when it was
+    /// first asked in Unix ms (#8871, with `walk_steps` only): lamp-cloud
+    /// tells the app once as `onboarding.step` with `outcome` `asked`, so
+    /// the phone moves on before Lamp's first line. Absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asking: Option<OnboardingStepAsked>,
+}
+
+/// The walk step asked (#8871): its name and when, in Unix ms.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnboardingStepAsked {
+    pub step: String,
+    pub at: u64,
 }
 
 /// One walk step's end (#5979): its name, its outcome as the walk keeps it
@@ -332,5 +351,68 @@ mod tests {
         let old: OnboardingPending =
             serde_json::from_str(r#"{"invitations":[],"walk":true}"#).unwrap();
         assert_eq!((old.walk_id, old.steps_ended.len()), (None, 0));
+    }
+
+    /// #8871: the walk's steps are a field added, nothing else changed. A
+    /// heartbeat with the switch off is byte for byte the one before, and an
+    /// older reader's shape (no `walk_steps`) reads a new one.
+    #[test]
+    fn walk_steps_only_add_a_field_and_the_old_shape_is_unchanged() {
+        let old = OnboardingPending {
+            invitations: Vec::new(),
+            walk: true,
+            done_at_unix_ms: Some(7),
+            walk_id: Some(5),
+            steps_ended: vec![OnboardingStepEnded {
+                step: "touch".into(),
+                outcome: "done".into(),
+                at: 6,
+            }],
+            walk_steps: Vec::new(),
+            asking: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&old).unwrap(),
+            r#"{"invitations":[],"walk":true,"done_at_unix_ms":7,"walk_id":5,"steps_ended":[{"step":"touch","outcome":"done","at":6}]}"#
+        );
+        let new = OnboardingPending {
+            walk_steps: vec!["where_you_sit".into(), "make_skill".into()],
+            asking: Some(OnboardingStepAsked {
+                step: "where_you_sit".into(),
+                at: 8,
+            }),
+            ..old.clone()
+        };
+        let text = serde_json::to_string(&new).unwrap();
+        assert!(
+            text.ends_with(
+                r#","walk_steps":["where_you_sit","make_skill"],"asking":{"step":"where_you_sit","at":8}}"#
+            ),
+            "{text}"
+        );
+        // An older reader: every field it knows, the new one passed over.
+        #[derive(Deserialize)]
+        struct Older {
+            invitations: Vec<OnboardingInvitation>,
+            walk: bool,
+            done_at_unix_ms: Option<u64>,
+            walk_id: Option<u64>,
+            steps_ended: Vec<OnboardingStepEnded>,
+        }
+        let older: Older = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            (
+                older.invitations.len(),
+                older.walk,
+                older.done_at_unix_ms,
+                older.walk_id,
+                older.steps_ended
+            ),
+            (0, true, Some(7), Some(5), old.steps_ended.clone())
+        );
+        assert_eq!(
+            serde_json::from_str::<OnboardingPending>(&text).unwrap(),
+            new
+        );
     }
 }

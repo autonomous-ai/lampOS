@@ -189,6 +189,7 @@ lamp says so.
 | `system.info`'s `update_events_supported` | `true` while `LAMP_APP_UPDATE_EVENTS=on` (with a state folder): this lamp sends `update.started` and `update.ended` (#6284). No field otherwise ("An update, told to the app" below) |
 | `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
 | `system.info`'s `onboarding_page_version` | `2` with the same switch (#6366): which `onboarding.page` contract the lamp speaks. 2 is per-tap Add (`added: [id]`, one tap a message, the page done with its first installed skill's line) and the `done` page (#6353). No field means 1, #6076's: picks sent once as Add is left, done at once. A version-2 lamp still ends Add on a 1-era leave: an `added` of no ids or several. The app sends per-tap adds and `done` only when it reads `>= 2` |
+| `system.info`'s `onboarding_walk_version` and `onboarding_walk_steps` | `2`, and the walk's steps after Wi-Fi in order (`["where_you_sit", "who_you_are", "touch", "how_you_sound", "try_skill", "make_skill"]`, the ones this lamp offers), while the voice's `LAMP_ONBOARDING_WALK_V2` is on, with the same switch as `onboarding_done_supported` (#8871): Lamp leads the whole walk by voice, so the app shows progress only, Wi-Fi as step one. Read from the heartbeat's `walk_steps`. No fields otherwise: the walk is as before ("Setup done, told to the app" below) |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
@@ -2903,7 +2904,14 @@ state folder (`STATE_DIRECTORY`); on in the product unit, the lead's call on
 - **What.** One unasked `data` reply on `fd_channel`, in V1's envelope, as
   `harness.sign_in.state` is pushed:
   `{"type":"data","kind":"onboarding.done","status":"success","data":{"at":<unix ms>},"device":"lamp",...}`.
-  `data` holds `at` only, the app's dedupe key.
+  `data` holds `at` only, the app's dedupe key. With the voice's
+  `LAMP_ONBOARDING_WALK_V2` on (#8871), and only then, `data` also holds
+  `steps`, each walk step that ended to its outcome (`done`, `later`,
+  `skipped` or `not_available`): `{"at": …, "steps": {"where_you_sit":
+  "done", "touch": "later", "make_skill": "done", …}}`. No names and no
+  words: the app shows generic rows, and the skill made from its skills
+  list. A step tried and not done is `later` with that switch, offered
+  again after the walk (`onboarding_done::data_with_steps`).
 - **When.** `at` is the voice's own date for the walk's done line, set
   once that closing line ("All done, <Name>! …") has finished playing, or
   at its cut (#6353: the app no longer moves on while the lamp still
@@ -2966,6 +2974,16 @@ As each step of the setup walk ends, the app is told, once. Behind
   kept-until-acked rule; the app never waits on a step event. The journal
   says `onboarding.step: <step> handed to the client, walk <walk_id>`, or
   `not handed to the client, not tried again`.
+- **The step asked** (#8871, only with the voice's
+  `LAMP_ONBOARDING_WALK_V2` on). The step Lamp asks is told too, once, as
+  soon as it is on the heartbeat (`onboarding/pending`'s `asking`):
+  `outcome` `asked` and `at` when it was first asked, the same four keys
+  (`onboarding_step::with_asked`). The voice holds the walk's first line
+  1.5 s after it is on the heartbeat (`ASKED_LEAD_US`, one look of
+  lamp-cloud's and a half), so the phone leaves "updating" before Lamp
+  speaks (lamp-9adf, 16492: 16 s with the opening said and the phone
+  still waiting). Kept in `onboarding-step` with `"asked": "asked"`, so an
+  ask and an end at the same moment are two events.
 - **Will it come.** `system.info`'s `onboarding_step_supported: true` beside
   `onboarding_done_supported`, with the switch on.
 
