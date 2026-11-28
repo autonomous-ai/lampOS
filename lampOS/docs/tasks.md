@@ -8786,7 +8786,9 @@ first-person line, never "your computer" (the first builder's P3 on
 lamp-tasks runs one at a time (OpenClaw direct's "waiting for the task
 before it to end", `LAMP_TASKS_OPENCLAW_DIRECT=on`; the one session's queue
 behind the running turn, `LAMP_TASKS_ONE_SESSION=on`), so the agent is busy,
-not waking, and the line would be false (Jarvis's P2 on #8510). The ids
+not waking, and the line would be false (Jarvis's P2 on #8510); with
+`LAMP_TASKS_BEHIND=on` such work is said so in the hand-over's own reply
+instead ([below](#work-behind-earlier-work-and-the-same-ask-again-8966-off-unless-lamp_tasks_behindon)). The ids
 kept against a second line are the newest 8 only (`hand_wait::SAID_KEPT`).
 OpenClaw direct enqueues the turn at the hand-over, so its record reads
 `working` at once, while a cold gateway has not taken the turn yet (the
@@ -8810,6 +8812,45 @@ a hand-over without the say service (nothing answering at its socket) says
 refuses says `lamp-voice: tasks: work N after 20 s: no line: the say service
 refused: <why>`, and one begun but not said, or let go, `... the line not
 said: <outcome>`.
+
+### Work behind earlier work, and the same ask again (#8966, off unless `LAMP_TASKS_BEHIND=on`)
+
+On lamp-52e6 task 85 ran 695 s; task 86, handed over meanwhile, waited
+behind it with nothing said (`work 86 after 20 s: no line: behind earlier
+work`), and the same ask said again made task 87. With
+`LAMP_TASKS_BEHIND=on` (on in the product's `lamp-voice.service`, passed to
+the second route's worker only):
+
+- **Said in the hand-over's breath.** After the yes, `confirm_agent_task`
+  reads `{"op":"work_list","limit":10}` once on the request socket, bounded
+  by `agent_tasks::OPEN_WORK_DEADLINE` (300 ms). When other work on the
+  records is not finished and started at or before this one (the rule the
+  20 s line uses for `behind earlier work`), the answer carries `behind`,
+  the earliest such work's label (the person's own words, quoted and
+  untrusted), and its `next` adds that the model says once, in the same
+  reply, that it will get to this after that work ("I'll get to that after
+  the research I'm doing."). Nothing ahead, the read refused or unanswered,
+  or a made skill's brief: the answer as before. The journal says
+  `lamp-voice: tasks: request N: work A behind work B: told in the hand-over
+  (#8966)`. The 20 s line above stays silent for such work.
+- **A repeat joins the waiting work.** A `start_agent_task` while the work
+  this voice handed over last still waits (`queued`, or `working` with
+  `waiting`), read once from the same `work_list` and bound, whose task is
+  the same ask as that work's `words` (`agent_tasks::same_ask`: lower-cased,
+  punctuation dropped, spacing collapsed, and "hey lamp", "lamp", "please",
+  "can you", "could you" left out; then equal), prepares nothing. It is
+  answered `already_waiting` with the work's `work_id`, `label` and
+  `behind` if any, and a `next` telling the model to say it is already
+  waiting and not to call `confirm_agent_task`. The journal says
+  `lamp-voice: tasks: request N: the same ask as waiting work A: nothing
+  prepared (#8966)`. A reworded ask, or one after the work was taken up,
+  is a new task, as before. Nothing handed over: nothing is read.
+
+Off, both answers are as before and nothing more is read. Tests:
+`agent_tasks::tests::work_handed_over_behind_earlier_work_is_said_so_in_the_hand_over`,
+`agent_tasks::tests::the_hand_over_is_as_before_with_nothing_ahead_unread_or_the_switch_off`,
+`agent_tasks::tests::a_repeat_of_waiting_work_joins_it_and_is_not_queued_twice`,
+`agent_tasks::tests::the_same_ask_is_the_same_words_without_fillers`.
 
 ### How the lamp's Harness is (#6061 part B, off unless `LAMP_TASKS_HARNESS_STATUS=on`)
 

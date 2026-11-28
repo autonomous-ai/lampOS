@@ -32,7 +32,10 @@
 //! before it to end", with `LAMP_TASKS_OPENCLAW_DIRECT=on`; the one
 //! session's queue behind the running turn, with `LAMP_TASKS_ONE_SESSION=on`),
 //! so it waits on a busy agent, not a waking one, and the line would be
-//! false (Jarvis's P2 on #8510).
+//! false (Jarvis's P2 on #8510). With `LAMP_TASKS_BEHIND=on` (#8966) such
+//! work is told in the hand-over's own breath instead: `confirm_agent_task`'s
+//! answer carries `behind`, and the model says it will get to it after that
+//! work (`agent_tasks::earlier_work`); this look stays silent for it.
 //!
 //! The say service's gates hold for it as for any say: nobody being heard,
 //! nothing under way, the speaker free, and [`crate::say::QUIET_US`] since
@@ -146,7 +149,7 @@ fn line_for(
 /// `working` while `waiting` (#8510: OpenClaw direct's turn, enqueued at the
 /// hand-over, reads `working` in lamp-tasks while the gateway has not taken
 /// it, `starting` on the watch).
-fn still_waits(work: &Value) -> bool {
+pub(crate) fn still_waits(work: &Value) -> bool {
     work["state"] == json!("queued")
         || (work["state"] == json!("working") && work["waiting"] == json!(true))
 }
