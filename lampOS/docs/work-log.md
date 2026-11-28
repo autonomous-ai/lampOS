@@ -1,5 +1,10 @@
 Ready for lamp-voice: no
 
+## 28 November 2026 — sensor 7, stops over the lamp’s own voice
+
+- Keep sensor 7 off. On the five failing-group requests the simple build logged 0/5 stops. The frozen offline decoder recovered 2/5 from the same post-AEC microphone recording. The clearest “Stop” became recognizable 645 ±58 ms after measured onset. Three live requests briefly interrupted output and resumed, including two own-sound masks. The other two left no interruption event. None reached speech-to-text. Stable credited 2/5 stops and returned stop words on 1/5. Its original microphone recording is missing from the collector. Both builds’ three straight-stop controls reached the rule. [Assignment and EVAL](https://github.com/autonomous-ai/lampOS/issues/8923#issuecomment-7237950265)
+- Draft #8965 contains the standalone 16 kHz replay at `31a295dac2`. Ruby 4 and the Mac’s system Ruby each passed all four regression tests. A native continuous-prefix test verified the first cue and the absence of an end-of-file trigger. Nine documentation checker tests passed and the English and Vietnamese guides were checked. The collector verified a 133-file inventory for the recorded replay and retained all stage evidence and failed attempts locally. [Draft replay and reproduction instructions](https://github.com/autonomous-ai/lampOS/pull/8965)
+
 ## 28 November 2026 — ECAPA caller frames on the simple-call base
 
 - Sensor 6 stays off and outside the combined judge. SpeechBrain’s Apache-2.0 ECAPA-TDNN checkpoint was the only learned asset. At the frozen median active-frame cosine threshold of 0.25, the provider set kept 130/554 callers (23.5%) and rejected 524/554 other voices (94.6%). On the same dbda microphone pairs it kept 10/16 (62.5%) and rejected 19/28 (67.9%). The bar is at least 95% kept and 90% rejected on each set. Both physical noise conditions fell in the original recorder gap. The shared reviewer verified all 1,152 decisions. [Sensor 6 EVAL, before and after](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7236567550)
