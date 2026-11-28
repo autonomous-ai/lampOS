@@ -54,8 +54,10 @@
 //!   copied into its state; the dirs a person added there are kept;
 //! - `plugins.allow` = [`PLUGINS_ALLOW`] when there is no `allow` list
 //!   yet; a list already set (a lamp's from before web search, or a
-//!   person's) gets the [`WEB_PLUGINS`] it lacks added, nothing taken out,
-//!   and an empty one (no limit) is kept; no `deny` is added;
+//!   person's) gets the [`WEB_PLUGINS`] it lacks added, and an empty one
+//!   (no limit) is kept; no `deny` is added; with `search`, `searxng` is
+//!   added too, and without it taken out unless `plugins.entries.searxng`
+//!   still holds a person's own settings;
 //! - with `search` (lamp-cloud's search token there,
 //!   `lamp_update::openclaw_install::SEARCH_TOKEN`), `web_search` through
 //!   lamp-cloud's SearXNG-shaped route: `tools.web.search.provider` =
@@ -161,16 +163,19 @@ pub const EXEC_MODE_V1: &str = "full";
 /// `openai` and `memory-core` the Gateway was ready in 27-50 s and two
 /// Harness turns answered in 43-73 s. `openai` serves the lamp's
 /// OpenAI-compatible provider, `memory-core` OpenClaw's own memory, and
-/// [`WEB_PLUGINS`] the web.
-pub const PLUGINS_ALLOW: [&str; 4] = ["openai", "memory-core", "web-readability", "searxng"];
+/// [`WEB_PLUGINS`] the web; with `search`, `searxng` after them.
+pub const PLUGINS_ALLOW: [&str; 3] = ["openai", "memory-core", "web-readability"];
 /// The web's plugins, also added to an allow list already set:
 /// `web-readability` (bundled) extracts a fetched page's main text for
-/// `web_fetch`, as on V1 (no allow list there); `searxng` (installed beside
-/// OpenClaw) is `web_search`'s provider. Both load on use, not at the
-/// Gateway's start (`activation.onStartup: false`). `browser`, also V1's,
-/// is left out: it drives a whole Chromium, heavy on the lamp's memory and
-/// start, and `web_fetch` with `web_search` cover reading the web.
-pub const WEB_PLUGINS: [&str; 2] = ["web-readability", "searxng"];
+/// `web_fetch`, as on V1 (no allow list there), with or without search.
+/// `searxng` (installed beside OpenClaw), `web_search`'s provider, is
+/// added only with `search`: allowed while not loaded, OpenClaw 2026.11.2's
+/// `config validate` warns "plugin not found: searxng (stale config
+/// entry ignored)". Both load on use, not at the Gateway's start
+/// (`activation.onStartup: false`). `browser`, also V1's, is left out: it
+/// drives a whole Chromium, heavy on the lamp's memory and start, and
+/// `web_fetch` with `web_search` cover reading the web.
+pub const WEB_PLUGINS: [&str; 1] = ["web-readability"];
 /// The SearXNG plugin's id, its `plugins.entries` key and the provider's.
 const SEARXNG: &str = "searxng";
 /// The switch for the lamp's skills in OpenClaw, as `LAMP_HERMES_SKILLS`
@@ -385,7 +390,7 @@ fn deny_list(tools: &mut Map<String, Value>) -> Result<&mut Vec<Value>, Refused>
 }
 
 /// `plugins.allow` ([`PLUGINS_ALLOW`], or the [`WEB_PLUGINS`] an allow
-/// list already set lacks, an empty one kept) and, with `search`,
+/// list already set lacks, an empty one kept; `searxng` with `search`) and, with `search`,
 /// `web_search` through lamp-cloud on `port`; without it, our search
 /// values taken out where they are ours, so the file is as before.
 fn web(root: &mut Map<String, Value>, port: u16, search: bool) -> Result<(), Refused> {
@@ -398,7 +403,7 @@ fn web(root: &mut Map<String, Value>, port: u16, search: bool) -> Result<(), Ref
         .as_array_mut()
         .ok_or_else(|| Refused("`plugins.allow` is not a list".into()))?;
     if !allow.is_empty() {
-        for id in WEB_PLUGINS {
+        for id in WEB_PLUGINS.into_iter().chain(search.then_some(SEARXNG)) {
             if !allow.iter().any(|have| have == id) {
                 allow.push(json!(id));
             }
@@ -441,7 +446,17 @@ fn web(root: &mut Map<String, Value>, port: u16, search: bool) -> Result<(), Ref
     take_empty(config, "webSearch");
     take_empty(entry, "config");
     take_empty(entries, SEARXNG);
+    let theirs = entries.contains_key(SEARXNG);
     take_empty(plugins, "entries");
+    // Without search, our `searxng` goes from the allow list, which keeps
+    // `web-readability` (added above), so it never becomes the empty "no
+    // limit" list; one a person configured the plugin for stays.
+    if !search
+        && !theirs
+        && let Some(allow) = plugins.get_mut("allow").and_then(Value::as_array_mut)
+    {
+        allow.retain(|id| id != SEARXNG);
+    }
 
     let tools = object(root, "tools", "tools")?;
     let tools_web = object(tools, "web", "tools.web")?;
@@ -769,36 +784,37 @@ mod tests {
         );
         assert_eq!(
             value["plugins"],
-            json!({"allow": ["openai", "memory-core", "web-readability", "searxng"]})
+            json!({"allow": ["openai", "memory-core", "web-readability"]})
         );
     }
 
-    /// #6226, lamp-c0a4: a fresh file gets exactly the four plugins; an
+    /// #6226, lamp-c0a4: a fresh file gets exactly the three plugins; an
     /// allow list already set (a lamp's from before web search, or a
-    /// person's) gets the web's two added and keeps every id it had, with no
-    /// deny added; an empty one (no limit) is kept; the models and agents
-    /// merge is the same either way.
+    /// person's) gets `web-readability` added and keeps every id it had,
+    /// `searxng` too with search on, with no deny added; an empty one (no
+    /// limit) is kept; the models and agents merge is the same either way.
     #[test]
     fn the_plugins_allowed_get_the_webs_and_lose_none() {
         let fresh = merged("", true);
         assert_eq!(
             fresh["plugins"],
-            json!({"allow": ["openai", "memory-core", "web-readability", "searxng"]})
+            json!({"allow": ["openai", "memory-core", "web-readability"]})
         );
         let before = merged(r#"{"plugins": {"allow": ["openai", "memory-core"]}}"#, true);
         assert_eq!(
             before["plugins"], fresh["plugins"],
             "an existing lamp's list"
         );
-        let own = merged(
+        let own: Value = serde_json::from_str(&searched(
             r#"{"plugins": {"allow": ["telegram", "searxng"], "entries": {"x": {"enabled": true}}}}"#,
             true,
-        );
+        ))
+        .unwrap();
         assert_eq!(
-            own["plugins"],
-            json!({"allow": ["telegram", "searxng", "web-readability"],
-                "entries": {"x": {"enabled": true}}})
+            own["plugins"]["allow"],
+            json!(["telegram", "searxng", "web-readability"])
         );
+        assert_eq!(own["plugins"]["entries"]["x"], json!({"enabled": true}));
         let empty = merged(r#"{"plugins": {"allow": []}}"#, true);
         assert_eq!(
             empty["plugins"],
@@ -883,10 +899,33 @@ mod tests {
             assert_eq!(value["tools"].get("web"), None);
             assert_eq!(
                 value["plugins"],
-                json!({"allow": ["openai", "memory-core", "web-readability", "searxng"]})
+                json!({"allow": ["openai", "memory-core", "web-readability"]})
             );
             assert_eq!(searched(&searched(text, true), false), off);
         }
+        // Allowed by an earlier write with search, `searxng` goes with the
+        // token; a person who configured the plugin keeps it allowed.
+        let before = r#"{"plugins": {"allow": ["openai", "searxng"]}}"#;
+        let value: Value = serde_json::from_str(&searched(before, false)).unwrap();
+        assert_eq!(
+            value["plugins"]["allow"],
+            json!(["openai", "web-readability"])
+        );
+        let configured =
+            r#"{"plugins": {"allow": ["searxng"], "entries": {"searxng": {"enabled": true}}}}"#;
+        let value: Value = serde_json::from_str(&searched(configured, false)).unwrap();
+        assert_eq!(
+            value["plugins"]["allow"],
+            json!(["searxng", "web-readability"])
+        );
+        // Search off, `searxng` is never added, a person's settings or not.
+        let unlisted =
+            r#"{"plugins": {"allow": ["telegram"], "entries": {"searxng": {"enabled": true}}}}"#;
+        let value: Value = serde_json::from_str(&searched(unlisted, false)).unwrap();
+        assert_eq!(
+            value["plugins"]["allow"],
+            json!(["telegram", "web-readability"])
+        );
         let theirs = r#"{"plugins": {"load": {"paths": ["/opt/mine"]},
             "entries": {"searxng": {"enabled": true, "config": {"webSearch": {"baseUrl": "https://search.example"}}}}},
             "tools": {"web": {"search": {"provider": "brave"}, "fetch": {"enabled": true}}}}"#;

@@ -41,8 +41,7 @@
     "allow": [
       "openai",
       "memory-core",
-      "web-readability",
-      "searxng"
+      "web-readability"
     ]
   },
   "skills": {

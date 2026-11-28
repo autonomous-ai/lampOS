@@ -4093,16 +4093,20 @@ fn lamp_folder(home: &Path) -> PathBuf {
 /// lamp's file is brought up to date on its next start or update. One
 /// journal line, and one per wait; no token is in the file. `web_search`
 /// through lamp-cloud only while its search token (`search_token`) is
-/// there and not empty; without it the line says so.
+/// there and not empty and the SearXNG plugin's folder (`searxng_dir`,
+/// `lamp_update::openclaw_install::SEARXNG_DIR`, put in by an install
+/// with it) is there; without either the line says which.
 pub fn set_up_openclaw(
     state_dir: &Path,
     home: &Path,
     skills: bool,
     v1: bool,
     search_token: &Path,
+    searxng_dir: &Path,
 ) -> String {
     let workspace = lamp_folder(home);
-    let search = std::fs::metadata(search_token).is_ok_and(|file| file.is_file() && file.len() > 0);
+    let search_off = openclaw_search_off(search_token, searxng_dir);
+    let search = search_off.is_none();
     match crate::openclaw_config::write(
         state_dir,
         HERMES_FORWARDER_PORT,
@@ -4120,31 +4124,46 @@ pub fn set_up_openclaw(
                 ", the lamp's skills off"
             },
             if v1 { "" } else { ", V1's tools off" },
-            if search {
-                ""
-            } else {
-                ", web search off: no search token"
-            }
+            search_off.unwrap_or_default()
         ),
         Err(error) => format!("tasks: OpenClaw's settings not written: {error}"),
     }
 }
 
-/// How long the agents' settings wait at the part's start for lamp-cloud's
-/// search token ([`wait_for_search_token`]): lamp-cloud makes it as its
+/// Why OpenClaw's `web_search` through lamp-cloud is off, as the start's
+/// line ends, or `None` when it is on: both lamp-cloud's search token and
+/// the SearXNG plugin's folder there, so `plugins.load.paths` never names
+/// a folder an install left out.
+fn openclaw_search_off(search_token: &Path, searxng_dir: &Path) -> Option<&'static str> {
+    if !search_token_there(search_token) {
+        Some(", web search off: no search token")
+    } else if !searxng_dir.is_dir() {
+        Some(", web search off: no SearXNG plugin")
+    } else {
+        None
+    }
+}
+
+/// How long, after the agents' settings are written at the part's start
+/// without lamp-cloud's search token, lamp-tasks looks for it to write them
+/// again with web search ([`write_settings`]): lamp-cloud makes it as its
 /// forwarder starts, and lamp-tasks may start first (no unit order between
 /// them; a round restarts the parts one by one).
 pub const SEARCH_TOKEN_WAIT: Duration = Duration::from_secs(120);
 /// How often that wait looks.
 pub const SEARCH_TOKEN_LOOK: Duration = Duration::from_secs(2);
 
+/// Whether `search_token` is there and not empty.
+fn search_token_there(search_token: &Path) -> bool {
+    fs::metadata(search_token).is_ok_and(|file| file.is_file() && file.len() > 0)
+}
+
 /// Whether `search_token` is there and not empty, looked at every `every`
-/// for up to `wait`; the settings are written either way, with web search
-/// through the lamp only when it is.
+/// for up to `wait`.
 pub fn wait_for_search_token(search_token: &Path, wait: Duration, every: Duration) -> bool {
     let until = Instant::now() + wait;
     loop {
-        if fs::metadata(search_token).is_ok_and(|file| file.is_file() && file.len() > 0) {
+        if search_token_there(search_token) {
             return true;
         }
         if Instant::now() >= until {
@@ -4152,6 +4171,25 @@ pub fn wait_for_search_token(search_token: &Path, wait: Duration, every: Duratio
         }
         std::thread::sleep(every);
     }
+}
+
+/// The agents' settings written by `write` at once, with or without
+/// lamp-cloud's search token, so nothing else in them waits for it; with
+/// none there yet, written once more if it comes within `wait` (looked at
+/// every `every`), then with web search. How many writes ran.
+pub fn write_settings(
+    search_token: &Path,
+    wait: Duration,
+    every: Duration,
+    mut write: impl FnMut(),
+) -> usize {
+    let had = search_token_there(search_token);
+    write();
+    if !had && wait_for_search_token(search_token, wait, every) {
+        write();
+        return 2;
+    }
+    1
 }
 
 /// `LAMP_HERMES_ON_LAMP` (#5978): Hermes' settings written at the part's
@@ -5683,10 +5721,11 @@ pub fn serve<C: Clock>(
     {
         set_no_harness(&no_harness, &config, lamp_side.clone(), absent, home);
     }
-    // The agents' settings, beside the start: lamp-cloud makes the search
-    // token as its forwarder starts, and the parts start in no set order (a
-    // round restarts them one by one), so the writes first wait for it
-    // (`SEARCH_TOKEN_WAIT`); OpenClaw's then waits for its gateway to check
+    // The agents' settings, beside the start, written at once: lamp-cloud
+    // makes the search token as its forwarder starts, and the parts start
+    // in no set order (a round restarts them one by one), so without it
+    // they are written again if it comes within `SEARCH_TOKEN_WAIT`
+    // (`write_settings`); OpenClaw's write waits for its gateway to check
     // the text, minutes at most (`openclaw_config::GATEWAY_WAITS`, #7268).
     let openclaw = lamp_side.as_ref().filter(|_| openclaw_on).map(|side| {
         let skills = crate::openclaw_config::skills_on(
@@ -5704,23 +5743,31 @@ pub fn serve<C: Clock>(
     if hermes_on || openclaw.is_some() {
         std::thread::spawn(move || {
             let search = Path::new(crate::hermes_config::SEARCH_TOKEN_PATH);
-            wait_for_search_token(search, SEARCH_TOKEN_WAIT, SEARCH_TOKEN_LOOK);
-            if hermes_on {
-                eprintln!(
-                    "{}",
-                    set_up_hermes(
-                        Path::new(HERMES_HOME),
-                        Path::new(crate::hermes_config::TOKEN_PATH),
-                        search
-                    )
-                );
-            }
-            if let Some((home, skills, v1)) = openclaw {
-                eprintln!(
-                    "{}",
-                    set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &home, skills, v1, search)
-                );
-            }
+            write_settings(search, SEARCH_TOKEN_WAIT, SEARCH_TOKEN_LOOK, || {
+                if hermes_on {
+                    eprintln!(
+                        "{}",
+                        set_up_hermes(
+                            Path::new(HERMES_HOME),
+                            Path::new(crate::hermes_config::TOKEN_PATH),
+                            search
+                        )
+                    );
+                }
+                if let Some((home, skills, v1)) = &openclaw {
+                    eprintln!(
+                        "{}",
+                        set_up_openclaw(
+                            Path::new(OPENCLAW_STATE_DIR),
+                            home,
+                            *skills,
+                            *v1,
+                            search,
+                            Path::new(lamp_update::openclaw_install::SEARXNG_DIR)
+                        )
+                    );
+                }
+            });
         });
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
@@ -7578,10 +7625,80 @@ mod tests {
         );
     }
 
-    /// lamp-cloud's search token made a moment after lamp-tasks' start (no
-    /// unit order between them): the start's write waits for it, so Hermes
-    /// searches through the lamp first without lamp-tasks started again; with
-    /// none, the wait ends at its bound.
+    /// OpenClaw searches through lamp-cloud only with both the search
+    /// token and the SearXNG plugin's folder there.
+    #[test]
+    fn openclaw_search_needs_the_token_and_the_plugin() {
+        let dir = tempfile::tempdir().unwrap();
+        let token = dir.path().join("search-token");
+        let plugin = dir.path().join("searxng-plugin");
+        let no_token = Some(", web search off: no search token");
+        assert_eq!(openclaw_search_off(&token, &plugin), no_token);
+        fs::create_dir_all(&plugin).unwrap();
+        assert_eq!(openclaw_search_off(&token, &plugin), no_token);
+        fs::write(&token, "").unwrap();
+        assert_eq!(openclaw_search_off(&token, &plugin), no_token);
+        fs::write(&token, "srch").unwrap();
+        assert_eq!(openclaw_search_off(&token, &plugin), None);
+        fs::remove_dir(&plugin).unwrap();
+        fs::write(&plugin, "").unwrap();
+        assert_eq!(
+            openclaw_search_off(&token, &plugin),
+            Some(", web search off: no SearXNG plugin")
+        );
+    }
+
+    /// The settings are written at once without a search token, not after
+    /// the wait; a token made a moment after the start (no unit order
+    /// between lamp-cloud and lamp-tasks) gets them written once more, so
+    /// Hermes searches through the lamp first without lamp-tasks started
+    /// again; with one there at the start, one write.
+    #[test]
+    fn the_settings_are_written_at_once_and_again_when_the_token_comes() {
+        let dir = tempfile::tempdir().unwrap();
+        let search = dir.path().join("search-token");
+        let started = Instant::now();
+        let mut first = None;
+        let writes = write_settings(
+            &search,
+            Duration::from_millis(400),
+            Duration::from_millis(20),
+            || {
+                first.get_or_insert(started.elapsed());
+            },
+        );
+        assert_eq!(writes, 1);
+        assert!(first.unwrap() < Duration::from_millis(100), "{first:?}");
+        let later = search.clone();
+        let cloud = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(200));
+            fs::write(later, "fedcba9876543210".repeat(4)).unwrap();
+        });
+        let mut seen = Vec::new();
+        let writes = write_settings(
+            &search,
+            Duration::from_secs(10),
+            Duration::from_millis(20),
+            || {
+                seen.push(search_token_there(&search));
+            },
+        );
+        cloud.join().unwrap();
+        assert_eq!((writes, seen), (2, vec![false, true]));
+        assert_eq!(
+            write_settings(
+                &search,
+                Duration::from_secs(10),
+                Duration::from_millis(20),
+                || {}
+            ),
+            1
+        );
+    }
+
+    /// lamp-cloud's search token made a moment after lamp-tasks' start: the
+    /// wait sees it, so Hermes searches through the lamp first; with none,
+    /// the wait ends at its bound.
     #[test]
     fn the_settings_wait_for_a_search_token_made_after_the_start() {
         let dir = tempfile::tempdir().unwrap();
@@ -8154,8 +8271,10 @@ mod tests {
         let home = dir.path().join("home");
         let search = dir.path().join("search-token");
         fs::write(&search, "srch-secret-123\n").unwrap();
+        let plugin = dir.path().join("searxng-plugin");
+        fs::create_dir_all(&plugin).unwrap();
         assert_eq!(
-            set_up_openclaw(&state, &home, true, true, &search),
+            set_up_openclaw(&state, &home, true, true, &search, &plugin),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config written"
         );
         let config: Value =
@@ -8192,13 +8311,33 @@ mod tests {
         assert!(!text.contains("srch-secret-123"), "{text}");
         assert!(text.contains("/v1/search/${LAMP_SEARCH_TOKEN}"), "{text}");
         assert_eq!(
-            set_up_openclaw(&state, &home, true, true, &search),
+            set_up_openclaw(&state, &home, true, true, &search, &plugin),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config unchanged"
+        );
+        // The token there but no SearXNG plugin installed: no search, so
+        // no load path to a missing folder, said in the one line.
+        let missing = dir.path().join("no-plugin");
+        assert_eq!(
+            set_up_openclaw(&state, &home, true, true, &search, &missing),
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config written, web search off: no SearXNG plugin"
+        );
+        let config: Value =
+            serde_json::from_str(&fs::read_to_string(state.join("openclaw.json")).unwrap())
+                .unwrap();
+        assert_eq!(config["tools"].get("web"), None);
+        assert_eq!(config["plugins"].get("load"), None);
+        assert_eq!(
+            config["plugins"]["allow"],
+            json!(["openai", "memory-core", "web-readability"])
+        );
+        assert_eq!(
+            set_up_openclaw(&state, &home, true, true, &search, &plugin),
+            "tasks: OpenClaw's settings for the lamp's DeepSeek: config written"
         );
         // No token (or an empty one): no search, said in the one line.
         fs::write(&search, "").unwrap();
         assert_eq!(
-            set_up_openclaw(&state, &home, true, true, &search),
+            set_up_openclaw(&state, &home, true, true, &search, &plugin),
             "tasks: OpenClaw's settings for the lamp's DeepSeek: config written, web search off: no search token"
         );
         let config: Value =
@@ -8207,7 +8346,7 @@ mod tests {
         assert_eq!(config["tools"].get("web"), None);
         fs::write(state.join("openclaw.json"), "{\"models\": []}").unwrap();
         assert!(
-            set_up_openclaw(&state, &home, true, true, &search)
+            set_up_openclaw(&state, &home, true, true, &search, &plugin)
                 .starts_with("tasks: OpenClaw's settings not written:")
         );
     }

@@ -3288,16 +3288,21 @@ forwarded on the lamp").
   lamp's route fails is served once by the keyless pool (`keyless_rescue`),
   and the next one asks the lamp's route again. A person's own
   `SEARXNG_URL` is kept and ours not added. Without the token file nothing
-  of this is added (a `SEARXNG_URL` of ours is taken out) and Hermes
-  searches through its keyless pool alone, as before; lamp-tasks' start line
+  of this is added: a `SEARXNG_URL` of ours is taken out, and so is a
+  `web.search_backend` naming `searxng` (one left from a token since gone
+  would pin a backend with no URL; unpinned, Hermes's autodetect picks a
+  person's own `SEARXNG_URL`, else the keyless pool), the other `web:` keys
+  kept. Hermes then searches through its keyless pool, as before; lamp-tasks' start line
   says which (`web search through the lamp first` or `web search keyless
   only (no search token)`). An existing lamp gains it on its next start.
   lamp-cloud makes the token as its forwarder starts, and lamp-tasks may
   start first (no unit order between them; a round restarts the parts one
-  by one): the start's writes of Hermes' and OpenClaw's settings, on a
-  thread beside the start, first wait up to 120 s for it
-  (`runtime::SEARCH_TOKEN_WAIT`, a look every 2 s), then are written either
-  way. Each gateway reads its settings at its own start.
+  by one): Hermes' and OpenClaw's settings are written at once on a thread
+  beside the start, with or without the token, so nothing else in them
+  waits for it; with none yet, lamp-tasks looks for it up to 120 s
+  (`runtime::SEARCH_TOKEN_WAIT`, a look every 2 s, `runtime::write_settings`)
+  and writes both once more, with web search, if it comes. Each gateway
+  reads its settings at its own start.
   Hermes's "Could not reach SearXNG at <url>" error names the URL, so the
   model may see the token when lamp-cloud is down: it is search-only and
   the route answers on loopback only.
@@ -3406,12 +3411,17 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   file with `mode` alone already is left unwritten (#7859). The skill-start launcher's allow-list entry ("One exec approval",
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
-- **Plugins and the web.** `plugins.allow` is `openai`, `memory-core`,
-  `web-readability` and `searxng` when none is set (#6226 on lamp-c0a4:
-  OpenClaw's default 41 bundled plugins stalled a turn 92 s; with only the
-  first two the Gateway was ready in 27-50 s). A list already set, a lamp's
-  from before web search or a person's, gets `web-readability` and
-  `searxng` added and loses nothing; an empty list (no limit) is kept.
+- **Plugins and the web.** `plugins.allow` is `openai`, `memory-core` and
+  `web-readability` when none is set, and `searxng` after them with web
+  search on (below) (#6226 on lamp-c0a4: OpenClaw's default 41 bundled
+  plugins stalled a turn 92 s; with only the first two the Gateway was ready
+  in 27-50 s). A list already set, a lamp's from before web search or a
+  person's, gets `web-readability` added (and `searxng` with search on) and
+  loses nothing else; an empty list (no limit) is kept. With search off,
+  `searxng` is taken out of the list, since OpenClaw warns of an allowed
+  plugin it cannot find ("plugin not found: searxng (stale config entry
+  ignored)"), unless `plugins.entries.searxng` still holds a person's own
+  settings. `web-readability` stays either way: `web_fetch` uses it.
   `web-readability` is bundled and extracts a fetched page's main text for
   `web_fetch`, as on V1, which set no allow list. `browser`, also loaded on
   V1, is left out: it drives a whole Chromium. `web_fetch` itself is on by
@@ -3422,7 +3432,8 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   before this (checked with OpenClaw 2026.11.2's `tools.effective` on a
   copy of the file: `web_fetch` there, no `web_search`). When lamp-cloud's
   search-only token is there and not empty
-  (`/var/lib/lampos-cloud/search-token`), lamp-tasks writes
+  (`/var/lib/lampos-cloud/search-token`) and the SearXNG plugin's folder
+  is there (an install with it, below), lamp-tasks writes
   `tools.web.search.provider: "searxng"`,
   `plugins.entries.searxng.config.webSearch.baseUrl:
   "http://127.0.0.1:7741/v1/search/${LAMP_SEARCH_TOKEN}"` (lamp-cloud's
@@ -3430,9 +3441,10 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   plugin's folder, `/var/lib/lampos-openclaw/npm/node_modules/@openclaw/searxng-plugin`,
   in `plugins.load.paths`. The token is never in the file: OpenClaw's
   wrapper exports it as `LAMP_SEARCH_TOKEN` (empty without the file), and
-  OpenClaw fills the `${…}` in. Without the token, those three values of
-  ours are taken out, others' kept, and the start's journal line ends
-  "web search off: no search token". OpenClaw takes a missing plugin, path
+  OpenClaw fills the `${…}` in. Without the token or the plugin's folder,
+  those values of ours (and `searxng` in `plugins.allow`) are taken out,
+  others' kept, and the start's journal line ends "web search off: no
+  search token" or "web search off: no SearXNG plugin". OpenClaw takes a missing plugin, path
   or variable as a warning, never a refused file. The plugin is not
   bundled in OpenClaw 2026.11.2; lamp-update installs it with OpenClaw
   (docs/install.md, "From a pinned lockfile"). **Start-time risk (#6226):**
