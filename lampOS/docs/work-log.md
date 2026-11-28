@@ -1,5 +1,11 @@
 Ready for lamp-voice: no
 
+## 28 November 2026 — sensor 6 standalone evaluation
+
+- Keep sensor 6 off. Across 1,108 verified provider comparisons, frames kept 457/554 callers (82.5%) and rejected 88/554 other voices (15.9%), including 0/277 in +5 dB noise. Guarded CAM++ kept 0/554 and rejected 84/554. The shared #8885 scorer reconciled 2,216 predictions. [Consolidated EVAL](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7224796496)
+- On lamp-dbda’s microphone, frames kept 16/16 quiet follow-ups and rejected 1/28 constructed impostors. Guarded CAM++ abstained on all 44 pairs. The recorder gap accounts for 53 missing pairs, all natural other-voice lines and both background lines. Another 12 follow-ups lacked their own verified call. Warm frame p95 was 7.918 ms on the provider replay and 10.5 ms on the physical replay Mac. The lead retains all 6,211 physical files on Mac 2. [Physical addendum](https://github.com/autonomous-ai/lampOS/issues/8849#issuecomment-7226611814)
+- Draft #8927 is stacked on #8892 and held from integration. Native ARM64 release and 21,934 scheduled tests passed at c89053ae91, as did strict Linux Clippy. The final two commits record results only. The complete 44,981-file audio release and failed attempts are retained in local archive sensor6-8849-20261127. Its permanent provider copy verified against inventory 907573417595c3347c56f9a152fb00a0dc5b9ac3f46014bf92071af7d16f873a. [Draft and data locations](https://github.com/autonomous-ai/lampOS/pull/8927)
+
 ## 27 November 2026 — sensor 6 on the simple-call base
 
 - Draft #8927 measures a standalone, default-off caller-conditioned Personal VAD from `1b3fc5360b9dc9d70064c52acccebb62fa3d4351` on #8892 at `0dbbfc95bbea6ddf397308e1a8ef1933c5d19dcb`. It uses the spoken opening “Hey Lamp.” The simple base continues to decide ordinary lines, confirmations and renewal. [Draft sensor PR](https://github.com/autonomous-ai/lampOS/pull/8927)
