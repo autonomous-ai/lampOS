@@ -2443,9 +2443,9 @@ Unit product mở sẵn socket hẹp của bộ nhớ (A8, #6852): `lamp-memory.
 chạy với `--forget-socket /run/lampos-memory/forget.sock --forget-group lampos`
 (`lampos` là nhóm của lamp-cloud, và user của bộ nhớ cũng ở trong nhóm này), và
 `lamp-cloud.service` đặt `LAMP_MEMORY_FORGET_SOCKET` trỏ tới đúng socket đó. Socket
-chỉ nhận `forget_person`. lamp-cloud chỉ hỏi nó khi `LAMP_FACES_PAGE=on`, nên
-khi công tắc đó còn tắt thì không có gì thay đổi với người dùng; khi nó bật, xóa
-một người trong app cũng xóa những gì bộ nhớ giữ về họ.
+chỉ nhận `forget_person`. lamp-cloud chỉ hỏi nó khi `LAMP_FACES_PAGE=on`, và
+`lamp-cloud.service` bật công tắc đó trong product (#6852), nên xóa một người
+trong app cũng xóa những gì bộ nhớ giữ về họ.
 
 ## Một lần nhìn được giữ cùng câu hỏi, của người hỏi (`LAMP_LOOK_KEPT_WITH_ASK`, #7814)
 
