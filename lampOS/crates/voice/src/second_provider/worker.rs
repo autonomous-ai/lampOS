@@ -8802,7 +8802,9 @@ pub(crate) struct Heeding {
     /// the person spoke again.
     called_at: Option<Instant>,
     /// When the lamp's words sent will have been played
-    /// ([`crate::second_provider::Did::Said`]), on the monotonic clock.
+    /// ([`crate::second_provider::Did::Said`]), on the monotonic clock. With
+    /// `LAMP_SIMPLE_CALL` a stop ends them where it cut them, never later
+    /// than when it is told ([`crate::second_provider::Did::Stopped`]).
     said_until_us: Option<u64>,
     /// The request judged last, and what the Policy's gate is told of it
     /// ([`Self::policy_turn`]).
@@ -10748,7 +10750,10 @@ impl Heeding {
     /// `turn.start`), is the lamp's own turn, or begins within
     /// [`crate::follows_on::WITHIN_US`]
     /// (20 s) of the end of the lamp's last words, measured to its start, as
-    /// every answer's words move it on; held otherwise, and never answered.
+    /// every answer's words move it on, and the route's fixed lines' (a
+    /// stop's "Okay, I'll stop there."); held otherwise, and never answered.
+    /// A stop keeps the window, the lamp's words ended where it cut them
+    /// ([`crate::second_provider::Did::Stopped`]).
     ///
     /// A line with no words in it (a sound, a cough, room noise) is never
     /// answered, but as a call; and a line begun within
@@ -12375,10 +12380,18 @@ impl Heeding {
             // `LAMP_SAME_SPEAKER_CARRIES`: a stop ends the conversation
             // carried.
             crate::second_provider::Did::Stopped => {
-                // `LAMP_SIMPLE_CALL`: a stop closes the window, and the call's
-                // carry with it; the next conversation opens with "Hey Lamp".
+                // `LAMP_SIMPLE_CALL`: a stop keeps the window (the product
+                // owner, 27 Nov 2026: "any conversation has a 20s window so
+                // reminder, proactive, chatting, etc."). The lamp's words end
+                // where the stop cut them, by now at the latest, as it is told
+                // at the next line's start: what was sent ahead and never
+                // played counts for nothing, and anything the lamp says after
+                // moves the end on, as any words do. Only the call's carry
+                // ends: it covers a line said right after "Hey Lamp", before
+                // the lamp spoke.
                 if self.simple_call {
-                    self.said_until_us = None;
+                    let now_us = monotonic_us();
+                    self.said_until_us = self.said_until_us.map(|until_us| until_us.min(now_us));
                     self.called_at = None;
                 }
                 self.carrying = false;

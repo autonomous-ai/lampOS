@@ -6302,7 +6302,17 @@ after a take-over, but now for every turn:
       the end of the lamp's last words, measured to the line's start
       (`said_until_us`), is answered, whatever the camera, the room, the
       voices or its length. Every answer's words move that end on, the lamp's
-      own news's too, so the window renews; a stop closes it. A line with no
+      own news's too, and so do the route's fixed lines (a stop's "Okay,
+      I'll stop there.", told to the rule as an answer's words are): every
+      time the lamp speaks, the window renews. A stop keeps the window (the
+      product owner, 27 Nov 2026: "any conversation has a 20s window so
+      reminder, proactive, chatting, etc."; on Fifth's gate on lamp-52e6 "So
+      which one is bigger?" after "Okay, I'll stop there." was held): the
+      lamp's words end where the stop cut them, by the time it is told at the
+      latest, so words sent ahead and never played count for nothing, and
+      anything it says after moves the end on. A stop ends only the call's
+      carry (`called_at`), which covers a line said right after "Hey Lamp"
+      before the lamp spoke. A line with no
       words in it (a sound, a cough, room noise) is never answered, but as a
       call: `no words heard in it (LAMP_SIMPLE_CALL)`. A
       checked short sound with a word in it, not a filler, is the rule's to
