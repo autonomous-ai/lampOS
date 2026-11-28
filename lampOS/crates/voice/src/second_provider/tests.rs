@@ -14609,11 +14609,23 @@ enum Comes {
 /// [`asked_after_a_cut`] with the second line coming `after` the first:
 /// what its chat was asked, if one was.
 async fn asked_after(
+    lines: (&'static str, &'static str),
+    gap: Duration,
+    same: Option<SameSpeaker>,
+    held: bool,
+    after: Comes,
+) -> Option<Message> {
+    asked_after_with(lines, gap, same, held, after, |engine| engine).await
+}
+
+/// [`asked_after`] with the engine set up further by `set`.
+async fn asked_after_with(
     (first, second): (&'static str, &'static str),
     gap: Duration,
     same: Option<SameSpeaker>,
     held: bool,
     after: Comes,
+    set: impl FnOnce(Engine) -> Engine,
 ) -> Option<Message> {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(first.to_owned()), Ok(second.to_owned())].into()),
@@ -14657,6 +14669,7 @@ async fn asked_after(
     if let Some(same) = same {
         engine = engine.joining_cut_words(same);
     }
+    let mut engine = set(engine);
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     engine.submit(end(1));
@@ -15380,6 +15393,41 @@ async fn a_piece_folded_into_the_next_by_its_sound_keeps_the_chain() {
         asked(false).await,
         Message::user("Like, every afternoon, Why could that be?"),
         "the switch off: as before"
+    );
+}
+
+/// `LAMP_SIMPLE_CALL`: words cut short from a line the one rule let out are
+/// still answered in the place of a held line that cut them (#1712), as
+/// before: only words whose own line the rule never let out are not.
+#[tokio::test]
+async fn with_simple_call_words_cut_from_a_line_let_out_are_still_answered_in_a_held_place() {
+    let lines = ("Lamp, play some jazz", "what time is it?");
+    let soon = Duration::from_millis(1_500);
+    assert_eq!(
+        asked_after_with(
+            lines,
+            soon,
+            None,
+            true,
+            Comes::Cut,
+            Engine::taking_simple_calls
+        )
+        .await,
+        Some(Message::user("Lamp, play some jazz")),
+        "held: the cut words, in its place"
+    );
+    assert_eq!(
+        asked_after_with(
+            lines,
+            soon,
+            None,
+            false,
+            Comes::Cut,
+            Engine::taking_simple_calls
+        )
+        .await,
+        Some(Message::user("what time is it?")),
+        "let out: its own words"
     );
 }
 

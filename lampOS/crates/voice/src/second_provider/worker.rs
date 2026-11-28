@@ -10891,6 +10891,14 @@ impl Heeding {
         }
     }
 
+    /// With [`Self::taking_simple_calls`], whether the one rule lets out a
+    /// line kept and never judged as the line in hand (a name waiting for
+    /// the line after it, `LAMP_SECOND_NAME_CARRIES`), by its request,
+    /// window and words, judged now and changing nothing.
+    pub(crate) fn simple_lets_out(&self, _request: u64, _said: (u64, u64), _heard: &str) -> bool {
+        true
+    }
+
     /// With [`Self::hearing_only_said_to_me`], a line is named for
     /// [`crate::said_to_me::judge`] only by a hearing that counts for its own
     /// sound ([`crate::attention::hearing_counts_for_line`]), never by an

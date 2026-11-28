@@ -634,6 +634,50 @@ fn simple_call_a_cut_in_ends_the_lamps_words_where_it_cut_them() {
     );
 }
 
+/// The one rule's verdict on a line kept and never judged as the line in
+/// hand (a name waiting for the line after it), judged now and changing
+/// nothing (`Heeding::simple_lets_out`). On lamp-dbda (28 Nov 08:18, with
+/// lamp-name stopped) "Lamp." with no hearing was answered in a held
+/// line's place, and played clips chained in through the window it opened.
+/// "Lamp." with no hearing and no window is not let out; with lamp-name's
+/// hearing at its start it is, and one 3 s in, past the start, is not;
+/// begun within 20 s of the lamp's words it is; a line with no words and no
+/// hearing is not. Without the switch: always, as before.
+#[test]
+fn simple_call_a_kept_line_is_let_out_only_as_the_rule_lets_a_line_out() {
+    let _one = crate::provider_worker::tests::one_thread();
+    let now = monotonic_us();
+    let line = (now, now + 600_000);
+    assert!(
+        !heeding(true, None).simple_lets_out(1, line, "Lamp."),
+        "no hearing, no window"
+    );
+    let mut heard = heeding(true, None);
+    heard.attention.name_heard_scored(now + 100_000, 0.99);
+    assert!(
+        heard.simple_lets_out(1, (now, now + 3_500_000), "Lamp."),
+        "lamp-name's hearing at its start"
+    );
+    let mut late = heeding(true, None);
+    late.attention.name_heard_scored(now + 3_000_000, 0.99);
+    assert!(
+        !late.simple_lets_out(1, (now, now + 3_500_000), "Lamp."),
+        "a hearing past its start"
+    );
+    assert!(
+        heeding(true, Some(5)).simple_lets_out(1, line, "Lamp."),
+        "within 20 s of the lamp's words"
+    );
+    assert!(
+        !heeding(true, Some(5)).simple_lets_out(1, line, ""),
+        "no words, no hearing"
+    );
+    assert!(
+        heeding(false, None).simple_lets_out(1, line, "Lamp."),
+        "off: as before"
+    );
+}
+
 /// A stop ends the call's carry (kept): "Hey Lamp, …", stopped before the
 /// lamp said anything, and a line 5 s after it is held. The carry covers
 /// only a line said right after the call, before the lamp spoke.
