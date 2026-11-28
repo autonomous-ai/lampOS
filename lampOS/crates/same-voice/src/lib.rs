@@ -14,6 +14,8 @@
 //! same. The voice runs it as a child of its own (`lamp-same-voice serve`,
 //! [`serve`]) with `LAMP_SAME_VOICE_MODEL` set, and nothing else on the
 //! lamp runs it.
+pub mod personal_vad;
+
 use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use std::{
     io::{self, Read, Write},

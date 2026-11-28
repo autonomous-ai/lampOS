@@ -540,3 +540,110 @@ fn simple_call_a_spoken_stop_in_the_window_is_judged_as_a_line() {
         None
     );
 }
+
+/// The detector supplies the opening call. A pending or late negative frame
+/// result never alters admission or advances the base's playback clock.
+#[test]
+fn caller_frame_observes_the_simple_verdict_and_only_the_spoken_caller() {
+    use super::super::caller_frame;
+    use crate::room_told::Room;
+    use crate::second_provider::Did;
+    let _one = crate::provider_worker::tests::one_thread();
+    let start = monotonic_us();
+    let (sensor, mut negative) = caller_frame::with_negative_model();
+    let mut rule = heeding(true, None);
+    rule.caller_frame = Some(sensor.clone());
+    let record = |request, at, words| {
+        let mut trial = sensor.lock().unwrap();
+        trial.begin(request, true, at);
+        trial.audio(request, &[21; 8_000], true, at + 500_000);
+        trial.pcm_ended(request, at, at + 520_000);
+        trial.words(request, Some(words), None);
+    };
+    record(1, start, "Hey Lamp");
+    assert_eq!(
+        judged(&mut rule, 1, start, "Hey Lamp", call_at(start)),
+        None
+    );
+    rule.lamp_did(Did::Said(1, start + 3 * S));
+    let first = start + 6 * S;
+    record(2, first, "And times two?");
+    assert_eq!(
+        judged(
+            &mut rule,
+            2,
+            first,
+            "And times two?",
+            signs(None, Room::Unknown, vec![])
+        ),
+        None
+    );
+    assert_eq!(negative(), Some((1, 2)));
+    sensor.lock().unwrap().tick(first + 2 * S);
+    assert_eq!(rule.said_until_us, Some(start + 3 * S));
+    rule.lamp_did(Did::Said(2, start + 8 * S));
+    let later = start + 25 * S;
+    {
+        let mut trial = sensor.lock().unwrap();
+        trial.begin(3, true, later);
+        trial.audio(3, &[11; 320], true, later + 20_000);
+        trial.pcm_ended(3, later, later + 21_000);
+    }
+    assert_eq!(negative(), Some((1, 3)));
+    sensor.lock().unwrap().tick(later + 300_000);
+    sensor.lock().unwrap().words(3, Some("Just one"), None);
+    assert_eq!(
+        judged(
+            &mut rule,
+            3,
+            later,
+            "Just one",
+            signs(None, Room::Unknown, vec![])
+        ),
+        None
+    );
+    assert_eq!(
+        negative(),
+        None,
+        "ASR and the admission verdict do not resubmit the pair"
+    );
+    rule.lamp_did(Did::Stopped);
+    sensor.lock().unwrap().tick(later);
+    record(4, later + S, "And times two?");
+    assert_eq!(
+        judged(
+            &mut rule,
+            4,
+            later + S,
+            "And times two?",
+            signs(None, Room::Unknown, vec![])
+        ),
+        Some(crate::second_provider::SIMPLE_HELD)
+    );
+    assert_eq!(negative(), None);
+
+    let computer = later + 4 * S;
+    rule.attention.turn_opened(5);
+    record(5, computer, "Hey Lamp");
+    assert_eq!(
+        judged(&mut rule, 5, computer, "Hey Lamp", call_at(computer)),
+        None
+    );
+    rule.lamp_did(Did::Said(5, computer + S));
+    record(6, computer + 2 * S, "Again");
+    assert_eq!(
+        judged(
+            &mut rule,
+            6,
+            computer + 2 * S,
+            "Again",
+            signs(None, Room::Unknown, vec![])
+        ),
+        None
+    );
+    assert_eq!(
+        negative(),
+        None,
+        "a computer-opened turn never enrolls even with a matching transcript and hearing"
+    );
+}

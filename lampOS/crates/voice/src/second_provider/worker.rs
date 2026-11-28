@@ -5696,6 +5696,13 @@ pub fn serve(
             );
             if let Ok(mut heeding) = heeding.lock() {
                 heeding.taking_simple_calls();
+                if route.only_voice
+                    && let Some(trial) = super::caller_frame::Trial::from_environment()
+                    && let Some(shared) = Arc::get_mut(&mut engine.shared)
+                {
+                    shared.caller_frame = Some(trial.clone());
+                    heeding.caller_frame = Some(trial);
+                }
             }
             engine = engine.taking_simple_calls();
         }
@@ -8978,6 +8985,8 @@ pub(crate) struct Heeding {
     name_or_follow_up: bool,
     /// `LAMP_SIMPLE_CALL=on` ([`Self::taking_simple_calls`]).
     simple_call: bool,
+    /// The standalone sensor trial observes this rule's verdict after it is fixed.
+    caller_frame: Option<super::caller_frame::Shared>,
     /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
     /// last looks, so two faces make the room busy only when they stay.
     faces_held: Option<Arc<Mutex<FacesHeld>>>,
@@ -10265,6 +10274,7 @@ impl Heeding {
             face_not_speaking: None,
             name_or_follow_up: false,
             simple_call: false,
+            caller_frame: None,
             faces_held: None,
             name_stays: false,
             from_start: false,
@@ -12015,6 +12025,11 @@ impl Heeding {
     /// unmuted ([`Gate::install`]): the caller's face ids and the eyes'
     /// looks go, so no passing id outlives a privacy change.
     pub(crate) fn privacy_changed(&mut self) {
+        if let Some(trial) = &self.caller_frame
+            && let Ok(mut trial) = trial.lock()
+        {
+            trial.clear();
+        }
         self.caller_faces.clear();
         self.caller_faces_from_call = false;
         // No line's words are kept past it for a repeat
@@ -12320,6 +12335,11 @@ impl Heeding {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
             crate::second_provider::Did::Said(request, until_us) => {
+                if let Some(trial) = &self.caller_frame
+                    && let Ok(mut trial) = trial.lock()
+                {
+                    trial.answered(request, until_us, monotonic_us());
+                }
                 // `LAMP_ONE_REPLY_WINDOW`: its news's reply window from its end.
                 self.attention.lamp_words_until(until_us);
                 if self.carries && self.carrying && !self.chain.contains(&request) {
@@ -12378,6 +12398,11 @@ impl Heeding {
                 // `LAMP_SIMPLE_CALL`: a stop closes the window, and the call's
                 // carry with it; the next conversation opens with "Hey Lamp".
                 if self.simple_call {
+                    if let Some(trial) = &self.caller_frame
+                        && let Ok(mut trial) = trial.lock()
+                    {
+                        trial.clear();
+                    }
                     self.said_until_us = None;
                     self.called_at = None;
                 }
@@ -14236,13 +14261,38 @@ impl Heeding {
         // renews the window.
         let simple = self.simple_call;
         if simple {
-            verdict = Some(Self::simple_verdict(
+            let simple_verdict = Self::simple_verdict(
                 attention,
                 self.said_until_us,
                 self.called_at,
                 seen.began_us,
                 &seen.heard,
-            ));
+            );
+            if let Some(trial) = &self.caller_frame {
+                use super::caller_frame::LineKind;
+                use crate::attention::Verdict;
+                let kind = match simple_verdict {
+                    Verdict::Play(SIMPLE_CALLED) if !attention.tapped() => LineKind::SpokenCall,
+                    Verdict::Play(SIMPLE_CALLED) => LineKind::OtherCall,
+                    Verdict::Play(SIMPLE_GOING_ON) => {
+                        let confirms = crate::services::answer_awaited(heard)
+                            || (seen.lamp_asked
+                                && (crate::services::plain_yes(heard)
+                                    || crate::services::plain_no(heard)));
+                        if confirms {
+                            LineKind::PlaybackOnly
+                        } else {
+                            LineKind::FollowUp
+                        }
+                    }
+                    Verdict::Play(SIMPLE_AFTER_THE_CALL) => LineKind::PlaybackOnly,
+                    _ => LineKind::Other,
+                };
+                if let Ok(mut trial) = trial.lock() {
+                    trial.judged(request, kind, seen.began_us, monotonic_us());
+                }
+            }
+            verdict = Some(simple_verdict);
         }
         let alone = alone && !simple;
         let someone_else = someone_else && !simple;

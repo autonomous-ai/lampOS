@@ -410,6 +410,8 @@ impl Transcript {
 /// builder at 15:29).
 #[derive(Debug, Default)]
 pub struct Replies {
+    // Allocated only for a caller-frame trial on this stream.
+    caller_wake: OnceLock<crate::second_provider::caller_frame::WakeSamples>,
     with_words: AtomicUsize,
     without_words: AtomicUsize,
     speech_started: AtomicUsize,
@@ -762,6 +764,13 @@ impl SttStream {
             holds_quiet: quiet_held(),
             queued_samples: AtomicU64::new(0),
         }
+    }
+
+    pub(crate) fn watch_caller_wake(
+        &self,
+    ) -> Option<crate::second_provider::caller_frame::WakeSamples> {
+        // Flux inserts startup silence and supplies segment rather than word times.
+        (!self.on_flux).then(|| Arc::clone(self.replies.caller_wake.get_or_init(Default::default)))
     }
 
     /// Each result's words as they come back, interim and final, in order,
@@ -1283,6 +1292,9 @@ where
                             &replies.with_words
                         });
                         if !words.transcript.is_empty() {
+                            if words.is_final && let Some(wake) = replies.caller_wake.get() {
+                                wake.get_or_init(|| crate::second_provider::caller_frame::wake_range(&text));
+                            }
                             let _ = words_at.set(Instant::now());
                             let _ = finals.send((words.is_final, words.end));
                             let _ = said.send(words.transcript.clone());

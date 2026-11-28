@@ -1632,6 +1632,7 @@ impl Thread {
         // The events a calendar read kept expire with it
         // (`LAMP_SERVICE_READ_IDS_KEPT`).
         crate::service_read_ids::conversation_ended();
+        crate::second_provider::caller_frame::forgotten();
         // A look's asking exchange waits no longer (`LAMP_LOOK_KEPT_WITH_ASK`,
         // Twelve's P2 on #8019): the close drops the look.
         self.look = None;
