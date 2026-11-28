@@ -13,16 +13,17 @@ The team lead holds the originals on Mac 2 under
 correction, failed seal and output, with its original bytes, SHA-256 inventory
 and README. No audio or private text belongs in this repository.
 
-The [metadata handoff](https://github.com/autonomous-ai/lampOS/issues/8850#issuecomment-7235897159)
+The [metadata follow-up](https://github.com/autonomous-ai/lampOS/issues/8850#issuecomment-7236053775)
 is frozen at
-[`c625cb08f960435195b626a4030e76382cd1337e`](https://github.com/autonomous-ai/lampOS/tree/c625cb08f960435195b626a4030e76382cd1337e).
-The Reviewer verified all **13 files** in its `SHA256SUMS.meta`. Both
+[`a9cb62589c4372a5533e81d84d867310b3ae9788`](https://github.com/autonomous-ai/lampOS/tree/a9cb62589c4372a5533e81d84d867310b3ae9788).
+The Reviewer verified all **17 files** in its `SHA256SUMS.meta`, including
+unchanged bytes for all 13 files from the initial `c625cb08f` handoff. Both
 captures are continuous `mic2_audio.jsonl` bus recordings (20 ms PCM16,
 16 kHz mono frames), not 3,200 separately verified recorded audio files.
 
 | Attempt | Registered collection | Intended use | Verification status |
 |---|---|---|---|
-| `recording/` (`session-1/` in the handoff) | 3,200 planned source slots; lamp output occurred during capture | Calls over lamp output, interruption development and self-wake diagnostics | Index, 32 playback blocks, correction, 1,509 sound intervals and both seal inventories checked; overlap membership unresolved below |
+| `recording/` (`session-1/` in the handoff) | 3,200 planned source slots; lamp output occurred during capture | Calls over lamp output, interruption development and self-wake diagnostics | Index, 32 playback blocks, correction, 1,509 sound intervals, both seal inventories and all 3,200 published cut-mask rows checked; alignment not independently rerun |
 | `recording-r1/` (`r1/` in the handoff) | The same 3,200 slots; 11:27:31–14:18:00 GMT+7 | Matched clean comparator | All 32 blocks report complete on try 1; sound TSV has zero rows; holder reports no outputs/watchdog events after repairing the journal seal |
 
 The r1 seal originally failed to fetch its journal because the start time was
@@ -36,14 +37,16 @@ verified here.
 
 | Bound item | SHA-256 |
 |---|---|
-| Metadata inventory | `a9c555316c104dcc10fd77a64241f3fe08ee62200bedf9ffed2b2d53a3913149` |
+| Initial metadata inventory (`c625cb08f`) | `a9c555316c104dcc10fd77a64241f3fe08ee62200bedf9ffed2b2d53a3913149` |
+| Follow-up metadata inventory (`a9cb62589`) | `8351f26915ef5ae3da6cc46964d042d0991d7d8041fc548ce643e7af3abe9d56` |
 | `index-meta.tsv` | `7db13e50e451dc511a2b2b558ad64c0a142f8b059fbd332ee43f74a21828a841` |
+| `session-1/lamp-sound-per-clip.tsv` | `014f5accfaf5126eed4ef126029322e7a97215cce9904e670e4e08fed1569e59` |
 | Initial `mic2_audio.jsonl` (both seals agree) | `5f159cb262968055ed7adce274a5d44cbf61a0f3fd2a54e4749a5a64b6b6f73a` |
 | r1 `mic2_audio.jsonl` (both seals agree) | `fd7fc00bf75526a22f6222912921eb504eafac34d885112bb5fe59a555665894` |
 
 The last two hashes are **verified agreement between recorded inventories**,
 not a fresh hash of the inaccessible raw bytes. Every original file's hash
-remains in the sealed inventories; these four anchors do not replace them.
+remains in the sealed inventories; these anchors do not replace them.
 
 ## Source labels and overlap limits
 
@@ -53,6 +56,8 @@ The shared index has 3,200 distinct opaque IDs, 32 blocks of 100, and
 `split=test` includes both test and test-extra; retain both columns rather
 than silently pooling them. Map `not-call` to the scorer's `non_call`
 explicitly when constructing an otherwise valid call manifest.
+The generic method README's wording of 800 `use=test` plus 200 extra
+conflicts with this exact index; use the verified 600 plus 200 counts.
 
 All source voices are generated: ElevenLabs 1,701 clips, Gemini 1,299 and
 OpenAI 200, with 83 distinct provider/voice IDs across nine styles. None of
@@ -63,24 +68,42 @@ these are different source clips, not every clip measured at both gains,
 and the gains are not calibrated sound pressure levels.
 
 **CORRECTION.md supersedes the initial README's claim of no lamp answers.**
-Its 1,758 count means overlap with **any lamp sound**, not speech alone.
-It reports 591 speech, 1,469 wait and 313 ring overlaps; these categories can
-overlap and must not be added. The supplied interval table contains 331
+Its 1,758 count means **padded cuts** overlapping any lamp sound, not speech
+alone or necessarily overlap within the original stimulus. All 3,200 mask
+IDs and their block, offset and duration match the index. The published
+rounded columns reproduce 1,758 any / 591 speech / 1,469 wait / 313 ring;
+these categories can overlap and must not be added. Of the 1,758 cuts,
+**1,584** have positive rounded any-sound overlap within the stimulus and
+**174** only in the surrounding cut. The cut adds 0.3 seconds before and
+0.5 seconds after the clip.
+
+The code and all rows use exclusive priority **speech > ring > wait > none**,
+giving 591 / 222 / 945 / 1,442. This corrects the order written in the
+producer's comment. These are output-condition tags, not interruption or
+recipient gold. The supplied interval table contains 331
 speech intervals reconstructed from handed audio, 1,160 estimated wait
 intervals and 18 ring upper bounds. The speaker level changed during the
 session and was muted at 10:12:35.863. These are not measured acoustic
 start/stop receipts. The reported 1,442 with no interval overlap are not
 automatically verified quiet recordings.
 
-The published clip counts do not reproduce from the supplied nominal
-timestamps. Using half-open intervals from `mac_wall_ns_before + offset_s`
-through that start plus `duration_s`, with no startup adjustment, gives
-**1,767 any / 582 speech / 1,354 wait / 348 ring / 1,433 none**. Adding
-0.1 or 0.2 seconds (the README's approximate afplay startup) does not
-reconcile all counts. Preserve these as a sensitivity check, not corrected
-labels. The exact helper, per-clip mask and any captured/chirp alignment
-used by the producer are requested before accepting the slices as frozen
-gold. Every planned row remains present in the provisional local report.
+The supplied recipe explains the difference from the Reviewer's earlier
+nominal-time sensitivity check (1,767 any overlaps). It aligns chirps and
+source waveforms within the recording, fits a line per block to place the
+cuts, then interpolates frame sample indices to the recorder's unix-ms
+timeline. It does not join directly on `mac_wall_ns_before + offset_s`.
+The original nominal report remains retained; its mask must not substitute
+for this source-bound mask. Raw audio and `timeline.npz` remain on Mac 2,
+so alignment and interval joins have not been independently regenerated.
+
+Retain all flags in denominators: **105 weak cuts, one cut with a gap and
+275 cuts with clipped samples**. Reported fit deviations reach 261.38 ms
+across all rows and 40.38 ms even among rows not flagged weak. A trimmed
+block-fit residual is not a bound for every row. The overlap helper sums
+intersections rather than taking their union: `lamp_sound_share` exceeds
+one in 400 rows (maximum 2.434). It must not be read as a probability or
+bounded fraction of audible time. Durations rounded to 0.01 seconds and
+estimated output intervals do not establish precise acoustic boundaries.
 
 Lamp pre-play monotonic ns, Mac pre-play wall ns and lamp journal wall ms
 are different clock domains. NTP plus a nominal offset does not establish
@@ -132,8 +155,8 @@ measured geometry or a zero clock error to satisfy a schema.
    detector activations separately from observed product wakes. Any additional
    windows keep their parent source identity and are not pooled as new
    independent trials.
-3. **Interruption.** The reported 1,758 overlap tags are not 1,758 successful or even
-   fully labelled interruptions. Independently label `interrupt`,
+3. **Interruption.** The 1,758 padded-cut overlap tags are not 1,758 successful
+   or fully labelled interruptions. Independently label `interrupt`,
    `backchannel`, `side_talk` and `noise`; record each actual acoustic onset,
    planned lamp playback interval and observation horizon. Only rows with
    those facts can enter the corresponding v2 barge manifest. Missing labels
