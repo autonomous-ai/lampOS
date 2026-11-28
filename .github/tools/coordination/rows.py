@@ -53,7 +53,10 @@ PASSED = re.compile(r"\bPASS\b")
 # 20 Nov (#8066): a "no row needed" inside inline quotes ("…", “…”, '…', `…`) is mentioned, not said, and never
 # counts. The Reviewer-lead's READ-OK said: I'd rather not call it "no row needed", and the bot took it as a reader's.
 NO_ROW = re.compile(r"(?i)(?<![\"“‘'`])\bno row needed\b(?![\"”’'`])")
-LAMP = re.compile(r"(?<![\w-])lamp-(?=[0-9a-f]{0,3}[0-9])[0-9a-f]{4}(?![\w-])")
+# 28 Nov (the first builder; #8892 sat out with a full ROW on lamp-dbda): the digit rule keeps a part's name ("lamp-face")
+# from counting, but one lamp of the fleet, dbda, has no digit. Such a lamp is named here, so no other all-letter word counts.
+ALL_LETTER_LAMPS = ("dbda",)
+LAMP = re.compile(r"(?<![\w-])lamp-(?:(?=[0-9a-f]{0,3}[0-9])[0-9a-f]{4}|" + "|".join(ALL_LETTER_LAMPS) + r")(?![\w-])")
 BUILD = re.compile(r"\b(?i:build|installed|on)[ \t]+[*`]*\d{5}(?!\w)|\bbuild[ \t]+`?[0-9a-f]{7,40}\b")
 FENCE_OPEN = re.compile(r" {0,3}(`{3,}|~{3,})")
 
