@@ -3257,7 +3257,7 @@ voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
 
 ## Hermes' settings on the lamp (#5978, `hermes_config`)
 
-`lamp_tasks::hermes_config::write(HERMES_HOME, port, token)` merges what
+`lamp_tasks::hermes_config::write(HERMES_HOME, port, token, search_token)` merges what
 Hermes on the lamp needs into its own two files, and nothing else. Nothing
 calls it yet: the lamp as a target (#5978, part 3) runs it before a Hermes
 task, with lamp-cloud's forwarder port (7741) and its local token
@@ -3278,6 +3278,37 @@ forwarded on the lamp").
   token, never the relay's key. Provider keys are taken out
   (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
   `AUTONOMOUS_API_KEY`, `OPENROUTER_API_KEY`); every other line kept.
+- **Web search, the lamp's first:** with lamp-cloud's search-only token in
+  `/var/lib/lampos-cloud/search-token` (beside `hermes-token`), `.env` also
+  gets `SEARXNG_URL=http://127.0.0.1:7741/v1/search/<search-token>`
+  (lamp-cloud's SearXNG-shaped search route, so Hermes's bundled `searxng`
+  provider asks it) and `config.yaml` a `web:` block:
+  `search_backend: "searxng"`, `extract_backend: "exa"`,
+  `keyless_fallback: true`, `keyless_rescue: true`. Page reads stay on
+  Hermes's keyless pool (Exa with no key, then Parallel, Firecrawl and
+  Keenable): at v0.22.2, a set `SEARXNG_URL` would otherwise make Hermes's
+  autodetect send `web_extract` to the search-only SearXNG too. A search the
+  lamp's route fails is served once by the keyless pool (`keyless_rescue`),
+  and the next one asks the lamp's route again. A person's own
+  `SEARXNG_URL` is kept and ours not added. Without the token file nothing
+  of this is added: a `SEARXNG_URL` of ours is taken out, and so is a
+  `web.search_backend` naming `searxng` (one left from a token since gone
+  would pin a backend with no URL; unpinned, Hermes's autodetect picks a
+  person's own `SEARXNG_URL`, else the keyless pool), the other `web:` keys
+  kept. Hermes then searches through its keyless pool, as before; lamp-tasks' start line
+  says which (`web search through the lamp first` or `web search keyless
+  only (no search token)`). An existing lamp gains it on its next start.
+  lamp-cloud makes the token as its forwarder starts, and lamp-tasks may
+  start first (no unit order between them; a round restarts the parts one
+  by one): Hermes' and OpenClaw's settings are written at once on a thread
+  beside the start, with or without the token, so nothing else in them
+  waits for it; with none yet, lamp-tasks looks for it up to 120 s
+  (`runtime::SEARCH_TOKEN_WAIT`, a look every 2 s, `runtime::write_settings`)
+  and writes both once more, with web search, if it comes. Each gateway
+  reads its settings at its own start.
+  Hermes's "Could not reach SearXNG at <url>" error names the URL, so the
+  model may see the token when lamp-cloud is down: it is search-only and
+  the route answers on loopback only.
 - **Who:** it must run as Hermes' own user (`lampos`), so both files stay
   Hermes'. lamp-tasks (also `lampos`) reads the token from
   `/var/lib/lampos-cloud/hermes-token`. Neither file is read through a link
@@ -3315,7 +3346,11 @@ them) (`crates/tasks/src/openclaw_config.rs`):
 - `agents.defaults.workspace`: the lamp's own work folder
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
   `lampos`'s home), where the lamp's skills keys point and the guidance
-  (`AGENTS.md`) is written, as for Hermes. Its last section, "Your last
+  (`AGENTS.md`) is written, as for Hermes. Its rules tell the agent to look
+  things up on the web with `web_search`, then `web_fetch` for a page it
+  found, never through `exec`, `curl` or a search engine's page (on
+  lamp-ee17 OpenClaw searched with `exec` + `curl` while `web_search` was
+  there; `the_written_guidance_says_to_search_with_web_search`). Its last section, "Your last
   answer" (#7930), asks the agent for a last answer that says what it
   found or did first, in short plain sentences, never only "done" or
   "saved", saying what a file it wrote holds and where, within about 800
@@ -3383,6 +3418,50 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   file with `mode` alone already is left unwritten (#7859). The skill-start launcher's allow-list entry ("One exec approval",
   below) stays. A skill's run still execs it, and `security: "full"` allows
   that exec too, so a run needs no grant of its own.
+- **Plugins and the web.** `plugins.allow` is `openai`, `memory-core` and
+  `web-readability` when none is set, and `searxng` after them with web
+  search on (below) (#6226 on lamp-c0a4: OpenClaw's default 41 bundled
+  plugins stalled a turn 92 s; with only the first two the Gateway was ready
+  in 27-50 s). A list already set, a lamp's from before web search or a
+  person's, gets `web-readability` added (and `searxng` with search on) and
+  loses nothing else; an empty list (no limit) is kept. With search off,
+  `searxng` is taken out of the list, since OpenClaw warns of an allowed
+  plugin it cannot find ("plugin not found: searxng (stale config entry
+  ignored)"), unless `plugins.entries.searxng` still holds a person's own
+  settings. `web-readability` stays either way: `web_fetch` uses it.
+  `web-readability` is bundled and extracts a fetched page's main text for
+  `web_fetch`, as on V1, which set no allow list. `browser`, also loaded on
+  V1, is left out: it drives a whole Chromium. `web_fetch` itself is on by
+  default and needs no key. Both web plugins load on first use, not at the
+  Gateway's start (`activation.onStartup: false`).
+- **Web search through lamp-cloud.** OpenClaw leaves `web_search` out of
+  the agent's tools when no provider is set; that was the lamp's state
+  before this (checked with OpenClaw 2026.11.2's `tools.effective` on a
+  copy of the file: `web_fetch` there, no `web_search`). When lamp-cloud's
+  search-only token is there and not empty
+  (`/var/lib/lampos-cloud/search-token`) and the SearXNG plugin's folder
+  is there (an install with it, below), lamp-tasks writes
+  `tools.web.search.provider: "searxng"`,
+  `plugins.entries.searxng.config.webSearch.baseUrl:
+  "http://127.0.0.1:7741/v1/search/${LAMP_SEARCH_TOKEN}"` (lamp-cloud's
+  SearXNG-shaped route; the plugin adds `/search?q=…&format=json`) and the
+  plugin's folder, `/var/lib/lampos-openclaw/npm/node_modules/@openclaw/searxng-plugin`,
+  in `plugins.load.paths`. The token is never in the file: OpenClaw's
+  wrapper exports it as `LAMP_SEARCH_TOKEN` (empty without the file), and
+  OpenClaw fills the `${…}` in. Without the token or the plugin's folder,
+  those values of ours (and `searxng` in `plugins.allow`) are taken out,
+  others' kept, and the start's journal line ends "web search off: no
+  search token" or "web search off: no SearXNG plugin". OpenClaw takes a missing plugin, path
+  or variable as a warning, never a refused file. The plugin is not
+  bundled in OpenClaw 2026.11.2; lamp-update installs it with OpenClaw
+  (docs/install.md, "From a pinned lockfile"). OpenClaw loads plugins only
+  at its Gateway's start, so a write that turns search on needs a gateway
+  start after it: the install starts lamp-tasks again, then waits for this
+  merge (up to 90 s) before it (re)starts the gateway (docs/install.md,
+  "The Gateway"). **Start-time risk (#6226):**
+  two more plugins in the allow list; both load on use, but the Gateway's
+  ready time and a first search turn must be measured in a lamp row before
+  this is taken as free.
 
 **OpenClaw checks the text before it lands** (#7108; on 15 Nov a merge
 OpenClaw 2026.11.2 refused, 78/CONFIG, took lamp-52e6's gateway down): a

@@ -13,7 +13,11 @@
 //! Served, with the token as the bearer:
 //! - `POST /v1/deepseek/chat/completions`: to `<relay>/chat/completions`,
 //!   the answer streamed back as it comes (Server-Sent Events included);
-//! - `GET /v1/deepseek/models`: to `<relay>/models`.
+//! - `GET /v1/deepseek/models`: to `<relay>/models`;
+//! - `GET /v1/search/<search token>/search?q=…&format=json`: a web search,
+//!   answered in SearXNG's JSON shape ([`search`]), with its own token
+//!   ([`SEARCH_TOKEN_FILE`]) in the path, as the engines' SearXNG clients
+//!   send no header.
 //!
 //! Anything else is 404, a wrong or missing token 401, a chat for any
 //! model but [`MODEL`] 400. A body is at most [`MOST_BODY`]; at most
@@ -61,6 +65,10 @@ pub const PORT: u16 = 7741;
 /// The local token's file, in lamp-cloud's state folder
 /// (`/var/lib/lampos-cloud`, `lampos`'s, 0700): 0600, made once.
 pub const TOKEN_FILE: &str = "hermes-token";
+/// The web search's own token's file, beside [`TOKEN_FILE`] and made the
+/// same way: a token of its own, as it is sent in the search's path, where
+/// the chat's token must never be.
+pub const SEARCH_TOKEN_FILE: &str = "search-token";
 /// The paths served, under Hermes' base `http://127.0.0.1:7741/v1/deepseek`.
 pub const CHAT_PATH: &str = "/v1/deepseek/chat/completions";
 pub const MODELS_PATH: &str = "/v1/deepseek/models";
@@ -172,7 +180,23 @@ fn plain(token: &str) -> bool {
 /// The local token in `dir`'s [`TOKEN_FILE`]: the one kept, or a new one
 /// (32 random bytes, hex) made and kept 0600 when there is none.
 pub fn token(dir: &Path) -> io::Result<String> {
-    let path = dir.join(TOKEN_FILE);
+    kept_token(dir, TOKEN_FILE)
+}
+
+/// The web search's token in `dir`'s [`SEARCH_TOKEN_FILE`], kept or made as
+/// [`token`] is; never the chat's token (one equal to it is made anew).
+pub fn search_token(dir: &Path) -> io::Result<String> {
+    let chat = token(dir)?;
+    let search = kept_token(dir, SEARCH_TOKEN_FILE)?;
+    if search != chat {
+        return Ok(search);
+    }
+    std::fs::remove_file(dir.join(SEARCH_TOKEN_FILE))?;
+    kept_token(dir, SEARCH_TOKEN_FILE)
+}
+
+fn kept_token(dir: &Path, file: &str) -> io::Result<String> {
+    let path = dir.join(file);
     match std::fs::read_to_string(&path) {
         Ok(kept) if plain(kept.trim()) => return Ok(kept.trim().to_owned()),
         Ok(_) => std::fs::remove_file(&path)?,
@@ -210,19 +234,46 @@ pub fn admits(peer: SocketAddr) -> bool {
     peer.ip().is_loopback()
 }
 
-/// Requests started in the last minute, for [`PER_MINUTE`].
-#[derive(Default)]
-struct Started(Vec<Instant>);
+/// Calls started (or waiting for their turn) in the last minute: at most
+/// `most` of them, each at least `spaced` after the one before.
+struct Started {
+    at: Vec<Instant>,
+    most: usize,
+    spaced: Duration,
+}
 
 impl Started {
-    fn take(&mut self, now: Instant) -> bool {
-        self.0
-            .retain(|at| now.duration_since(*at) < Duration::from_secs(60));
-        if self.0.len() >= PER_MINUTE {
-            return false;
+    /// The chat's: [`PER_MINUTE`], none waiting.
+    fn chat() -> Self {
+        Self::new(PER_MINUTE, Duration::ZERO)
+    }
+
+    fn new(most: usize, spaced: Duration) -> Self {
+        Self {
+            at: Vec::new(),
+            most,
+            spaced,
         }
-        self.0.push(now);
-        true
+    }
+
+    /// The wait before the next call may start, its start kept; none when
+    /// the minute's `most` are used or another call already waits its turn.
+    fn take(&mut self, now: Instant) -> Option<Duration> {
+        self.at.retain(|at| *at + Duration::from_secs(60) > now);
+        if self.at.len() >= self.most {
+            return None;
+        }
+        let next = self
+            .at
+            .iter()
+            .max()
+            .map_or(now, |last| (*last + self.spaced).max(now));
+        let wait = next - now;
+        if wait > self.spaced {
+            return None;
+        }
+        self.at.push(next);
+        Some(wait)
     }
 }
 
@@ -379,6 +430,7 @@ pub struct Forwarder {
     flights: Arc<Mutex<Vec<(u64, Instant)>>>,
     next_flight: std::sync::atomic::AtomicU64,
     stopping: std::sync::atomic::AtomicBool,
+    search: Option<search::Search>,
 }
 
 /// A chat in flight, taken off [`Forwarder::flights`] when it ends.
@@ -560,6 +612,12 @@ impl std::fmt::Debug for Forwarder {
     }
 }
 
+/// A request let through: for the relay, or a web search.
+enum Asked {
+    Relay(Request),
+    Search(search::Ask),
+}
+
 /// A request as read and let through: its method, path (no query) and
 /// body, with its place among the [`AT_ONCE`]. The token is checked while
 /// the head is read and not kept.
@@ -584,6 +642,8 @@ enum Refusal {
     OwnUnreachable,
     NotThisModel,
     Stopping,
+    NoQuery,
+    NotJson,
 }
 
 impl Refusal {
@@ -591,7 +651,7 @@ impl Refusal {
         match self {
             Self::Bad => (400, "Bad Request", "the request can't be read"),
             Self::Unauthorized => (401, "Unauthorized", "the lamp's local token is needed"),
-            Self::NotFound => (404, "Not Found", "only DeepSeek's chat and models"),
+            Self::NotFound => (404, "Not Found", "only DeepSeek's chat, models and search"),
             Self::NotAllowed => (405, "Method Not Allowed", "not with this method"),
             Self::TooLarge => (413, "Payload Too Large", "the request is too large"),
             Self::LengthRequired => (411, "Length Required", "a Content-Length is needed"),
@@ -604,6 +664,8 @@ impl Refusal {
             ),
             Self::NotThisModel => (400, "Bad Request", "only the model deepseek-flash"),
             Self::Stopping => (503, "Service Unavailable", "the lamp's link is restarting"),
+            Self::NoQuery => (400, "Bad Request", "a query q is needed"),
+            Self::NotJson => (400, "Bad Request", "only format=json"),
         }
     }
 }
@@ -635,14 +697,31 @@ impl Forwarder {
             client,
             running: Arc::new(Semaphore::new(AT_ONCE)),
             unread: Arc::new(Semaphore::new(UNREAD_AT_ONCE)),
-            started: Mutex::new(Started::default()),
+            started: Mutex::new(Started::chat()),
             meter: None,
             own: None,
             said_refused: Mutex::default(),
             flights: Arc::default(),
             next_flight: Default::default(),
             stopping: Default::default(),
+            search: None,
         })
+    }
+
+    /// The web search served too, on `token` (the [`SEARCH_TOKEN_FILE`]'s,
+    /// never the chat's): DeepSeek's search on the relay, then `fallback`
+    /// ([`search::DUCKDUCKGO`] in the product). The tests' way in.
+    #[cfg(test)]
+    fn with_search_to(mut self, token: &str, fallback: &str) -> Result<Self, String> {
+        self.search = Some(self.search_on(token, fallback)?);
+        Ok(self)
+    }
+
+    fn search_on(&self, token: &str, fallback: &str) -> Result<search::Search, String> {
+        if !plain(token) || same(token.as_bytes(), self.token.as_bytes()) {
+            return Err("the web search needs a token of its own".into());
+        }
+        search::Search::new(&self.base, &self.key, token, fallback)
     }
 
     /// The person's own model from `own` (#8735), read once, the route said
@@ -820,7 +899,7 @@ impl Forwarder {
         })
     }
 
-    async fn read(&self, stream: &mut TcpStream) -> Result<Request, Refusal> {
+    async fn read(&self, stream: &mut TcpStream) -> Result<Asked, Refusal> {
         let mut bytes = Vec::with_capacity(4096);
         let mut chunk = [0u8; 4096];
         let head_end = tokio::time::timeout(HEAD_WITHIN, async {
@@ -876,6 +955,13 @@ impl Forwarder {
                 _ => {}
             }
         }
+        // The web search: its own token, in the path or as the bearer.
+        if let Some(rest) = path.strip_prefix(search::PREFIX) {
+            let search = self.search.as_ref().ok_or(Refusal::NotFound)?;
+            return search
+                .ask(method, target, rest, bearer.as_deref())
+                .map(Asked::Search);
+        }
         let authorized = bearer
             .as_deref()
             .is_some_and(|given| same(given.as_bytes(), self.token.as_bytes()));
@@ -925,12 +1011,12 @@ impl Forwarder {
                 return Err(Refusal::NotThisModel);
             }
         }
-        Ok(Request {
+        Ok(Asked::Relay(Request {
             method: method.to_owned(),
             path,
             body,
             _running: running,
-        })
+        }))
     }
 
     /// A place among the [`AT_ONCE`], then one of the minute's
@@ -945,8 +1031,7 @@ impl Forwarder {
         let started = self
             .started
             .lock()
-            .map(|mut started| started.take(Instant::now()))
-            .unwrap_or(false);
+            .is_ok_and(|mut started| started.take(Instant::now()).is_some());
         started.then_some(permit).ok_or(Refusal::TooMany)
     }
 
@@ -963,22 +1048,18 @@ impl Forwarder {
         );
         send(stream, head.as_bytes()).await?;
         send(stream, body.as_bytes()).await?;
-        stream.shutdown().await?;
-        // What the caller still sends is read and dropped, briefly, so the
-        // close is not a reset that loses the answer before it is read.
-        let mut sink = [0u8; 4096];
-        let _ = tokio::time::timeout(DRAIN_WITHIN, async {
-            while matches!(stream.read(&mut sink).await, Ok(read) if read > 0) {}
-        })
-        .await;
-        Ok(())
+        finish(stream).await
     }
 
     async fn answer(&self, mut stream: TcpStream, unread: OwnedSemaphorePermit) -> io::Result<()> {
         let read = self.read(&mut stream).await;
         drop(unread);
         let request = match read {
-            Ok(request) => request,
+            Ok(Asked::Relay(request)) => request,
+            Ok(Asked::Search(ask)) => {
+                let search = self.search.as_ref().expect("asked only when served");
+                return search.answer(&mut stream, ask).await;
+            }
             Err(refusal) => return Self::refuse(&mut stream, &refusal).await,
         };
         let chat = request.path == CHAT_PATH;
@@ -1091,6 +1172,19 @@ impl Forwarder {
     }
 }
 
+/// The answer's end: the stream shut, then what the caller still sends
+/// read and dropped, briefly, so the close is not a reset that loses the
+/// answer before it is read.
+async fn finish(stream: &mut TcpStream) -> io::Result<()> {
+    stream.shutdown().await?;
+    let mut sink = [0u8; 4096];
+    let _ = tokio::time::timeout(DRAIN_WITHIN, async {
+        while matches!(stream.read(&mut sink).await, Ok(read) if read > 0) {}
+    })
+    .await;
+    Ok(())
+}
+
 /// Runs the forwarder when `LAMP_HERMES_ON_LAMP=on` or
 /// `LAMP_OPENCLAW_ON_LAMP=on`: the token kept in
 /// `state` (lamp-cloud's state folder), the relay from `second_json` (the
@@ -1144,6 +1238,16 @@ pub async fn serve_when(
         if let Some(own) = &own {
             forwarder = forwarder.with_own(own);
         }
+        // The web search with its own token; without one, chat goes on.
+        let searching = search_token(state)
+            .map_err(|_| "its token can't be kept".to_owned())
+            .and_then(|search| forwarder.search_on(&search, search::DUCKDUCKGO));
+        if let Err(why) = &searching {
+            eprintln!("lamp-cloud: the Hermes forwarder: no web search: {why}");
+        }
+        if let Ok(search) = searching {
+            forwarder.search = Some(search);
+        }
         let listener = Forwarder::bind(port)
             .await
             .map_err(|_| format!("127.0.0.1:{port} can't be listened on"))?;
@@ -1172,6 +1276,8 @@ pub async fn serve_when(
         }
     }
 }
+
+mod search;
 
 #[cfg(test)]
 mod tests;

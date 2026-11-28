@@ -229,13 +229,16 @@ async fn an_unreachable_relay_is_a_502_naming_no_key() {
 
 #[test]
 fn starts_are_capped_per_minute() {
-    let mut started = Started::default();
+    let mut started = Started::chat();
     let now = Instant::now();
     for _ in 0..PER_MINUTE {
-        assert!(started.take(now));
+        assert_eq!(started.take(now), Some(Duration::ZERO));
     }
-    assert!(!started.take(now));
-    assert!(started.take(now + Duration::from_secs(61)));
+    assert_eq!(started.take(now), None);
+    assert_eq!(
+        started.take(now + Duration::from_secs(61)),
+        Some(Duration::ZERO)
+    );
 }
 
 /// #6226: the forwarder serves Hermes or OpenClaw on the lamp, with either
@@ -416,10 +419,10 @@ async fn with_no_place_free_it_is_429_and_no_minute_start_is_used() {
         MOST_BODY + 1
     );
     assert_eq!(ask(address, raw.as_bytes()).await.0, 429);
-    assert!(forwarder.started.lock().unwrap().0.is_empty());
+    assert!(forwarder.started.lock().unwrap().at.is_empty());
     drop(held);
     assert_eq!(ask(address, &chat(Some(TOKEN), ASKED)).await.0, 502);
-    assert_eq!(forwarder.started.lock().unwrap().0.len(), 1);
+    assert_eq!(forwarder.started.lock().unwrap().at.len(), 1);
 }
 
 /// One answer of [`metered_relay`]: its status, its `X-Usage-Day-Used` (or

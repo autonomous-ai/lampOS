@@ -231,6 +231,8 @@ struct Runs {
     /// Hermes's gateway's `ActiveState`: `inactive` unless a test says
     /// otherwise.
     hermes: &'static str,
+    /// Whether `npm ci` puts the SearXNG plugin in too.
+    searxng: bool,
 }
 
 impl Runs {
@@ -248,6 +250,7 @@ impl Runs {
             restart_at_add: RefCell::new(0),
             inactive: RefCell::new(0),
             hermes: "inactive",
+            searxng: false,
         }
     }
     fn runner(&self) -> impl FnMut(&[String]) -> Result<String, String> + '_ {
@@ -321,6 +324,9 @@ impl Runs {
                 Ok(String::new())
             } else if line.contains(&format!("{NPM_CI_ENV}=on")) {
                 put_package(&self.root, self.package);
+                if self.searxng {
+                    fs::create_dir_all(on(&self.root, SEARXNG_DIR)).unwrap();
+                }
                 Ok(String::new())
             } else if line.ends_with(" --version") {
                 // It runs in the namespace script: none there, it fails.
@@ -605,8 +611,9 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
 fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     assert!(WRAPPER_TEXT.starts_with("#!/bin/sh\n"));
     assert!(WRAPPER_TEXT.contains(&format!("$(cat {TOKEN} 2>/dev/null)")));
+    assert!(WRAPPER_TEXT.contains(&format!("S=$(cat {SEARCH_TOKEN} 2>/dev/null) || S=\n")));
     assert!(WRAPPER_TEXT.contains(&format!(
-        "export {TOKEN_ENV}=\"$T\" {STATE_ENV}={STATE} OPENCLAW_NO_AUTO_UPDATE=1 PATH=\"{NODE_BIN}:$PATH\" "
+        "export {TOKEN_ENV}=\"$T\" {SEARCH_TOKEN_ENV}=\"$S\" {STATE_ENV}={STATE} OPENCLAW_NO_AUTO_UPDATE=1 PATH=\"{NODE_BIN}:$PATH\" "
     )));
     assert_eq!(
         NS_FLAGS.join(" "),
@@ -642,7 +649,7 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     let printer = folder.path().join("unshare");
     fs::write(
         &printer,
-        "#!/bin/sh\necho \"token=$LAMP_HERMES_TOKEN state=$OPENCLAW_STATE_DIR path=$PATH gateway=${LAMP_OPENCLAW_GATEWAY-unset}\"\necho \"args: $*\"\n",
+        "#!/bin/sh\necho \"token=$LAMP_HERMES_TOKEN search=${LAMP_SEARCH_TOKEN-unset} state=$OPENCLAW_STATE_DIR path=$PATH gateway=${LAMP_OPENCLAW_GATEWAY-unset}\"\necho \"args: $*\"\n",
     )
     .unwrap();
     fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
@@ -657,11 +664,13 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     .unwrap();
     fs::set_permissions(&systemctl, fs::Permissions::from_mode(0o755)).unwrap();
     let token = folder.path().join("hermes-token");
+    let search = folder.path().join("search-token");
     let wrapper = folder.path().join("openclaw");
     fs::write(
         &wrapper,
         WRAPPER_TEXT
             .replace(TOKEN, &token.to_string_lossy())
+            .replace(SEARCH_TOKEN, &search.to_string_lossy())
             .replace("/usr/bin/unshare", &printer.to_string_lossy())
             .replace("/usr/bin/nsenter", &printer.to_string_lossy())
             .replace("/usr/bin/systemctl", &systemctl.to_string_lossy()),
@@ -688,9 +697,18 @@ fn the_wrapper_fails_closed_without_the_token_and_runs_only_in_the_namespace() {
     let good = ran(true);
     assert!(good.status.success(), "{good:?}");
     let out = String::from_utf8_lossy(&good.stdout);
+    // No search token: the variable is there but empty, so OpenClaw leaves
+    // `web_search` unavailable; with it, the token in `LAMP_SEARCH_TOKEN`.
     assert!(out.contains(&format!(
-        "token=tok_0123456789abcdef state={STATE} path={NODE_BIN}:/usr/bin:/bin gateway=unset\n"
+        "token=tok_0123456789abcdef search= state={STATE} path={NODE_BIN}:/usr/bin:/bin gateway=unset\n"
     )));
+    fs::write(&search, "srch_0123456789\n").unwrap();
+    let out = String::from_utf8_lossy(&ran(true).stdout).into_owned();
+    assert!(
+        out.contains("token=tok_0123456789abcdef search=srch_0123456789 state="),
+        "{out}"
+    );
+    fs::remove_file(&search).unwrap();
     assert!(out.contains(&format!("args: {} {NS} gateway run\n", NS_FLAGS.join(" "))));
     // A pane with no gateway running, or with a "gateway" in its own user
     // namespace: refused, nothing run, never a namespace of its own.
@@ -890,6 +908,16 @@ fn the_pins_are_node_24_and_the_measured_package() {
         format!("https://registry.npmjs.org/openclaw/-/openclaw-{VERSION}.tgz")
     );
     assert!(PACKAGE_INTEGRITY.starts_with("sha512-") && PACKAGE_INTEGRITY.len() == 95);
+    // The SearXNG plugin: the release built with this OpenClaw.
+    assert_eq!(
+        SEARXNG_URL,
+        format!("https://registry.npmjs.org/{SEARXNG_PACKAGE}/-/searxng-plugin-{VERSION}.tgz")
+    );
+    assert!(SEARXNG_INTEGRITY.starts_with("sha512-") && SEARXNG_INTEGRITY.len() == 95);
+    assert_eq!(
+        SEARXNG_DIR,
+        format!("{PREFIX}/node_modules/{SEARXNG_PACKAGE}")
+    );
     assert_eq!(
         integrity_of(b""),
         "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
@@ -911,7 +939,7 @@ fn the_lockfile_pins_the_whole_tree_and_the_measured_package() {
     let manifest: serde_json::Value = serde_json::from_str(MANIFEST).unwrap();
     assert_eq!(
         manifest["dependencies"],
-        serde_json::json!({"openclaw": VERSION})
+        serde_json::json!({"openclaw": VERSION, "@openclaw/searxng-plugin": VERSION})
     );
     assert_eq!(manifest["private"], true);
     let lock: serde_json::Value = serde_json::from_str(LOCKFILE).unwrap();
@@ -930,6 +958,16 @@ fn the_lockfile_pins_the_whole_tree_and_the_measured_package() {
     assert!(refused(LOCKFILE, "2026.11.1").contains("wants"));
     let other = LOCKFILE.replacen(PACKAGE_INTEGRITY, "sha512-other", 1);
     assert!(refused(&other, VERSION).contains("the lockfile's openclaw"));
+    // The SearXNG plugin is pinned as OpenClaw is: wanted by the project at
+    // VERSION, from its tarball with its integrity.
+    let plugin = LOCKFILE.replacen(SEARXNG_INTEGRITY, "sha512-other", 1);
+    assert!(refused(&plugin, VERSION).contains("the lockfile's @openclaw/searxng-plugin"));
+    let mut without = lock.clone();
+    without["packages"][""]["dependencies"]
+        .as_object_mut()
+        .unwrap()
+        .remove(SEARXNG_PACKAGE);
+    assert!(refused(&without.to_string(), VERSION).contains("wants"));
     let mut loose = lock.clone();
     loose["packages"]["node_modules/zod"]
         .as_object_mut()
@@ -2447,8 +2485,18 @@ fn the_one_path_writes_nothing_to_openclaws_shared_config() {
     let source = include_str!("../openclaw_install.rs");
     let code = source.split("\n#[cfg(test)]").next().unwrap();
     // The writer, and (#7868) a round's read-only check of the `gateway`
-    // block, which writes nothing.
-    assert_eq!(code.matches("on(root, CONFIG)").count(), 2);
+    // block, and the install's look for lamp-tasks' search merge, which
+    // write nothing.
+    assert_eq!(code.matches("on(root, CONFIG)").count(), 3);
+    let merge_look = code
+        .split_once("fn names_searxng(")
+        .unwrap()
+        .1
+        .split_once("\n}\n")
+        .unwrap()
+        .0;
+    assert!(merge_look.contains("fs::read(on(root, CONFIG))"));
+    assert!(!merge_look.contains("write") && !merge_look.contains("replace"));
     let reader = code
         .split_once("fn gateway_block_due(")
         .unwrap()
@@ -4819,4 +4867,100 @@ fn the_gateway_block_restarts_no_gateway_that_is_not_wanted() {
         "{said:#?}"
     );
     assert_eq!(gateway_starts(&runs), Vec::<String>::new());
+}
+
+/// lamp-ee17, 28 Nov: the install restarted lamp-tasks and then the
+/// gateway at once, before lamp-tasks' merge put the SearXNG plugin in
+/// `plugins.load.paths`; OpenClaw loads plugins only at its start, so it
+/// ran with no `web_search`. With the search token and the plugin there,
+/// the restart now waits for the merge (bounded), said in a line before
+/// it; without the token nothing is waited for.
+#[test]
+fn the_installs_gateway_restart_waits_for_lamp_tasks_search_merge() {
+    let restart_after_wait = |token: &str| {
+        let lamp = Lamp::new();
+        lamp.harness_there();
+        let mut systemd = Fake::default();
+        round(&lamp, &mut systemd, true, 10).unwrap();
+        fs::create_dir_all(lamp.at(SEARCH_TOKEN).parent().unwrap()).unwrap();
+        fs::write(lamp.at(SEARCH_TOKEN), token).unwrap();
+        let runs = Runs {
+            searxng: true,
+            ..Runs::new(&lamp)
+        };
+        let lines = RefCell::new(Vec::<String>::new());
+        let said = install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut runs.runner(),
+            &mut || 20,
+            &mut |line: &str| lines.borrow_mut().push(line.to_owned()),
+            &kit(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(said.install, "installed", "{:#?}", runs.lines());
+        runs.position(&format!("systemctl restart {UNIT}"));
+        lines.into_inner()
+    };
+    let lines = restart_after_wait("srch");
+    let waits = lines
+        .iter()
+        .position(|line| line.contains("the restart waits for lamp-tasks' web search merge"))
+        .unwrap_or_else(|| panic!("{lines:#?}"));
+    let gave_up = lines
+        .iter()
+        .position(|line| {
+            line.contains(&format!(
+                "merge not in after {} s: restarted anyway",
+                SEARCH_MERGE_AT_MOST.as_secs()
+            ))
+        })
+        .unwrap_or_else(|| panic!("{lines:#?}"));
+    assert!(waits < gave_up, "{lines:#?}");
+    let lines = restart_after_wait("");
+    assert!(
+        !lines.iter().any(|line| line.contains("web search merge")),
+        "no token, no wait: {lines:#?}"
+    );
+}
+
+/// The merge landing during the wait ends it at the next look; one
+/// already in place waits for nothing.
+#[test]
+fn the_search_merge_wait_ends_once_the_load_path_is_in() {
+    let lamp = Lamp::new();
+    fs::create_dir_all(lamp.at(SEARXNG_DIR)).unwrap();
+    fs::create_dir_all(lamp.at(SEARCH_TOKEN).parent().unwrap()).unwrap();
+    fs::write(lamp.at(SEARCH_TOKEN), "srch").unwrap();
+    fs::create_dir_all(lamp.at(CONFIG).parent().unwrap()).unwrap();
+    fs::write(lamp.at(CONFIG), r#"{"plugins": {"allow": ["openai"]}}"#).unwrap();
+    let merged = serde_json::json!({"plugins": {"load": {"paths": [SEARXNG_DIR]}}}).to_string();
+    let mut pauses = 0;
+    let mut lines = Vec::new();
+    search_merged(
+        lamp.root(),
+        &mut |line: &str| lines.push(line.to_owned()),
+        &mut || {
+            pauses += 1;
+            if pauses == 3 {
+                fs::write(lamp.at(CONFIG), &merged).unwrap();
+            }
+        },
+    );
+    assert_eq!(pauses, 3);
+    assert!(
+        lines
+            .last()
+            .unwrap()
+            .ends_with("merge in after 6 s: restarted with it"),
+        "{lines:#?}"
+    );
+    let mut lines = Vec::new();
+    search_merged(
+        lamp.root(),
+        &mut |line: &str| lines.push(line.to_owned()),
+        &mut || panic!("no wait"),
+    );
+    assert!(lines.is_empty());
 }

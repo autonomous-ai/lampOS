@@ -2611,11 +2611,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      No switch of its own: it only keeps what the install writes.
    - **From a pinned lockfile, inside the namespace:** the tree is never
      resolved freely. The build carries `crates/update/openclaw/package.json`
-     (`openclaw` at 2026.11.2 exactly) and its `package-lock.json` (made
-     once with `npm install --package-lock-only --ignore-scripts`: every
-     package with its registry tarball and sha512 integrity). Before
-     anything is fetched, lamp-update checks the lockfile's SHA-256, that
-     its `openclaw` is the registry tarball with the pinned integrity, and
+     (`openclaw` and OpenClaw's official SearXNG `web_search` plugin
+     `@openclaw/searxng-plugin`, both at 2026.11.2 exactly; the plugin is
+     not bundled in OpenClaw 2026.11.2, has no dependencies, and lamp-tasks
+     loads it from `node_modules/@openclaw/searxng-plugin`, docs/tasks.md)
+     and its `package-lock.json` (made with `npm install --package-lock-only
+     --ignore-scripts`: every package with its registry tarball and sha512
+     integrity). Before anything is fetched, lamp-update checks the
+     lockfile's SHA-256, that its `openclaw` and the plugin are the registry
+     tarballs with the pinned integrities, and
      that every other package carries a registry tarball and a sha512
      integrity or comes bundled inside one that does; any other is
      `pin_mismatch`. It writes both files in `/var/lib/lampos-openclaw/npm`
@@ -2726,7 +2730,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      startup), and a second stop seconds after a start was SIGKILLed and
      left OpenClaw's state unreadable (gate G); a stop 60 s or more after
      the listen took under 10 s. A gateway started long ago and listening,
-     or not running, is restarted at once. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
+     or not running, is restarted at once. Before the install's (re)start
+     (a new install, lamp-tasks just started again), with lamp-cloud's
+     search token and the SearXNG plugin there, the one-shot also waits
+     for lamp-tasks' merge to name the plugin's folder in
+     `plugins.load.paths` of `openclaw.json` (looking every 2 s, 90 s at
+     most, then restarted anyway, said in one line): OpenClaw loads plugins
+     only at its gateway's start, and a restart right after lamp-tasks'
+     own ran without `web_search` until the next start (lamp-ee17, 28
+     Nov). Without the token or the plugin nothing is waited for. With `LAMP_OPENCLAW_GATEWAY_BY_DEFAULT=on` (#8105, off until
      its row), or `LAMP_HERMES_GATEWAY=on` (on in the product), it runs only while OpenClaw is the lamp's default agent, as
      lamp-tasks says it on its app socket: `serve` asks every 10 s and
      each round once, enables and starts it for `openclaw`, disables and
@@ -2812,6 +2824,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **The forwarder token:** the wrapper exports `LAMP_HERMES_TOKEN` from
      lamp-cloud's `/var/lib/lampos-cloud/hermes-token`, as Hermes's does,
      for the `lampos` provider's `apiKey` (`${LAMP_HERMES_TOKEN}`).
+   - **The search token:** the wrapper also exports `LAMP_SEARCH_TOKEN` from
+     lamp-cloud's `/var/lib/lampos-cloud/search-token`, empty when the file
+     is not there, for the SearXNG plugin's `baseUrl`
+     (`.../v1/search/${LAMP_SEARCH_TOKEN}`, docs/tasks.md); an empty value
+     leaves `web_search` unavailable, never the wrapper failed.
    - **The lamp's skills** behind `LAMP_OPENCLAW_SKILLS` (unset, on on every
      product lamp, read only with `LAMP_OPENCLAW_ON_LAMP` on), as
      `LAMP_HERMES_SKILLS` does for Hermes: on, `openclaw-ns` shows

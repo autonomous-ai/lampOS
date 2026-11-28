@@ -4772,6 +4772,40 @@ gì về: `harness: home moved to XDG (<sign>): lampOS paths need
 `.local/share/harness/.harness-root`, `.harness/runtime is a link` hoặc
 `.harness/cli is a link`.
 
+## Tìm kiếm web của Hermes trên đèn (`hermes_config`)
+
+`lamp_tasks::hermes_config::write(HERMES_HOME, port, token, search_token)`
+lúc lamp-tasks khởi động: khi có token chỉ-dùng-để-tìm-kiếm của lamp-cloud
+ở `/var/lib/lampos-cloud/search-token` (cạnh `hermes-token`), `.env` của
+Hermes có thêm `SEARXNG_URL=http://127.0.0.1:7741/v1/search/<search-token>`
+(đường tìm kiếm dạng SearXNG của lamp-cloud, nên provider `searxng` có sẵn
+của Hermes hỏi nó) và `config.yaml` có khối `web:`:
+`search_backend: "searxng"`, `extract_backend: "exa"`,
+`keyless_fallback: true`, `keyless_rescue: true`. Việc đọc trang vẫn ở nhóm
+không cần khóa của Hermes (Exa không khóa, rồi Parallel, Firecrawl và
+Keenable): ở v0.22.2, nếu đặt `SEARXNG_URL` mà không ghim, cơ chế tự dò của
+Hermes cũng gửi `web_extract` sang SearXNG vốn chỉ tìm kiếm. Một lần tìm mà
+đường của đèn lỗi thì được nhóm không cần khóa phục vụ một lần
+(`keyless_rescue`), lần sau lại hỏi đường của đèn. `SEARXNG_URL` riêng của
+người dùng được giữ và của ta không được thêm. Không có file token thì không
+thêm gì: một `SEARXNG_URL` của ta bị bỏ đi, và cả một `web.search_backend`
+ghi `searxng` (cái còn lại từ một token nay đã mất sẽ ghim một backend không
+có URL; không ghim thì cơ chế tự dò của Hermes chọn `SEARXNG_URL` riêng của
+người dùng, nếu không thì nhóm không cần khóa), các khóa `web:` khác được
+giữ. Khi đó Hermes tìm qua nhóm không cần khóa như trước; dòng khởi động của lamp-tasks nói rõ (`web search through
+the lamp first` hoặc `web search keyless only (no search token)`). Một đèn
+đang chạy có nó ở lần khởi động sau. lamp-cloud tạo token khi bộ chuyển tiếp
+của nó khởi động, và lamp-tasks có thể khởi động trước (giữa hai unit không có
+thứ tự; một vòng cập nhật khởi động lại từng phần một): thiết lập của Hermes
+và OpenClaw được ghi ngay trên một luồng bên cạnh lúc khởi động, có hay không
+có token, nên không phần nào khác trong đó phải chờ nó; khi chưa có, lamp-tasks
+tìm nó tối đa 120 s (`runtime::SEARCH_TOKEN_WAIT`, nhìn lại mỗi 2 s,
+`runtime::write_settings`) và ghi lại cả hai một lần, có tìm kiếm web, nếu
+token xuất hiện. Mỗi gateway đọc thiết lập của nó khi chính nó khởi động.
+Lỗi "Could not reach SearXNG at <url>"
+của Hermes có ghi URL, nên model có thể thấy token khi lamp-cloud không
+chạy: token chỉ dùng để tìm kiếm và đường đó chỉ trả lời trên loopback.
+
 ## Cài đặt của OpenClaw trên đèn (#6226)
 
 Khi `LAMP_OPENCLAW_ON_LAMP` bật, lamp-tasks lúc khởi động gộp những gì
@@ -4794,7 +4828,11 @@ là phần của một coder khác trong #6226; thiết kế:
 - `agents.defaults.workspace`: thư mục làm việc riêng của đèn
   (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` trong
   home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn
-  (`AGENTS.md`) được ghi, như với Hermes. Mục cuối của nó, "Your last
+  (`AGENTS.md`) được ghi, như với Hermes. Các quy tắc của nó bảo agent tìm
+  thông tin trên web bằng `web_search`, rồi `web_fetch` để đọc một trang nó
+  tìm được, không bao giờ qua `exec`, `curl` hay trang của một công cụ tìm
+  kiếm (trên lamp-ee17 OpenClaw tìm bằng `exec` + `curl` dù đã có
+  `web_search`; `the_written_guidance_says_to_search_with_web_search`). Mục cuối của nó, "Your last
   answer" (#7930), yêu cầu agent đưa ra câu trả lời cuối nói trước tiên
   điều nó tìm được hoặc đã làm, bằng câu ngắn, rõ, không bao giờ chỉ
   "done" hay "saved", nói file nó ghi chứa gì và ở đâu, trong khoảng 800
@@ -4861,6 +4899,52 @@ là phần của một coder khác trong #6226; thiết kế:
   riêng của người dùng (như `askFallback`) được giữ; file đã chỉ có `mode` thì không bị ghi lại (#7859). Mục cho phép của launcher
   skill-start vẫn được giữ. Lần chạy kỹ năng vẫn exec nó, và `security:
   "full"` cũng cho phép exec đó, nên lần chạy không cần quyền riêng nào.
+- **Plugin và web.** `plugins.allow` là `openai`, `memory-core` và
+  `web-readability` khi chưa có danh sách nào, và thêm `searxng` sau chúng
+  khi bật tìm kiếm web (bên dưới) (#6226 trên lamp-c0a4: 41 plugin có sẵn
+  mặc định của OpenClaw làm một lượt treo 92 s; chỉ với hai plugin đầu,
+  Gateway sẵn sàng trong 27-50 s). Danh sách đã có, của đèn từ trước khi có
+  tìm kiếm web hay của người dùng, được thêm `web-readability` (và `searxng`
+  khi bật tìm kiếm) và không mất gì khác; danh sách rỗng (không giới hạn)
+  được giữ nguyên. Khi tắt tìm kiếm, `searxng` bị bỏ khỏi danh sách, vì
+  OpenClaw cảnh báo về plugin được cho phép mà nó không tìm thấy ("plugin
+  not found: searxng (stale config entry ignored)"), trừ khi
+  `plugins.entries.searxng` vẫn còn thiết lập riêng của người dùng.
+  `web-readability` luôn ở lại: `web_fetch` dùng nó. `web-readability` có sẵn trong OpenClaw, trích
+  nội dung chính của trang cho `web_fetch`, như trên V1 (V1 không đặt danh
+  sách cho phép). `browser`, cũng được nạp trên V1, bị bỏ ra: nó chạy cả một
+  Chromium. Bản thân `web_fetch` bật sẵn và không cần khóa. Cả hai plugin
+  web chỉ nạp khi dùng lần đầu, không nạp lúc Gateway khởi động
+  (`activation.onStartup: false`).
+- **Tìm kiếm web qua lamp-cloud.** OpenClaw bỏ `web_search` khỏi công cụ
+  của agent khi chưa đặt nhà cung cấp; đó là trạng thái của đèn trước thay
+  đổi này (kiểm bằng `tools.effective` của OpenClaw 2026.11.2 trên bản sao
+  của file: có `web_fetch`, không có `web_search`). Khi token chỉ-để-tìm-kiếm
+  của lamp-cloud có mặt và không rỗng (`/var/lib/lampos-cloud/search-token`)
+  và thư mục của plugin SearXNG có mặt (một lần cài có nó, bên dưới),
+  lamp-tasks ghi `tools.web.search.provider: "searxng"`,
+  `plugins.entries.searxng.config.webSearch.baseUrl:
+  "http://127.0.0.1:7741/v1/search/${LAMP_SEARCH_TOKEN}"` (đường tìm kiếm
+  dạng SearXNG của lamp-cloud; plugin tự thêm `/search?q=…&format=json`) và
+  thư mục của plugin,
+  `/var/lib/lampos-openclaw/npm/node_modules/@openclaw/searxng-plugin`, vào
+  `plugins.load.paths`. Token không bao giờ nằm trong file: wrapper của
+  OpenClaw xuất nó thành `LAMP_SEARCH_TOKEN` (rỗng khi không có file), và
+  OpenClaw điền vào chỗ `${…}`. Không có token hoặc thư mục của plugin thì
+  các giá trị đó của ta (và `searxng` trong `plugins.allow`) bị bỏ đi, giá
+  trị của người khác được giữ, và dòng nhật ký lúc khởi động kết thúc bằng
+  "web search off: no search token" hoặc "web search off: no SearXNG
+  plugin". OpenClaw coi plugin, đường
+  dẫn hay biến bị thiếu là cảnh báo, không bao giờ từ chối file. Plugin này
+  không có sẵn trong OpenClaw 2026.11.2; lamp-update cài nó cùng OpenClaw
+  (docs/install.md, "From a pinned lockfile"). OpenClaw chỉ nạp plugin lúc
+  Gateway khởi động, nên một lần ghi bật tìm kiếm cần Gateway khởi động sau
+  nó: bản cài khởi động lại lamp-tasks, rồi chờ lần gộp này (tối đa 90 s)
+  trước khi (khởi động lại) Gateway (docs/install.md, "The Gateway").
+  **Rủi ro thời gian khởi động
+  (#6226):** thêm hai plugin vào danh sách cho phép; cả hai chỉ nạp khi
+  dùng, nhưng thời gian Gateway sẵn sàng và lượt tìm kiếm đầu tiên phải được
+  đo trong một lamp row trước khi coi là không tốn gì.
 
 **OpenClaw kiểm tra văn bản trước khi nó vào chỗ** (#7108; ngày 15/11 một
 lần merge mà OpenClaw 2026.11.2 từ chối, 78/CONFIG, đã làm gateway của

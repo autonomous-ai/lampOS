@@ -41,7 +41,8 @@
 //! namespace of its own nor in the lamp's. A restart of the gateway ends
 //! its panes with its namespace. It is given only lamp-cloud's
 //! local forwarder token ([`TOKEN`], as [`TOKEN_ENV`]: the forwarder is the
-//! one Hermes uses). With [`SKILLS_SWITCH`] on, the namespace also shows
+//! one Hermes uses) and its search-only token ([`SEARCH_TOKEN`], as
+//! [`SEARCH_TOKEN_ENV`], empty without the file). With [`SKILLS_SWITCH`] on, the namespace also shows
 //! lamp-skills' socket folder, read-only, as Hermes's does with its own
 //! switch.
 //!
@@ -60,7 +61,10 @@
 //! ([`LOCKFILE`], every package with its sha512 integrity, the file itself
 //! checked by its SHA-256 [`LOCKFILE_SHA256`], its `openclaw` entry
 //! checked against [`PACKAGE_URL`] and [`PACKAGE_INTEGRITY`]), never
-//! resolved freely. npm runs as `lampos` inside OpenClaw's own namespace
+//! resolved freely. The same `npm ci` puts in OpenClaw's official SearXNG
+//! plugin ([`SEARXNG_PACKAGE`] at [`VERSION`], [`SEARXNG_URL`],
+//! [`SEARXNG_INTEGRITY`]), not bundled in OpenClaw 2026.11.2; lamp-tasks
+//! loads it from [`SEARXNG_DIR`] for `web_search` through lamp-cloud. npm runs as `lampos` inside OpenClaw's own namespace
 //! ([`NPM_CI_ENV`], the one mode of [`NS`]), with no package's install
 //! scripts: OpenClaw finishes its own package step at its first run (the
 //! install's `openclaw --version`, in the namespace too).
@@ -168,6 +172,13 @@ pub const TOKEN: &str = hermes_install::TOKEN;
 /// The variable the forwarder's key is given in: the same as Hermes's, so
 /// lamp-tasks' provider entry names `${LAMP_HERMES_TOKEN}`.
 pub const TOKEN_ENV: &str = hermes_install::TOKEN_ENV;
+/// lamp-cloud's search-only token, for its SearXNG-shaped search route.
+/// [`WRAPPER_TEXT`] gives it as [`SEARCH_TOKEN_ENV`], empty when the file
+/// is not there; lamp-tasks names `${LAMP_SEARCH_TOKEN}` in the plugin's
+/// `baseUrl`, so the token is never written in `openclaw.json`.
+pub const SEARCH_TOKEN: &str = "/var/lib/lampos-cloud/search-token";
+/// The variable [`SEARCH_TOKEN`] is given in.
+pub const SEARCH_TOKEN_ENV: &str = "LAMP_SEARCH_TOKEN";
 /// Harness's project, where it starts OpenClaw's panes: as Hermes's.
 pub const WORK: &str = hermes_install::WORK;
 /// The lamp's skills, shown read-only.
@@ -236,7 +247,20 @@ pub const PACKAGE_URL: &str = "https://registry.npmjs.org/openclaw/-/openclaw-20
 /// Its integrity, as the registry gives it (`dist.integrity`): what
 /// [`LOCKFILE`]'s `openclaw` entry must hold, so npm checks the tarball by it.
 pub const PACKAGE_INTEGRITY: &str = "sha512-SgBml4WLp8V1DdAYkrTPLzVdA/iYo3iuHCtm4788GjaG83QZdd1VeOTlue0HBJGdn3SbFE06b6uPs+AM5ShMgg==";
-/// The npm project `npm ci` installs: `openclaw` at [`VERSION`] exactly.
+/// OpenClaw's official SearXNG `web_search` provider plugin, an npm
+/// package of its own (not in OpenClaw's `dist/extensions`), installed by
+/// the same `npm ci` at [`VERSION`], the release built with this OpenClaw
+/// (its `openclaw.build.openclawVersion`). It has no dependencies.
+pub const SEARXNG_PACKAGE: &str = "@openclaw/searxng-plugin";
+/// Its tarball, as [`LOCKFILE`]'s entry must give it.
+pub const SEARXNG_URL: &str =
+    "https://registry.npmjs.org/@openclaw/searxng-plugin/-/searxng-plugin-2026.11.2.tgz";
+/// Its integrity, as the registry gives it (`dist.integrity`).
+pub const SEARXNG_INTEGRITY: &str = "sha512-WFEPd+l2Y4az7YPksRS7NAL/zq/YFRoLYMvFkGPNugXd449wgWHyVZ3D2bXP0A2VJ9rGSzlJRgnPOniTMzAG2g==";
+/// Where `npm ci` puts it: lamp-tasks names it in `plugins.load.paths`.
+pub const SEARXNG_DIR: &str = "/var/lib/lampos-openclaw/npm/node_modules/@openclaw/searxng-plugin";
+/// The npm project `npm ci` installs: `openclaw` and [`SEARXNG_PACKAGE`]
+/// at [`VERSION`] exactly.
 pub const MANIFEST: &str = include_str!("../openclaw/package.json");
 /// Its lockfile, made once on a developer's machine by `npm install
 /// --package-lock-only --ignore-scripts` (npm 11, lockfile version 3) for
@@ -246,7 +270,7 @@ pub const MANIFEST: &str = include_str!("../openclaw/package.json");
 pub const LOCKFILE: &str = include_str!("../openclaw/package-lock.json");
 /// [`LOCKFILE`]'s SHA-256, checked by a test and again before each install.
 pub const LOCKFILE_SHA256: &str =
-    "2a916259319f5f67b1f8a93d3431839a81ea0f233ceb4cbc18676ecb72962fee";
+    "5d1e5567f40384e2f1606a5a87feb78141818f9b2e3123a5108a67c12eacfd04";
 /// Set to `on` for [`NS`], it runs `npm ci` in [`PREFIX`] instead of
 /// OpenClaw: lamp-update's install step, in OpenClaw's namespace.
 pub const NPM_CI_ENV: &str = "LAMP_OPENCLAW_NPM_CI";
@@ -300,7 +324,7 @@ pub const WRAPPER_TEXT: &str = r#"#!/bin/sh
 # lampOS: OpenClaw on the lamp (#6226; lampOS/docs/install.md, "OpenClaw on the lamp"). Written by lamp-update.
 # OpenClaw (its gateway and each Harness pane) runs as its caller (lampos), in a user and mount namespace where it sees
 # only its own folder, its work folder and the skills, no lamp service's files or sockets and no camera, mic or serial
-# device; it is given only lamp-cloud's local forwarder token. Its gateway's unit (LAMP_OPENCLAW_GATEWAY=on) starts it in
+# device; it is given only lamp-cloud's local forwarder and search tokens. Its gateway's unit (LAMP_OPENCLAW_GATEWAY=on) starts it in
 # a PID namespace of its own, and every other call joins the running gateway's namespaces, so OpenClaw sees and can
 # signal only OpenClaw's processes, never a lamp service; with no gateway running, a call fails. It is never run any
 # other way.
@@ -309,8 +333,9 @@ T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || {
   exit 1
 }
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
-export LAMP_HERMES_TOKEN="$T" OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state OPENCLAW_NO_AUTO_UPDATE=1 PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
-unset T
+S=$(cat /var/lib/lampos-cloud/search-token 2>/dev/null) || S=
+export LAMP_HERMES_TOKEN="$T" LAMP_SEARCH_TOKEN="$S" OPENCLAW_STATE_DIR=/var/lib/lampos-openclaw/state OPENCLAW_NO_AUTO_UPDATE=1 PATH="/var/lib/lampos-openclaw/node/bin:$PATH" LAMP_NS_UID LAMP_NS_GID
+unset T S
 A=${LAMP_OPENCLAW_GATEWAY-}
 unset LAMP_OPENCLAW_GATEWAY
 if [ "$A" = on ]; then
@@ -1667,8 +1692,9 @@ impl Kit {
 
 /// Whether `lockfile` is the pinned one: its SHA-256 `sha256`, a lockfile
 /// npm 7 or later reads (version 2 or 3), whose project wants `openclaw`
-/// at `version` exactly (as [`MANIFEST`]), and whose `openclaw` is
-/// `version` from [`PACKAGE_URL`] with [`PACKAGE_INTEGRITY`]. Every other
+/// and [`SEARXNG_PACKAGE`] at `version` exactly (as [`MANIFEST`]), whose
+/// `openclaw` is `version` from [`PACKAGE_URL`] with [`PACKAGE_INTEGRITY`]
+/// and whose plugin is from [`SEARXNG_URL`] with [`SEARXNG_INTEGRITY`]. Every other
 /// package of the tree must carry a registry tarball and its integrity,
 /// unless it comes inside another package's tarball (`inBundle`).
 pub fn lockfile_pinned(lockfile: &str, sha256: &str, version: &str) -> Result<(), String> {
@@ -1685,22 +1711,27 @@ pub fn lockfile_pinned(lockfile: &str, sha256: &str, version: &str) -> Result<()
         .as_object()
         .ok_or("the lockfile lists no packages")?;
     let wants = &packages.get("").ok_or("the lockfile has no project")?["dependencies"];
-    if wants != &serde_json::json!({"openclaw": version}) {
+    if wants != &serde_json::json!({"openclaw": version, SEARXNG_PACKAGE: version}) {
         return Err(format!(
-            "the lockfile's project wants {wants}, not openclaw {version}"
+            "the lockfile's project wants {wants}, not openclaw and {SEARXNG_PACKAGE} {version}"
         ));
     }
-    let openclaw = packages
-        .get("node_modules/openclaw")
-        .ok_or("the lockfile has no openclaw")?;
-    let pinned = serde_json::json!([version, PACKAGE_URL, PACKAGE_INTEGRITY]);
-    let given = serde_json::json!([
-        openclaw["version"],
-        openclaw["resolved"],
-        openclaw["integrity"]
-    ]);
-    if given != pinned {
-        return Err(format!("the lockfile's openclaw is {given}, not {pinned}"));
+    for (name, url, integrity) in [
+        ("openclaw", PACKAGE_URL, PACKAGE_INTEGRITY),
+        (SEARXNG_PACKAGE, SEARXNG_URL, SEARXNG_INTEGRITY),
+    ] {
+        let package = packages
+            .get(&format!("node_modules/{name}"))
+            .ok_or(format!("the lockfile has no {name}"))?;
+        let pinned = serde_json::json!([version, url, integrity]);
+        let given = serde_json::json!([
+            package["version"],
+            package["resolved"],
+            package["integrity"]
+        ]);
+        if given != pinned {
+            return Err(format!("the lockfile's {name} is {given}, not {pinned}"));
+        }
     }
     for (name, package) in packages {
         let bundled = package["inBundle"].as_bool() == Some(true);
@@ -2130,6 +2161,9 @@ fn steps(
             if let Err(why) = run(&["systemctl", "reset-failed", UNIT].map(str::to_owned)) {
                 say(&format!("{UNIT} not reset-failed: {why}"));
             }
+            if !pinned_there {
+                search_merged(root, say, &mut || std::thread::sleep(SETTLE_SLEEP));
+            }
             settled(root, run, say, false);
             // Looked at again after `settled`'s wait (up to SETTLE_AT_MOST):
             // a switch meanwhile, or Hermes's gateway not down (a round
@@ -2156,6 +2190,9 @@ fn steps(
             }
         }
         Gateway::Unknown => {
+            if !pinned_there {
+                search_merged(root, say, &mut || std::thread::sleep(SETTLE_SLEEP));
+            }
             settled(root, run, say, false);
             if let Err(why) = run(&["systemctl", "try-restart", "--", UNIT].map(str::to_owned)) {
                 return fail(
@@ -2512,6 +2549,70 @@ fn settled(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str), retry: bool
         std::thread::sleep(SETTLE_SLEEP);
         waited += SETTLE_EVERY;
     }
+}
+
+/// The longest [`search_merged`] waits for lamp-tasks' merge.
+pub const SEARCH_MERGE_AT_MOST: Duration = Duration::from_secs(90);
+
+/// Before the install's (re)start of the gateway, lamp-tasks just started
+/// again: with lamp-cloud's search token ([`SEARCH_TOKEN`], not empty) and
+/// the SearXNG plugin ([`SEARXNG_DIR`]) there, the merge lamp-tasks writes
+/// at its start (web search on, the plugin's folder in
+/// `plugins.load.paths` of [`CONFIG`]) is waited for, looking every
+/// [`SETTLE_EVERY`] and [`SEARCH_MERGE_AT_MOST`] at most, then the gateway
+/// is (re)started either way. OpenClaw loads its plugins only at the
+/// gateway's start, and lamp-tasks' write is checked by OpenClaw (seconds
+/// to a minute): a restart right after lamp-tasks' own left the gateway
+/// without `web_search` until its next start (lamp-ee17, 28 Nov: started
+/// 16:20:38 with `memory-core, openai`; `searxng` only after a switch at
+/// 16:35:22). Without the token or the plugin nothing is waited for.
+/// `pause` sleeps one step.
+fn search_merged(root: &Path, say: &mut dyn FnMut(&str), pause: &mut dyn FnMut()) {
+    let token =
+        fs::metadata(on(root, SEARCH_TOKEN)).is_ok_and(|file| file.is_file() && file.len() > 0);
+    if !token || !on(root, SEARXNG_DIR).is_dir() {
+        return;
+    }
+    let mut waited = Duration::ZERO;
+    loop {
+        if names_searxng(root) {
+            if waited > Duration::ZERO {
+                say(&format!(
+                    "{UNIT}: lamp-tasks' web search merge in after {} s: restarted with it",
+                    waited.as_secs()
+                ));
+            }
+            return;
+        }
+        if waited >= SEARCH_MERGE_AT_MOST {
+            say(&format!(
+                "{UNIT}: lamp-tasks' web search merge not in after {} s: restarted anyway, web_search from its next start",
+                waited.as_secs()
+            ));
+            return;
+        }
+        if waited == Duration::ZERO {
+            say(&format!(
+                "{UNIT}: the restart waits for lamp-tasks' web search merge (the SearXNG plugin loads only at the gateway's start)"
+            ));
+        }
+        pause();
+        waited += SETTLE_EVERY;
+    }
+}
+
+/// Whether [`CONFIG`]'s `plugins.load.paths` names [`SEARXNG_DIR`].
+fn names_searxng(root: &Path) -> bool {
+    fs::read(on(root, CONFIG))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|config| {
+            config
+                .pointer("/plugins/load/paths")?
+                .as_array()
+                .map(|paths| paths.iter().any(|path| path.as_str() == Some(SEARXNG_DIR)))
+        })
+        .unwrap_or(false)
 }
 
 /// When systemd started the gateway's current process, on the monotonic

@@ -30,6 +30,24 @@
 //!   reaches the linked services only through lamp-control under the run's
 //!   grants; with it off, that one entry is taken out (a person's other
 //!   servers are kept).
+//! - with lamp-cloud's search token ([`SEARCH_TOKEN_PATH`]), web search
+//!   through the lamp's own search route first: `.env`'s [`SEARCH_ENV`]
+//!   line ([`search_url`], SearXNG-shaped, so Hermes's bundled `searxng`
+//!   provider asks it), `web.search_backend` = `searxng`, and
+//!   `web.extract_backend` = [`EXTRACT_BACKEND`], since with a SearXNG URL
+//!   set Hermes's autodetect would hand page reads to the search-only
+//!   SearXNG too (v0.22.2 `tools/web_tools.py` `_autodetect_backend`);
+//!   `exa` with no key is Hermes's keyless pool (Exa, Parallel, Firecrawl,
+//!   Keenable, failing over in turn), what reads pages today.
+//!   `web.keyless_fallback` and `web.keyless_rescue` are set on, so a
+//!   search the lamp's route fails is served by that pool. A person's own
+//!   `SEARXNG_URL` is kept, and ours is not added. Without the token,
+//!   nothing of it is added, and a `web.search_backend` naming `searxng`
+//!   is taken out (ours from a token that has since gone would name a
+//!   backend with no URL), so Hermes searches through its keyless pool, or
+//!   a person's own `SEARXNG_URL` by its autodetect. Hermes's "Could not reach SearXNG at <url>" error
+//!   names the URL, so the model may see this token: it is search-only and
+//!   answered on loopback only (lamp-cloud's search route).
 //!
 //! Every other line is kept as it was, Harness's `hooks:` block above all
 //! (openharness `engines/hermes/contract.ts`). The workspace has no YAML
@@ -58,6 +76,15 @@ pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
 /// (`lamp_cloud::hermes_llm::TOKEN_FILE` in its state folder), read by
 /// lamp-tasks and handed to [`write`].
 pub const TOKEN_PATH: &str = "/var/lib/lampos-cloud/hermes-token";
+/// lamp-cloud's search-only token for its search route, beside
+/// [`TOKEN_PATH`]; read by lamp-tasks and handed to [`write`], and by
+/// OpenClaw's wrapper, which lamp-update writes.
+pub const SEARCH_TOKEN_PATH: &str = lamp_update::openclaw_install::SEARCH_TOKEN;
+/// Where Hermes's bundled SearXNG provider reads its instance URL.
+pub const SEARCH_ENV: &str = "SEARXNG_URL";
+/// Hermes's page reader with a search URL set: Exa, keyless with no key,
+/// the first of Hermes's keyless pool.
+pub const EXTRACT_BACKEND: &str = "exa";
 /// Provider keys taken out of `.env`: Hermes asks only the forwarder, and
 /// no provider's own key is kept where Hermes, or what it runs, reads it.
 pub const DROPPED_KEYS: [&str; 5] = [
@@ -121,6 +148,20 @@ pub fn mcp_entry() -> Vec<String> {
 /// The forwarder's base for Hermes, on `port`.
 pub fn base_url(port: u16) -> String {
     format!("http://127.0.0.1:{port}/v1/deepseek")
+}
+
+/// lamp-cloud's search route for Hermes, on `port`, with its search-only
+/// `token` in the path (Hermes's SearXNG provider sends no header).
+pub fn search_url(port: u16, token: &str) -> String {
+    format!("http://127.0.0.1:{port}/v1/search/{token}")
+}
+
+/// A `SEARXNG_URL` value [`search_url`] made, on any port.
+fn is_our_search_url(value: &str) -> bool {
+    value
+        .strip_prefix("http://127.0.0.1:")
+        .and_then(|rest| rest.split_once("/v1/search/"))
+        .is_some_and(|(port, _)| port.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 /// Why a merge was refused; the files are left as they were.
@@ -619,13 +660,21 @@ fn quoted(value: &str) -> String {
 /// `port`, with the lamp's agent's connectors off. The same text given
 /// twice gives the same text back.
 pub fn merge_config(text: &str, port: u16) -> Result<String, Refused> {
-    merge_config_for(text, port, false)
+    merge_config_for(text, port, false, false)
 }
 
 /// [`merge_config`] with [`AGENT_SERVICES_SWITCH`] as `agent_services`:
 /// on, the lamp's `mcp_servers` entry ([`mcp_entry`]) set; off, that entry
 /// taken out, and `mcp_servers` with it when nothing else is left there.
-pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<String, Refused> {
+/// With `search`, the `web:` settings for the lamp's search route first
+/// (module doc); without it, a `web.search_backend` naming `searxng` is
+/// taken out and the rest of `web:` is left as it is.
+pub fn merge_config_for(
+    text: &str,
+    port: u16,
+    agent_services: bool,
+    search: bool,
+) -> Result<String, Refused> {
     let mut parts = parts(text)?;
     let one = |key: &str, value: &str| vec![format!("{key}: {}", quoted(value))];
     set_child(
@@ -664,6 +713,31 @@ pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<S
         );
     }
     merge_mcp_servers(&mut parts, agent_services)?;
+    if search {
+        set_child(
+            &mut parts,
+            "web",
+            "search_backend",
+            Some(&one("search_backend", "searxng")),
+        )?;
+        set_child(
+            &mut parts,
+            "web",
+            "extract_backend",
+            Some(&one("extract_backend", EXTRACT_BACKEND)),
+        )?;
+        for on in ["keyless_fallback", "keyless_rescue"] {
+            set_child(&mut parts, "web", on, Some(&[format!("{on}: true")]))?;
+        }
+    } else if child_value(&parts, "web", "search_backend")?
+        .is_some_and(|value| value.trim_matches(['"', '\'']) == "searxng")
+    {
+        // The search token gone, our SEARXNG_URL left `.env`: a `searxng`
+        // pin would name a backend with no URL. Unpinned, Hermes's
+        // autodetect picks SearXNG when a person's own URL is set, else
+        // the keyless pool; the rest of `web:` is kept.
+        set_child(&mut parts, "web", "search_backend", None)?;
+    }
     let mut out = String::new();
     for part in &parts {
         for line in &part.lines {
@@ -741,30 +815,40 @@ fn merge_mcp_servers(parts: &mut Vec<Part>, agent_services: bool) -> Result<(), 
 }
 
 /// `.env`'s text with [`TOKEN_ENV`] set to `token`, the [`DROPPED_KEYS`]
-/// taken out and every other line kept. `None` for a token that isn't
-/// [`token_is_plain`].
-pub fn merge_env(text: &str, token: &str) -> Option<String> {
+/// taken out and every other line kept; with `search` (a [`search_url`]),
+/// [`SEARCH_ENV`] set to it, unless a person's own [`SEARCH_ENV`] is there;
+/// without it, only a line of ours taken out. `None` for a token that
+/// isn't [`token_is_plain`].
+pub fn merge_env(text: &str, token: &str, search: Option<&str>) -> Option<String> {
     if !token_is_plain(token) {
         return None;
     }
     let mut out = String::new();
-    let prefix = format!("{TOKEN_ENV}=");
+    let mut theirs = false;
     for line in text.lines() {
         let trimmed = line.trim_start();
         let trimmed = trimmed
             .strip_prefix("export ")
             .unwrap_or(trimmed)
             .trim_start();
-        let name = trimmed.split('=').next().unwrap_or_default().trim();
+        let (name, value) = trimmed.split_once('=').unwrap_or((trimmed, ""));
+        let name = name.trim();
         if trimmed.contains('=') && (name == TOKEN_ENV || DROPPED_KEYS.contains(&name)) {
             continue;
+        }
+        if trimmed.contains('=') && name == SEARCH_ENV {
+            if is_our_search_url(value.trim().trim_matches(['"', '\''])) {
+                continue;
+            }
+            theirs = true;
         }
         out.push_str(line);
         out.push('\n');
     }
-    out.push_str(&prefix);
-    out.push_str(token);
-    out.push('\n');
+    out.push_str(&format!("{TOKEN_ENV}={token}\n"));
+    if let Some(url) = search.filter(|_| !theirs) {
+        out.push_str(&format!("{SEARCH_ENV}={url}\n"));
+    }
     Some(out)
 }
 
@@ -823,10 +907,17 @@ pub(crate) fn replace_checked(
 }
 
 /// Both files under `hermes_home` merged, on the forwarder's `port`, with
-/// its local `token`; a file already right is not written. Nothing is
-/// written when `config.yaml` can't be merged or the token isn't plain.
-pub fn write(hermes_home: &Path, port: u16, token: &str) -> io::Result<Written> {
-    write_for(hermes_home, port, token, agent_services_on())
+/// its local `token` and, when lamp-cloud has one, its `search_token`
+/// (web search through the lamp first); a file already right is not
+/// written. Nothing is written when `config.yaml` can't be merged or the
+/// token isn't plain; a search token that isn't plain is as none.
+pub fn write(
+    hermes_home: &Path,
+    port: u16,
+    token: &str,
+    search_token: Option<&str>,
+) -> io::Result<Written> {
+    write_for(hermes_home, port, token, agent_services_on(), search_token)
 }
 
 /// [`write`] with the lamp's agent's connectors as `agent_services`.
@@ -835,14 +926,18 @@ pub fn write_for(
     port: u16,
     token: &str,
     agent_services: bool,
+    search_token: Option<&str>,
 ) -> io::Result<Written> {
     let config_path = hermes_home.join("config.yaml");
     let env_path = hermes_home.join(".env");
     let config = read_or_empty(&config_path)?;
     let env = read_or_empty(&env_path)?;
-    let merged_config =
-        merge_config_for(&config, port, agent_services).map_err(io::Error::other)?;
-    let merged_env = merge_env(&env, token)
+    let search = search_token
+        .filter(|search| token_is_plain(search))
+        .map(|search| search_url(port, search));
+    let merged_config = merge_config_for(&config, port, agent_services, search.is_some())
+        .map_err(io::Error::other)?;
+    let merged_env = merge_env(&env, token, search.as_deref())
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "the token is not plain"))?;
     fs::create_dir_all(hermes_home)?;
     let written = Written {
@@ -906,6 +1001,9 @@ play sounds on your own.
 - To write a new skill, read two or three existing ones for the format, write \
 it in this work folder, and tell the person where it is. Installing it on the \
 lamp is the person's step, never yours.
+- To look something up on the web, call `web_search`, then `web_fetch` to \
+read a page it found; never search through `exec`, `curl` or a search \
+engine's page.
 
 ## Your last answer
 
@@ -1027,11 +1125,11 @@ custom_providers:
     /// emptied `mcp_servers` goes.
     #[test]
     fn the_lamps_mcp_server_is_added_on_and_removed_off() {
-        let on = merge_config_for(HARNESS, 7741, true).unwrap();
+        let on = merge_config_for(HARNESS, 7741, true, false).unwrap();
         assert!(on.ends_with(SERVERS), "{on}");
-        assert_eq!(merge_config_for(&on, 7741, true).unwrap(), on);
+        assert_eq!(merge_config_for(&on, 7741, true, false).unwrap(), on);
         assert!(!on.contains("LAMP_CONTROL_TOKEN="));
-        let off = merge_config_for(&on, 7741, false).unwrap();
+        let off = merge_config_for(&on, 7741, false, false).unwrap();
         assert!(
             !off.contains("mcp_servers") && !off.contains(MCP_NAME),
             "{off}"
@@ -1039,19 +1137,19 @@ custom_providers:
         assert_eq!(off, merge_config(HARNESS, 7741).unwrap());
         // A person's own server beside it: kept both ways.
         let theirs = "mcp_servers:\n  notes:\n    command: /home/me/notes-mcp\n";
-        let both = merge_config_for(theirs, 7741, true).unwrap();
+        let both = merge_config_for(theirs, 7741, true, false).unwrap();
         assert!(
             both.contains("  notes:\n    command: /home/me/notes-mcp\n  lamp-services:\n"),
             "{both}"
         );
-        let kept = merge_config_for(&both, 7741, false).unwrap();
+        let kept = merge_config_for(&both, 7741, false, false).unwrap();
         assert!(
             kept.contains("mcp_servers:\n  notes:\n    command: /home/me/notes-mcp\n"),
             "{kept}"
         );
         assert!(!kept.contains(MCP_NAME));
         // What a reset leaves (`mcp_servers` cut), merged on again.
-        let reset = merge_config_for("updates:\n  check: false\n", 7741, true).unwrap();
+        let reset = merge_config_for("updates:\n  check: false\n", 7741, true, false).unwrap();
         assert!(reset.ends_with(SERVERS), "{reset}");
     }
 
@@ -1065,7 +1163,7 @@ custom_providers:
         // A flow mapping: kept untouched, both ways.
         let flow = "mcp_servers: {notes: {command: /x}}\n";
         for on in [false, true] {
-            let merged = merge_config_for(flow, 7741, on).unwrap();
+            let merged = merge_config_for(flow, 7741, on, false).unwrap();
             assert!(merged.starts_with(flow), "{merged}");
             assert!(merged.contains(&provider) && !merged.contains(MCP_NAME));
         }
@@ -1077,22 +1175,22 @@ custom_providers:
             "mcp_servers:\n    notes:\n      command: /x\n  lamp-services:\n    command: /y\n",
         ] {
             for on in [false, true] {
-                let merged = merge_config_for(other, 7741, on).unwrap();
+                let merged = merge_config_for(other, 7741, on, false).unwrap();
                 assert!(merged.starts_with(other), "{other} -> {merged}");
                 assert!(merged.contains(&provider), "{merged}");
             }
         }
         // A block holding only the lamp's entry: the key goes.
-        let ours = merge_config_for("", 7741, true).unwrap();
+        let ours = merge_config_for("", 7741, true, false).unwrap();
         assert!(ours.contains(SERVERS), "{ours}");
-        let off = merge_config_for(&ours, 7741, false).unwrap();
+        let off = merge_config_for(&ours, 7741, false, false).unwrap();
         assert!(!off.contains("mcp_servers"), "{off}");
         // A person's server beside the lamp's: the person's is kept.
         let both = format!(
             "mcp_servers:\n  notes:\n    command: /x\n{}",
             &SERVERS[13..]
         );
-        let kept = merge_config_for(&both, 7741, false).unwrap();
+        let kept = merge_config_for(&both, 7741, false, false).unwrap();
         assert!(
             kept.starts_with("mcp_servers:\n  notes:\n    command: /x\n"),
             "{kept}"
@@ -1101,7 +1199,7 @@ custom_providers:
         // A block without the lamp's entry, off: byte for byte.
         let theirs = "mcp_servers:\n  notes:\n    command: /x\n\n# mine\n";
         assert!(
-            merge_config_for(theirs, 7741, false)
+            merge_config_for(theirs, 7741, false, false)
                 .unwrap()
                 .starts_with(theirs)
         );
@@ -1127,11 +1225,11 @@ custom_providers:
     fn the_settings_written_follow_the_switch() {
         let dir = tempfile::tempdir().unwrap();
         let token = "a".repeat(43);
-        write_for(dir.path(), 7741, &token, true).unwrap();
+        write_for(dir.path(), 7741, &token, true, None).unwrap();
         let config = fs::read_to_string(dir.path().join("config.yaml")).unwrap();
         assert!(config.contains(SERVERS), "{config}");
         assert!(
-            write_for(dir.path(), 7741, &token, false)
+            write_for(dir.path(), 7741, &token, false, None)
                 .unwrap()
                 .config_changed
         );
@@ -1174,8 +1272,8 @@ custom_providers:
         assert_eq!(merge_config(&once, 7741).unwrap(), once);
         let empty = merge_config("", 7741).unwrap();
         assert_eq!(merge_config(&empty, 7741).unwrap(), empty);
-        let env = merge_env("OTHER=1\n", TOKEN).unwrap();
-        assert_eq!(merge_env(&env, TOKEN).unwrap(), env);
+        let env = merge_env("OTHER=1\n", TOKEN, None).unwrap();
+        assert_eq!(merge_env(&env, TOKEN, None).unwrap(), env);
     }
 
     #[test]
@@ -1223,22 +1321,22 @@ custom_providers:
 
     #[test]
     fn the_env_carries_the_local_token_and_nothing_of_the_relay() {
-        let env = merge_env("TELEGRAM_BOT_TOKEN=x\nLAMP_HERMES_TOKEN=old\n", TOKEN).unwrap();
+        let env = merge_env("TELEGRAM_BOT_TOKEN=x\nLAMP_HERMES_TOKEN=old\n", TOKEN, None).unwrap();
         assert_eq!(
             env,
             format!("TELEGRAM_BOT_TOKEN=x\nLAMP_HERMES_TOKEN={TOKEN}\n")
         );
-        assert!(merge_env("", "short").is_none());
-        assert!(merge_env("", &format!("{TOKEN}\nAUTONOMOUS_API_KEY=x")).is_none());
+        assert!(merge_env("", "short", None).is_none());
+        assert!(merge_env("", &format!("{TOKEN}\nAUTONOMOUS_API_KEY=x"), None).is_none());
     }
 
     #[test]
     fn written_files_hold_no_relay_key_and_a_second_write_is_idle() {
         let home = tempfile::tempdir().unwrap();
         fs::write(home.path().join("config.yaml"), HARNESS).unwrap();
-        let first = write(home.path(), 7741, TOKEN).unwrap();
+        let first = write(home.path(), 7741, TOKEN, None).unwrap();
         assert!(first.config_changed && first.env_changed);
-        let again = write(home.path(), 7741, TOKEN).unwrap();
+        let again = write(home.path(), 7741, TOKEN, None).unwrap();
         assert!(!again.config_changed && !again.env_changed);
         let config = fs::read_to_string(home.path().join("config.yaml")).unwrap();
         let env = fs::read_to_string(home.path().join(".env")).unwrap();
@@ -1270,7 +1368,7 @@ API_SERVER_KEY=kept
 
 LAMP_HERMES_TOKEN=old
 ";
-        let merged = merge_env(before, TOKEN).unwrap();
+        let merged = merge_env(before, TOKEN, None).unwrap();
         let kept: Vec<&str> = before
             .lines()
             .filter(|line| {
@@ -1304,12 +1402,12 @@ LAMP_HERMES_TOKEN=old
         let target = elsewhere.path().join("config.yaml");
         fs::write(&target, "model: {}\n").unwrap();
         std::os::unix::fs::symlink(&target, home.path().join("config.yaml")).unwrap();
-        assert!(write(home.path(), 7741, TOKEN).is_err());
+        assert!(write(home.path(), 7741, TOKEN, None).is_err());
         assert_eq!(fs::read_to_string(&target).unwrap(), "model: {}\n");
         assert!(!home.path().join(".env").exists());
         let other = tempfile::tempdir().unwrap();
         fs::create_dir(other.path().join(".env")).unwrap();
-        assert!(write(other.path(), 7741, TOKEN).is_err());
+        assert!(write(other.path(), 7741, TOKEN, None).is_err());
         assert!(!other.path().join("config.yaml").exists());
     }
 
@@ -1317,7 +1415,7 @@ LAMP_HERMES_TOKEN=old
     fn a_refused_config_is_left_untouched() {
         let home = tempfile::tempdir().unwrap();
         fs::write(home.path().join("config.yaml"), "- not a mapping\n").unwrap();
-        assert!(write(home.path(), 7741, TOKEN).is_err());
+        assert!(write(home.path(), 7741, TOKEN, None).is_err());
         assert_eq!(
             fs::read_to_string(home.path().join("config.yaml")).unwrap(),
             "- not a mapping\n"
@@ -1419,6 +1517,21 @@ skills:
             "skills:\n- /a\n",
         ] {
             assert!(merge_config(text, 7741).is_err(), "{text:?}");
+        }
+    }
+
+    /// On lamp-ee17 OpenClaw had `web_search` and still searched with
+    /// `exec` + `curl` and `web_fetch`: the written guidance of both
+    /// engines tells the model to search with `web_search`.
+    #[test]
+    fn the_written_guidance_says_to_search_with_web_search() {
+        const LINE: &str = "- To look something up on the web, call `web_search`, then `web_fetch` to read a page it found; never search through `exec`, `curl` or a search engine's page.\n";
+        for write in [write_guidance, crate::openclaw_config::write_guidance] {
+            let folder = tempfile::tempdir().unwrap();
+            write(folder.path()).unwrap();
+            let text = fs::read_to_string(folder.path().join(GUIDANCE_FILE)).unwrap();
+            let at = text.find(LINE).unwrap_or_else(|| panic!("not in {text}"));
+            assert!(at < text.find("## Your last answer").unwrap());
         }
     }
 
@@ -1602,5 +1715,101 @@ skills:
             made,
             "a quoted false is true to Hermes"
         );
+    }
+
+    const FOUND: &str = "fedcba9876543210fedcba9876543210";
+    const WEB: &str = "web:\n  search_backend: \"searxng\"\n  extract_backend: \"exa\"\n  keyless_fallback: true\n  keyless_rescue: true\n";
+
+    /// The search route's URL joins the person's lines; one of ours from
+    /// another port is replaced, a person's own SearXNG is kept and ours
+    /// is then not added, and without a search token only ours goes.
+    #[test]
+    fn the_env_gets_the_search_url_beside_the_persons_lines() {
+        let url = search_url(7741, FOUND);
+        let env = merge_env("TELEGRAM_BOT_TOKEN=x\n", TOKEN, Some(&url)).unwrap();
+        assert_eq!(
+            env,
+            format!(
+                "TELEGRAM_BOT_TOKEN=x\nLAMP_HERMES_TOKEN={TOKEN}\nSEARXNG_URL=http://127.0.0.1:7741/v1/search/{FOUND}\n"
+            )
+        );
+        assert_eq!(merge_env(&env, TOKEN, Some(&url)).unwrap(), env);
+        let moved = format!("SEARXNG_URL=\"{}\"\nA=1\n", search_url(7742, "old"));
+        assert_eq!(
+            merge_env(&moved, TOKEN, Some(&url)).unwrap(),
+            format!("A=1\nLAMP_HERMES_TOKEN={TOKEN}\nSEARXNG_URL={url}\n")
+        );
+        let theirs = "export SEARXNG_URL=http://localhost:8080\n";
+        let kept = merge_env(theirs, TOKEN, Some(&url)).unwrap();
+        assert_eq!(kept, format!("{theirs}LAMP_HERMES_TOKEN={TOKEN}\n"));
+        assert_eq!(
+            merge_env(&env, TOKEN, None).unwrap(),
+            format!("TELEGRAM_BOT_TOKEN=x\nLAMP_HERMES_TOKEN={TOKEN}\n")
+        );
+        assert_eq!(merge_env(theirs, TOKEN, None).unwrap(), kept);
+    }
+
+    /// With search: SearXNG for search, the keyless pool's Exa for page
+    /// reads, the keyless fallback and rescue on, a person's other `web:`
+    /// keys kept; without it, no `web:` is added.
+    #[test]
+    fn the_config_searches_through_the_lamp_and_keeps_the_keyless_pool() {
+        let on = merge_config_for(HARNESS, 7741, false, true).unwrap();
+        assert!(on.ends_with(WEB), "{on}");
+        assert_eq!(merge_config_for(&on, 7741, false, true).unwrap(), on);
+        assert_eq!(hooks_block(&on), hooks_block(HARNESS));
+        assert!(!merge_config(HARNESS, 7741).unwrap().contains("web:"));
+        let theirs = "web:\n  keyless_fallback: false\n  cache_ttl_minutes: 5\n";
+        let merged = merge_config_for(theirs, 7741, false, true).unwrap();
+        assert!(
+            merged.contains(
+                "web:\n  keyless_fallback: true\n  cache_ttl_minutes: 5\n  search_backend: \"searxng\"\n  extract_backend: \"exa\"\n  keyless_rescue: true\n"
+            ),
+            "{merged}"
+        );
+    }
+
+    /// A lamp whose files the old code wrote gains the search on its next
+    /// start's write, then stays still; a token file's text that isn't
+    /// plain adds nothing.
+    #[test]
+    fn a_lamp_written_before_gains_search_on_the_next_write() {
+        let home = tempfile::tempdir().unwrap();
+        fs::write(home.path().join("config.yaml"), HARNESS).unwrap();
+        write_for(home.path(), 7741, TOKEN, false, None).unwrap();
+        let config = fs::read_to_string(home.path().join("config.yaml")).unwrap();
+        let env = fs::read_to_string(home.path().join(".env")).unwrap();
+        assert!(!config.contains("web:") && !env.contains(SEARCH_ENV));
+        let bad = write_for(home.path(), 7741, TOKEN, false, Some("not plain")).unwrap();
+        assert!(!bad.config_changed && !bad.env_changed);
+        let now = write_for(home.path(), 7741, TOKEN, false, Some(FOUND)).unwrap();
+        assert!(now.config_changed && now.env_changed);
+        let config = fs::read_to_string(home.path().join("config.yaml")).unwrap();
+        let env = fs::read_to_string(home.path().join(".env")).unwrap();
+        assert!(config.ends_with(WEB), "{config}");
+        assert!(env.ends_with(&format!("{SEARCH_ENV}={}\n", search_url(7741, FOUND))));
+        let again = write_for(home.path(), 7741, TOKEN, false, Some(FOUND)).unwrap();
+        assert!(!again.config_changed && !again.env_changed);
+    }
+
+    /// The search token gone, the next write takes out both the URL and
+    /// the `searxng` pin, and keeps the keyless pool's settings.
+    #[test]
+    fn a_token_gone_takes_the_searxng_pin_out() {
+        let home = tempfile::tempdir().unwrap();
+        fs::write(home.path().join("config.yaml"), HARNESS).unwrap();
+        write_for(home.path(), 7741, TOKEN, false, Some(FOUND)).unwrap();
+        let gone = write_for(home.path(), 7741, TOKEN, false, None).unwrap();
+        assert!(gone.config_changed && gone.env_changed);
+        let config = fs::read_to_string(home.path().join("config.yaml")).unwrap();
+        let env = fs::read_to_string(home.path().join(".env")).unwrap();
+        assert!(!env.contains(SEARCH_ENV), "{env}");
+        assert!(!config.contains("search_backend"), "{config}");
+        assert!(
+            config.ends_with("web:\n  extract_backend: \"exa\"\n  keyless_fallback: true\n  keyless_rescue: true\n"),
+            "{config}"
+        );
+        let still = write_for(home.path(), 7741, TOKEN, false, None).unwrap();
+        assert!(!still.config_changed && !still.env_changed);
     }
 }
