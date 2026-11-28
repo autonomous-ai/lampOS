@@ -1,5 +1,60 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Compare head geometry through the product pipeline (#8847, 2026-11-27)
+
+Reuse `lamp-eyes`' pinned detector, JPEG decoder, rotated mesh crop and tract
+model runner for the [offline head comparison](head-direction-evaluation.md).
+The existing five-mark geometry already ports V1
+`hal/drivers/tracking/gaze.py`; its broad facing threshold is not a measured
+lamp/screen/phone classifier. V1 also clears observations after camera
+motion and excludes missing measurements from its vote. Preserve those
+distinctions as explicit future freshness/unknown requirements rather than
+claiming parity from angle fixtures.
+
+Reuse the pure geometry from closed draft #8782, with finite and degeneracy
+checks. It now lives in
+[`crates/eyes/src/head_direction/geometry.rs`](../crates/eyes/src/head_direction/geometry.rs),
+moved from the example without changing its math; the offline example imports
+it, and the default-off runtime observer borrows an existing mesh to check
+availability. Do not reuse #8782's default-on unit change,
+fallback to marks, or replacement of existing facing/speaking inputs. The
+old MediaPipe task benchmark has a different crop, pose estimator and fitted
+scoring rule; it is a reference experiment, not evidence for this candidate.
+Keep the Reviewer's shared scorer authoritative and add no duplicate scoring
+pipeline or production image upload. On-body accuracy, freshness, privacy
+and latency remain qualification work.
+
+### Count existing runtime observations before adding a pose consumer (#8847)
+
+Reuse the existing camera `PortFrame` provenance, permission generation,
+YuNet result, still-face filter and already scheduled mouth mesh. The
+[`head_direction` observer](../crates/eyes/src/head_direction/mod.rs) adds
+`--head-direction-observer on|off`, default `off`, with no product unit
+enabling it. It adds no inference, camera read, thread, cadence change,
+legacy-field replacement, fallback to marks or policy decision. Multiple
+raw detections stay ambiguous; unknown or unavailable geometry never means
+away. The shared geometry's local angles are discarded.
+
+The eyes' direct camera reader does not run the camera's `Capture` wrapper,
+so reuse its identity, source-time and sequence semantics in the bounded
+[`freshness` guard](../crates/eyes/src/head_direction/freshness.rs), including
+permission checks around open/read and after geometry. Keep the camera's
+exclusive 250 ms ceiling as a rejection boundary, not a substitute for the
+approved p95 100 ms source-to-usable-output gate. This metadata guard cannot
+close an unsampled revocation race or authorize a raw-pose publication;
+that export fence remains separate reviewed work.
+
+Reuse the existing journal for at most one bounded numeric/fixed-enum
+`lamp-head-direction-observer/1` record per 60 seconds or longer. It has
+processing-look outcomes, separate frame/look rejection reasons and fresh
+available source-age histograms, split by crop and source timestamp point;
+it has no angles, landmarks, identity or event timestamps. Retain late and
+unknown counts rather than qualifying a truncated accepted-only latency
+population. This is not a durable fleet recorder or upload, nor a per-case
+adapter for the Reviewer's scorer. Target added overhead is p95 below 1 ms;
+the on-lamp overhead, periodic journal cost, overall 100 ms budget and
+head-target accuracy remain unmeasured by this prerequisite.
+
 ## Keep retirement before requested music; distinguish cues (2026-11-10)
 
 V1 `hal/drivers/voice/music_service.py` waits while TTS is speaking before

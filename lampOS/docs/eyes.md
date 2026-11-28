@@ -2611,6 +2611,48 @@ the full seems read as before. With the switch off and no yes, no read
 runs, as before. Every other face, or no read, leaves it out: unknown,
 not away.
 
+### Head-direction availability observer (`--head-direction-observer on`, #8847)
+
+This explicit CLI option accepts `on` or `off`, defaults to `off`, and is not
+enabled by any product unit. It observes existing processing looks without
+changing the detector, mesh scheduling, camera reader, thread count, bus
+payloads, legacy facing/speaking decisions or voice policy. It does not
+enable pitch/gaze or select which person was addressed. With no configured
+or currently wanted mesh, it counts that missing/deferred state rather than
+running another inference or falling back to five marks.
+
+The observer borrows the existing picture, detections and mesh landmarks,
+checks the shared candidate geometry, discards its angles, then retains
+fixed counters only. Two raw detections remain ambiguous even if the
+still-face filter removes one. No-face, ambiguous, filtered, skipped,
+decode/detector failure, size/visibility, absent/deferred/unavailable mesh,
+invalid geometry, freshness rejection and cancellation have distinct
+outcomes. The denominator is processing looks, not labelled head turns or
+independent conversation opportunities. These counts show availability,
+not accuracy or a successful lamp/screen/phone decision.
+
+At most once per 60 seconds, after the pending look ends, the main loop
+writes one bounded numeric/fixed-enum JSON record with schema
+`lamp-head-direction-observer/1` and prefix
+`lamp-eyes: head_direction_observer`. Its `window_us` is elapsed duration;
+the payload has no event timestamp, pose, angles, landmarks, image, identity
+or raw error text. Frame and look rejection counts are separate. Fresh,
+available geometry alone enters source-age histograms, split by
+start-of-exposure versus end-of-frame driver timestamps and working versus
+full crop. The exclusive source-age ceiling is **less than 250 ms**, not
+the approved **p95 100 ms or less** source-to-usable-output budget. Late
+looks remain in upper bins or stale rejections; a percentile of accepted
+samples cannot hide those missing outcomes and claim qualification.
+
+The capture/source, permission-generation, sequence and timestamp guard
+checks metadata again after geometry. It neither exports pose nor supplies
+the reviewed raw-pose revoke/publish fence needed by a future sensor.
+The added overhead target is p95 below 1 ms; on-lamp overhead, journal cost
+and the overall 100 ms budget remain unmeasured. Fleet recording/upload,
+the live per-case scorer adapter and qualification are not implemented.
+See [the runtime observation contract](head-direction-evaluation.md#default-off-runtime-observer)
+and [`head_direction`](../crates/eyes/src/head_direction/mod.rs).
+
 ### Who counts as someone at the lamp (`LAMP_FACES_AT_DESK_ONLY=on`)
 
 The eyes report every face the detector finds, however small or unsure.
@@ -3994,7 +4036,7 @@ Not yet shown on a lamp.
 lamp-eyes --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
 ```
 
-Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` (with `--glance-log ABSOLUTE_PATH`) and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above.
+Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` (with `--glance-log ABSOLUTE_PATH`) and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above. Separately, `--head-direction-observer on|off` counts existing head-geometry availability and source-age outcomes; its default is `off` and no product unit enables it.
 `--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; or
 `VENDOR:PRODUCT` alone (#2190). `--device` is given only with a port, and
 may be left out. Without it, at each open the eyes take the one camera with
@@ -4041,6 +4083,16 @@ cargo run --release -p lamp-eyes --example look -- MODEL.onnx PHOTO.jpg
 ```
 
 ## Verification without a lamp
+
+For the new head-direction work, the
+[offline comparison](head-direction-evaluation.md#run-without-a-lamp) runs
+the existing detector/crop/mesh pipeline with the shared checked geometry
+in [`head_direction/geometry.rs`](../crates/eyes/src/head_direction/geometry.rs).
+The default-off runtime observer reuses that math with already computed
+meshes and counts metadata/availability only. It leaves product sensing
+decisions and voice policy unchanged. Neither path replaces the Reviewer's
+labelled, on-body accuracy and latency gates; host geometry and freshness
+fixtures are not those measurements.
 
 Host tests, `cargo test -p lamp-eyes` (14 passed, 0 failed, on macOS; the 12
 before the kept frame also passed under emulated ARM64). They cover: that the
