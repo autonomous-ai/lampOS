@@ -1,0 +1,1205 @@
+{
+  "evaluation": {
+    "schema": "face-pad-evaluation/1",
+    "protocol_sha256": "8bd405357881e3c767309c635e25cd69ac0b399febc68778d2b31a94e8e75df2",
+    "selection_sha256": "84625408a02ee37fe7b79828bb5483e6b47ecac0d1dfd2a530bad5a03dbe8beb",
+    "threshold": 1.0,
+    "calibration": {
+      "rows": 1808,
+      "by_family": {
+        "public_object_scene": {
+          "total": 308,
+          "detected": 7,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "public_person_scene": {
+          "total": 804,
+          "detected": 322,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "constructed_display": {
+          "total": 268,
+          "detected": 166,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "constructed_print": {
+          "total": 268,
+          "detected": 166,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "photo_screen": {
+          "total": 4,
+          "detected": 0,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "unresolved_scene": {
+          "total": 12,
+          "detected": 1,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "ceramic_bust": {
+          "total": 36,
+          "detected": 0,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "headphones": {
+          "total": 36,
+          "detected": 0,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "round_lamp": {
+          "total": 36,
+          "detected": 0,
+          "accepted": 0,
+          "unknown": 0
+        },
+        "rendered_person": {
+          "total": 36,
+          "detected": 36,
+          "accepted": 0,
+          "unknown": 0
+        }
+      },
+      "primary_real": {
+        "total": 67,
+        "detected": 49,
+        "accepted": 0,
+        "unknown": 0
+      },
+      "objects": {
+        "total": 956,
+        "accepted": 0,
+        "unknown": 0
+      },
+      "unknown_labels": 12
+    },
+    "conditions": {
+      "frozen": {
+        "threshold": 1.0,
+        "heldout_5b": {
+          "rows": 1828,
+          "by_family": {
+            "public_person_scene": {
+              "total": 816,
+              "detected": 262,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "constructed_display": {
+              "total": 268,
+              "detected": 139,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "constructed_print": {
+              "total": 268,
+              "detected": 138,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "public_object_scene": {
+              "total": 308,
+              "detected": 6,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "unresolved_scene": {
+              "total": 16,
+              "detected": 2,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "framed_photo": {
+              "total": 4,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "game_screen": {
+              "total": 4,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "ceramic_bust": {
+              "total": 36,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "headphones": {
+              "total": 36,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "round_lamp": {
+              "total": 36,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "rendered_person": {
+              "total": 36,
+              "detected": 36,
+              "accepted": 0,
+              "unknown": 0
+            }
+          },
+          "primary_real": {
+            "total": 67,
+            "detected": 45,
+            "accepted": 0,
+            "unknown": 0
+          },
+          "objects": {
+            "total": 960,
+            "accepted": 0,
+            "unknown": 0
+          },
+          "unknown_labels": 16,
+          "by_source": {
+            "public_person_scene/person": {
+              "sources": 137,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 59
+            },
+            "constructed_display/object": {
+              "sources": 67,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 45
+            },
+            "constructed_print/object": {
+              "sources": 67,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 44
+            },
+            "public_object_scene/object": {
+              "sources": 77,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 3
+            },
+            "unresolved_scene/unknown": {
+              "sources": 4,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 1
+            },
+            "framed_photo/object": {
+              "sources": 1,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "game_screen/object": {
+              "sources": 1,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "ceramic_bust/object": {
+              "sources": 6,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "headphones/object": {
+              "sources": 6,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "round_lamp/object": {
+              "sources": 6,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "rendered_person/person": {
+              "sources": 6,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 6
+            }
+          },
+          "detected_face_eye_bins": {
+            "public_person_scene/0-15": {
+              "faces": 205,
+              "accepted": 0
+            },
+            "constructed_display/0-15": {
+              "faces": 112,
+              "accepted": 0
+            },
+            "constructed_display/15-30": {
+              "faces": 30,
+              "accepted": 0
+            },
+            "constructed_print/0-15": {
+              "faces": 110,
+              "accepted": 0
+            },
+            "constructed_print/15-30": {
+              "faces": 31,
+              "accepted": 0
+            },
+            "public_person_scene/15-30": {
+              "faces": 58,
+              "accepted": 0
+            },
+            "public_object_scene/15-30": {
+              "faces": 6,
+              "accepted": 0
+            },
+            "constructed_display/30-40": {
+              "faces": 2,
+              "accepted": 0
+            },
+            "constructed_print/30-40": {
+              "faces": 2,
+              "accepted": 0
+            },
+            "public_person_scene/30-40": {
+              "faces": 5,
+              "accepted": 0
+            },
+            "unresolved_scene/0-15": {
+              "faces": 2,
+              "accepted": 0
+            },
+            "rendered_person/15-30": {
+              "faces": 18,
+              "accepted": 0
+            },
+            "rendered_person/0-15": {
+              "faces": 15,
+              "accepted": 0
+            },
+            "rendered_person/30-40": {
+              "faces": 3,
+              "accepted": 0
+            }
+          },
+          "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+        },
+        "external_by_scale": {
+          "1.0": {
+            "rows": 43,
+            "by_family": {
+              "axon_real": {
+                "total": 5,
+                "detected": 5,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "axon_display": {
+                "total": 25,
+                "detected": 25,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "persona_print": {
+                "total": 13,
+                "detected": 13,
+                "accepted": 0,
+                "unknown": 0
+              }
+            },
+            "primary_real": {
+              "total": 0,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "objects": {
+              "total": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "unknown_labels": 1,
+            "by_source": {
+              "axon_real/real": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "axon_display/display_attack": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "persona_print/print_attack": {
+                "sources": 12,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 12
+              },
+              "persona_print/unknown": {
+                "sources": 1,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 1
+              }
+            },
+            "detected_face_eye_bins": {
+              "axon_real/15-30": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "axon_real/48-60": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "axon_real/40-48": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "axon_display/48-60": {
+                "faces": 21,
+                "accepted": 0
+              },
+              "axon_display/40-48": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "axon_display/60-80": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "persona_print/60-80": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "persona_print/48-60": {
+                "faces": 8,
+                "accepted": 0
+              },
+              "persona_print/40-48": {
+                "faces": 2,
+                "accepted": 0
+              }
+            },
+            "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+          },
+          "0.65": {
+            "rows": 43,
+            "by_family": {
+              "axon_real": {
+                "total": 5,
+                "detected": 5,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "axon_display": {
+                "total": 25,
+                "detected": 25,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "persona_print": {
+                "total": 13,
+                "detected": 13,
+                "accepted": 0,
+                "unknown": 0
+              }
+            },
+            "primary_real": {
+              "total": 0,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "objects": {
+              "total": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "unknown_labels": 1,
+            "by_source": {
+              "axon_real/real": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "axon_display/display_attack": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "persona_print/print_attack": {
+                "sources": 12,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 12
+              },
+              "persona_print/unknown": {
+                "sources": 1,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 1
+              }
+            },
+            "detected_face_eye_bins": {
+              "axon_real/15-30": {
+                "faces": 4,
+                "accepted": 0
+              },
+              "axon_real/30-40": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "axon_display/30-40": {
+                "faces": 17,
+                "accepted": 0
+              },
+              "axon_display/15-30": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "axon_display/40-48": {
+                "faces": 5,
+                "accepted": 0
+              },
+              "persona_print/30-40": {
+                "faces": 9,
+                "accepted": 0
+              },
+              "persona_print/40-48": {
+                "faces": 2,
+                "accepted": 0
+              },
+              "persona_print/0-15": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "persona_print/15-30": {
+                "faces": 2,
+                "accepted": 0
+              }
+            },
+            "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+          },
+          "0.4": {
+            "rows": 43,
+            "by_family": {
+              "axon_real": {
+                "total": 5,
+                "detected": 5,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "axon_display": {
+                "total": 25,
+                "detected": 25,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "persona_print": {
+                "total": 13,
+                "detected": 13,
+                "accepted": 0,
+                "unknown": 0
+              }
+            },
+            "primary_real": {
+              "total": 0,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "objects": {
+              "total": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "unknown_labels": 1,
+            "by_source": {
+              "axon_real/real": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "axon_display/display_attack": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "persona_print/print_attack": {
+                "sources": 12,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 12
+              },
+              "persona_print/unknown": {
+                "sources": 1,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 1
+              }
+            },
+            "detected_face_eye_bins": {
+              "axon_real/0-15": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "axon_real/15-30": {
+                "faces": 2,
+                "accepted": 0
+              },
+              "axon_display/15-30": {
+                "faces": 25,
+                "accepted": 0
+              },
+              "persona_print/15-30": {
+                "faces": 13,
+                "accepted": 0
+              }
+            },
+            "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+          }
+        },
+        "heldout_full_pipeline_qualified": false,
+        "heldout_conditional_real_retained": 0.0
+      },
+      "argmax_baseline": {
+        "threshold": 0,
+        "heldout_5b": {
+          "rows": 1828,
+          "by_family": {
+            "public_person_scene": {
+              "total": 816,
+              "detected": 262,
+              "accepted": 169,
+              "unknown": 0
+            },
+            "constructed_display": {
+              "total": 268,
+              "detected": 139,
+              "accepted": 74,
+              "unknown": 0
+            },
+            "constructed_print": {
+              "total": 268,
+              "detected": 138,
+              "accepted": 77,
+              "unknown": 0
+            },
+            "public_object_scene": {
+              "total": 308,
+              "detected": 6,
+              "accepted": 1,
+              "unknown": 0
+            },
+            "unresolved_scene": {
+              "total": 16,
+              "detected": 2,
+              "accepted": 1,
+              "unknown": 0
+            },
+            "framed_photo": {
+              "total": 4,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "game_screen": {
+              "total": 4,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "ceramic_bust": {
+              "total": 36,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "headphones": {
+              "total": 36,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "round_lamp": {
+              "total": 36,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "rendered_person": {
+              "total": 36,
+              "detected": 36,
+              "accepted": 33,
+              "unknown": 0
+            }
+          },
+          "primary_real": {
+            "total": 67,
+            "detected": 45,
+            "accepted": 27,
+            "unknown": 0
+          },
+          "objects": {
+            "total": 960,
+            "accepted": 152,
+            "unknown": 0
+          },
+          "unknown_labels": 16,
+          "by_source": {
+            "public_person_scene/person": {
+              "sources": 137,
+              "any_accepted": 46,
+              "any_unknown": 0,
+              "any_detected": 59
+            },
+            "constructed_display/object": {
+              "sources": 67,
+              "any_accepted": 31,
+              "any_unknown": 0,
+              "any_detected": 45
+            },
+            "constructed_print/object": {
+              "sources": 67,
+              "any_accepted": 33,
+              "any_unknown": 0,
+              "any_detected": 44
+            },
+            "public_object_scene/object": {
+              "sources": 77,
+              "any_accepted": 1,
+              "any_unknown": 0,
+              "any_detected": 3
+            },
+            "unresolved_scene/unknown": {
+              "sources": 4,
+              "any_accepted": 1,
+              "any_unknown": 0,
+              "any_detected": 1
+            },
+            "framed_photo/object": {
+              "sources": 1,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "game_screen/object": {
+              "sources": 1,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "ceramic_bust/object": {
+              "sources": 6,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "headphones/object": {
+              "sources": 6,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "round_lamp/object": {
+              "sources": 6,
+              "any_accepted": 0,
+              "any_unknown": 0,
+              "any_detected": 0
+            },
+            "rendered_person/person": {
+              "sources": 6,
+              "any_accepted": 6,
+              "any_unknown": 0,
+              "any_detected": 6
+            }
+          },
+          "detected_face_eye_bins": {
+            "public_person_scene/0-15": {
+              "faces": 205,
+              "accepted": 127
+            },
+            "constructed_display/0-15": {
+              "faces": 112,
+              "accepted": 58
+            },
+            "constructed_display/15-30": {
+              "faces": 30,
+              "accepted": 16
+            },
+            "constructed_print/0-15": {
+              "faces": 110,
+              "accepted": 57
+            },
+            "constructed_print/15-30": {
+              "faces": 31,
+              "accepted": 20
+            },
+            "public_person_scene/15-30": {
+              "faces": 58,
+              "accepted": 40
+            },
+            "public_object_scene/15-30": {
+              "faces": 6,
+              "accepted": 1
+            },
+            "constructed_display/30-40": {
+              "faces": 2,
+              "accepted": 1
+            },
+            "constructed_print/30-40": {
+              "faces": 2,
+              "accepted": 1
+            },
+            "public_person_scene/30-40": {
+              "faces": 5,
+              "accepted": 3
+            },
+            "unresolved_scene/0-15": {
+              "faces": 2,
+              "accepted": 1
+            },
+            "rendered_person/15-30": {
+              "faces": 18,
+              "accepted": 17
+            },
+            "rendered_person/0-15": {
+              "faces": 15,
+              "accepted": 13
+            },
+            "rendered_person/30-40": {
+              "faces": 3,
+              "accepted": 3
+            }
+          },
+          "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+        },
+        "external_by_scale": {
+          "1.0": {
+            "rows": 43,
+            "by_family": {
+              "axon_real": {
+                "total": 5,
+                "detected": 5,
+                "accepted": 3,
+                "unknown": 0
+              },
+              "axon_display": {
+                "total": 25,
+                "detected": 25,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "persona_print": {
+                "total": 13,
+                "detected": 13,
+                "accepted": 13,
+                "unknown": 0
+              }
+            },
+            "primary_real": {
+              "total": 0,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "objects": {
+              "total": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "unknown_labels": 1,
+            "by_source": {
+              "axon_real/real": {
+                "sources": 5,
+                "any_accepted": 3,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "axon_display/display_attack": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "persona_print/print_attack": {
+                "sources": 12,
+                "any_accepted": 12,
+                "any_unknown": 0,
+                "any_detected": 12
+              },
+              "persona_print/unknown": {
+                "sources": 1,
+                "any_accepted": 1,
+                "any_unknown": 0,
+                "any_detected": 1
+              }
+            },
+            "detected_face_eye_bins": {
+              "axon_real/15-30": {
+                "faces": 3,
+                "accepted": 1
+              },
+              "axon_real/48-60": {
+                "faces": 1,
+                "accepted": 1
+              },
+              "axon_real/40-48": {
+                "faces": 1,
+                "accepted": 1
+              },
+              "axon_display/48-60": {
+                "faces": 21,
+                "accepted": 0
+              },
+              "axon_display/40-48": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "axon_display/60-80": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "persona_print/60-80": {
+                "faces": 3,
+                "accepted": 3
+              },
+              "persona_print/48-60": {
+                "faces": 8,
+                "accepted": 8
+              },
+              "persona_print/40-48": {
+                "faces": 2,
+                "accepted": 2
+              }
+            },
+            "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+          },
+          "0.65": {
+            "rows": 43,
+            "by_family": {
+              "axon_real": {
+                "total": 5,
+                "detected": 5,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "axon_display": {
+                "total": 25,
+                "detected": 25,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "persona_print": {
+                "total": 13,
+                "detected": 13,
+                "accepted": 0,
+                "unknown": 0
+              }
+            },
+            "primary_real": {
+              "total": 0,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "objects": {
+              "total": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "unknown_labels": 1,
+            "by_source": {
+              "axon_real/real": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "axon_display/display_attack": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "persona_print/print_attack": {
+                "sources": 12,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 12
+              },
+              "persona_print/unknown": {
+                "sources": 1,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 1
+              }
+            },
+            "detected_face_eye_bins": {
+              "axon_real/15-30": {
+                "faces": 4,
+                "accepted": 0
+              },
+              "axon_real/30-40": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "axon_display/30-40": {
+                "faces": 17,
+                "accepted": 0
+              },
+              "axon_display/15-30": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "axon_display/40-48": {
+                "faces": 5,
+                "accepted": 0
+              },
+              "persona_print/30-40": {
+                "faces": 9,
+                "accepted": 0
+              },
+              "persona_print/40-48": {
+                "faces": 2,
+                "accepted": 0
+              },
+              "persona_print/0-15": {
+                "faces": 1,
+                "accepted": 0
+              },
+              "persona_print/15-30": {
+                "faces": 2,
+                "accepted": 0
+              }
+            },
+            "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+          },
+          "0.4": {
+            "rows": 43,
+            "by_family": {
+              "axon_real": {
+                "total": 5,
+                "detected": 5,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "axon_display": {
+                "total": 25,
+                "detected": 25,
+                "accepted": 0,
+                "unknown": 0
+              },
+              "persona_print": {
+                "total": 13,
+                "detected": 13,
+                "accepted": 0,
+                "unknown": 0
+              }
+            },
+            "primary_real": {
+              "total": 0,
+              "detected": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "objects": {
+              "total": 0,
+              "accepted": 0,
+              "unknown": 0
+            },
+            "unknown_labels": 1,
+            "by_source": {
+              "axon_real/real": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "axon_display/display_attack": {
+                "sources": 5,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 5
+              },
+              "persona_print/print_attack": {
+                "sources": 12,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 12
+              },
+              "persona_print/unknown": {
+                "sources": 1,
+                "any_accepted": 0,
+                "any_unknown": 0,
+                "any_detected": 1
+              }
+            },
+            "detected_face_eye_bins": {
+              "axon_real/0-15": {
+                "faces": 3,
+                "accepted": 0
+              },
+              "axon_real/15-30": {
+                "faces": 2,
+                "accepted": 0
+              },
+              "axon_display/15-30": {
+                "faces": 25,
+                "accepted": 0
+              },
+              "persona_print/15-30": {
+                "faces": 13,
+                "accepted": 0
+              }
+            },
+            "eye_bin_semantics": "Per detected face, actual Euclidean eye distance in the supplied 320x240 frame; no detection is not silently assigned an eye size. No identity recognition or physical-size estimate."
+          }
+        },
+        "heldout_full_pipeline_qualified": false,
+        "heldout_conditional_real_retained": 0.6
+      }
+    },
+    "latency": {
+      "boundary": "Decoded 320x240 RGB plus supplied face box -> crop/tensor/forward/softmax; no JPEG or detector included. External detector reported separately.",
+      "first_face_call_us": {
+        "forward_softmax": 76442.248,
+        "prepare": 658.969,
+        "total": 77101.217
+      },
+      "later_face_calls": {
+        "prepare": {
+          "samples": 1434,
+          "p50_us": 299.818,
+          "p95_us": 594.0551999999998,
+          "max_us": 13274.875
+        },
+        "forward_softmax": {
+          "samples": 1434,
+          "p50_us": 10501.039499999999,
+          "p95_us": 19295.484849999997,
+          "max_us": 81443.509
+        },
+        "total": {
+          "samples": 1434,
+          "p50_us": 10812.377499999999,
+          "p95_us": 19718.56755,
+          "max_us": 83275.687
+        }
+      },
+      "target_p95_us": 10000,
+      "external_detector_first_us": 29086.336,
+      "external_detector_later": {
+        "samples": 128,
+        "p50_us": 9333.895,
+        "p95_us": 18124.940799999993,
+        "max_us": 22401.668
+      },
+      "host_target_passed": false
+    },
+    "replay": {
+      "schema": "face-pad-replay/1",
+      "state": "complete",
+      "rows": 3765,
+      "faces": 1435,
+      "processing_errors": 0,
+      "constructor_s": 0.17270464496687055,
+      "elapsed_s": 27.620590901002288,
+      "started_at": "2026-11-28T16:33:50.263894+00:00",
+      "finished_at": "2026-11-28T16:34:17.885357+00:00",
+      "parameters": 434560,
+      "protocol_sha256": "8bd405357881e3c767309c635e25cd69ac0b399febc68778d2b31a94e8e75df2",
+      "files": {
+        "cal": "421e588b12ba9c5444b5f68e980a9afd220d94ccc00080e2344884da80673e94",
+        "test": "4742cd6767cfdeac67715d68cdc8a1c054b92eedc0e69814a9424694ac4fd140",
+        "external_test": "0911879672afcc7936413ef25e213093996e682eff5aef23412b0334859c37a4"
+      },
+      "torch_threads": 1,
+      "torch_interop_threads": 1,
+      "opencv_threads_reported": 16,
+      "versions": {
+        "torch": "2.2.2",
+        "opencv": "4.10.0",
+        "numpy": "1.26.4",
+        "python": "3.11.13"
+      },
+      "training": false,
+      "device_access": false,
+      "scored": false,
+      "source_before_after_equal": true
+    },
+    "source_references": [
+      {
+        "title": "MiniFASNet source and Apache-2.0 license",
+        "url": "https://github.com/minivision-ai/Silent-Face-Anti-Spoofing/tree/b6d5f04ad78778917853b25c778acef6d5626d15"
+      },
+      {
+        "title": "Publisher private training-data statement",
+        "url": "https://github.com/minivision-ai/Silent-Face-Anti-Spoofing/issues/25#issuecomment-678321691"
+      },
+      {
+        "title": "Axon Labs public replay sample, CC-BY-4.0",
+        "url": "https://huggingface.co/datasets/AxonData/Display_replay_attacks/tree/f5560f659e185ded62c2f09ff502426b0588406e"
+      },
+      {
+        "title": "Persona filtered public attack release, CC-BY-4.0",
+        "url": "https://huggingface.co/datasets/withpersona/persona-fas-bench-v1/tree/726d025dc1d187f553a3faff3e438d879e7a57e8"
+      },
+      {
+        "title": "Frozen 5b evaluation and source attribution",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/8980"
+      }
+    ],
+    "limits": [
+      "Private MiniFAS training set not available; unknown training overlap and rights/consent audit, separate checkpoint-license clarification unanswered.",
+      "COCO primary scenes are visible-person labels, not operator-attested physical liveness.",
+      "Renders and constructed print/display scenes are outside publisher camera-capture use guidance.",
+      "External publisher annotations retained after content review, not independent capture attestation.",
+      "Public sample counts too small for fleet reliability claim.",
+      "No blink/parallax event timing ground truth in these still/frame samples; do not fabricate measured delay."
+    ],
+    "attribution_and_changes": "Minivision model; Axon Labs public sample; Persona / Saatvik Billa and Zhaofeng Si attack release. No images or weights redistributed. Locally sampled video frames and full-frame resized/letterboxed/JPEG views; one mixed-presence source relabelled unknown before inference. No published publisher benchmark result is claimed."
+  },
+  "verification": {
+    "schema": "face-pad-audit/1",
+    "status": "PASS",
+    "checks": 15794,
+    "independent_implementation_same_builder": true,
+    "model_rerun": false,
+    "scorer_imported": false,
+    "exact_duplicate_image_rows": 0,
+    "all_rows_retained": true,
+    "protocol_sha256": "8bd405357881e3c767309c635e25cd69ac0b399febc68778d2b31a94e8e75df2",
+    "report_sha256": "658001351b6726f971a9cae356bdc4115caa75b7849de695ad3d353bbc7a3f4f"
+  },
+  "source_report_sha256": "658001351b6726f971a9cae356bdc4115caa75b7849de695ad3d353bbc7a3f4f",
+  "scripts_sha256": {
+    "acquire_v1.py": "1c0aef4574a527479bcabf64c088e1d574fea8f289f94105b771f14d5b54deb9",
+    "materialize_v1.py": "558c3f18234ba14b278a072198bd918f63b9121ad29ad9ff622b43a99c9e5bda",
+    "pad_adapter_v1.py": "323144a6c416d2720e24a476189696f692ebdc2158cdaa6b692e1e742aff4672",
+    "yunet_adapter_v1.py": "459ec0d603291e290518b6cdc6d08eee0d715aed0034295786b57c6c7addb7cd",
+    "test_adapter_score_v1.py": "6e913f44cbdc5b0ebf79ff396b989fff173bbeb5fe766cb41deca69e263ebd33",
+    "run_v1.py": "294d5e948c60e1cefb881eaa38e9c83cf02b28ae694d8c93af9be9af0af55e5a",
+    "score_v1.py": "7d2153877747daa04d6c4cfa2e8446b76057dd25036e5b646849f4f11bb7e441",
+    "summarize_v1.py": "98d17da58cb6c457b65e899c9afd92b6dde907124f3909f3f563dee4e0cc961a",
+    "audit_v1.py": "199f4d4284e41409104018cd124f8f2891d491a6641edcd4b5f97f20461da472"
+  },
+  "retention": "All source media, weights, per-example predictions, protocols and timings remain private locally; no images or weight redistribution. Replay receipt scored=false records its pre-scoring state, followed by the separately frozen scoring stage."
+}
