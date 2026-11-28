@@ -35262,6 +35262,40 @@ mod tests {
         assert_eq!(heeding.after_news_note_for(9), None);
     }
 
+    /// First's hold on #8809: a line let out by another rule than the
+    /// news's own, here a turn a paired computer opened 5 s after the lamp's
+    /// news (let out as a call, `attention::OPENED`, before the news is
+    /// weighed), still earns [`super::AFTER_NEWS_NOTE`]; the next line does
+    /// not.
+    #[test]
+    fn a_line_a_computer_opened_right_after_the_news_earns_the_after_news_note() {
+        use crate::second_provider::Did;
+        let signs = |going_on: bool| super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+            soft_lead_us: 0,
+        };
+        let at = |seconds: u64| 1_000_000_000 + seconds * 1_000_000;
+        let ask = "Compare three robot vacuums under 300 dollars and tell me which to buy.";
+        let mut heeding = Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.lamp_did(Did::Spoke(at(0)));
+        // As the route tells it: right after the Start, before its words.
+        heeding.attention.turn_opened(9);
+        let line = (at(5), at(5) + 1_500_000);
+        assert_eq!(heeding.judge(9, line, ask, signs(false)), None);
+        assert_eq!(heeding.after_news_note_for(9), Some(super::AFTER_NEWS_NOTE));
+        let next = (at(12), at(12) + 1_500_000);
+        heeding.attention.turn_opened(10);
+        heeding.judge(10, next, ask, signs(true));
+        assert_eq!(heeding.after_news_note_for(10), None);
+    }
+
     /// #1712, lamp-4ace's busy room: colleagues' talk just after a named
     /// request was let out only as the conversation going on, and this
     /// route's model answered it. With `--spoken-to`, such a line earns the
