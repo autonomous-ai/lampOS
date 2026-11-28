@@ -1,5 +1,19 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Shared face quality without presence authority (#8971, 28 November 2026)
+
+V1's `faceid/recognizer.py` checks height, raw-box truncation and aligned-crop
+Laplacian variance; `faceid/geometry.py` rejects landmarks outside the box/image.
+Keep those geometry protections, reusing Rust's decoder scale and yaw helper.
+Change V1's missing-aligned-crop fallback from infinite sharpness to unavailable.
+A bounded native-pixel blur metric is versioned separately; V1's aligned
+112-pixel cutoff cannot be copied. No legacy runtime, model, storage or bus
+contract is added. The API has no runtime caller or default operating limits.
+Capture binding, freshness and privacy epochs remain the future caller's duty.
+The failed static presence evaluation does not make comparison quality evidence
+of liveness or identity. Full contract: [English](face-quality.md),
+[Vietnamese](face-quality_vi.md).
+
 ## Keep retirement before requested music; distinguish cues (2026-11-10)
 
 V1 `hal/drivers/voice/music_service.py` waits while TTS is speaking before

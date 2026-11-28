@@ -1,0 +1,82 @@
+{
+  "schema": "face-quality-latency-evidence/1",
+  "recorded_at": "2026-11-28T16:14:54.435837+00:00",
+  "protocol_sha256": "b896f0e4338eeae1708b4a06d0e4ee027befa22a17168040e765e727c5a3f7b1",
+  "raw_output_sha256": "7dfcd379554e27740f575c847b476991cba2f90de3357801c5f8d4691d1cb736",
+  "source_hashes": {
+    "crates/eyes/src/quality.rs": "78f34a9167ba585b78fee2d4a7a323f86366efbc7adefb25529bb729f483b50b",
+    "crates/eyes/src/picture.rs": "d8fad5776578b99fbb74de089c79292297722136f8c187191890b6944183fac7",
+    "crates/eyes/src/facing.rs": "e75585aeaa5bd6cb01eb4ba317a20a4c5cc7363d95164438b207886d6614b885",
+    "crates/eyes/examples/quality_measure.rs": "6bbd029aac9e4f129dbbe08a3ad12d3dcb87688730d5340635e0c240371e2b74"
+  },
+  "checks": 27,
+  "host": "Intel iMac20,1 i7-10700K macOS x86_64 shared host",
+  "boundary": "Borrowed decoded frame and supplied face to measurements; decode, detector and allocation excluded",
+  "first_call_scope": "first per size, not a separate fresh process for each size",
+  "arm64_measured": false,
+  "voice_load_measured": false,
+  "all_3000_individual_timings_retained": true,
+  "target_pass": true,
+  "results": [
+    {
+      "batch_faces": 8,
+      "batch_max_us": 6334.2,
+      "batch_p50_us": 1818.8865,
+      "batch_p95_us": 2644.38885,
+      "blur_samples": 16384,
+      "first_call_us": 249.86499999999998,
+      "native_size": [
+        320,
+        240
+      ],
+      "one_face_max_us": 531.308,
+      "one_face_p50_us": 225.26350000000002,
+      "one_face_p95_us": 334.65315,
+      "warm_samples": 500,
+      "working_size": [
+        320,
+        240
+      ]
+    },
+    {
+      "batch_faces": 8,
+      "batch_max_us": 4671.512,
+      "batch_p50_us": 1798.9295,
+      "batch_p95_us": 2139.7620499999994,
+      "blur_samples": 16384,
+      "first_call_us": 844.0459999999999,
+      "native_size": [
+        1280,
+        960
+      ],
+      "one_face_max_us": 867.962,
+      "one_face_p50_us": 224.466,
+      "one_face_p95_us": 256.68129999999996,
+      "warm_samples": 500,
+      "working_size": [
+        320,
+        240
+      ]
+    },
+    {
+      "batch_faces": 8,
+      "batch_max_us": 14652.025000000001,
+      "batch_p50_us": 1958.6014999999998,
+      "batch_p95_us": 7532.764999999996,
+      "blur_samples": 16384,
+      "first_call_us": 690.716,
+      "native_size": [
+        4096,
+        4096
+      ],
+      "one_face_max_us": 1900.941,
+      "one_face_p50_us": 243.6175,
+      "one_face_p95_us": 962.2797499999984,
+      "warm_samples": 500,
+      "working_size": [
+        256,
+        256
+      ]
+    }
+  ]
+}
