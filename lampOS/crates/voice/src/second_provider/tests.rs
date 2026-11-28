@@ -2840,6 +2840,49 @@ async fn an_empty_answer_to_a_line_said_by_name_is_asked_again_never_silence() {
     }
 }
 
+/// #8675's HOLD (lamp-74ff, 26 Nov 2026, request 135 at 04:31): "Hey, Lamp.
+/// What is 17% of 200?" was answered with 2 tokens, no call and nothing
+/// said, and with `LAMP_NO_WORDS_AGAIN` on the lamp stayed silent. A call
+/// written as words (`web_search`) is never said, but its text has letters,
+/// so the gate was skipped. It now counts as no words: the line is asked once
+/// more, told it gave none, and the second answer is said. Off, silence as
+/// found.
+#[tokio::test]
+async fn a_call_written_as_words_to_a_line_said_by_name_is_asked_again() {
+    let rounds = || {
+        vec![
+            vec![text("web_search"), Ok(ChatEvent::Done)],
+            vec![text("Here it is."), Ok(ChatEvent::Done)],
+        ]
+    };
+    for on in [true, false] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Hey, Lamp. What is 17% of 200?".to_owned())].into()),
+            chats: Mutex::new(rounds().into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.asking_again_for_no_words(on);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        assert_eq!(out.last().map(String::as_str), Some("complete"), "{out:?}");
+        let spoken: Vec<&String> = out.iter().filter(|o| o.starts_with("said:")).collect();
+        let asked_rounds = script.asked.lock().unwrap();
+        let told = Message::system(NO_WORDS_AGAIN_NOTE);
+        if on {
+            let said = "said:Here it is.".to_owned();
+            assert_eq!(spoken, [&said], "{out:?}");
+            assert_eq!(asked_rounds.len(), 2);
+            assert!(asked_rounds.iter().any(|round| round.contains(&told)));
+        } else {
+            assert!(spoken.is_empty(), "{out:?}");
+            assert_eq!(asked_rounds.len(), 1);
+        }
+    }
+}
+
 /// #4473 (Tests' P3 on #4723): with an owner's language, the line said
 /// after no words twice is in it, never English.
 #[tokio::test]

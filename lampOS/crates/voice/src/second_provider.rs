@@ -23306,13 +23306,18 @@ async fn answer(
             // No words and no call, after nothing said or called in the
             // turn, to a line that began with the lamp's name: never silence
             // (`LAMP_NO_WORDS_AGAIN`, #3704). Asked once more; with no words
-            // again, the lamp says it lost them.
+            // again, the lamp says it lost them. A call written as words is
+            // no words: it is never said (`Queue::push`). On lamp-74ff on
+            // 26 Nov, request 135 ("Hey, Lamp. What is 17% of 200?") was
+            // answered with 2 tokens, no call and nothing said, and this
+            // logged nothing; such a text fits, its letters having kept it
+            // from here, so the turn ended in silence.
             if calls.is_empty()
                 && shared.no_words_again
                 && asked == Asker::Spoken
                 && !called_earlier
                 && !queue.started
-                && !text.chars().any(char::is_alphanumeric)
+                && (!text.chars().any(char::is_alphanumeric) || crate::not_speech::bare_call(&text))
                 && by_name
             {
                 if !std::mem::replace(&mut no_words_asked_again, true) {
@@ -25211,6 +25216,31 @@ async fn answer(
             told(decision);
         }
     }
+    // `LAMP_NO_WORDS_AGAIN`: a spoken line begun with the lamp's name whose
+    // turn ended with none of its answer's audio out says how it ended, so a
+    // silence names its path (the Reviewer-lead's lead 2 on #8675). On
+    // lamp-74ff on 26 Nov (#8675's row), "Hey, Lamp. What is 17% of 200?"
+    // got three 2-token answers with no call, nothing said and no line at
+    // all after the round's tools line. No words of the line or the answer
+    // are journaled, only the turn's end.
+    if shared.no_words_again
+        && asked == Asker::Spoken
+        && by_name
+        && !answered.load(Ordering::Relaxed)
+    {
+        let how = match &ended {
+            Ok(_) => "its rounds ended with no words said",
+            Err(Stop::Declined) => "the model declined it",
+            Err(Stop::GaveUp) => "its first round never began",
+            Err(Stop::Held) => "it was held",
+            Err(Stop::Taken) => "it was taken by another turn",
+            Err(Stop::Gone) => "the turn was gone",
+            Err(Stop::Failed(_)) => "its rounds failed",
+        };
+        eprintln!(
+            "lamp-voice second: request {request}: a line begun with the lamp's name ended with nothing said: {how} (LAMP_NO_WORDS_AGAIN)"
+        );
+    }
     // A forget held in this turn stands only on its answer said whole.
     settle_held_forget(
         shared,
@@ -25522,6 +25552,19 @@ impl Queue<'_> {
             if text.trim_start().starts_with(NOT_FOR_ME) {
                 return Err(Stop::Declined);
             }
+            // Journaled by the function's name alone (a lower-case name with
+            // an underscore, `not_speech::names_a_function`), never its
+            // arguments: on lamp-74ff on 26 Nov such a drop left no line.
+            let name: String = text
+                .trim()
+                .chars()
+                .take_while(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == '_')
+                .take(40)
+                .collect();
+            eprintln!(
+                "lamp-voice second: request {}: a piece written as a call ({name}) was left out, not said and not run",
+                self.request
+            );
             return Ok(());
         }
         // A claim to have stopped looking, with desk noticing still on and
