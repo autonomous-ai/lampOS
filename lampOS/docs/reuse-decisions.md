@@ -2398,3 +2398,84 @@ tests with a fake NPU, a fake Store and the service's own clock; the
 VIPLite struct's size; the ARM64 build; MoveNet converted and measured on
 the lamp by its own reference. Not yet proven: a run on the lamp's NPU
 through this service.
+
+## Bounded local evaluation evidence (2026-11-27)
+
+For the fleet evaluation recorder, inspected V1's actual
+`hal/telemetry/voice_metrics.py` (`playback_audio`, `_interaction_params`),
+`hal/telemetry/live_voice.py` (`speech`, `complete`, `interrupt`),
+`hal/telemetry/client.py` (`report`), and `system/telemetry/{telemetry,voice_task}.go`
+(`Report`, `isDuplicate`, `ReportTaskExecution`). These are baseline references
+in the parent V1 tree, not dependencies of standalone lampOS.
+
+Keep the useful semantics: explicit playback ownership, unknown endpoint and
+ownership coverage, separate acknowledgement/answer boundaries, cancellation
+and exclusion categories, source-specific task cohorts, and the distinction
+between an execution terminal and answer correctness. V1 rejects a received
+server-VAD timestamp as a captured-speech endpoint, excludes unowned audio from
+acknowledgement, and reports an unfinished transport correlation as unknown.
+Those are requirements for any new producer adapter; the recorder does not
+claim to have ported the playback or task lifecycle trackers themselves.
+
+Replace V1's generic per-event logging/forwarding path for this purpose. Its
+HAL sender has a 128-event queue and a three-second POST timeout; the Go sender
+has a 256-event queue, a ten-second send timeout and an in-memory 30-minute
+seen-ID registry. It reports queue/transport losses but accepts generic
+parameter maps, logs individual event payloads, and does not persist its
+dedupe state with a 30-day aggregate. `lamp-evals` instead uses closed internal
+enums and numeric evidence, bounded local aggregate segments and sorted ID
+ranges, with dedupe and aggregate cardinality validated in one checkpoint.
+No legacy HTTP handler, Python runtime, analytics worker or log parser is
+linked into the lamp runtime.
+
+Existing Rust implementations informed the smaller design:
+
+| Existing source | Reuse or keep | Deliberate difference |
+|---|---|---|
+| `crates/cloud/src/reports/counters.rs` | Fixed histogram edges and count aggregation; preserve the separation of counting from transport acknowledgement. | Its counters are since acknowledgement and may be sent again. The new local history uses retained event identities, build/origin/rubric partitions and checked conservation; it does not treat overlapping health-report counters as hourly history. The shared edge values do not make endpoint-decision-to-speaker-write timing the same as every existing voice timing boundary. |
+| `crates/health/src/parts.rs::health` | Preserve stale/missing evidence and existing hardware/service diagnostics as lower-level context. | A diagnostic heartbeat or an `ok` part does not grade perception, feature correctness or user success. Health's messages are not copied into evaluation snapshots. |
+| `crates/voice-eval/src/{export,canary,report}.rs` | Retain explicit privacy projection, evaluator fault controls, evidence strata, and the warning that software playback does not prove semantic or acoustic success. | The finite export keeps event timing and fixture correlations for replay; it is not a production fleet upload. The new snapshot has only aggregate categories and numbers. No active test or finite-run evaluator is installed as a background service. |
+| `crates/checked-replace/src/lib.rs::{lock,replace_checked_in}` | Reuse the held directory lock, exclusive candidate, whole-file write, file sync, caller validation, descriptor-relative rename and directory fsync. | The evaluation store uses a zero-wait lifetime lock, exclusive caller access for saves, a fixed private file, an 8 MiB bounded payload, checksum and recorder restore checks. Under that lock, open/save recovery checks at most 64 entries before removing only safe exact-name crash candidates and syncing the directory; unrelated entries remain untouched. It reserves two slots before the first save, or one candidate slot when the committed file exists. It does not invoke OpenClaw's validator or introduce another atomic replacement implementation. |
+
+The first implementation is library-only. The internal `VoiceDeliveryV1`
+rubric is independent of the proposed voice producer version 2, whose adapter
+is not present. Daily rows require a completed UTC day but still have unknown
+coverage; rolling retention can clip the oldest day. Ingest's proposed target
+is under 1 ms on the lamp, without filesystem, network or logging work. Sparse
+or interleaved IDs may exhaust the 4096 total dedupe ranges before 30 days;
+capacity rejections remain coverage evidence and require traffic-based cap
+calibration. Host synthetic tests establish accounting and storage boundaries
+only; no physical latency, power-loss, acoustic or all-feature acceptance is claimed. See
+[evals.md](evals.md) for the precise state bounds, durability limits, privacy
+contract and remaining integration gates.
+
+### Isolating checkpoint writes (2026-11-27)
+
+The next recorder primitive keeps the existing `Store` format, private lifetime
+lock, bounded recovery and checked replacement. It adds a caller-neutral
+single-write worker; it does not create another storage engine or a daemon.
+
+The source pattern is `crates/voice/src/onboarding/storage.rs`: checked revision
+tags and matching completions (115–201), one-slot job/result channels (362–410),
+and requested shutdown kept separate from observed completion (437–459).
+The evaluation version is smaller: one owned immutable `Recorder`, no deferred
+job, profile/mailbox fields, take-back retry or mutable shared client. A busy
+or closed offer returns the caller's snapshot. Thread ownership remains
+explicit, and no stalled writer is replaced by another.
+
+`crates/settings/src/runtime.rs`'s indeterminate-write treatment informs the
+error boundary. `checked-replace` renames before its directory fsync; an error
+there cannot establish rollback. Every failed evaluation save therefore stays
+durability-unknown and stops further submissions until confirmed shutdown and
+validated recovery. `crates/controls/src/strip_worker.rs` also distinguishes a
+requested stop from observed worker exit. The bus logger's detached-thread
+pattern and cloud transport's broker acknowledgement are not substitutes for
+this local writer's lifecycle or durability acknowledgement.
+
+Snapshot capture remains explicit caller work, while serialization, validation
+and filesystem operations run in the worker. Offer/poll's proposed p99 budget
+is 100 microseconds with a prepared snapshot; capture and complete-save costs
+must be measured separately. Rust thread teardown and kernel filesystem stalls
+have no hard deadline here. The separate supervised recorder process and its
+quiet scheduling, producer adapter, recovery, consent and deletion policies
+remain necessary integration work.
