@@ -439,29 +439,146 @@ fn simple_call_no_other_window_keeps_a_line_past_20_s() {
     );
 }
 
-/// "Stop" closes the window (kept): after a stop, a line 5 s after the
-/// lamp's words is held, and "Hey Lamp" opens again.
+/// A stop keeps the window (the product owner, 27 Nov 2026: "any
+/// conversation has a 20s window so reminder, proactive, chatting, etc."):
+/// it runs from the end of the lamp's last words, where the stop cut its
+/// answer or what it said after (its "Okay, I'll stop there."). On Fifth's
+/// gate on lamp-52e6, after "Okay, okay, never mind." and the lamp's "Okay,
+/// I'll stop there.", "So which one is bigger?" was held. After a
+/// stop, a line begun 5 s after the lamp's last words, the cut or its
+/// acknowledgment, is answered as the conversation going on; one begun 25 s
+/// after is held, and so is one with no words; "Hey Lamp" still calls.
 #[test]
-fn simple_call_a_stop_closes_the_window() {
+fn simple_call_a_stop_keeps_the_window_from_the_lamps_last_words() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::attention::Verdict;
+    use crate::room_told::Room;
+    let none = || signs(None, Room::Unknown, vec![]);
+    // The lamp's last words ended `ended_ago_s` before the stop is told:
+    // where the stop cut its answer, or its acknowledgment, said after the
+    // cut and ended 9 s after it.
+    let stopped = |ended_ago_s: u64, acknowledged: bool| {
+        let cut_ago_s = ended_ago_s + if acknowledged { 9 } else { 0 };
+        let mut heeding = heeding(true, Some(cut_ago_s));
+        if acknowledged {
+            let ended_us = monotonic_us().saturating_sub(ended_ago_s * S);
+            heeding.lamp_did(crate::second_provider::Did::Said(8, ended_us));
+        }
+        // Told as the next line begins (its Start's `after_stop`).
+        heeding.lamp_did(crate::second_provider::Did::Stopped);
+        heeding
+    };
+    let heard = "So which one is bigger?";
+    for acknowledged in [false, true] {
+        let mut heeding = stopped(5, acknowledged);
+        let now = monotonic_us();
+        assert_eq!(
+            judged(&mut heeding, 9, now, heard, none()),
+            None,
+            "5 s after, acknowledged {acknowledged}"
+        );
+        assert_eq!(
+            Heeding::simple_verdict(
+                &heeding.attention,
+                heeding.said_until_us,
+                heeding.called_at,
+                now,
+                heard
+            ),
+            Verdict::Play(SIMPLE_GOING_ON),
+            "5 s after, acknowledged {acknowledged}"
+        );
+        let mut heeding = stopped(25, acknowledged);
+        let now = monotonic_us();
+        assert_eq!(
+            judged(&mut heeding, 9, now, heard, none()),
+            Some(crate::second_provider::SIMPLE_HELD),
+            "25 s after, acknowledged {acknowledged}"
+        );
+        let mut heeding = stopped(5, acknowledged);
+        let now = monotonic_us();
+        assert_eq!(
+            judged(&mut heeding, 9, now, "", none()),
+            Some(crate::second_provider::SIMPLE_NO_WORDS),
+            "no words, acknowledged {acknowledged}"
+        );
+        let mut heeding = stopped(25, acknowledged);
+        let now = monotonic_us();
+        assert_eq!(
+            judged(
+                &mut heeding,
+                10,
+                now,
+                "Hey Lamp, and tomorrow?",
+                call_at(now)
+            ),
+            None,
+            "a call, acknowledged {acknowledged}"
+        );
+    }
+}
+
+/// A stop ends the lamp's words where it cut them: the rest of an answer
+/// sent ahead and never played counts for nothing. Words sent to play 30 s
+/// more, stopped now: a line 5 s later is answered as the conversation going
+/// on, and one 25 s later is held, though both began before the words sent
+/// would have ended.
+#[test]
+fn simple_call_a_stop_ends_the_lamps_words_where_it_cut_them() {
     let _one = crate::provider_worker::tests::one_thread();
     use crate::room_told::Room;
     let none = || signs(None, Room::Unknown, vec![]);
-    let mut heeding = heeding(true, Some(5));
+    let mut heeding = heeding(true, None);
+    let now = monotonic_us();
+    heeding.lamp_did(crate::second_provider::Did::Said(8, now + 30 * S));
     heeding.lamp_did(crate::second_provider::Did::Stopped);
+    assert_eq!(
+        judged(
+            &mut heeding,
+            9,
+            now + 5 * S,
+            "So which one is bigger?",
+            none()
+        ),
+        None,
+        "5 s after the cut"
+    );
+    assert_eq!(
+        judged(&mut heeding, 10, now + 25 * S, "And the other one?", none()),
+        Some(crate::second_provider::SIMPLE_HELD),
+        "25 s after the cut"
+    );
+}
+
+/// A stop ends the call's carry (kept): "Hey Lamp, …", stopped before the
+/// lamp said anything, and a line 5 s after it is held. The carry covers
+/// only a line said right after the call, before the lamp spoke.
+#[test]
+fn simple_call_a_stop_ends_the_calls_carry() {
+    let _one = crate::provider_worker::tests::one_thread();
+    use crate::room_told::Room;
+    let mut heeding = heeding(true, None);
     let now = monotonic_us();
     assert_eq!(
-        judged(&mut heeding, 9, now, "And tomorrow?", none()),
-        Some(crate::second_provider::SIMPLE_HELD)
+        judged(
+            &mut heeding,
+            9,
+            now,
+            "Hey Lamp, what's the weather",
+            call_at(now)
+        ),
+        None
     );
+    heeding.lamp_did(crate::second_provider::Did::Stopped);
     assert_eq!(
         judged(
             &mut heeding,
             10,
-            now + S,
-            "Hey Lamp, and tomorrow?",
-            call_at(now + S)
+            now + 5 * S,
+            "in Hanoi tomorrow?",
+            signs(None, Room::Unknown, vec![])
         ),
-        None
+        Some(crate::second_provider::SIMPLE_HELD)
     );
 }
 
