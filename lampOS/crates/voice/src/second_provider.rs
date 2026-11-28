@@ -2508,6 +2508,9 @@ struct Shared {
     /// `LAMP_SIMPLE_CALL`: whether the one rule lets out a kept line never
     /// judged as the line in hand ([`Engine::judging_kept_lines`]).
     kept_line: Option<KeptLine>,
+    /// Whether no judge of kept lines was journaled
+    /// ([`Shared::kept_line_let_out`]): once.
+    kept_line_missing: AtomicBool,
     /// Whether lamp-name heard the name in a request's line (#3504 N4).
     name_fired: Option<NameFired>,
     /// With the tasks part: the note that a prepared task waits for a yes.
@@ -2701,6 +2704,15 @@ struct Shared {
     /// With `LAMP_SIMPLE_CALL`, the newest lines the one rule let out, by
     /// request ([`Shared::let_out_by_the_rule`]): only their words are
     /// answered in a held line's place ([`Shared::words_let_out`]).
+    ///
+    /// Kept by request number alone, since within one worker the numbers
+    /// never start again (the Reviewer-lead's P3 on #8892): one provider
+    /// worker runs per service cycle (`coordinator::spawn_rig`, called by
+    /// `run_cycle`), and that cycle's turn owner numbers every turn, spoken,
+    /// written, a reminder or a computer's, by its own counter, never reset
+    /// (`turn_owner::Controller::admit`). A cycle numbering from 1 again (a
+    /// mute, a head sleep, a privacy switch: `coordinator::cycle_controller`)
+    /// spawns a new worker, with a `Shared` of its own.
     let_out: Mutex<VecDeque<u64>>,
     /// The request last held, its words not answered: never chained into a
     /// later line's ([`Engine::chain_heard`]).
@@ -5819,6 +5831,7 @@ impl Engine {
                 call_note: None,
                 name_sounded: None,
                 kept_line: None,
+                kept_line_missing: AtomicBool::new(false),
                 name_fired: None,
                 task_waiting: None,
                 task_declined: None,
@@ -8090,9 +8103,12 @@ impl Engine {
     /// after it), by its request, window and words, changing nothing
     /// (`worker::Heeding::simple_lets_out`). Before any turn only.
     pub fn judging_kept_lines(mut self, judge: KeptLine) -> Self {
-        if let Some(shared) = Arc::get_mut(&mut self.shared) {
-            shared.kept_line = Some(judge);
-        }
+        // Set too late, the judge would be dropped and kept names would pass
+        // again: it fails loudly (the Reviewer-lead's P3 on #8892).
+        let shared = Arc::get_mut(&mut self.shared).expect(
+            "judging_kept_lines is set before any turn, while the engine alone holds its shared state",
+        );
+        shared.kept_line = Some(judge);
         self
     }
 
@@ -10746,16 +10762,22 @@ impl Shared {
     /// line over `said` with `words`, kept and never judged as the line in
     /// hand (a name waiting for the line after it), judged now and changing
     /// nothing ([`Engine::judging_kept_lines`]); let out, it is kept as one
-    /// ([`Self::let_out_by_the_rule`]). With no rule to judge it, or without
-    /// the switch, as before: let out.
+    /// ([`Self::let_out_by_the_rule`]). With no rule installed to judge it,
+    /// never: it fails closed, journaled once (the Reviewer-lead's P3 on
+    /// #8892). Without the switch, as before: let out.
     fn kept_line_let_out(&self, request: u64, said: (u64, u64), words: &str) -> bool {
         if !self.simple_call {
             return true;
         }
-        let let_out = self
-            .kept_line
-            .as_ref()
-            .is_none_or(|judge| judge(request, said, words));
+        let Some(judge) = self.kept_line.as_ref() else {
+            if !self.kept_line_missing.swap(true, Ordering::Relaxed) {
+                eprintln!(
+                    "lamp-voice second: no rule judges a kept line, so none is answered in a held line's place (LAMP_SIMPLE_CALL)"
+                );
+            }
+            return false;
+        };
+        let let_out = judge(request, said, words);
         if let_out {
             self.let_out_by_the_rule(request);
         }

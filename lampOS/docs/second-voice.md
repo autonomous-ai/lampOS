@@ -6342,6 +6342,12 @@ after a take-over, but now for every turn:
       "Lamp." no rule let out was answered in a held line's place, and the
       window its answer opened let played clips chain in for two hours.
       `LAMP_CUT_ASK_ANSWERED`'s "only declined" path takes the same check.
+      With no judge installed for kept lines it fails closed: none is let
+      out, journaled once, and a judge set too late fails loudly (the
+      Reviewer-lead's P3s on #8892). The lines let out are kept by request
+      number alone: one worker runs per service cycle, whose turn owner
+      numbers every turn and never starts again (a cycle that does, after a
+      mute, a head sleep or a privacy switch, spawns a new worker).
     - **Set aside**: `said_to_me` and the turned-silent rules
       (`silence_turned` is not read), every hold and let-out in
       `judged_verdict` (the face as a sign, lone words, untied and others'
