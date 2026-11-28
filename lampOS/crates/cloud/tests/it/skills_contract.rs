@@ -64,7 +64,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         places: Places::default(),
         bus: None,
         device_id: "d-42".into(),
-        build: String::new(),
+        build: Default::default(),
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::default(),
