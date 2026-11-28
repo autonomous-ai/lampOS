@@ -1393,9 +1393,9 @@ builder, #800). That is too many to hold all speech on the Policy yet, but
 an action changes the lamp and outlasts the moment.
 
 With the switch, a call that changes the lamp, any of the executive's
-functions (the volume and the light), or one of the schedule's three that
-set or take away something to come (`set_timer`, `set_reminder`,
-`cancel_reminder`: on lamp-4ace on 16 October "Yes, give me five minutes",
+functions (the volume and the light), or one of the schedule's four that
+set, move or take away something to come (`set_timer`, `set_reminder`,
+`cancel_reminder`, `move_reminder` since #8840: on lamp-4ace on 16 October "Yes, give me five minutes",
 said to someone else, set a five-minute timer; the first builder on #908),
 waits for the Policy's attention decision about its turn. The schedule's
 other three, `list_reminders`, `repeat_reminder` and `snooze_reminder`, are
@@ -1403,8 +1403,10 @@ not held (the first builder, 05:57), nor is any other call:
 - **A reply to the lamp keeps its schedule** (#1040). A `stay_quiet` whose
   `follows_lamp` answer is 0.6 or more (`policy_holds::FOLLOWS_FROM`) still
   holds the volume, the light and the executive's functions, but not the
-  schedule's two that set something to come, `set_timer` and
-  `set_reminder` (`policy_holds::SETS`). On lamp-4ace on 2026-10-16 at 11:20 "Set a timer for 1
+  schedule's four, `set_timer`, `set_reminder`, `cancel_reminder` and
+  `move_reminder` (`policy_holds::SETS`; the cancel and the move since
+  #8840, the first builder's ruling of 28 Nov: a line said back to the
+  lamp is answered). On lamp-4ace on 2026-10-16 at 11:20 "Set a timer for 1
   minute", said to the lamp in a conversation with it, was held and no
   timer was set: the fitted weights count a follow-up to the lamp against
   answering, though `follows_lamp` told the lamp's lines apart (median 0.60
@@ -1599,7 +1601,9 @@ the battery's counters read both routes alike.
   so once at its start. Live's `busy_talk` comes with going-on asks,
   which this route has not. Its rule already holds what a line let out
   only as the conversation going on would set on the schedule
-  (`Heeding::holds_call`), before the gate is asked.
+  (`Heeding::holds_call`), before the gate is asked; never a cancel or a
+  move (#8840: on lamp-52e6 on 28 Nov "Actually, cancel that.", said right
+  after the lamp set a reminder, was held there and the reminder stayed).
 - **The wait is in the turn's own task.** The call looks for its decision
   every 20 ms (`policy::LOOK_EVERY`) for at most 2 s, and nothing else
   waits. A round's calls are put to the gate together, so the round waits
