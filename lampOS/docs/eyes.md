@@ -4042,6 +4042,12 @@ cargo run --release -p lamp-eyes --example look -- MODEL.onnx PHOTO.jpg
 
 ## Verification without a lamp
 
+For the new head-direction work, the
+[offline comparison](head-direction-evaluation.md) runs the existing
+detector/crop/mesh pipeline with isolated candidate geometry. It leaves
+product sensing and voice policy unchanged, and does not replace the
+Reviewer's labelled, on-body accuracy and latency gates.
+
 Host tests, `cargo test -p lamp-eyes` (14 passed, 0 failed, on macOS; the 12
 before the kept frame also passed under emulated ARM64). They cover: that the
 kept file is the newest frame, private, never a second file, left alone by a

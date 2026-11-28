@@ -1,5 +1,25 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Compare head geometry through the product pipeline (#8847, 2026-11-27)
+
+Reuse `lamp-eyes`' pinned detector, JPEG decoder, rotated mesh crop and tract
+model runner for the [offline head comparison](head-direction-evaluation.md).
+The existing five-mark geometry already ports V1
+`hal/drivers/tracking/gaze.py`; its broad facing threshold is not a measured
+lamp/screen/phone classifier. V1 also clears observations after camera
+motion and excludes missing measurements from its vote. Preserve those
+distinctions as explicit future freshness/unknown requirements rather than
+claiming parity from angle fixtures.
+
+Reuse the pure geometry from closed draft #8782 in the example only, with
+finite and degeneracy checks. Do not reuse its default-on unit change,
+fallback to marks, or replacement of existing facing/speaking inputs. The
+old MediaPipe task benchmark has a different crop, pose estimator and fitted
+scoring rule; it is a reference experiment, not evidence for this candidate.
+Keep the Reviewer's shared scorer authoritative and add no duplicate scoring
+pipeline or production image upload. On-body accuracy, freshness, privacy
+and latency remain qualification work.
+
 ## Keep retirement before requested music; distinguish cues (2026-11-10)
 
 V1 `hal/drivers/voice/music_service.py` waits while TTS is speaking before
