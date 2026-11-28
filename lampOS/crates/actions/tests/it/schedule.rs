@@ -490,6 +490,92 @@ fn cancel_by_text_cancels_the_one_match_and_names_several() {
     assert_eq!(texts, ["Water plants", "Bins"]);
 }
 
+/// #8840: a reminder moved by voice keeps its words and how it repeats, and
+/// only its time changes: "move my 4 PM go-home reminder to 4:30" is one
+/// daily item at 16:30 after it, never both. Two that match are named and
+/// nothing moves; none says none; a timer or an interval series is not
+/// moved by clock and nothing changes.
+#[test]
+fn move_by_text_keeps_the_repeat_and_changes_only_the_time() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter().with_moving(true)));
+    for (name, args) in [
+        ("repeat_reminder", json!({"text":"Go home","time":"16:00","every":"daily"})),
+        ("repeat_reminder", json!({"text":"Bins out","time":"19:00","every":"weekly","weekday":"thursday"})),
+        ("set_reminder", json!({"text":"Call Ana","time":"09:00","day":"tomorrow"})),
+        ("set_reminder", json!({"text":"Call the bank","time":"10:00","day":"tomorrow"})),
+        ("set_timer", json!({"text":"Pasta","seconds":600})),
+    ] {
+        assert_eq!(actions.call(name, args.clone())["ok"], true, "{args}");
+    }
+    let moved = actions.call("move_reminder", json!({"text":"go home","time":"16:30"}));
+    assert_eq!(moved["ok"], true, "{moved}");
+    assert_eq!(moved["result"]["moved"], true, "{moved}");
+    assert_eq!(moved["result"]["text"], "Go home", "{moved}");
+    assert_eq!(moved["result"]["clock"], "16:30", "{moved}");
+    assert_eq!(moved["result"]["repeat"], "daily", "{moved}");
+    let weekly = actions.call("move_reminder", json!({"text":"bins","time":"20:00"}));
+    assert_eq!(weekly["result"]["moved"], true, "{weekly}");
+    assert_eq!(weekly["result"]["repeat"], "weekly", "{weekly}");
+    let list = actions.call("list_reminders", json!({}));
+    let items = list["result"]["items"].as_array().unwrap().clone();
+    let of = |text: &str| -> Vec<Value> {
+        items.iter().filter(|item| item["text"] == text).cloned().collect()
+    };
+    let home = of("Go home");
+    assert_eq!(home.len(), 1, "never both: {list}");
+    assert_eq!(home[0]["repeat"]["kind"], "daily", "{list}");
+    assert_eq!(home[0]["repeat"]["time"], "16:30", "{list}");
+    let bins = of("Bins out");
+    assert_eq!(bins.len(), 1, "{list}");
+    assert_eq!(bins[0]["repeat"]["weekday"], "thursday", "{list}");
+    assert_eq!(bins[0]["repeat"]["time"], "20:00", "{list}");
+    // Two hold "call": named, nothing moved.
+    let two = actions.call("move_reminder", json!({"text":"call","time":"11:00"}));
+    assert_eq!(two["result"]["moved"], false, "{two}");
+    assert_eq!(two["result"]["matches"].as_array().unwrap().len(), 2, "{two}");
+    // None hold "dentist": none, nothing moved.
+    let none = actions.call("move_reminder", json!({"text":"dentist","time":"11:00"}));
+    assert_eq!(none["result"]["matches"], json!([]), "{none}");
+    // A one-time reminder moves to its new time, still once.
+    let ana = actions.call("move_reminder", json!({"text":"ana","time":"09:15","day":"tomorrow"}));
+    assert_eq!(ana["result"]["moved"], true, "{ana}");
+    assert_eq!(ana["result"]["repeat"], "once", "{ana}");
+    // A timer is not moved by clock: nothing changes.
+    let pasta = actions.call("move_reminder", json!({"text":"pasta","time":"12:00"}));
+    assert_eq!(pasta["result"]["moved"], false, "{pasta}");
+    let after = actions.call("list_reminders", json!({}));
+    let texts: Vec<&str> = after["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts.len(), 5, "{after}");
+    assert_eq!(texts.iter().filter(|t| **t == "Pasta").count(), 1);
+    assert_eq!(texts.iter().filter(|t| **t == "Call Ana").count(), 1);
+    assert_eq!(texts.iter().filter(|t| **t == "Call the bank").count(), 1);
+}
+
+/// #8840: `LAMP_SCHEDULE_MOVE` off, the catalog is as it was and
+/// `move_reminder` is refused without a schedule connection.
+#[test]
+fn move_reminder_is_offered_only_with_its_switch() {
+    let names = |moving: bool| -> Vec<&'static str> {
+        lamp_actions::schedule::catalog_moving(lamp_actions::schedule::catalog_with(false), moving)
+            .iter()
+            .map(|function| function.name)
+            .collect()
+    };
+    assert_eq!(names(false), NAMES);
+    assert_eq!(names(true).last(), Some(&"move_reminder"));
+    assert_eq!(names(true).len(), NAMES.len() + 1);
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(schedule.adapter().with_moving(false)));
+    let refused = actions.call("move_reminder", json!({"text":"x","time":"10:00"}));
+    assert_eq!(refused["ok"], false, "{refused}");
+}
+
 #[test]
 fn malformed_arguments_and_unknown_fields_open_no_schedule_connection() {
     let root = root();
