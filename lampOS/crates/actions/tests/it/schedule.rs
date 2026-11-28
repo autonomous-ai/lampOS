@@ -500,10 +500,22 @@ fn move_by_text_keeps_the_repeat_and_changes_only_the_time() {
     let schedule = Schedule::new();
     let actions = Actions::new(Some(schedule.adapter().with_moving(true)));
     for (name, args) in [
-        ("repeat_reminder", json!({"text":"Go home","time":"16:00","every":"daily"})),
-        ("repeat_reminder", json!({"text":"Bins out","time":"19:00","every":"weekly","weekday":"thursday"})),
-        ("set_reminder", json!({"text":"Call Ana","time":"09:00","day":"tomorrow"})),
-        ("set_reminder", json!({"text":"Call the bank","time":"10:00","day":"tomorrow"})),
+        (
+            "repeat_reminder",
+            json!({"text":"Go home","time":"16:00","every":"daily"}),
+        ),
+        (
+            "repeat_reminder",
+            json!({"text":"Bins out","time":"19:00","every":"weekly","weekday":"thursday"}),
+        ),
+        (
+            "set_reminder",
+            json!({"text":"Call Ana","time":"09:00","day":"tomorrow"}),
+        ),
+        (
+            "set_reminder",
+            json!({"text":"Call the bank","time":"10:00","day":"tomorrow"}),
+        ),
         ("set_timer", json!({"text":"Pasta","seconds":600})),
     ] {
         assert_eq!(actions.call(name, args.clone())["ok"], true, "{args}");
@@ -520,7 +532,11 @@ fn move_by_text_keeps_the_repeat_and_changes_only_the_time() {
     let list = actions.call("list_reminders", json!({}));
     let items = list["result"]["items"].as_array().unwrap().clone();
     let of = |text: &str| -> Vec<Value> {
-        items.iter().filter(|item| item["text"] == text).cloned().collect()
+        items
+            .iter()
+            .filter(|item| item["text"] == text)
+            .cloned()
+            .collect()
     };
     let home = of("Go home");
     assert_eq!(home.len(), 1, "never both: {list}");
@@ -533,12 +549,19 @@ fn move_by_text_keeps_the_repeat_and_changes_only_the_time() {
     // Two hold "call": named, nothing moved.
     let two = actions.call("move_reminder", json!({"text":"call","time":"11:00"}));
     assert_eq!(two["result"]["moved"], false, "{two}");
-    assert_eq!(two["result"]["matches"].as_array().unwrap().len(), 2, "{two}");
+    assert_eq!(
+        two["result"]["matches"].as_array().unwrap().len(),
+        2,
+        "{two}"
+    );
     // None hold "dentist": none, nothing moved.
     let none = actions.call("move_reminder", json!({"text":"dentist","time":"11:00"}));
     assert_eq!(none["result"]["matches"], json!([]), "{none}");
     // A one-time reminder moves to its new time, still once.
-    let ana = actions.call("move_reminder", json!({"text":"ana","time":"09:15","day":"tomorrow"}));
+    let ana = actions.call(
+        "move_reminder",
+        json!({"text":"ana","time":"09:15","day":"tomorrow"}),
+    );
     assert_eq!(ana["result"]["moved"], true, "{ana}");
     assert_eq!(ana["result"]["repeat"], "once", "{ana}");
     // A timer is not moved by clock: nothing changes.

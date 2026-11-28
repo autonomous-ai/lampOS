@@ -247,7 +247,8 @@ fn gives_when(heard: &str) -> bool {
 pub(crate) fn when_not_heard(name: &str, request: u64, heard: bool) -> Option<serde_json::Value> {
     let ask = match name {
         "set_timer" => "For how long?",
-        "set_reminder" => "What time?",
+        // A move's new time is the person's too (#8840), never the model's.
+        "set_reminder" | lamp_actions::schedule::MOVE => "What time?",
         _ => return None,
     };
     if !asks_how_long()

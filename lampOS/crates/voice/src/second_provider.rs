@@ -579,7 +579,7 @@ pub(crate) fn kept_args(name: &str, args: &serde_json::Value) -> Option<serde_js
         return (kept && args.to_string().len() <= crate::thread::KEPT_ARGS_BYTES)
             .then(|| args.clone());
     }
-    if !crate::tools::is_light_or_volume(name) && !crate::tools::SCHEDULE_NAMES.contains(&name) {
+    if !crate::tools::is_light_or_volume(name) && !crate::tools::is_schedule_tool(name) {
         return None;
     }
     if args.to_string().len() <= crate::thread::KEPT_ARGS_BYTES {
@@ -16666,7 +16666,11 @@ const ONE_FACE_REFUSED: &[&str] = &[
 /// The reminder calls that change someone's reminders. On a one-face-read
 /// line they run only with `LAMP_ONE_FACE_REMINDERS` on, whose cancel risk
 /// the memory owner accepted on 4 Nov (`tools::schedule_whose`).
-const ONE_FACE_REMINDER_CHANGES: [&str; 2] = ["cancel_reminder", "snooze_reminder"];
+const ONE_FACE_REMINDER_CHANGES: [&str; 3] = [
+    "cancel_reminder",
+    "snooze_reminder",
+    lamp_actions::schedule::MOVE,
+];
 
 /// What such a call is told instead of running ([`ONE_FACE_REFUSED`]).
 pub(crate) const ONE_FACE_FORGET: &str = "Nothing was forgotten, changed or agreed: I couldn't see who was talking, so I can't forget anything, correct what I kept, keep or read their standing rules, set or end a role, change their reminders, or take a yes for anyone. Ask them to look at me and say it again.";
@@ -23600,6 +23604,13 @@ async fn answer(
                     continue;
                 }
                 if policed == Policed::Held {
+                    // Journalled: a held call reaches no part, so nothing
+                    // else says it was asked (#8840: on lamp-52e6 a cancel
+                    // held this way left no line anywhere).
+                    eprintln!(
+                        "lamp-voice second: request {request} asked for {}: held by the Policy's decision for the turn",
+                        call.name
+                    );
                     messages.push(Message::tool(
                         call.id.clone(),
                         crate::policy_holds::held().to_string(),

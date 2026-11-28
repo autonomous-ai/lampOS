@@ -2,7 +2,7 @@
 //! `LAMP_POLICY_HOLDS_ACTIONS=on`: a call that changes the lamp (its volume
 //! or its light, the executive's functions) or sets or takes away something
 //! on its schedule ([`SCHEDULE_HELD`]: `set_timer`, `set_reminder`,
-//! `cancel_reminder`) runs only when the Policy's attention decision for the
+//! `cancel_reminder`, `move_reminder`) runs only when the Policy's attention decision for the
 //! turn is not `stay_quiet`, or the lamp's name was heard. Every other call
 //! runs as it did, `list_reminders`, `repeat_reminder` and `snooze_reminder`
 //! among them ([`holds`]).
@@ -144,12 +144,22 @@ const KEPT: usize = 16;
 /// builder on #908). Listing what is set, and changing one already set
 /// (`repeat_reminder`, `snooze_reminder`), are not held (the first builder,
 /// 05:57).
-pub const SCHEDULE_HELD: [&str; 3] = ["set_timer", "set_reminder", "cancel_reminder"];
+/// `move_reminder` (#8840) is held as a set is: it sets the one moved at
+/// its new time.
+pub const SCHEDULE_HELD: [&str; 4] = [
+    "set_timer",
+    "set_reminder",
+    "cancel_reminder",
+    lamp_actions::schedule::MOVE,
+];
 
-/// Of [`SCHEDULE_HELD`], the two that a reply to the lamp still runs
+/// Of [`SCHEDULE_HELD`], those that a reply to the lamp still runs
 /// ([`Verdict::StayQuietFollowing`]): they set something to come, which can
-/// be cancelled by asking. `cancel_reminder` is not one (Fourth on #1054).
-pub const SETS: [&str; 2] = ["set_timer", "set_reminder"];
+/// be cancelled or moved back by asking. `cancel_reminder` is not one
+/// (Fourth on #1054). `move_reminder` is (#8840): "4:30, please", said back
+/// to the lamp's "what time?", moves it; held, the lamp set nothing new and
+/// the person was told it could not change it (lamp-52e6, 27 Nov).
+pub const SETS: [&str; 3] = ["set_timer", "set_reminder", lamp_actions::schedule::MOVE];
 
 /// Whether a call, by its route and its name, waits for the Policy's
 /// decision: every one of the executive's and the connected services'
@@ -567,7 +577,13 @@ mod tests {
             ("set_timer", Gate::Run),
             ("set_reminder", Gate::Run),
             ("cancel_reminder", Gate::Hold),
+            // #8840: a move runs on a reply, as a set does.
+            (lamp_actions::schedule::MOVE, Gate::Run),
         ] {
+            assert!(
+                holds(&schedule, name),
+                "{name} waits for the Policy's decision"
+            );
             assert_eq!(
                 gate(following, false, short, sets(&schedule, name)),
                 run,

@@ -204,6 +204,21 @@ pub fn after_call(
     if !on() {
         return Kept::Off;
     }
+    // A move (#8840) is the old one's dismissal and the new one's set: its
+    // creator's record follows the reminder to its new time.
+    if name == lamp_actions::schedule::MOVE && told["moved"] == true {
+        if let Some(old) = told["old_id"].as_u64() {
+            let followed = kept::followed(|all| {
+                let at = all.iter().position(|one| one.id == old)?;
+                all.remove(at)
+            });
+            if let Some(followed) = followed {
+                put(&followed, Deed::Dismissed, now_ms);
+            }
+        }
+        let text = serde_json::json!({"text": told["text"]});
+        return after_call("set_reminder", &text, caller, told, now_ms);
+    }
     let committed = told["status"] == "committed";
     let Some(id) = told["id"].as_u64().filter(|id| committed && *id > 0) else {
         return Kept::Nothing;
