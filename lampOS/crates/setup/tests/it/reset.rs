@@ -2618,11 +2618,14 @@ fn a_forget_that_hangs_is_killed_at_its_bound_and_never_holds_the_start() {
 /// the reset must stop it ([`reset::WRITERS`]) or start it again
 /// ([`reset::STARTERS`]). Only the boot's own units, which a start in place
 /// does not run, are left: the waking face, which every voice start shows
-/// too. On an office lamp `lamp-peek` was such a unit and kept port 80 from
-/// setup (`peek.md`); a product unit like it fails this until it is named.
+/// too, and the servo port's oneshot (#8594), run only when the port's
+/// device comes, whose condition keeps it still while setup runs and which a
+/// reset must not start (it would start lamp-body). On an office lamp
+/// `lamp-peek` was such a unit and kept port 80 from setup (`peek.md`); a
+/// product unit like it fails this until it is named.
 #[test]
 fn every_product_unit_outside_the_target_that_waits_for_setup_is_the_resets() {
-    const BOOT_ONLY: [&str; 1] = ["lamp-waking.service"];
+    const BOOT_ONLY: [&str; 2] = ["lamp-body-port.service", "lamp-waking.service"];
     let named = |unit: &str| {
         reset::STARTERS
             .iter()

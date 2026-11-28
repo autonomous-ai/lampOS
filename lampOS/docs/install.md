@@ -939,6 +939,7 @@ product does it with systemd alone (#811):
 |---|---|---|
 | `lamp-setup.service` | at boot, `WantedBy=multi-user.target`, only while `/var/lib/lampos-setup/done` is missing and setup's two settings exist | the hotspot and setup's own page until the home's Wi-Fi and the person's settings are saved; then writes the marker, and starts each part `lampos.target` wants that is inactive, when the target already runs (setup.md, "The parts a target already up leaves behind") |
 | `lampos-setup-done.path` | at boot, `WantedBy=multi-user.target` | starts `lampos.target` once the marker exists: the moment setup writes it, and at every later boot. A target already active pulls nothing in again; setup itself starts what it left behind (above) |
+| `lamp-body-port.service` | each time the servo port's device appears, `WantedBy=dev-ttyACM0.device`, only once the marker exists | starts `lamp-body` again, after a `reset-failed`, only when it had stopped for good after three failed starts in ten minutes (its `StartLimitBurst`): a lamp whose servo port dropped and came back stayed still until a reboot (lamp-8ffc, 20 Nov, #8594). A body running, starting or never started is left alone, and it never runs on a timer, so a port that is there but broken still stops after three tries. Each failed stop's reason is in lamp-cloud's exit note (`/run/lampos-exits`) |
 | `lamp-setup-reset.service` | in the target, after setup | the reset button held 5 s: stops the lamp, wipes, removes the marker, and starts setup again in place with no reboot (#4500; it reboots if that fails, setup.md). Sandboxed (#3710): it writes only its subscriber's socket under `/run/lampos-bus` (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`), and hands the reset to `lamp-setup-wipe` through `systemd-run` (the plan's `detach`), which runs outside it. So it needs a plan with `detach`, as every plan a build ships has (the install test checks it): a plan kept by hand without one, which only a keeper-installed lamp can have (`crates/keeper/src/profile.rs`, a hand-changed plan is kept), would reset inside this read-only unit, fail on its journal and restart without wiping; give such a plan the shipped `detach` |
 | `lamp-waking.service` | early at boot, `WantedBy=sysinit.target`, only once the marker exists, and with every start of the voice (`lamp-voice.service` wants it and starts after it, #2848) | the waking face until the voice asks for the ring (#1681, [ring-choreography.md](ring-choreography.md), "The waking face"); off unless `LAMP_WAKING_FACE=on`, and then it exits at once. Sandboxed (#3710): `ProtectSystem=strict` with nothing written but its runtime directory and the ring's `/dev/spidev3.0`, `ProtectHome`, `NoNewPrivileges`; no `PrivateTmp`, which would order it after the /tmp mounts and delay first light |
 
@@ -1213,7 +1214,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    target (`lamp-setup.service`, `lamp-waking.service`,
    `lamp-setup-wifi-restore.service` and `lamp-setup-recover.service`,
    [setup.md](setup.md)), `lamp-records.timer`, `lamp-selftest.timer`,
-   `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-region.service`
+   `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-body-port.service`
+   (#8594, the table above), `lamp-region.service`
    and `lamp-region.path` (#6256, below), and the helpers'
    sockets `lamp-skills-manage.socket`, `lamp-apps-manage.socket`, `lamp-setup-change.socket`,
    `lamp-setup-wifi.socket` and `lamp-eyes-camera.socket` (`install::enabled`;

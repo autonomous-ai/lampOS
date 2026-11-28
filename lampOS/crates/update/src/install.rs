@@ -64,6 +64,10 @@ pub const PRODUCT: &[(&str, &str)] = &[
         include_str!("../../../deploy/product/lamp-body.service"),
     ),
     (
+        "lamp-body-port.service",
+        include_str!("../../../deploy/product/lamp-body-port.service"),
+    ),
+    (
         "lamp-eyes.service",
         include_str!("../../../deploy/product/lamp-eyes.service"),
     ),
@@ -346,6 +350,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-apps-folders.service",
     "lamp-apps-manage@.service",
     "lamp-apps-start.service",
+    "lamp-body-port.service",
     "lamp-body.service",
     "lamp-cloud.service",
     "lamp-control.service",
@@ -1032,6 +1037,41 @@ pub const REGION_FILE: &str = "/var/lib/lampos-cloud/region";
 /// The region's one-shot: it starts `update/current`, so a round never
 /// counts it as a part of its own (`round::installed_units`).
 pub const REGION_UNIT: &str = "lamp-region.service";
+
+/// The body's port one-shot (#8594): it starts `update/current`, so a
+/// round never counts it as a part of its own (`round::installed_units`).
+pub const BODY_PORT_UNIT: &str = "lamp-body-port.service";
+
+/// The body's unit, which [`body_port`] starts again.
+pub const BODY_UNIT: &str = "lamp-body.service";
+
+/// What `lamp-update body-port` did (#8594), run by [`BODY_PORT_UNIT`] each
+/// time the servo port's device appears: lamp-body started again when it
+/// had given up after its three failed starts (`systemctl is-failed`), its
+/// failure cleared first so its start limit doesn't refuse it; otherwise
+/// nothing. `run` runs one `systemctl` command and says whether it ended 0.
+/// A body running, starting, stopped on purpose or never started is left
+/// alone, so it never moves a lamp that wasn't stuck.
+pub fn body_port(
+    run: &mut dyn FnMut(&[&str]) -> Result<bool, String>,
+) -> Result<&'static str, String> {
+    if !run(&["systemctl", "is-failed", "--quiet", BODY_UNIT])? {
+        return Ok("the servo port is there, and lamp-body has not given up: left alone");
+    }
+    if !run(&["systemctl", "reset-failed", BODY_UNIT])? {
+        return Err(format!(
+            "the servo port came back, and {BODY_UNIT}'s failure could not be cleared"
+        ));
+    }
+    if !run(&["systemctl", "start", "--no-block", BODY_UNIT])? {
+        return Err(format!(
+            "the servo port came back, and {BODY_UNIT} could not be started"
+        ));
+    }
+    Ok(
+        "the servo port came back, and lamp-body had given up after its failed starts: started again (#8594)",
+    )
+}
 
 /// The name and time servers for the region the backend places the lamp
 /// in (#6256, #6414), read from [`REGION_FILE`]. `CN`: [`NAME_SERVERS`]
@@ -4034,12 +4074,12 @@ mod tests {
         // restore, and the own keys', #8367) share one binary, and so do the air and its bus clock,
         // the skills and their manage helper, the eyes and their camera
         // helper (#2892), the apps' manage helper with its boot start, its folders and its two app templates, and lamp-update
-        // and its region one-shot (#6256);
+        // and its region one-shot (#6256) and the body's port one-shot (#8594);
         // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
         assert_eq!(
             parts.len(),
-            services - 15,
+            services - 16,
             "every product service is a part"
         );
         for part in &parts {
@@ -4511,6 +4551,86 @@ mod tests {
 
     /// docs/install.md names every unit `install` enables, beyond the
     /// parts in `lampos.target` (its "every part"), so a unit added to
+    /// #8594: a lamp whose servo port dropped and came back stayed still
+    /// until a reboot (lamp-8ffc, 20 Nov): lamp-body had given up after three
+    /// failed starts. `lamp-body-port.service` starts it again each time
+    /// the port's device appears, only when it had given up, and never on a
+    /// timer, so it is no restart loop.
+    #[test]
+    fn the_body_is_started_again_when_its_port_comes_back_only_if_it_gave_up() {
+        let unit = |name: &str| {
+            PRODUCT
+                .iter()
+                .find(|(unit, _)| *unit == name)
+                .map(|(_, text)| *text)
+                .unwrap()
+        };
+        let port = unit("lamp-body-port.service");
+        let lines: Vec<&str> = port.lines().collect();
+        // The port lamp-body opens is the device that starts it.
+        assert!(unit("lamp-body.service").contains("--device /dev/ttyACM0"));
+        assert!(lines.contains(&"WantedBy=dev-ttyACM0.device"), "{port}");
+        assert!(lines.contains(&"After=dev-ttyACM0.device"), "{port}");
+        assert!(lines.contains(&"Type=oneshot"), "{port}");
+        assert!(
+            lines.contains(&"ConditionPathExists=/var/lib/lampos-setup/done"),
+            "{port}"
+        );
+        // Once per appearance: no restart, no timer.
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.starts_with("Restart=") || line.starts_with("OnCalendar=")),
+            "{port}"
+        );
+        assert!(
+            lines.contains(&"ExecStart=/opt/lampOS/update/current/lamp-update body-port"),
+            "{port}"
+        );
+        assert!(lines.contains(&"User=root"), "{port}");
+        assert!(enabled().contains(&"lamp-body-port.service".to_owned()));
+        // A round that adds it enables it by the port's device, as install.
+        assert_eq!(
+            crate::added::wants("lamp-body-port.service", port).unwrap(),
+            ["/etc/systemd/system/dev-ttyACM0.device.wants/lamp-body-port.service"]
+        );
+    }
+
+    /// #8594: `body-port` starts lamp-body again only when it had given
+    /// up, its failure cleared first; any other state is left alone.
+    #[test]
+    fn body_port_starts_a_body_that_gave_up_and_leaves_any_other_alone() {
+        let ran = |failed: bool| {
+            let mut calls: Vec<String> = Vec::new();
+            let said = body_port(&mut |argv: &[&str]| {
+                calls.push(argv.join(" "));
+                Ok(argv[1] != "is-failed" || failed)
+            });
+            (said, calls)
+        };
+        let (said, calls) = ran(true);
+        assert!(said.unwrap().contains("started again"));
+        assert_eq!(
+            calls,
+            [
+                "systemctl is-failed --quiet lamp-body.service",
+                "systemctl reset-failed lamp-body.service",
+                "systemctl start --no-block lamp-body.service",
+            ]
+        );
+        let (said, calls) = ran(false);
+        assert!(said.unwrap().contains("left alone"));
+        assert_eq!(calls, ["systemctl is-failed --quiet lamp-body.service"]);
+        // A failed clear starts nothing.
+        let mut calls = Vec::new();
+        let said = body_port(&mut |argv: &[&str]| {
+            calls.push(argv[1].to_owned());
+            Ok(argv[1] == "is-failed")
+        });
+        assert!(said.is_err());
+        assert_eq!(calls, ["is-failed", "reset-failed"]);
+    }
+
     /// [`enabled`] is said where a reader of the install looks: the Wi-Fi
     /// restore, the hotspot's recovery and the camera's socket had gone
     /// unsaid there.

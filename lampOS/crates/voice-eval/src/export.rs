@@ -140,6 +140,7 @@ const PARTS: &[&str] = &[
     "lamp-apps-folders",
     "lamp-apps-start",
     "lamp-body",
+    "lamp-body-port",
     "lamp-cloud",
     "lamp-control",
     "lamp-controls",
