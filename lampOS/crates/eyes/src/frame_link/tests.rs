@@ -421,6 +421,38 @@ fn only_lamp_seen_as_this_user_may_read() {
 }
 
 #[test]
+fn diagnostic_policy_is_explicit_exact_and_mutually_exclusive() {
+    assert_eq!(ReaderPolicy::default(), ReaderPolicy::Seen);
+    let caller = |uid, unit: &str| Caller {
+        pid: 7,
+        uid,
+        unit: Some(unit.to_owned()),
+    };
+    for (unit, seen, diagnostic) in [
+        (READER_UNIT, true, false),
+        (SENSOR5_READER_UNIT, false, true),
+        ("lamp-sensor5-capture@pilot.service", false, false),
+        ("lamp-sensor5-capture.service.extra", false, false),
+        ("lamp-control.service", false, false),
+    ] {
+        let peer = caller(990, unit);
+        assert_eq!(ReaderPolicy::Seen.may(Some(&peer), Some(990)), seen);
+        assert_eq!(
+            ReaderPolicy::Sensor5Capture.may(Some(&peer), Some(990)),
+            diagnostic
+        );
+    }
+    for peer in [
+        None,
+        Some(caller(0, SENSOR5_READER_UNIT)),
+        Some(caller(1000, SENSOR5_READER_UNIT)),
+    ] {
+        assert!(!ReaderPolicy::Sensor5Capture.may(peer.as_ref(), Some(990)));
+    }
+    assert!(!ReaderPolicy::Sensor5Capture.may(Some(&caller(990, SENSOR5_READER_UNIT)), None));
+}
+
+#[test]
 fn a_peer_with_the_wrong_cgroup_is_refused_and_counted_with_the_right_boots() {
     let dir = Dir::new();
     // The product's check: this test process is no lamp-seen.service (and

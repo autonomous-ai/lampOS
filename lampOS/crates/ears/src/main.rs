@@ -22,6 +22,9 @@ While the voice says it is speaking, and half a second after, nothing is sudden.
 By default it keeps no sound and writes none down; only metadata leaves it.
 LAMP_BUS_AUDIO=on exports raw mic1/audio (16 kHz mono S16LE), only with
 LAMP_PRIVACY_CONTROLS=on or no-slide. Missing privacy enablement refuses startup.
+LAMP_BUS_AUDIO_CAPTURE_PERMIT=on adds original clock/epoch/deadline metadata only
+to that existing export, for a separately consented diagnostic recorder. Off by
+default; it grants no permission and never renews an original block deadline.
 LAMP_EARS_CLASSES=on scores speech, music and laughter on ears/classes with the
 pinned YAMNet at LAMP_EARS_CLASSES_MODEL (yamnet.onnx, yamnet.data beside it),
 only with LAMP_PRIVACY_CONTROLS=on (a lamp with a slide); without it, and with

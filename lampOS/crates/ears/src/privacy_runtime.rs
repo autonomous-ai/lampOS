@@ -231,6 +231,12 @@ fn connected(
     let mut body_publisher = None;
     let mut audio = None;
     let mut audio_retry = lamp_ears::pcm::ExportRetry::default();
+    let capture_permit = lamp_ears::pcm::capture_permit_enabled(
+        shared.export,
+        std::env::var("LAMP_BUS_AUDIO_CAPTURE_PERMIT")
+            .ok()
+            .as_deref(),
+    );
     let mut looked = 0;
     loop {
         if shared.stop.load(Ordering::Acquire) {
@@ -269,8 +275,16 @@ fn connected(
                                 .take(&shared.publication, lamp_ipc::monotonic_us())
                             {
                                 let at_us = pcm.captured_at_us();
-                                if let Some(packet) =
+                                let packet = if capture_permit {
+                                    pcm.pack_with_capture_permit(
+                                        &shared.publication,
+                                        lamp_ipc::monotonic_us(),
+                                        clock_id,
+                                    )?
+                                } else {
                                     pcm.pack(&shared.publication, lamp_ipc::monotonic_us())?
+                                };
+                                if let Some(packet) = packet
                                     && let Some(bytes) = packet.bytes_if_allowed(
                                         &shared.publication,
                                         lamp_ipc::monotonic_us(),

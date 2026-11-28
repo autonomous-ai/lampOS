@@ -89,7 +89,13 @@ One datagram: a line of JSON, a line end, then the payload's bytes untouched.
 
 `enc` says how to read the payload: `json`, `none` (there is none), or
 `json+pcm` for sound (`lamp_msgs::Audio::ENCODING`): a JSON `Audio` header
-line, then the samples. `type` (optional) says what
+line, then the samples. An explicitly enabled Ears diagnostic may add
+`capture_permit:{clock_id,epoch,until_us}` to that inner Audio header, preserving
+the original capture deadline for the [sensor 5 recorder](sensor5-pilot.md).
+It changes no topic, encoding or version. Old Audio readers ignore this field;
+the diagnostic recorder refuses a missing ticket. This is original-authority
+metadata, not a recording grant or an ADC timestamp; see [Ears](ears.md).
+`type` (optional) says what
 the payload is, by the name its publisher declared for the topic; a publisher
 that declared nothing leaves it out, and so does a recording made before
 there were types. `source` is the publisher's name, `boot` sixteen hex
