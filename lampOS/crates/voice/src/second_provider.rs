@@ -18530,7 +18530,7 @@ fn agree_held_forget(
     });
     match (agreed, scope, held.args["source_id"].as_u64()) {
         (Some(call), Some(scope), Some(id)) => {
-            scope.mark_forget_agreed(&OneFaceForgetYes(()), id);
+            scope.mark_forget_agreed(&OneFaceForgetYes(()), id, held.args["about"].as_str());
             call.args = held.args;
             eprintln!(
                 "lamp-voice second: request {request} chat round {round}: the model's forget is their yes: the one-face forget held runs as held (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
@@ -18583,8 +18583,10 @@ fn told_on_forget(
 /// is refused as before, for any other call or line: a bare forget, two
 /// faces in view (the line is then nobody's by one face), a line held by a
 /// gap, or no one kept thing named ([`crate::remember::one_face_forget_target`]).
-/// The kept thing is looked up off the runtime's thread (#8204): its two
-/// listings wait up to `tools::ASK_DEADLINE` each on lamp-memory, and on
+/// The kept thing is looked up off the runtime's thread (#8204): its three
+/// listings (the kept things, then the person's app-fact pages within the
+/// same `tools::ASK_DEADLINE`, then the kept ids within another, #8228)
+/// wait up to two `tools::ASK_DEADLINE`s in all on lamp-memory, and on
 /// that thread the worker's control loop read nothing meanwhile, so the
 /// coordinator's renewals filled its socket and the voice ended. The turn
 /// still waits for it, so the forget's answer goes out in its place.
@@ -20333,7 +20335,11 @@ async fn answer(
                     && let Some(scope) = scope.as_ref()
                     && let Some(id) = call.args["source_id"].as_u64()
                 {
-                    scope.mark_forget_agreed(&OneFaceForgetYes(()), id);
+                    scope.mark_forget_agreed(
+                        &OneFaceForgetYes(()),
+                        id,
+                        call.args["about"].as_str(),
+                    );
                 }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {

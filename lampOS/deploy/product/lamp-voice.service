@@ -802,6 +802,9 @@ Environment=LAMP_APP_TOOLS=on
 # (a look named the person's toy motorcycle a camera, and was kept under the room without its question).
 Environment=LAMP_LOOK_TOLD=on
 Environment=LAMP_LOOK_KEPT_WITH_ASK=on
+# LAMP_APP_MEMORY: #7415 (#8072); a Store app's live `apps.context` line is told as a quoted note in the turn, never
+# kept, and cleared while private and on forget everything. Its rules are its row in docs/switches.md.
+Environment=LAMP_APP_MEMORY=on
 # Only the body opens the servo port. Defence in depth, not a mechanical stop.
 # With '-', a servo port that isn't there when the voice starts (a boot race: it comes up after the
 # unit starts; the body unplugged; a lamp without one) is passed over, and then not hidden for that run:

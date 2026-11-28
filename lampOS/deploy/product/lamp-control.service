@@ -47,6 +47,10 @@ Environment=LAMP_AGENT_SERVICES=on
 Environment=LAMP_SKILL_WRITE_AGENT=on
 # A skill's task reaches the public web (80/443) with its owner's spoken yes (#7200).
 Environment=LAMP_TASK_NET=on
+# LAMP_APP_REMEMBER: #7415 C166, a Store app's `apps.remember` (an app with the `remember` grant keeps a fact for the
+# lamp's known person, never while private; removing the app forgets them). Read only here, and only with
+# LAMP_STORE_APPS; on in the product by the first builder's DEFAULT-ON on its row; its rules are its row in docs/switches.md.
+Environment=LAMP_APP_REMEMBER=on
 # A skill's own writes (#6142): lamp-control loads a skill in its own process to read its grants before it mints a
 # run's token (task_yes.rs, lamp_skills::load_with), and that load refuses a write step with this off. The same line
 # as lamp-skills, so a skill lamp-skills runs isn't refused a token as "doesn't load".

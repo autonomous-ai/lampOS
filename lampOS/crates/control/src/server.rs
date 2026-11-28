@@ -4816,6 +4816,68 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// #8228: a publish that errs on subscribers past the cap still
+    /// reached the voice, so the door waits for its word and answers from
+    /// it: kept, not unavailable.
+    #[test]
+    fn a_publish_that_errs_on_extra_subscribers_is_answered_by_the_voices_word() {
+        use lamp_msgs::app_fact::{AppRemember, AppRemembered, KEPT};
+        let base = std::env::temp_dir().join(format!("lampos-remember-cap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let bus = lamp_bus::Bus::new(base.join("bus")).unwrap();
+        let (shared, _lines, _inbox, _newest) = stalled_keeping(None);
+        // The voice sorts first; 64 live others put the topic past the cap.
+        let mut facts = bus.subscribe(AppRemember::TOPIC, "a").unwrap();
+        let _extras: Vec<_> = (0..lamp_bus::MOST_SUBSCRIBERS)
+            .map(|_| bus.subscribe(AppRemember::TOPIC, "z").unwrap())
+            .collect();
+        crate::app_remember::start(&bus, shared.clone());
+        let coach = crate::app_socket::AppPeer {
+            name: "gym-coach".into(),
+            title: "Gym Coach".into(),
+            version: "1.0.4".into(),
+            client: crate::app_socket::app_client("gym-coach"),
+            grants: Default::default(),
+            remember: true,
+        };
+        let (outbox, mut answers) = mpsc::unbounded_channel::<Value>();
+        let now = shared.remember_fact(
+            &coach,
+            4,
+            "squats 3x10".into(),
+            outbox.downgrade(),
+            crate::app_remember::WITHIN,
+        );
+        assert_eq!(now, None, "not answered unavailable at once");
+        let fact: AppRemember = facts
+            .recv(Duration::from_secs(5))
+            .unwrap()
+            .expect("the voice heard it")
+            .parse()
+            .unwrap();
+        let mut voice = bus
+            .publisher_declared(AppRemembered::TOPIC, &AppRemembered::declaration(), "voice")
+            .unwrap();
+        let start = std::time::Instant::now();
+        let answer = loop {
+            let _ = voice.publish_json(
+                lamp_ipc::monotonic_us(),
+                &AppRemembered {
+                    ask: fact.ask,
+                    app: "gym-coach".into(),
+                    outcome: KEPT.into(),
+                },
+            );
+            std::thread::sleep(Duration::from_millis(20));
+            if let Ok(answer) = answers.try_recv() {
+                break answer;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "not answered");
+        };
+        assert_eq!(answer, json!({"re": 4, "ok": true, "kept": true}));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     fn body_state(yaw: f64) -> Out {
         Out::Event(
             EventKind::BodyState,

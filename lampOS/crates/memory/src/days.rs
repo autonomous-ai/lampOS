@@ -1112,6 +1112,42 @@ impl Days {
         Ok(entries)
     }
 
+    /// `person`'s own app facts (#7415), each with its source
+    /// (`app:<name>`), for a forget about a thing alone (`kept
+    /// {app_facts}`): never the hits note's list. Newest first up to
+    /// `max_bytes`, below `before` when given, given oldest first.
+    pub fn kept_app_facts(
+        &self,
+        person: &Person,
+        max_bytes: usize,
+        before: Option<u64>,
+    ) -> Result<Vec<(Kept, String)>> {
+        let mut statement=self.db.prepare("SELECT e.id,e.at_unix_ms,e.text,a.source FROM entries e JOIN app_facts a ON a.rid=e.rid WHERE e.person=?1 AND e.kind='kept' AND e.active=1 AND e.id<?2 ORDER BY e.id DESC")?;
+        let before = before.map_or(i64::MAX, |id| i64::try_from(id).unwrap_or(i64::MAX));
+        let rows = statement.query_map(params![person.as_str(), before], |r| {
+            Ok((
+                Kept {
+                    id: r.get(0)?,
+                    at_unix_ms: r.get(1)?,
+                    text: r.get(2)?,
+                },
+                r.get::<_, String>(3)?,
+            ))
+        })?;
+        let mut entries = vec![];
+        let mut room = max_bytes.min(16384);
+        for row in rows {
+            let row = row?;
+            if row.0.text.len() > room {
+                break;
+            }
+            room -= row.0.text.len();
+            entries.push(row);
+        }
+        entries.reverse();
+        Ok(entries)
+    }
+
     pub fn recall(&self, person: &Person, ask: &Ask<'_>) -> Result<Vec<Entry>> {
         self.recall_wider(person, ask, Wider::default())
     }

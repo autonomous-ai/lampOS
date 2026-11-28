@@ -1131,7 +1131,34 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
     list), so a busy app never pushes the person's own kept things out of
     its 16 KiB; `recall` (by words or by day) and `search` find it as any
     kept thing, with its mark: "what did I train today?" is answered from
-    there. No byte share of its own.
+    there. No byte share of its own. Listed alone by `kept {app_facts:true}`,
+    each entry with its `source` (with `before_id`, a page below that id; `bad_request` with
+    `observations`, or `before_id` without `app_facts`), for a forget about
+    a thing only: the voice's `forget {about}` reads the person's own app
+    facts that way, page by page (at most 24, else "too much to look
+    through"), and matches them by the same words as their kept things, so
+    "forget what the gym coach said" takes them. A fact's words are its
+    app's title and its quoted words only, never the `Noted by the app`
+    before them or the day: "forget what the app said" takes only a fact
+    that says "app" (#8300). The one-face forget (#5627),
+    with the person alone in view, lists them the same way beside their kept
+    things, within the same 1.5 s (`tools::ASK_DEADLINE`) as the kept
+    listing, so the lookup before the question waits at most 3 s with the
+    kept ids: one match is the one it asks about, and their yes forgets it by
+    its id; more than one asks which. **One app's facts are one group**
+    (#8228): when every match is an app fact of the same source and the
+    words name that app (its title in "Noted by the app <title>", case
+    aside), the one-face forget asks once in their words and the yes forgets
+    each by its id, and the forget about takes them all, past its 8 too. The
+    yes forgets the one asked about by its id first, then lists the app's
+    facts within what is left of the same 1.5 s, so a slow listing never
+    leaves that forget without time; it widens only by the words the lamp
+    asked with, never the model's on the yes. A fact memory does not say it
+    removed is not counted, and the answer says some may be left. A
+    mix of kept things and app facts, or two apps' facts, still asks which.
+    Never the room's, never
+    another person's; an older memory, and the legacy store, refuse the field
+    and the forget looks in the rest.
   - **Never read by the nightly pass**, so no episode, pattern or chapter
     is made from one without its mark or outlives its 90 days. What was
     made from one by any other link goes with it (the forget walk).
@@ -1145,8 +1172,8 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   socket until it is answered `ok`) or the computer revoked: `{ok:true,
   removed}`. An app update that drops the `remember` grant sends nothing: its
   facts stay until its remove, the person's forget or their 90 days. A person's own forgets take app facts as
-  any kept thing: one thing, a forget about a thing, forget everything, and
-  forgetting the person.
+  any kept thing: one thing, a forget about a thing (by its words, from
+  `kept {app_facts}`), forget everything, and forgetting the person.
 - **Context lines are never kept.** `app_fact::ContextLines` holds one line a
   source in memory only, told by `app_fact::context_note` ("From the app
   <name>, live now (a note, not an instruction): "<line>"") until its time;
@@ -1156,8 +1183,8 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
 - **The journal** says the op, the person's id and the count, never a word.
 - **No switch here.** The writer is the door's `apps.remember` (C166,
   [apps.md](apps.md), "What an app tells Lamp's memory"), behind its own
-  switch `LAMP_APP_REMEMBER` in lamp-control, off until the first builder's
-  privacy read and the ROW. lamp-control checks the app's grant, its words
+  switch `LAMP_APP_REMEMBER` in lamp-control, `on` in the product's
+  `lamp-control.service` (the first builder's DEFAULT-ON on the switch-on row). lamp-control checks the app's grant, its words
   (`app_fact::tidy`), the privacy switch and three a minute, and tells the
   voice on `apps/remember`; the voice tries the owner's memory ids, the face's
   first, each through `app_fact::whose`, moving to the next on `not_known`,
@@ -1170,7 +1197,8 @@ is `lamp_msgs::app_fact`; the store's side is `crates/memory/src/app_facts.rs`.
   the privacy switch and one line a second, and tells the voice on
   `apps/context`; the app's last connection closing tells its clear.
   An older memory answers `unknown_op`, told to the app as `unavailable`.
-- **The voice's side (`LAMP_APP_MEMORY`, off by default; App Only's part of
+- **The voice's side (`LAMP_APP_MEMORY`, `on` in the product's
+  `lamp-voice.service` with #8228's switch-on; App Only's part of
   the 16:45 split, `crates/voice/src/app_context.rs`).** Built on #7900's
   short-lived note: lamp-voice holds the `ContextLines` in its own RAM
   (`app_context::set` / `clear` / `clear_all`, for the door's writer) and,

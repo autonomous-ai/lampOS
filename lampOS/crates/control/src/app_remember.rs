@@ -17,8 +17,8 @@
 //! pending, the app's new facts wait ([`FORGETTING`]).
 //!
 //! Behind `LAMP_STORE_APPS` like the whole socket, and its own switch
-//! [`ENVIRONMENT`], off until the first builder's privacy read and the ROW
-//! (Friday's 16:47 on #7415).
+//! [`ENVIRONMENT`], on in the product's `lamp-control.service` by the first
+//! builder's DEFAULT-ON on the switch-on row (Friday's 16:47 on #7415).
 use crate::app_yes::Live;
 use crate::protocol::{Error, ErrorCode};
 use lamp_msgs::app_fact::{self, AppRemember, AppRemembered};
@@ -175,9 +175,21 @@ pub fn answer_of(re: u64, outcome: &str) -> Value {
     crate::protocol::refused(Some(re), &Error::new(code, why))
 }
 
-/// How an app's fact reaches the voice (`apps/remember`): whether it was
-/// sent.
+/// How an app's fact reaches the voice (`apps/remember`): whether it may
+/// have reached it. `false` only when nothing was sent; then the app is
+/// answered [`UNANSWERED`] at once. Otherwise the voice's word within
+/// [`WITHIN`] is the answer, and no word is [`UNANSWERED`].
 pub type Sink = Arc<dyn Fn(&AppRemember) -> bool + Send + Sync>;
+
+/// Whether a publish that returned `error` may still have reached the
+/// voice. The bus says a trouble with the topic (such as more than 64
+/// subscribers, #8272) after it sent to the subscribers it links, and the
+/// count of those is lost with the error, so only a message the bus
+/// refuses before any send (`InvalidInput`: too long or badly labelled)
+/// surely reached nobody.
+pub fn may_have_reached(error: &std::io::Error) -> bool {
+    error.kind() != std::io::ErrorKind::InvalidInput
+}
 
 /// Starts the bus side: the sink that publishes an app's fact, and the
 /// thread that hands each `apps/remembered` to the ask that waits for it.
@@ -188,17 +200,20 @@ pub fn start(bus: &lamp_bus::Bus, shared: Arc<crate::server::Shared>) {
         Ok(remember) => {
             let remember = Mutex::new(remember);
             shared.set_remember_sink(Arc::new(move |fact: &AppRemember| {
-                let sent =
-                    remember
-                        .lock()
-                        .map_err(|_| "poisoned".to_owned())
-                        .and_then(|mut publisher| {
-                            publisher
-                                .publish_json(lamp_ipc::monotonic_us(), fact)
-                                .map_err(|error| error.to_string())
-                        });
-                match sent {
+                let Ok(mut publisher) = remember.lock() else {
+                    eprintln!("lamp-control: an app's fact was not told to the voice: poisoned");
+                    return false;
+                };
+                match publisher.publish_json(lamp_ipc::monotonic_us(), fact) {
                     Ok(_) => true,
+                    // The voice may have it all the same: its word decides.
+                    Err(error) if may_have_reached(&error) => {
+                        eprintln!(
+                            "lamp-control: an app's fact was told to the voice with trouble, \
+                             its word decides: {error}"
+                        );
+                        true
+                    }
                     Err(error) => {
                         eprintln!("lamp-control: an app's fact was not told to the voice: {error}");
                         false
@@ -400,6 +415,17 @@ mod tests {
             ask(&mut live, "gym-coach", &fact, ALL, t0 + MINUTE),
             Some(Ask::Keep { .. })
         ));
+    }
+
+    /// Only a message the bus refused before any send reached nobody.
+    #[test]
+    fn a_publish_with_trouble_may_still_have_reached_the_voice() {
+        use std::io::{Error, ErrorKind};
+        assert!(may_have_reached(&Error::other(
+            "more than 64 subscribers (65 found): the rest get nothing"
+        )));
+        assert!(may_have_reached(&Error::from(ErrorKind::PermissionDenied)));
+        assert!(!may_have_reached(&Error::from(ErrorKind::InvalidInput)));
     }
 
     #[test]

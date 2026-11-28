@@ -2555,6 +2555,15 @@ fn run_call_with_scope(
                                         args: json!({"source_id": call.args["source_id"]}),
                                         ..call.clone()
                                     };
+                                    // The words the lamp held when it
+                                    // asked, from the heard line: all the
+                                    // yes widens by, never the model's
+                                    // `about` on the yes (the
+                                    // Reviewer-lead's P2-a on #8300).
+                                    let about = lease.agreed_about().map(Value::String);
+                                    // The forget they agreed to first, so
+                                    // no listing after it can leave it
+                                    // without time (P2-c on #8300).
                                     let told = crate::remember::run_scoped_for(
                                         socket,
                                         &by_id,
@@ -2562,8 +2571,18 @@ fn run_call_with_scope(
                                         lease,
                                         &person,
                                     );
-                                    match call.args.get("about") {
+                                    match about.as_ref() {
                                         Some(about) => {
+                                            // One app's facts those words
+                                            // name go with it (#8228).
+                                            let told = crate::remember::agreed_forget_app_facts(
+                                                socket,
+                                                told,
+                                                about,
+                                                &person,
+                                                deadline.saturating_sub(started.elapsed()),
+                                                lease,
+                                            );
                                             let told = crate::remember::agreed_forget_exchanges(
                                                 socket,
                                                 told,
@@ -8149,7 +8168,7 @@ mod tests {
             assert!(lease.read_by_one_face());
             assert!(lease.forgets_need_mouth());
             let yes = crate::second_provider::one_face_forget_yes_for_test();
-            lease.mark_forget_agreed(&yes, 3);
+            lease.mark_forget_agreed(&yes, 3, None);
             if narrowed {
                 lease.narrow_to_room();
             }
@@ -8211,6 +8230,10 @@ mod tests {
                 let mut asked = vec![];
                 for answer in [
                     by_id,
+                    // #8228: their app facts after the forget agreed to, for
+                    // the app group the yes takes with it; none, and not in
+                    // `asked`.
+                    b"{\"ok\":true,\"entries\":[]}\n".as_slice(),
                     b"{\"ok\":true,\"removed\":2}\n".as_slice(),
                     // #8038: their observations, then their kept things
                     // alone, then the observation naming it forgotten.
@@ -8234,7 +8257,10 @@ mod tests {
                         .read_line(&mut line)
                         .unwrap();
                     stream.write_all(answer).unwrap();
-                    asked.push(serde_json::from_str::<Value>(&line).unwrap());
+                    let line = serde_json::from_str::<Value>(&line).unwrap();
+                    if !(line["op"] == "kept" && line["app_facts"] == true) {
+                        asked.push(line);
+                    }
                 }
                 asked
             });
@@ -8249,7 +8275,7 @@ mod tests {
             let lease = owner.lease();
             assert!(lease.read_by_one_face());
             let yes = crate::second_provider::one_face_forget_yes_for_test();
-            lease.mark_forget_agreed(&yes, 3);
+            lease.mark_forget_agreed(&yes, 3, Some("the recheck party"));
             let settings = Settings {
                 memory: Some(socket.clone()),
                 ..Default::default()
@@ -8286,6 +8312,226 @@ mod tests {
             }
             std::fs::remove_file(socket).unwrap();
         }
+    }
+
+    /// A memory for the agreed one-face forget's tests (#8300): each line
+    /// answered by its op, in turn, until none comes for half a second; the
+    /// app facts listing after `listing_after`, with two Gym Coach facts
+    /// (8 and 9), and each forget by `forget`. The lines asked, in order.
+    fn agreed_memory(
+        socket: &std::path::Path,
+        listing_after: Duration,
+        forget: fn(&Value) -> Value,
+    ) -> std::thread::JoinHandle<Vec<Value>> {
+        let _ = std::fs::remove_file(socket);
+        let listener = UnixListener::bind(socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        std::thread::spawn(move || {
+            let mut asked = vec![];
+            loop {
+                let until = Instant::now() + Duration::from_millis(500);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(_) if Instant::now() < until => {
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(_) => return asked,
+                    }
+                };
+                stream.set_nonblocking(false).unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                let line = serde_json::from_str::<Value>(&line).unwrap();
+                let answer = match line["op"].as_str() {
+                    Some("forget") => forget(&line["id"]),
+                    Some("kept") if line["app_facts"] == true => {
+                        std::thread::sleep(listing_after);
+                        json!({"ok": true, "entries": [
+                            {"id": 8, "at_unix_ms": 1, "source": "app:gym-coach",
+                             "text": "Noted by the app Gym Coach, 22 Nov: \"lunges 2x8\""},
+                            {"id": 9, "at_unix_ms": 1, "source": "app:gym-coach",
+                             "text": "Noted by the app Gym Coach, 22 Nov: \"plank 60 s\""},
+                        ]})
+                    }
+                    Some("kept") => json!({"ok": true, "entries": []}),
+                    _ => json!({"ok": true, "removed": 0}),
+                };
+                let _ = stream.write_all(format!("{answer}\n").as_bytes());
+                asked.push(line);
+            }
+        })
+    }
+
+    /// The agreed one-face forget's lease (#5627) for Nell, its held id 3
+    /// about `about`, the words the lamp asked with.
+    fn agreed_lease(request: u64, about: &str) -> crate::memory_scope::RequestScope {
+        let owner = crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([0x59; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            crate::memory_scope::ScopeSnapshot::of("Nell"),
+        );
+        let yes = crate::second_provider::one_face_forget_yes_for_test();
+        owner.lease().mark_forget_agreed(&yes, 3, Some(about));
+        owner
+    }
+
+    /// Set by [`agreed_days_child`] for the test its child process runs.
+    const AGREED_DAYS_CHILD: &str = "LAMP_VOICE_TEST_AGREED_DAYS_CHILD";
+
+    /// The agreed forget by id runs as `forget {id}` only with the Days
+    /// memory and `LAMP_MEMORY_FORGET_ALL` on, as in the product; without
+    /// them a `source_id` forget is the old memory's `forget_last`. Both are
+    /// set once per process, so the test `name` runs again in a child
+    /// process of its own with them on, its memory on the socket this gives
+    /// it there (`None` here, where the child's result was checked). Recall
+    /// showed Nell her kept thing 3 there, as before the lamp asked her.
+    fn agreed_days_child(name: &str) -> Option<std::path::PathBuf> {
+        if std::env::var(AGREED_DAYS_CHILD).ok().as_deref() != Some(name) {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", &format!("tools::tests::{name}"), "--nocapture"])
+                .env(AGREED_DAYS_CHILD, name)
+                .output()
+                .unwrap();
+            let said = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran no test: {said}");
+            return None;
+        }
+        let socket =
+            std::env::temp_dir().join(format!("one-face-agreed-{}.sock", std::process::id()));
+        crate::remember::days_forget_all_for_test(socket.clone(), "Nell", &[3]);
+        Some(socket)
+    }
+
+    /// The Reviewer-lead's P2-a on #8300: the yes widens the forget only by
+    /// the words the lamp held when it asked, never the model's `about` on
+    /// the yes. Asked about "squats", a yes whose call says "gym coach"
+    /// takes no other Gym Coach fact; asked about "gym coach", it takes
+    /// both.
+    #[test]
+    fn an_agreed_forget_widens_only_by_the_words_it_asked_with() {
+        let Some(socket) =
+            agreed_days_child("an_agreed_forget_widens_only_by_the_words_it_asked_with")
+        else {
+            return;
+        };
+        for (at, held, others) in [(0u64, "squats", false), (1, "gym coach", true)] {
+            let served = agreed_memory(
+                &socket,
+                Duration::ZERO,
+                |_| json!({"ok": true, "removed": 1}),
+            );
+            let owner = agreed_lease(8_300_100 + at, held);
+            let lease = owner.lease();
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "a8300".into(),
+                name: crate::remember::FORGET.into(),
+                args: json!({"source_id": 3, "about": "gym coach"}),
+            };
+            assert!(lease.agreed_forget(&call.args));
+            let told = answer_scoped(&settings, &call, 8_300_100 + at, false, &lease);
+            let asked = served.join().unwrap();
+            assert_eq!(told["forgotten"], true, "{told}");
+            let forgot: Vec<&Value> = asked
+                .iter()
+                .filter(|line| line["op"] == "forget")
+                .map(|line| &line["id"])
+                .collect();
+            if others {
+                assert_eq!(forgot, [&json!(3), &json!(8), &json!(9)], "{asked:?}");
+                assert_eq!(told["count"], 3, "{told}");
+            } else {
+                assert_eq!(forgot, [&json!(3)], "{asked:?}");
+            }
+            std::fs::remove_file(&socket).unwrap();
+        }
+    }
+
+    /// The Reviewer-lead's P3 on #8300: an app fact the memory did not say it
+    /// removed (no `removed`, or 0) is not counted, and the answer says some
+    /// may be left.
+    #[test]
+    fn an_app_fact_not_said_removed_is_not_counted() {
+        let Some(socket) = agreed_days_child("an_app_fact_not_said_removed_is_not_counted") else {
+            return;
+        };
+        let served = agreed_memory(&socket, Duration::ZERO, |id| match id.as_u64() {
+            Some(3) => json!({"ok": true, "removed": 1}),
+            Some(8) => json!({"ok": true}),
+            _ => json!({"ok": true, "removed": 0}),
+        });
+        let owner = agreed_lease(8_300_300, "gym coach");
+        let lease = owner.lease();
+        let settings = Settings {
+            memory: Some(socket.clone()),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "a8300r".into(),
+            name: crate::remember::FORGET.into(),
+            args: json!({"source_id": 3, "about": "gym coach"}),
+        };
+        let told = answer_scoped(&settings, &call, 8_300_300, false, &lease);
+        served.join().unwrap();
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(told["count"], 1, "{told}");
+        assert_eq!(told["all"], false, "{told}");
+        assert_eq!(told["note"], crate::remember::APP_FACTS_LEFT, "{told}");
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// The Reviewer-lead's P2-c on #8300: the forget their yes agreed to runs
+    /// first, so an app facts listing slower than the whole call still
+    /// leaves it its time: the kept thing goes, and nothing else.
+    #[test]
+    fn a_slow_app_facts_listing_never_starves_the_agreed_forget() {
+        let Some(socket) =
+            agreed_days_child("a_slow_app_facts_listing_never_starves_the_agreed_forget")
+        else {
+            return;
+        };
+        let served = agreed_memory(
+            &socket,
+            ASK_DEADLINE + Duration::from_millis(200),
+            |_| json!({"ok": true, "removed": 1}),
+        );
+        let owner = agreed_lease(8_300_200, "gym coach");
+        let lease = owner.lease();
+        let settings = Settings {
+            memory: Some(socket.clone()),
+            ..Default::default()
+        };
+        let call = ToolCall {
+            id: "a8300s".into(),
+            name: crate::remember::FORGET.into(),
+            args: json!({"source_id": 3, "about": "gym coach"}),
+        };
+        let told = answer_scoped(&settings, &call, 8_300_200, false, &lease);
+        let asked = served.join().unwrap();
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(asked[0]["op"], json!("forget"), "{asked:?}");
+        assert_eq!(asked[0]["id"], json!(3), "{asked:?}");
+        assert!(
+            !asked
+                .iter()
+                .any(|line| line["op"] == "forget" && line["id"] != 3),
+            "{asked:?}"
+        );
+        std::fs::remove_file(socket).unwrap();
     }
 
     #[test]
